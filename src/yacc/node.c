@@ -187,3 +187,48 @@ char * strcpy_range (const char * start, const char * end)
     return dst;
   }
 }
+
+#include "khash.h"
+
+const int khStrNode = 33;
+KHASH_MAP_INIT_STR(khStrNode, Node *)
+
+static khash_t (khStrNode) * types = NULL;
+
+#define kh_set(t,h,s,p) do {				\
+    int ret;						\
+    khiter_t k = kh_put(t, h, s, &ret);			\
+    kh_value (h, k) = p;				\
+  } while(0)
+
+static void init_types()
+{
+  if (types == NULL) {
+    types = kh_init (khStrNode);
+    kh_set (khStrNode, types, "FILE", NULL);
+    kh_set (khStrNode, types, "size_t", NULL);
+    kh_set (khStrNode, types, "bool", NULL);
+  }  
+}
+
+void type_definition (Node * n)
+{
+  init_types();
+  
+  char * name = calloc (n->after - n->before + 2, sizeof (char));
+  for (char * i = n->before, * s = name; i <= n->after; i++, s++)
+    *s = *i;
+
+  int ret;
+  khiter_t k = kh_put(khStrNode, types, name, &ret);
+  kh_value (types, k) = n;
+}
+
+int sym_type (const char * name)
+{
+  init_types();  
+  khiter_t k = kh_get (khStrNode, types, name);
+  if (k != kh_end (types))
+    return TYPEDEF_NAME;
+  return IDENTIFIER;
+}

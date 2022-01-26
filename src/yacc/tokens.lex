@@ -139,6 +139,7 @@ static Node * new_node (Allocator * alloc,
 "_Thread_local"                         { SNODE(THREAD_LOCAL); }
 "__func__"                              { SNODE(FUNC_NAME); }
 
+
                     /* Basilisk C tokens */
 
 "face"{WS}+"vector"                     { SNODE(TYPEDEF_NAME); }
@@ -263,41 +264,9 @@ static void bpreproc (void)
   yyerror ("unterminated @def");
 }
 
-int sym_type (const char * name)
-{
-  if (!strcmp (name, "bid") ||
-      !strcmp (name, "bool") ||
-      !strcmp (name, "size_t") ||
-      !strcmp (name, "scalar") ||
-      !strcmp (name, "vector") ||
-      !strcmp (name, "vectorl") ||
-      !strcmp (name, "tensor") ||
-      !strcmp (name, "coord") ||
-      !strcmp (name, "Point"))
-    return TYPEDEF_NAME;
-#if 1
-  if (!strcmp (name, "mgstats") ||
-      !strcmp (name, "astats") ||
-      !strcmp (name, "FILE") ||
-      !strcmp (name, "pmfunc") ||
-      !strcmp (name, "pmdata") ||
-      !strcmp (name, "IndexLevel") ||
-      !strcmp (name, "CacheLevel") ||
-      !strcmp (name, "Index") ||
-      !strcmp (name, "Layer") ||
-      !strcmp (name, "Memindex") ||
-      !strcmp (name, "Mempool") ||
-      !strcmp (name, "Grid") ||
-      !strcmp (name, "Tree") ||
-      !strcmp (name, "Cache"))
-    return TYPEDEF_NAME;
-#endif
-  return IDENTIFIER;
-}
-
 static int check_type (void)
 {
-  switch (sym_type(yytext)) {
+  switch (sym_type (yytext)) {
   case TYPEDEF_NAME:                /* previously defined */
     return TYPEDEF_NAME;
   case ENUMERATION_CONSTANT:        /* previously defined */

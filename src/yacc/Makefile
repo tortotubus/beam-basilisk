@@ -1,4 +1,4 @@
-CFLAGS += -Wall -g
+CFLAGS += -Wall -g -I$(BASILISK)
 
 libbasilisk.a: node.o tokens.o basilisk.o transform.o
 	ar cr $@ $^

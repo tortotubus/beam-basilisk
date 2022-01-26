@@ -30,3 +30,6 @@ char * str_prepend_realloc (char * dst, ...);
 #define str_prepend(dst, ...)						\
   do { dst = str_prepend_realloc (dst, __VA_ARGS__, NULL); } while(0)
 char * strcpy_range (const char * start, const char * end);
+
+void type_definition (Node * n);
+int sym_type (const char * name);
