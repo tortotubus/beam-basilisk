@@ -247,13 +247,13 @@ constant_expression
 	;
 
 declaration
-	: declaration_specifiers ';'
-	| declaration_specifiers init_declarator_list ';'
+        : declaration_specifiers ';' 
+	| declaration_specifiers init_declarator_list ';'         { if ($$->type == TYPEDEF) type_definition ($2); }
 	| static_assert_declaration
 	;
 
 declaration_specifiers
-	: storage_class_specifier declaration_specifiers
+        : storage_class_specifier declaration_specifiers
 	| storage_class_specifier
 	| type_specifier declaration_specifiers
 	| type_specifier
@@ -387,13 +387,13 @@ alignment_specifier
 	;
 
 declarator
-	: pointer direct_declarator
+        : pointer direct_declarator { $$ = $2; }
 	| direct_declarator
 	;
 
 direct_declarator
 	: IDENTIFIER
-	| '(' declarator ')'
+	| '(' declarator ')'  { $$ = $2; }
 	| direct_declarator '[' ']'
 	| direct_declarator '[' '*' ']'
 	| direct_declarator '[' STATIC type_qualifier_list assignment_expression ']'
