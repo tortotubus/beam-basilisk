@@ -1,0 +1,308 @@
+%option bison-bridge
+%option nounput
+%option noyywrap
+
+%e  1019
+%p  2807
+%n  371
+%k  284
+%a  1213
+%o  1117
+
+O   [0-7]
+D   [0-9]
+NZ  [1-9]
+L   [a-zA-Z_]
+A   [a-zA-Z_0-9]
+H   [a-fA-F0-9]
+HP  (0[xX])
+E   ([Ee][+-]?{D}+)
+P   ([Pp][+-]?{D}+)
+FS  (f|F|l|L)
+IS  (((u|U)(l|L|ll|LL)?)|((l|L|ll|LL)(u|U)?))
+CP  (u|U|L)
+SP  (u8|u|U|L)
+ES  (\\(['"\?\\abfnrtv]|[0-7]{1,3}|x[a-fA-F0-9]+))
+WS  [ \t\v\n\f]
+
+%{
+#include <stdio.h>
+#include <assert.h>
+#include "node.h"
+#include "basilisk.h"
+
+#define YYSTYPE Node *
+#define YY_DECL int yylex(YYSTYPE * yylval_param,			\
+			  Allocator * alloc,				\
+			  char ** bison_input, int * bison_line)
+static char ** binput;
+static int * bline;
+
+#define YY_USER_INIT binput = bison_input, (*binput)--, bline = bison_line
+
+#define YY_INPUT(buf,result,max_size)			      \
+  {							      \
+    (*binput)++;					      \
+    int c = **binput;					      \
+    if (c == '\0') result = YY_NULL;			      \
+    else {						      \
+      if (c == '\n') (*bline)++;			      \
+      buf[0] = c; result = 1;				      \
+    }							      \
+  }
+
+extern void yyerror (const char * s);
+
+static void comment (void);
+static void preproc (void);
+static void bpreproc (void);
+static int check_type(void);
+
+static Node * new_node (Allocator * alloc,
+			int type, int line, char * before, char * after)
+{
+  Node * n = allocate (alloc, sizeof(Node));
+  memset (n, 0, sizeof(Node));
+  n->type = type;
+  n->line = line;
+  n->before = before;
+  n->after = after;
+  return n;
+}
+  
+#define CNODE()								\
+  if (**binput != yytext[0] && *(*binput - 1) != yytext[0]) {		\
+    /*fprintf (stderr, "%d: %c %c\n", *bline, **binput, yytext[0]);*/	\
+    /*assert (0);*/							\
+  }									\
+  *yylval = new_node (alloc, yytext[0], *bline, *binput, *binput);	\
+ return yytext[0];
+ 
+#define SNODE(t)							\
+  *yylval = new_node (alloc, t, *bline,					\
+		      *binput - strlen(yytext), *binput - 1);		\
+ return t;
+    
+%}
+
+%%
+
+"/*"                                    { comment(); }
+"//".*                                  { /* consume //-comment */ }
+^[ \t]*#	                        { preproc(); }
+^[ \t]*@[ \t]*def[ \t].*                { bpreproc(); }
+^[ \t]*@.*
+
+"auto"					{ SNODE(AUTO); }
+"break"					{ SNODE(BREAK); }
+"case"					{ SNODE(CASE); }
+"char"					{ SNODE(CHAR); }
+"const"					{ SNODE(CONST); }
+"continue"				{ SNODE(CONTINUE); }
+"default"				{ SNODE(DEFAULT); }
+"do"					{ SNODE(DO); }
+"double"				{ SNODE(DOUBLE); }
+"else"					{ SNODE(ELSE); }
+"enum"					{ SNODE(ENUM); }
+"extern"				{ SNODE(EXTERN); }
+"float"					{ SNODE(FLOAT); }
+"for"					{ SNODE(FOR); }
+"goto"					{ SNODE(GOTO); }
+"if"					{ SNODE(IF); }
+"inline"				{ SNODE(INLINE); }
+"int"					{ SNODE(INT); }
+"long"					{ SNODE(LONG); }
+"register"				{ SNODE(REGISTER); }
+"restrict"				{ SNODE(RESTRICT); }
+"return"				{ SNODE(RETURN); }
+"short"					{ SNODE(SHORT); }
+"signed"				{ SNODE(SIGNED); }
+"sizeof"				{ SNODE(SIZEOF); }
+"static"				{ SNODE(STATIC); }
+"struct"				{ SNODE(STRUCT); }
+"switch"				{ SNODE(SWITCH); }
+"typedef"				{ SNODE(TYPEDEF); }
+"union"					{ SNODE(UNION); }
+"unsigned"				{ SNODE(UNSIGNED); }
+"void"					{ SNODE(VOID); }
+"volatile"				{ SNODE(VOLATILE); }
+"while"					{ SNODE(WHILE); }
+"_Alignas"                              { SNODE(ALIGNAS); }
+"_Alignof"                              { SNODE(ALIGNOF); }
+"_Atomic"                               { SNODE(ATOMIC); }
+"_Bool"                                 { SNODE(BOOL); }
+"_Complex"                              { SNODE(COMPLEX); }
+"_Generic"                              { SNODE(GENERIC); }
+"_Imaginary"                            { SNODE(IMAGINARY); }
+"_Noreturn"                             { SNODE(NORETURN); }
+"_Static_assert"                        { SNODE(STATIC_ASSERT); }
+"_Thread_local"                         { SNODE(THREAD_LOCAL); }
+"__func__"                              { SNODE(FUNC_NAME); }
+
+                    /* Basilisk C tokens */
+
+"face"{WS}+"vector"                     { SNODE(TYPEDEF_NAME); }
+"vertex"{WS}+"scalar"                   { SNODE(TYPEDEF_NAME); }
+"(const)"                               { SNODE(MAYBECONST); }
+"in"			                { SNODE(IN); }
+"new"			                { SNODE(NEW); }
+"trace"			                { SNODE(TRACE); }
+
+"foreach_child" |
+"foreach_neighbor"                      { SNODE(FOREACH_INNER); }
+
+"foreach_dimension"			{ SNODE(FOREACH_DIMENSION); }
+
+"foreach" |
+"foreach_"{L}{A}*                       { SNODE(FOREACH); }
+
+                    /* End of Basilisk C tokens */
+
+{L}{A}*					{ SNODE(check_type()); }
+
+{HP}{H}+{IS}?				{ SNODE(I_CONSTANT); }
+{NZ}{D}*{IS}?				{ SNODE(I_CONSTANT); }
+"0"{O}*{IS}?				{ SNODE(I_CONSTANT); }
+{CP}?"'"([^'\\\n]|{ES})+"'"		{ SNODE(I_CONSTANT); }
+
+{D}+{E}{FS}?				{ SNODE(F_CONSTANT); }
+{D}*"."{D}+{E}?{FS}?			{ SNODE(F_CONSTANT); }
+{D}+"."{E}?{FS}?			{ SNODE(F_CONSTANT); }
+{HP}{H}+{P}{FS}?			{ SNODE(F_CONSTANT); }
+{HP}{H}*"."{H}+{P}{FS}?			{ SNODE(F_CONSTANT); }
+{HP}{H}+"."{P}{FS}?			{ SNODE(F_CONSTANT); }
+
+({SP}?\"([^"\\\n]|{ES})*\"{WS}*)+	{ SNODE(STRING_LITERAL); }
+
+"..."					{ SNODE(ELLIPSIS); }
+">>="					{ SNODE(RIGHT_ASSIGN); }
+"<<="					{ SNODE(LEFT_ASSIGN); }
+"+="					{ SNODE(ADD_ASSIGN); }
+"-="					{ SNODE(SUB_ASSIGN); }
+"*="					{ SNODE(MUL_ASSIGN); }
+"/="					{ SNODE(DIV_ASSIGN); }
+"%="					{ SNODE(MOD_ASSIGN); }
+"&="					{ SNODE(AND_ASSIGN); }
+"^="					{ SNODE(XOR_ASSIGN); }
+"|="					{ SNODE(OR_ASSIGN); }
+">>"					{ SNODE(RIGHT_OP); }
+"<<"					{ SNODE(LEFT_OP); }
+"++"					{ SNODE(INC_OP); }
+"--"					{ SNODE(DEC_OP); }
+"->"					{ SNODE(PTR_OP); }
+"&&"					{ SNODE(AND_OP); }
+"||"					{ SNODE(OR_OP); }
+"<="					{ SNODE(LE_OP); }
+">="					{ SNODE(GE_OP); }
+"=="					{ SNODE(EQ_OP); }
+"!="					{ SNODE(NE_OP); }
+";"					{ CNODE(); }
+("{"|"<%")				{ CNODE(); }
+("}"|"%>")				{ CNODE(); }
+","					{ CNODE(); }
+":"					{ CNODE(); }
+"="					{ CNODE(); }
+"("					{ CNODE(); }
+")"					{ CNODE(); }
+("["|"<:")				{ CNODE(); }
+("]"|":>")				{ CNODE(); }
+"."					{ CNODE(); }
+"&"					{ CNODE(); }
+"!"					{ CNODE(); }
+"~"					{ CNODE(); }
+"-"					{ CNODE(); }
+"+"					{ CNODE(); }
+"*"					{ CNODE(); }
+"/"					{ CNODE(); }
+"%"					{ CNODE(); }
+"<"					{ CNODE(); }
+">"					{ CNODE(); }
+"^"					{ CNODE(); }
+"|"					{ CNODE(); }
+"?"					{ CNODE(); }
+
+{WS}					{ /* whitespace separates tokens */ }
+.					{ /* discard bad characters */ }
+	 
+%%
+
+static void comment (void)
+{
+  int c;  
+  while ((c = input()) != 0)
+    if (c == '*') {
+      while ((c = input()) == '*')
+	;
+      
+      if (c == '/')
+	return;
+      
+      if (c == 0)
+	break;
+    }
+  yyerror ("unterminated comment");
+}
+
+static void preproc (void)
+{
+  int c, c1 = 0;
+  while ((c = input()) != 0) {
+    if (c == '\n' && c1 != '\\')      
+      return;
+    c1 = c;
+  }
+  yyerror ("unterminated preprocessor directive");
+}
+
+static void bpreproc (void)
+{
+  int c;
+  while ((c = input()) != 0)
+    if (c == '@')
+      return;
+  yyerror ("unterminated @def");
+}
+
+int sym_type (const char * name)
+{
+  if (!strcmp (name, "bid") ||
+      !strcmp (name, "bool") ||
+      !strcmp (name, "size_t") ||
+      !strcmp (name, "scalar") ||
+      !strcmp (name, "vector") ||
+      !strcmp (name, "vectorl") ||
+      !strcmp (name, "tensor") ||
+      !strcmp (name, "coord") ||
+      !strcmp (name, "Point"))
+    return TYPEDEF_NAME;
+#if 1
+  if (!strcmp (name, "mgstats") ||
+      !strcmp (name, "astats") ||
+      !strcmp (name, "FILE") ||
+      !strcmp (name, "pmfunc") ||
+      !strcmp (name, "pmdata") ||
+      !strcmp (name, "IndexLevel") ||
+      !strcmp (name, "CacheLevel") ||
+      !strcmp (name, "Index") ||
+      !strcmp (name, "Layer") ||
+      !strcmp (name, "Memindex") ||
+      !strcmp (name, "Mempool") ||
+      !strcmp (name, "Grid") ||
+      !strcmp (name, "Tree") ||
+      !strcmp (name, "Cache"))
+    return TYPEDEF_NAME;
+#endif
+  return IDENTIFIER;
+}
+
+static int check_type (void)
+{
+  switch (sym_type(yytext)) {
+  case TYPEDEF_NAME:                /* previously defined */
+    return TYPEDEF_NAME;
+  case ENUMERATION_CONSTANT:        /* previously defined */
+    return ENUMERATION_CONSTANT;
+  default:                          /* includes undefined */
+    return IDENTIFIER;
+  }
+}
