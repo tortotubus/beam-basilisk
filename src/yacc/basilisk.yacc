@@ -53,8 +53,9 @@ static void node_child (Node * n, Node * c)
 
  /* Basilisk C tokens */
 
-%token MAYBECONST IN NEW TRACE
+%token MAYBECONST IN NEW_FIELD TRACE
 %token FOREACH FOREACH_INNER FOREACH_DIMENSION
+%token REDUCTION
 
  /* End of Basilisk C tokens */
 
@@ -64,17 +65,23 @@ static void node_child (Node * n, Node * c)
 
 translation_unit /* Must be first */
         : external_declaration
-	| translation_unit external_declaration { node_append ($$, $2); }
+	| translation_unit external_declaration           { node_append ($$, $2); }
         | translation_unit error ';'            { node_append ($$, $2), $2->kind = 1; }
         | translation_unit error '}'            { node_append ($$, $2), $2->kind = 1; }
+        | translation_unit error ')'            { node_append ($$, $2), $2->kind = 1; }
         ;
 
 primary_expression
-	: IDENTIFIER
+        : generic_identifier          { SYMBOL($$); }
 	| constant
 	| string
-	| '(' expression ')'    { node_child ($$, $2); }
+	| '(' expression_error ')'    { node_child ($$, $2); }
 	| generic_selection
+	;
+
+expression_error
+        : expression
+	| error
 	;
 
 constant
@@ -84,7 +91,7 @@ constant
 	;
 
 enumeration_constant		/* before it has been defined as such */
-	: IDENTIFIER
+	: generic_identifier
 	;
 
 string
@@ -112,8 +119,8 @@ postfix_expression
 	| postfix_expression '[' expression ']'
 	| postfix_expression '(' ')'
 	| postfix_expression '(' argument_expression_list ')'
-	| postfix_expression '.' IDENTIFIER
-	| postfix_expression PTR_OP IDENTIFIER
+	| postfix_expression '.' generic_identifier
+	| postfix_expression PTR_OP generic_identifier
 	| postfix_expression INC_OP
 	| postfix_expression DEC_OP
 	| '(' type_name ')' '{' initializer_list '}'
@@ -138,7 +145,7 @@ unary_expression
 	| SIZEOF unary_expression
 	| SIZEOF '(' type_name ')'
 	| ALIGNOF '(' type_name ')'
-	| NEW type_name /* Basilisk C extension */
+	| NEW_FIELD /* Basilisk C extension */
 	;
 
 unary_operator
@@ -221,6 +228,7 @@ conditional_expression
 assignment_expression
 	: conditional_expression
 	| unary_expression assignment_operator assignment_expression
+	| unary_expression assignment_operator initializer              /* Basilisk C extension */
 	;
 
 assignment_operator
@@ -306,10 +314,10 @@ type_specifier
 
 struct_or_union_specifier
 	: struct_or_union '{' struct_declaration_list '}'
-	| struct_or_union IDENTIFIER '{' struct_declaration_list '}'
-	| struct_or_union IDENTIFIER
+	| struct_or_union generic_identifier '{' struct_declaration_list '}'
+	| struct_or_union generic_identifier
 	| struct_or_union '{' error '}'
-	| struct_or_union IDENTIFIER '{' error '}'
+	| struct_or_union generic_identifier '{' error '}'
 	;
 
 struct_or_union
@@ -349,9 +357,9 @@ struct_declarator
 enum_specifier
 	: ENUM '{' enumerator_list '}'
 	| ENUM '{' enumerator_list ',' '}'
-	| ENUM IDENTIFIER '{' enumerator_list '}'
-	| ENUM IDENTIFIER '{' enumerator_list ',' '}'
-	| ENUM IDENTIFIER
+	| ENUM generic_identifier '{' enumerator_list '}'
+	| ENUM generic_identifier '{' enumerator_list ',' '}'
+	| ENUM generic_identifier
 	;
 
 enumerator_list
@@ -392,7 +400,7 @@ declarator
 	;
 
 direct_declarator
-	: IDENTIFIER
+	: generic_identifier
 	| '(' declarator ')'  { $$ = $2; }
 	| direct_declarator '[' ']'
 	| direct_declarator '[' '*' ']'
@@ -404,8 +412,14 @@ direct_declarator
 	| direct_declarator '[' type_qualifier_list ']'
 	| direct_declarator '[' assignment_expression ']'
 	| direct_declarator '(' parameter_type_list ')'
+	| direct_declarator '(' error ')'
 	| direct_declarator '(' ')'
 	| direct_declarator '(' identifier_list ')'
+	;
+
+generic_identifier
+        : IDENTIFIER
+	| TYPEDEF_NAME  /* workaround when variable name = type name */
 	;
 
 pointer
@@ -438,8 +452,8 @@ parameter_declaration
 	;
 
 identifier_list
-	: IDENTIFIER
-	| identifier_list ',' IDENTIFIER
+	: generic_identifier
+	| identifier_list ',' generic_identifier
 	;
 
 type_name
@@ -501,7 +515,7 @@ designator_list
 
 designator
 	: '[' constant_expression ']'
-	| '.' IDENTIFIER
+	| '.' generic_identifier
 	;
 
 static_assert_declaration
@@ -520,7 +534,7 @@ statement
 	;
 
 labeled_statement
-	: IDENTIFIER ':' statement
+	: generic_identifier ':' statement
 	| CASE constant_expression ':' statement
 	| DEFAULT ':' statement
 	;
@@ -543,12 +557,13 @@ block_item
 expression_statement
 	: ';'
 	| expression ';'                    { SYMBOL($$), $$->after = $2->before; }
+        | expression compound_statement     { SYMBOL($$), node_child($$, $2); } /* Basilisk C extension */
 	;
 
 selection_statement
-        : IF '(' expression ')' statement ELSE statement            { SYMBOL($$), node_child ($$, $5), node_child ($$, $7); }
-        | IF '(' expression ')' statement                           { SYMBOL($$), node_child ($$, $5); }
-	| SWITCH '(' expression ')' statement                       { SYMBOL($$), node_child ($$, $5); }
+        : IF '(' expression_error ')' statement ELSE statement            { SYMBOL($$), node_child ($$, $5), node_child ($$, $7); }
+        | IF '(' expression_error ')' statement                           { SYMBOL($$), node_child ($$, $5); }
+	| SWITCH '(' expression_error ')' statement                       { SYMBOL($$), node_child ($$, $5); }
 	;
 
 iteration_statement
@@ -561,7 +576,7 @@ iteration_statement
 	;
 
 jump_statement
-        : GOTO IDENTIFIER ';'    { SYMBOL($$), $$->after = $2->before; }
+        : GOTO generic_identifier ';'    { SYMBOL($$), $$->after = $2->before; }
 	| CONTINUE ';'           { SYMBOL($$), $$->after = $2->before; }
 	| BREAK ';'              { SYMBOL($$), $$->after = $2->before; }
 	| RETURN ';'             { SYMBOL($$), $$->after = $2->before; }
@@ -575,13 +590,12 @@ external_declaration
 	| boundary_definition /* Basilisk C extension */
 	| external_foreach_dimension /* Basilisk C extension */
 	| attribute /* Basilisk C extension */
+	| error compound_statement { $$ = $2, $$->before = $1->before; }
 	;
 
 function_definition
         : declaration_specifiers declarator declaration_list compound_statement { $$ = $4; SYMBOL($$); $$->before = $1->before; }
 	| declaration_specifiers declarator compound_statement                  { $$ = $3; SYMBOL($$); $$->before = $1->before; }
-        | IDENTIFIER IDENTIFIER '(' parameter_type_list ')' compound_statement  { $$ = $6; SYMBOL($$); $$->before = $1->before; }
-	| declaration_specifiers error compound_statement                       { $$ = $3; SYMBOL($$); $$->before = $1->before; }
 	;
 
 declaration_list
@@ -614,11 +628,11 @@ foreach_parameter
 	;
 
 reduction
-        : IDENTIFIER '(' reduction_operator  ':' IDENTIFIER ')'
+        : REDUCTION '(' reduction_operator  ':' generic_identifier ')'
 	;
 
 reduction_operator
-        : IDENTIFIER
+        : generic_identifier
 	| '+'
 	;
 
@@ -633,7 +647,8 @@ foreach_dimension_statement
 	;
 
 forin_statement
-        : FOR '(' TYPEDEF_NAME IDENTIFIER IN field_list ')' statement    { SYMBOL($$); $8->before = $7->after + 1, node_child ($$, $8); }
+        : FOR '(' TYPEDEF_NAME generic_identifier IN field_list ')' statement  { SYMBOL($$); $8->before = $7->after + 1, node_child ($$, $8); }
+        | FOR '(' expression IN field_list ')' statement                 { SYMBOL($$); $7->before = $6->after + 1, node_child ($$, $7); }
 	;
 
 field_list
@@ -642,13 +657,25 @@ field_list
 	;
 
 field_item_list
-        : IDENTIFIER
-	| field_item_list ',' IDENTIFIER
+        : generic_identifier
+	| field_item_list ',' generic_identifier
 	;
 
 event_definition
-        : IDENTIFIER IDENTIFIER '(' expression ')' statement { $$ = $6; SYMBOL($$); $$->before = $1->before; }
+        : generic_identifier generic_identifier '(' event_parameters ')' statement { $$ = $6; SYMBOL($$); $$->before = $1->before; }
 	;
+
+event_parameter
+        : expression
+	| generic_identifier '=' initializer
+	| generic_identifier '=' expression
+        ;
+
+event_parameters
+        : event_parameter
+	| event_parameters ',' event_parameter
+	| event_parameters ';' event_parameter
+        ;
 
 boundary_definition
         : assignment_expression ';'
@@ -660,7 +687,7 @@ external_foreach_dimension
 	;
 
 attribute
-        : IDENTIFIER '{' struct_declaration_list '}'
+        : generic_identifier '{' struct_declaration_list '}' { SYMBOL($$), node_child($$, $3); }
 	;
 
 root /* Must be last */
@@ -712,17 +739,13 @@ Node * parse_node (char * code, const char * fname)
   char * code1 = code;
   globalfname = fname;
   //  yydebug = 1;
-  int status = yyparse (alloc, &code1, &line, &root);
+  yyparse (alloc, &code1, &line, &root);
   assert (root);
   yylex_destroy();
-  if (1/*status == 0*/) {
-    root = copy_node (root);
-    root->before = code;
-    root->after = code + strlen(code) - 1;
-    recopy_node (root);
-  }
-  else
-    root = NULL;
+  root = copy_node (root);
+  root->before = code;
+  root->after = code + strlen(code) - 1;
+  recopy_node (root);
   free_allocator (alloc);
   return root;
 }

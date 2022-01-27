@@ -8,7 +8,7 @@ basilisk.c: basilisk.yacc
 	sed -i 's/# define YY_REDUCE_PRINT(Rule)$$//' basilisk.c
 
 symbols.h: basilisk.c Makefile
-	echo "// Automatically generated from basilisk.y" > symbols.h
+	echo "// Automatically generated from basilisk.yacc" > symbols.h
 	@echo "#define YY_NULLPTR NULL" >> symbols.h
 	@awk '/static const char \*const yytname/ {a=1}{if(a)print $$0;}/};/{a=0}' basilisk.c >> symbols.h
 	@awk '/^enum yysymbol_kind_t/{a=1}{if(a)print $$0;}/};/{a=0}' \
@@ -17,14 +17,13 @@ symbols.h: basilisk.c Makefile
 tokens.c: tokens.lex
 	flex -o tokens.c tokens.lex
 
-basilisk.o: basilisk.c node.h 
-	$(CC) $(CFLAGS) -c -o basilisk.o basilisk.c
+basilisk.o: node.h 
 
-node.o: node.c node.h symbols.h
-	$(CC) $(CFLAGS) -c -o node.o node.c
+node.o: node.h symbols.h
 
-tokens.o: tokens.c node.h basilisk.c
-	$(CC) $(CFLAGS) -c -o tokens.o tokens.c
+tokens.o: node.h basilisk.c
+
+transform.o: node.h symbols.h
 
 clean:
 	rm -f *.o *.a
