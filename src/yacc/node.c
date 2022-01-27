@@ -208,6 +208,7 @@ static void init_types()
     kh_set (khStrNode, types, "FILE", NULL);
     kh_set (khStrNode, types, "size_t", NULL);
     kh_set (khStrNode, types, "bool", NULL);
+    kh_set (khStrNode, types, "_Attributes", NULL);
   }  
 }
 

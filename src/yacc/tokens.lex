@@ -139,15 +139,17 @@ static Node * new_node (Allocator * alloc,
 "_Thread_local"                         { SNODE(THREAD_LOCAL); }
 "__func__"                              { SNODE(FUNC_NAME); }
 
-
                     /* Basilisk C tokens */
 
+"new"{WS}+("vertex"{WS}+)?"scalar"      { SNODE(NEW_FIELD); }
+"new"{WS}+("face"{WS}+)?"vector"        { SNODE(NEW_FIELD); }
+"new"{WS}+"tensor"                      { SNODE(NEW_FIELD); }
 "face"{WS}+"vector"                     { SNODE(TYPEDEF_NAME); }
 "vertex"{WS}+"scalar"                   { SNODE(TYPEDEF_NAME); }
 "(const)"                               { SNODE(MAYBECONST); }
 "in"			                { SNODE(IN); }
-"new"			                { SNODE(NEW); }
 "trace"			                { SNODE(TRACE); }
+"reduction"			        { SNODE(REDUCTION); }
 
 "foreach_child" |
 "foreach_neighbor"                      { SNODE(FOREACH_INNER); }
