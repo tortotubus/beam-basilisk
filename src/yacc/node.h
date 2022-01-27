@@ -1,4 +1,5 @@
 #include <stdio.h>
+#include <stdbool.h>
 
 typedef struct _Allocator Allocator;  
   
@@ -18,7 +19,7 @@ void node_append (Node * n, Node * m);
 Node * copy_node (Node * n);
 void free_node (Node * n);
 void graph_node (Node * n, FILE * fp);
-void print_node (Node * n, FILE * fp);
+void print_node (Node * n, FILE * fp, bool kind);
 void print_graph (Node * n, FILE * fp, int indent);
 
 Node * parse_node (char * code, const char * fname);

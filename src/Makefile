@@ -1,7 +1,7 @@
 CFLAGS += -O2
 
 # these are not Basilisk programs
-EXCLUDE = qcc.c include.c rotate.c stencils.c qplot.c
+EXCLUDE = qcc.c include.c postproc.c rotate.c stencils.c qplot.c
 
 all: qcc qplot libkdt literatec libfb_dumb libws bview2D bview3D
 	@chmod +x ppm2mpeg ppm2mp4 ppm2ogv ppm2gif runtest \
@@ -22,6 +22,14 @@ qcc: qcc.c include.o rotate.o stencils.o config
 		-DCADNACC="\"$(CADNACC)\"" \
 		-DBASILISK="\"$(BASILISK)\"" \
 		qcc.c include.o rotate.o stencils.o -o qcc
+
+qcc1: qcc1.c include.o postproc.o yacc/libbasilisk.a config
+	$(CC) $(CFLAGS) -DLIBDIR=\"`pwd`\" \
+		-DCC99="\"$(CC99)\"" \
+		-DCPP99="\"$(CPP99)\"" \
+		-DCADNACC="\"$(CADNACC)\"" \
+		-DBASILISK="\"$(BASILISK)\"" \
+		qcc1.c include.o postproc.o -o qcc1 -Lyacc -lbasilisk
 
 rotate.c: rotate.lex
 	flex -P rot -o rotate.c rotate.lex
@@ -58,6 +66,9 @@ draw_json.h: draw.h json.awk
 
 include.c: include.lex
 	flex -P inc -o include.c include.lex
+
+postproc.c: postproc.lex
+	flex -P post -o postproc.c postproc.lex
 
 qcc.c: qcc.lex Makefile
 	flex -o qcc.c qcc.lex

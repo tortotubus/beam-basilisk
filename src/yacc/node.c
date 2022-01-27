@@ -93,25 +93,21 @@ void graph_node (Node * n, FILE * fp)
 #endif
 }
 
-void print_node (Node * n, FILE * fp)
+void print_node (Node * n, FILE * fp, bool kind)
 {
-#if 1
-  fputc ('|', fp);
-  fputs (yytname[n->kind], fp);
-  fputc ('|', fp);
-#endif
-  //  fprintf (fp, "@%d", n->line);
+  if (kind) {
+    fputc ('|', fp);
+    fputs (yytname[n->kind], fp);
+    fputc ('|', fp);
+  }
   if (*n->child && n->before)
     fputs (n->before, fp);
   for (Node ** c = n->child; *c; c++)
-    print_node (*c, fp);
+    print_node (*c, fp, kind);
   if (n->after)
     fputs (n->after, fp);
-  if (n->next) {
-    //    fprintf (fp, "%d|", n->line);
-    print_node (n->next, fp);
-  }
-  //  fprintf (fp, "%d@", n->line);
+  if (n->next)
+    print_node (n->next, fp, kind);
 }
 
 char * str_append_realloc (char * src, ...)

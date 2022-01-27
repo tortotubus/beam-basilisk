@@ -56,6 +56,7 @@ extern void yyerror (const char * s);
 static void comment (void);
 static void preproc (void);
 static void bpreproc (void);
+static void ompreproc (void);
 static int check_type(void);
 
 static Node * new_node (Allocator * alloc,
@@ -78,11 +79,16 @@ static Node * new_node (Allocator * alloc,
   *yylval = new_node (alloc, yytext[0], *bline, *binput, *binput);	\
  return yytext[0];
  
-#define SNODE(t)							\
-  *yylval = new_node (alloc, t, *bline,					\
-		      *binput - strlen(yytext), *binput - 1);		\
- return t;
-    
+#define SNODE(t) {							\
+    int len = strlen(yytext);						\
+    if (len == 1)							\
+      *yylval = new_node (alloc, t, *bline, *binput, *binput);		\
+    else								\
+      *yylval = new_node (alloc, t, *bline,				\
+			  *binput - len, *binput - 1);			\
+  }									\
+  return t;
+  
 %}
 
 %%
@@ -92,7 +98,8 @@ static Node * new_node (Allocator * alloc,
 ^[ \t]*#	                        { preproc(); }
 ^[ \t]*@[ \t]*def[ \t].*                { bpreproc(); }
 ^[ \t]*@.*
-
+^[ \t]*OMP[ \t]*\(	                { ompreproc(); }
+	 
 "auto"					{ SNODE(AUTO); }
 "break"					{ SNODE(BREAK); }
 "case"					{ SNODE(CASE); }
@@ -264,6 +271,21 @@ static void bpreproc (void)
     if (c == '@')
       return;
   yyerror ("unterminated @def");
+}
+
+static void ompreproc (void)
+{
+  int c, scope = 1;
+  while ((c = input()) != 0) {
+    if (c == '(')
+      scope++;
+    else if (c == ')') {
+      scope--;
+      if (scope == 0)
+	return;
+    }
+  }
+  yyerror ("unterminated OMP");
 }
 
 static int check_type (void)
