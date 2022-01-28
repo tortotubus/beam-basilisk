@@ -10,17 +10,16 @@ void free_allocator (Allocator * a);
 #define CMAX 5  
 typedef struct _Node Node;
 struct _Node {
-  int type, kind, line;
+  int kind, line;
+  char * start, * end;
   char * before, * after;
-  Node * next, * child[CMAX + 1];
+  Node ** child, * parent;
 };
 
-void node_append (Node * n, Node * m);
-Node * copy_node (Node * n);
 void free_node (Node * n);
-void graph_node (Node * n, FILE * fp);
-void print_node (Node * n, FILE * fp, bool kind);
-void print_graph (Node * n, FILE * fp, int indent);
+char * print_node (char * i, Node * n, FILE * fp);
+void print_node_value (Node * n, FILE * fp);
+char * get_node_value (Allocator * alloc, Node * n);
 
 Node * parse_node (char * code, const char * fname);
 
@@ -30,7 +29,4 @@ char * str_append_realloc (char * dst, ...);
 char * str_prepend_realloc (char * dst, ...);
 #define str_prepend(dst, ...)						\
   do { dst = str_prepend_realloc (dst, __VA_ARGS__, NULL); } while(0)
-char * strcpy_range (const char * start, const char * end);
 
-void type_definition (Node * n);
-int sym_type (const char * name);

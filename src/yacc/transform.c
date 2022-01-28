@@ -15,8 +15,6 @@ static void no_nested_foreach (Node * n, int parent)
   }
   for (Node ** c = n->child; *c; c++)
     no_nested_foreach (*c, parent);
-  if (n->next)
-    no_nested_foreach (n->next, parent);
 }
 
 static void foreach_statement (Node * n)
@@ -30,8 +28,6 @@ static void foreach_statement (Node * n)
   else
     for (Node ** c = n->child; *c; c++)
       foreach_statement (*c);
-  if (n->next)
-    foreach_statement (n->next);
 }
 
 static void foreach_inner_statement (Node * n)
@@ -40,10 +36,20 @@ static void foreach_inner_statement (Node * n)
     str_prepend (n->after, "}end_", strstr (n->before, "foreach"), ";");
     str_append (n->before, "{");
   }
+}
+
+static void variables (Node * n)
+{
+  if (n->kind == sym_generic_identifier) {
+    fprintf (stderr, ".endfor.out:%d: %s\n", n->line, n->after);
+  }
+}
+
+static void do_transform (Node * n, void transform (Node * n))
+{
+  transform (n);
   for (Node ** c = n->child; *c; c++)
-    foreach_inner_statement (*c);
-  if (n->next)
-    foreach_inner_statement (n->next);
+    do_transform (*c, transform);
 }
 
 void endfor (FILE * fin, FILE * fout)
@@ -64,17 +70,36 @@ void endfor (FILE * fin, FILE * fout)
   }
   buffer[len++] = '\0';
 
-#if 1  
+#if 1
   FILE * fp = fopen (".endfor", "w");
   fputs (buffer, fp);
   fclose (fp);
 #endif
   
   Node * root = parse_node (buffer, "");
+  
+#if 1
+  char * i = print_node (root->start, root, stdout);
+  for (; *i != '\0'; i++)
+    fputc (*i, stdout);
+#endif
+  free_node (root);
+  free (buffer);
+  exit (0);
+  
   if (root) {
+
     foreach_statement (root);
-    foreach_inner_statement (root);
-    print_node (root, stdout);
+    do_transform (root, foreach_inner_statement);
+    do_transform (root, variables);
+    print_node (root, fout, false);
+
+#if 1
+    FILE * fp = fopen (".endfor.out", "w");
+    print_node (root, fp, true);
+    fclose (fp);
+#endif
+    
     free_node (root);
   }
   

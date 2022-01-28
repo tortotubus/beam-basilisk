@@ -52,7 +52,9 @@ static int * bline;
   }
 
 extern void yyerror (const char * s);
-
+extern int token_symbol (int token);
+extern int sym_type (const char * name);
+ 
 static void comment (void);
 static void preproc (void);
 static void bpreproc (void);
@@ -60,29 +62,32 @@ static void ompreproc (void);
 static int check_type(void);
 
 static Node * new_node (Allocator * alloc,
-			int type, int line, char * before, char * after)
+			int token, int line, char * start, char * end)
 {
   Node * n = allocate (alloc, sizeof(Node));
   memset (n, 0, sizeof(Node));
-  n->type = type;
+  n->kind = token_symbol (token);
   n->line = line;
-  n->before = before;
-  n->after = after;
+  n->start = start;
+  n->end = end;
   return n;
 }
   
 #define CNODE()								\
-  if (**binput != yytext[0] && *(*binput - 1) != yytext[0]) {		\
-    /*fprintf (stderr, "%d: %c %c\n", *bline, **binput, yytext[0]);*/	\
-    /*assert (0);*/							\
-  }									\
-  *yylval = new_node (alloc, yytext[0], *bline, *binput, *binput);	\
+  char * s = *binput;							\
+  while (*s != yytext[0])						\
+    s--;								\
+  *yylval = new_node (alloc, yytext[0], *bline, s, s);			\
  return yytext[0];
  
 #define SNODE(t) {							\
     int len = strlen(yytext);						\
-    if (len == 1)							\
-      *yylval = new_node (alloc, t, *bline, *binput, *binput);		\
+    if (len == 1) {							\
+      char * s = *binput;						\
+      while (*s != yytext[0])						\
+	s--;								\
+      *yylval = new_node (alloc, t, *bline, s, s);			\
+    }									\
     else								\
       *yylval = new_node (alloc, t, *bline,				\
 			  *binput - len, *binput - 1);			\
