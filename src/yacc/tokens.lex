@@ -69,7 +69,7 @@ static Node * new_node (Allocator * alloc,
   n->kind = token_symbol (token);
   n->line = line;
   n->start = start;
-  n->end = end;
+  n->after = end;
   return n;
 }
   

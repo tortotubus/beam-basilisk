@@ -1,3 +1,10 @@
+%param { Allocator * alloc }
+%param { char ** input }
+%param { int * line }
+%parse-param { Node ** root }
+%define api.pure full
+%define api.value.type { Node * }
+
 %{
 #include <string.h>
 #include <assert.h>
@@ -5,7 +12,6 @@
   
 #include "node.h"
 
-#define SYMBOL(n) n->kind = yyr1[yyn]
 static Node * reduce_node (Allocator * alloc, Node ** children, int yyn);
 #define YY_REDUCE_PRINT(yyn) yyval = reduce_node (alloc, yyvsp, yyn)
   
@@ -17,16 +23,8 @@ void yylex_destroy();
 
 const char * symbol_name (int sym);
 void type_definition (Allocator * alloc, Node * declaration);
-void typedef_cleanup();
- 
+void typedef_cleanup(); 
 %}
-
-%param { Allocator * alloc }
-%param { char ** input }
-%param { int * line }
-%parse-param { Node ** root }
-%define api.pure full
-%define api.value.type { Node * }
 
 %token	IDENTIFIER I_CONSTANT F_CONSTANT STRING_LITERAL FUNC_NAME SIZEOF
 %token	PTR_OP INC_OP DEC_OP LEFT_OP RIGHT_OP LE_OP GE_OP EQ_OP NE_OP
@@ -234,7 +232,8 @@ conditional_expression
 assignment_expression
 	: conditional_expression
 	| unary_expression assignment_operator assignment_expression
-	| unary_expression assignment_operator initializer   /* Basilisk C extension */
+	   /* Basilisk C extension */
+	| unary_expression assignment_operator initializer
 	;
 
 assignment_operator
@@ -262,7 +261,9 @@ constant_expression
 
 declaration
         : declaration_specifiers ';' 
-	| declaration_specifiers init_declarator_list ';'         { type_definition (alloc, $$); }
+	| declaration_specifiers init_declarator_list ';' {
+	      type_definition (alloc, $$);
+        }
 	| static_assert_declaration
 	;
 
@@ -700,7 +701,7 @@ root
         : translation_unit {
 	  $$ = *root = allocate (alloc, sizeof(Node));
 	  memset ($$, 0, sizeof(Node));
-	  SYMBOL($$);
+	  $$->kind = yyr1[yyn];
 	  $$->child = allocate (alloc, 2*sizeof(Node *));
 	  $$->child[0] = $1;
 	  $$->child[1] = NULL;
@@ -709,8 +710,6 @@ root
 
 %%
 
-static const char * globalfname = NULL; // fixme
-
 /* Called by yyparse on error.  */
 void
 yyerror (Allocator * alloc,
@@ -718,7 +717,7 @@ yyerror (Allocator * alloc,
 	 Node ** root, char const *s)
 {
 #if 1
-  fprintf (stderr, "%s:%d: %s near '", globalfname, *line, s);
+  fprintf (stderr, "%d: %s near '", *line, s);
   char * s1 = *input - 1;
   while (!strchr("}{;\n", *s1)) s1--;
   s1++;
@@ -742,16 +741,17 @@ static char * copy_range (char * start, char * end)
   return c;
 }
 
-char * copy_strings (char * i, Node * n)
+static char * copy_strings (char * i, Node * n)
 {
   if (n->start) {
     n->before = copy_range (i, n->start);
     if (n->start > i)
       i = n->start;
 
-    n->start = copy_range (i, n->end + 1);
-    if (n->end + 1 > i)
-      i = n->end + 1;
+    n->start = copy_range (i, n->after + 1);
+    if (n->after + 1 > i)
+      i = n->after + 1;
+    n->after = NULL;
   }
     
   if (n->child && n->child[0])
@@ -810,19 +810,20 @@ static Node * reduce_node (Allocator * alloc, Node ** children, int yyn)
   return node;
 }
 
-Node * parse_node (char * code, const char * fname)
+Node * parse_node (char * code)
 {
   Node * root = NULL;
   Allocator * alloc = new_allocator();
   int line = 1;
   char * code1 = code;
-  globalfname = fname;
   //  yydebug = 1;
   yyparse (alloc, &code1, &line, &root);
   assert (root);
   yylex_destroy();
-  copy_strings (code, root);
+  char * i = copy_strings (code, root);
   root = recopy_node (root);
+  char * end = i; while (*end != '\0') end++;
+  root->after = copy_range (i, end);
   free_allocator (alloc);
   typedef_cleanup();
   return root;
@@ -830,7 +831,8 @@ Node * parse_node (char * code, const char * fname)
 
 int token_symbol (int token)
 {
-  if (0) yy_reduce_print (NULL, NULL, 0, NULL, NULL, NULL, NULL); // just to avoid unused warning
+   // just to avoid unused warning
+  if (0) yy_reduce_print (NULL, NULL, 0, NULL, NULL, NULL, NULL);
   return YYTRANSLATE (token);
 }
 
