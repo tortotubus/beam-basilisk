@@ -7,7 +7,6 @@ Allocator * new_allocator();
 void * allocate (Allocator * a, long size);
 void free_allocator (Allocator * a);
 
-#define CMAX 5  
 typedef struct _Node Node;
 struct _Node {
   int kind, line;
@@ -17,7 +16,7 @@ struct _Node {
 };
 
 void free_node (Node * n);
-char * print_node (char * i, Node * n, FILE * fp);
+void print_node (Node * n, FILE * fp, bool kind);
 void print_node_value (Node * n, FILE * fp);
 char * get_node_value (Allocator * alloc, Node * n);
 

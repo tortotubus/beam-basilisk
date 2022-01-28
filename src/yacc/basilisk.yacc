@@ -729,10 +729,43 @@ yyerror (Allocator * alloc,
 #endif
 }
 
+static char * copy_range (char * start, char * end)
+{
+  char * c = NULL;
+  int len = end - start;
+  if (len > 0) {
+    char * s = c = malloc (len + 1);
+    for (char * i = start; i < end; i++, s++)
+      *s = *i;
+    *s = '\0';
+  }
+  return c;
+}
+
+char * copy_strings (char * i, Node * n)
+{
+  if (n->start) {
+    n->before = copy_range (i, n->start);
+    if (n->start > i)
+      i = n->start;
+
+    n->start = copy_range (i, n->end + 1);
+    if (n->end + 1 > i)
+      i = n->end + 1;
+  }
+    
+  if (n->child && n->child[0])
+    for (Node ** c = n->child; *c; c++)
+      i = copy_strings (i, *c);
+  return i;
+}
+
 static Node * recopy_node (Node * n)
 {
   Node * c = malloc (sizeof (Node));
   memcpy (c, n, sizeof (Node));
+  n->before = NULL;
+  n->start = NULL;
   if (n->child) {
     int len = 0;
     for (Node ** i = n->child; *i; i++, len++);
@@ -788,10 +821,10 @@ Node * parse_node (char * code, const char * fname)
   yyparse (alloc, &code1, &line, &root);
   assert (root);
   yylex_destroy();
+  copy_strings (code, root);
   root = recopy_node (root);
   free_allocator (alloc);
   typedef_cleanup();
-  root->start = root->end = code;
   return root;
 }
 

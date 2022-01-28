@@ -77,14 +77,10 @@ void endfor (FILE * fin, FILE * fout)
 #endif
   
   Node * root = parse_node (buffer, "");
-  
-#if 1
-  char * i = print_node (root->start, root, stdout);
-  for (; *i != '\0'; i++)
-    fputc (*i, stdout);
-#endif
-  free_node (root);
   free (buffer);
+  
+  print_node (root, stdout, true);
+  free_node (root);
   exit (0);
   
   if (root) {
