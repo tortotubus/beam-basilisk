@@ -10,17 +10,27 @@ void free_allocator (Allocator * a);
 typedef struct _Node Node;
 struct _Node {
   int kind, line;
-  char * start, * end;
-  char * before, * after;
+  char * before, * start, * after;
   Node ** child, * parent;
 };
 
-void free_node (Node * n);
-void print_node (Node * n, FILE * fp, bool kind);
-void print_node_value (Node * n, FILE * fp);
-char * get_node_value (Allocator * alloc, Node * n);
+Node * parse_node   (char * code);
+void   free_node    (Node * n);
+void   print_node   (Node * n, FILE * fp, bool kind);
 
-Node * parse_node (char * code, const char * fname);
+static inline Node * node_last_child (Node * n)
+{
+  Node ** c = n->child;
+  if (!c)
+    return NULL;
+  while (*(c + 1)) c++;
+  return *c;
+}
+
+Node * declarator_identifier (Node * declarator);
+
+Node * node_schema_internal (Node * n, ...);
+#define node_schema(n,...) node_schema_internal (n, __VA_ARGS__, -1)
 
 char * str_append_realloc (char * dst, ...);
 #define str_append(dst, ...)						\
@@ -28,4 +38,3 @@ char * str_append_realloc (char * dst, ...);
 char * str_prepend_realloc (char * dst, ...);
 #define str_prepend(dst, ...)						\
   do { dst = str_prepend_realloc (dst, __VA_ARGS__, NULL); } while(0)
-
