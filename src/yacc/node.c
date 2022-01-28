@@ -44,7 +44,7 @@ void free_allocator (Allocator * a)
   if (a->next) free_allocator (a->next);
   free (a);
 }
-  
+
 void free_node (Node * n)
 {
   if (n->child) {
@@ -52,36 +52,34 @@ void free_node (Node * n)
       free_node (*c);
     free (n->child);
   }
-  //  free (n->before);
-  //  free (n->after);
+  free (n->before);
+  free (n->start);
+  free (n->after);
   free (n);
 }
 
-char * print_node (char * i, Node * n, FILE * fp)
+void print_node (Node * n, FILE * fp, bool kind)
 {
+  if (n->before)
+    fputs (n->before, fp);
+
   if (n->start) {
-    for (; i < n->start; i++)
-      fputc (*i, fp);
 
-#if 1
-    fputc ('|', fp);
-    fputs (symbol_name (n->kind), fp);
-    fputc ('|', fp);
-#endif
-  
-    for (; i <= n->end; i++)
-      fputc (*i, fp);
+    if (kind) {
+      fputc ('|', fp);
+      fputs (symbol_name (n->kind), fp);
+      fputc ('|', fp);
+    }
+    
+    fputs (n->start, fp);
 
-    fputc ('/', fp);
+    if (kind)
+      fputc ('/', fp);
   }
     
-  if (n->child && n->child[0]) {
-    for (; i < n->child[0]->start; i++)
-      fputc (*i, fp);
+  if (n->child && n->child[0])
     for (Node ** c = n->child; *c; c++)
-      i = print_node (i, *c, fp);
-  }
-  return i;
+      print_node (*c, fp, kind);
 }
 
 void print_node_value (Node * n, FILE * fp)
