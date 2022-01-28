@@ -20,7 +20,7 @@ struct _Allocator {
 Allocator * new_allocator()
 {
   Allocator * a = calloc (1, sizeof (Allocator));
-  a->maxlen = 1 << 16;
+  a->maxlen = 1 << 22;
   a->m = calloc (a->maxlen, 1);
   return a;
 }
@@ -45,69 +45,59 @@ void free_allocator (Allocator * a)
   free (a);
 }
   
-void node_append (Node * n, Node * m)
-{
-  Node * i = n;
-  while (i->next)
-    i = i->next;
-  i->next = m;
-}
-
-Node * copy_node (Node * n)
-{
-  Node * a = malloc (sizeof (Node));
-  memcpy (a, n, sizeof (Node));
-  for (int i = 0; n->child[i]; i++)
-    a->child[i] = copy_node (n->child[i]);
-  if (n->next)
-    a->next = copy_node (n->next);
-  return a;
-}
-
 void free_node (Node * n)
 {
-  free (n->before);
-  free (n->after);
-  for (Node ** c = n->child; *c; c++)
-    free_node (*c);
-  if (n->next)
-    free_node (n->next);
+  if (n->child) {
+    for (Node ** c = n->child; *c; c++)
+      free_node (*c);
+    free (n->child);
+  }
+  //  free (n->before);
+  //  free (n->after);
   free (n);
 }
 
-void graph_node (Node * n, FILE * fp)
+char * print_node (char * i, Node * n, FILE * fp)
 {
-  fprintf (fp, "n%p ", n);
-#if 0
-  if (n->type == TEXT)
-    fprintf (fp, "[label=\"TEXT\"];\n");
-  else
-    fprintf (fp, "[label=\"%c\", shape=box];\n", n->type);
-  int i;
-  for (i = 0; i < 3; i++)
-    if (n->e[i])
-      fprintf (fp, "n%p -> n%p;\n", n, n->e[i]);
-  for (i = 0; i < 3; i++)
-    if (n->e[i])
-      print_node (n->e[i], fp);
+  if (n->start) {
+    for (; i < n->start; i++)
+      fputc (*i, fp);
+
+#if 1
+    fputc ('|', fp);
+    fputs (symbol_name (n->kind), fp);
+    fputc ('|', fp);
 #endif
+  
+    for (; i <= n->end; i++)
+      fputc (*i, fp);
+
+    fputc ('/', fp);
+  }
+    
+  if (n->child && n->child[0]) {
+    for (; i < n->child[0]->start; i++)
+      fputc (*i, fp);
+    for (Node ** c = n->child; *c; c++)
+      i = print_node (i, *c, fp);
+  }
+  return i;
 }
 
-void print_node (Node * n, FILE * fp, bool kind)
+void print_node_value (Node * n, FILE * fp)
+{  
+  for (char * s = n->start; s <= n->end; s++)
+    fputc (*s, fp);
+}
+
+char * get_node_value (Allocator * alloc, Node * n)
 {
-  if (kind) {
-    fputc ('|', fp);
-    fputs (yytname[n->kind], fp);
-    fputc ('|', fp);
-  }
-  if (*n->child && n->before)
-    fputs (n->before, fp);
-  for (Node ** c = n->child; *c; c++)
-    print_node (*c, fp, kind);
-  if (n->after)
-    fputs (n->after, fp);
-  if (n->next)
-    print_node (n->next, fp, kind);
+  char * name = allocate (alloc, (n->end - n->start + 2)*sizeof (char));
+  char * s = name;
+  for (char * i = n->start; i <= n->end; i++, s++)
+    *s = *i;
+  *s = '\0';
+  return name;
 }
 
 char * str_append_realloc (char * src, ...)
@@ -171,61 +161,3 @@ char * str_prepend_realloc (char * src, ...)
   return dst;
 }
 
-char * strcpy_range (const char * start, const char * end)
-{
-  int len = end - start + 1;
-  if (len <= 1)
-    return NULL;
-  else {
-    char * dst = malloc (len);
-    strncpy (dst, start, len - 1);
-    dst[len - 1] = '\0';
-    return dst;
-  }
-}
-
-#include "khash.h"
-
-const int khStrNode = 33;
-KHASH_MAP_INIT_STR(khStrNode, Node *)
-
-static khash_t (khStrNode) * types = NULL;
-
-#define kh_set(t,h,s,p) do {				\
-    int ret;						\
-    khiter_t k = kh_put(t, h, s, &ret);			\
-    kh_value (h, k) = p;				\
-  } while(0)
-
-static void init_types()
-{
-  if (types == NULL) {
-    types = kh_init (khStrNode);
-    kh_set (khStrNode, types, "FILE", NULL);
-    kh_set (khStrNode, types, "size_t", NULL);
-    kh_set (khStrNode, types, "bool", NULL);
-    kh_set (khStrNode, types, "_Attributes", NULL);
-  }  
-}
-
-void type_definition (Node * n)
-{
-  init_types();
-  
-  char * name = calloc (n->after - n->before + 2, sizeof (char));
-  for (char * i = n->before, * s = name; i <= n->after; i++, s++)
-    *s = *i;
-
-  int ret;
-  khiter_t k = kh_put(khStrNode, types, name, &ret);
-  kh_value (types, k) = n;
-}
-
-int sym_type (const char * name)
-{
-  init_types();  
-  khiter_t k = kh_get (khStrNode, types, name);
-  if (k != kh_end (types))
-    return TYPEDEF_NAME;
-  return IDENTIFIER;
-}

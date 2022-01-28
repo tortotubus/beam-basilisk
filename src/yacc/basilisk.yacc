@@ -6,25 +6,19 @@
 #include "node.h"
 
 #define SYMBOL(n) n->kind = yyr1[yyn]
-#define YY_REDUCE_PRINT(yyn) \
-  if (yyn <= YYSYMBOL_root && !yyval->kind) yyval->kind = yyr1[yyn] // fixme
-
+static Node * reduce_node (Allocator * alloc, Node ** children, int yyn);
+#define YY_REDUCE_PRINT(yyn) yyval = reduce_node (alloc, yyvsp, yyn)
+  
 static int yyparse (Allocator * alloc, char ** input, int * line, Node ** root);
 int yylex (Node ** lvalp, Allocator * alloc, char ** input, int * line);
 void yyerror (Allocator * alloc, char ** input, int * line,
 	      Node ** root, char const *);
 void yylex_destroy();
 
-static void node_child (Node * n, Node * c)
-{
-  int i;
-  for (i = 0; n->child[i]; i++);
-  assert (i < CMAX);
-  n->child[i] = c;
-  if (i > 0)
-    n->child[i - 1]->after = c->before - 1;
-}
-
+const char * symbol_name (int sym);
+void type_definition (Allocator * alloc, Node * declaration);
+void typedef_cleanup();
+ 
 %}
 
 %param { Allocator * alloc }
@@ -63,19 +57,19 @@ static void node_child (Node * n, Node * c)
 
 %%
 
-translation_unit /* Must be first */
+translation_unit
         : external_declaration
-	| translation_unit external_declaration           { node_append ($$, $2); }
-        | translation_unit error ';'            { node_append ($$, $2), $2->kind = 1; }
-        | translation_unit error '}'            { node_append ($$, $2), $2->kind = 1; }
-        | translation_unit error ')'            { node_append ($$, $2), $2->kind = 1; }
+	| translation_unit external_declaration
+        | translation_unit error ';'
+        | translation_unit error '}'
+        | translation_unit error ')'
         ;
 
 primary_expression
-        : generic_identifier          { SYMBOL($$); }
+        : generic_identifier
 	| constant
 	| string
-	| '(' expression_error ')'    { node_child ($$, $2); }
+	| '(' expression_error ')'
 	| generic_selection
 	;
 
@@ -100,7 +94,7 @@ string
 	;
 
 generic_selection
-	: GENERIC '(' assignment_expression ',' generic_assoc_list ')'
+        : GENERIC '(' assignment_expression ',' generic_assoc_list ')'
 	;
 
 generic_assoc_list
@@ -115,16 +109,28 @@ generic_association
 
 postfix_expression
 	: primary_expression
-	| postfix_expression '[' ']' /* Basilisk C extension */
-	| postfix_expression '[' expression ']'
-	| postfix_expression '(' ')'
-	| postfix_expression '(' argument_expression_list ')'
-	| postfix_expression '.' generic_identifier
-	| postfix_expression PTR_OP generic_identifier
+	| function_call
+	| array_access
+        | postfix_expression '.' member_identifier
+        | postfix_expression PTR_OP member_identifier
 	| postfix_expression INC_OP
 	| postfix_expression DEC_OP
 	| '(' type_name ')' '{' initializer_list '}'
 	| '(' type_name ')' '{' initializer_list ',' '}'
+	;
+
+array_access
+        : postfix_expression '[' ']' /* Basilisk C extension */
+        | postfix_expression '[' expression ']'
+	;
+	
+function_call
+        : postfix_expression '(' ')'
+	| postfix_expression '(' argument_expression_list ')'
+        ;
+
+member_identifier
+        : generic_identifier
 	;
 
 argument_expression_list
@@ -228,7 +234,7 @@ conditional_expression
 assignment_expression
 	: conditional_expression
 	| unary_expression assignment_operator assignment_expression
-	| unary_expression assignment_operator initializer              /* Basilisk C extension */
+	| unary_expression assignment_operator initializer   /* Basilisk C extension */
 	;
 
 assignment_operator
@@ -256,7 +262,7 @@ constant_expression
 
 declaration
         : declaration_specifiers ';' 
-	| declaration_specifiers init_declarator_list ';'         { if ($$->type == TYPEDEF) type_definition ($2); }
+	| declaration_specifiers init_declarator_list ';'         { type_definition (alloc, $$); }
 	| static_assert_declaration
 	;
 
@@ -395,13 +401,13 @@ alignment_specifier
 	;
 
 declarator
-        : pointer direct_declarator { $$ = $2; }
+        : pointer direct_declarator
 	| direct_declarator
 	;
 
 direct_declarator
 	: generic_identifier
-	| '(' declarator ')'  { $$ = $2; }
+	| '(' declarator ')'
 	| direct_declarator '[' ']'
 	| direct_declarator '[' '*' ']'
 	| direct_declarator '[' STATIC type_qualifier_list assignment_expression ']'
@@ -540,13 +546,13 @@ labeled_statement
 	;
 
 compound_statement
-	: '{' '}'                           { SYMBOL($$), $$->after = $2->after; }
-	| '{'  block_item_list '}'          { SYMBOL($$), $$->after = $3->after, node_child ($$, $2); }
+	: '{' '}'
+	| '{'  block_item_list '}'
 	;
 
 block_item_list
 	: block_item
-	| block_item_list block_item        { node_append ($$, $2); }
+	| block_item_list block_item
 	;
 
 block_item
@@ -556,31 +562,31 @@ block_item
 
 expression_statement
 	: ';'
-	| expression ';'                    { SYMBOL($$), $$->after = $2->before; }
-        | expression compound_statement     { SYMBOL($$), node_child($$, $2); } /* Basilisk C extension */
+	| expression ';'
+        | expression compound_statement
 	;
 
 selection_statement
-        : IF '(' expression_error ')' statement ELSE statement            { SYMBOL($$), node_child ($$, $5), node_child ($$, $7); }
-        | IF '(' expression_error ')' statement                           { SYMBOL($$), node_child ($$, $5); }
-	| SWITCH '(' expression_error ')' statement                       { SYMBOL($$), node_child ($$, $5); }
+        : IF '(' expression_error ')' statement ELSE statement
+        | IF '(' expression_error ')' statement
+	| SWITCH '(' expression_error ')' statement
 	;
 
 iteration_statement
-        : WHILE '(' expression ')' statement                                            { SYMBOL($$), node_child ($$, $5); }
-	| DO statement WHILE '(' expression ')' ';'                                     { SYMBOL($$), node_child ($$, $2); }
-	| FOR '(' expression_statement expression_statement ')' statement               { SYMBOL($$), node_child ($$, $6); }
-	| FOR '(' expression_statement expression_statement expression ')' statement    { SYMBOL($$), node_child ($$, $7); }
-	| FOR '(' declaration expression_statement ')' statement                        { SYMBOL($$), node_child ($$, $6); }
-	| FOR '(' declaration expression_statement expression ')' statement             { SYMBOL($$), node_child ($$, $7); }
+        : WHILE '(' expression ')' statement                                            
+	| DO statement WHILE '(' expression ')' ';'
+	| FOR '(' expression_statement expression_statement ')' statement
+	| FOR '(' expression_statement expression_statement expression ')' statement
+	| FOR '(' declaration expression_statement ')' statement
+	| FOR '(' declaration expression_statement expression ')' statement
 	;
 
 jump_statement
-        : GOTO generic_identifier ';'    { SYMBOL($$), $$->after = $2->before; }
-	| CONTINUE ';'           { SYMBOL($$), $$->after = $2->before; }
-	| BREAK ';'              { SYMBOL($$), $$->after = $2->before; }
-	| RETURN ';'             { SYMBOL($$), $$->after = $2->before; }
-	| RETURN expression ';'  { SYMBOL($$), $$->after = $3->before; }
+        : GOTO generic_identifier ';'
+	| CONTINUE ';'
+	| BREAK ';'
+	| RETURN ';'
+	| RETURN expression ';'
 	;
 
 external_declaration
@@ -590,12 +596,12 @@ external_declaration
 	| boundary_definition /* Basilisk C extension */
 	| external_foreach_dimension /* Basilisk C extension */
 	| attribute /* Basilisk C extension */
-	| error compound_statement { $$ = $2, $$->before = $1->before; }
+	| error compound_statement
 	;
 
 function_definition
-        : declaration_specifiers declarator declaration_list compound_statement { $$ = $4; SYMBOL($$); $$->before = $1->before; }
-	| declaration_specifiers declarator compound_statement                  { $$ = $3; SYMBOL($$); $$->before = $1->before; }
+        : declaration_specifiers declarator declaration_list compound_statement
+	| declaration_specifiers declarator compound_statement
 	;
 
 declaration_list
@@ -613,8 +619,8 @@ basilisk_statements
 	;
 
 foreach_statement
-        : FOREACH '(' ')' statement                       { SYMBOL($$), $4->before = $3->after + 1, node_child ($$, $4); }
-        | FOREACH '(' foreach_parameters ')' statement    { SYMBOL($$), $5->before = $4->after + 1, node_child ($$, $5); }
+        : FOREACH '(' ')' statement
+        | FOREACH '(' foreach_parameters ')' statement
 	;
 
 foreach_parameters
@@ -637,18 +643,18 @@ reduction_operator
 	;
 
 foreach_inner_statement
-        : FOREACH_INNER '(' ')' statement               { SYMBOL($$), $4->before = $3->after + 1, node_child ($$, $4); }
-	| FOREACH_INNER '(' expression ')' statement    { SYMBOL($$), $5->before = $4->after + 1, node_child ($$, $5); }
+        : FOREACH_INNER '(' ')' statement
+	| FOREACH_INNER '(' expression ')' statement
 	;
 
 foreach_dimension_statement
-        : FOREACH_DIMENSION '(' ')' statement               { SYMBOL($$), $4->before = $3->after + 1, node_child ($$, $4); }
-        | FOREACH_DIMENSION '(' expression ')' statement    { SYMBOL($$), $5->before = $4->after + 1, node_child ($$, $5); }
+        : FOREACH_DIMENSION '(' ')' statement
+        | FOREACH_DIMENSION '(' expression ')' statement
 	;
 
 forin_statement
-        : FOR '(' TYPEDEF_NAME generic_identifier IN field_list ')' statement  { SYMBOL($$); $8->before = $7->after + 1, node_child ($$, $8); }
-        | FOR '(' expression IN field_list ')' statement                 { SYMBOL($$); $7->before = $6->after + 1, node_child ($$, $7); }
+        : FOR '(' TYPEDEF_NAME generic_identifier IN field_list ')' statement
+        | FOR '(' expression IN field_list ')' statement
 	;
 
 field_list
@@ -662,7 +668,7 @@ field_item_list
 	;
 
 event_definition
-        : generic_identifier generic_identifier '(' event_parameters ')' statement { $$ = $6; SYMBOL($$); $$->before = $1->before; }
+        : generic_identifier generic_identifier '(' event_parameters ')' statement
 	;
 
 event_parameter
@@ -687,16 +693,17 @@ external_foreach_dimension
 	;
 
 attribute
-        : generic_identifier '{' struct_declaration_list '}' { SYMBOL($$), node_child($$, $3); }
+        : generic_identifier '{' struct_declaration_list '}'
 	;
 
-root /* Must be last */
+root
         : translation_unit {
 	  $$ = *root = allocate (alloc, sizeof(Node));
 	  memset ($$, 0, sizeof(Node));
-	  $$->type = -1;
 	  SYMBOL($$);
+	  $$->child = allocate (alloc, 2*sizeof(Node *));
 	  $$->child[0] = $1;
+	  $$->child[1] = NULL;
         }
         ;
 
@@ -711,24 +718,63 @@ yyerror (Allocator * alloc,
 	 Node ** root, char const *s)
 {
 #if 1
-  fprintf (stderr, "%s:%d: %s\n", globalfname, *line, s);
+  fprintf (stderr, "%s:%d: %s near '", globalfname, *line, s);
+  char * s1 = *input - 1;
+  while (!strchr("}{;\n", *s1)) s1--;
+  s1++;
+  while (strchr(" \t", *s1)) s1++;
+  for (; s1 < *input; s1++)
+    fputc (*s1, stderr);
+  fputs ("'\n", stderr);
 #endif
 }
 
-static char * recopy_node (Node * n)
+static Node * recopy_node (Node * n)
 {
-  char * i = n->before;
-  n->before = !(*n->child) ? NULL: strcpy_range (i, (*n->child)->before);
-  for (Node ** c = n->child; *c; c++)
-    i = recopy_node (*c);
-  char * after = n->after;
-  n->after = NULL;
-  if (n->next) {
-    n->after = strcpy_range (i, n->next->before);
-    return recopy_node (n->next);
+  Node * c = malloc (sizeof (Node));
+  memcpy (c, n, sizeof (Node));
+  if (n->child) {
+    int len = 0;
+    for (Node ** i = n->child; *i; i++, len++);
+    c->child = malloc ((len + 1)*sizeof (Node *));
+    c->child[len] = NULL;
+    for (Node ** i = n->child, ** j = c->child; *i; i++, j++) {
+      *j = recopy_node (*i);
+      (*j)->parent = c;
+    }
   }
-  n->after = strcpy_range (i, after + 1);
-  return i > after ? i : after + 1;
+  return c;
+}
+
+static void remove_child (Node * c)
+{
+  if (!c->parent)
+    return;
+  Node ** i = c->parent->child;
+  for (; *i && *i != c; i++);
+  assert (*i == c);
+  for (; *i; i++)
+    *i = *(i + 1);
+  c->parent = NULL;
+}
+
+static Node * reduce_node (Allocator * alloc, Node ** children, int yyn)
+{
+  Node * node = allocate (alloc, sizeof(Node));
+  memset (node, 0, sizeof(Node));
+  node->kind = yyr1[yyn];
+  int n = yyr2[yyn];
+  node->child = allocate (alloc, (n + 1)*sizeof(Node *));
+  for (int i = 0; i < n; i++) {
+    Node * c = children[i + 1 - n];
+    if (c->parent)
+      remove_child (c);
+    c->parent = node;
+    node->child[i] = c;
+    node->child[i + 1] = NULL;
+  }
+  node->line = node->child[0]->line;
+  return node;
 }
 
 Node * parse_node (char * code, const char * fname)
@@ -742,10 +788,20 @@ Node * parse_node (char * code, const char * fname)
   yyparse (alloc, &code1, &line, &root);
   assert (root);
   yylex_destroy();
-  root = copy_node (root);
-  root->before = code;
-  root->after = code + strlen(code) - 1;
-  recopy_node (root);
+  root = recopy_node (root);
   free_allocator (alloc);
+  typedef_cleanup();
+  root->start = root->end = code;
   return root;
+}
+
+int token_symbol (int token)
+{
+  if (0) yy_reduce_print (NULL, NULL, 0, NULL, NULL, NULL, NULL); // just to avoid unused warning
+  return YYTRANSLATE (token);
+}
+
+const char * symbol_name (int sym)
+{
+  return yytname[sym];
 }
