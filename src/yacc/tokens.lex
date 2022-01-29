@@ -29,7 +29,7 @@ WS  [ \t\v\n\f]
 %{
 #include <stdio.h>
 #include <assert.h>
-#include "node.h"
+#include "parser.h"
 #include "basilisk.h"
 
 #define YYSTYPE Node *

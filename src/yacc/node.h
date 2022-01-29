@@ -1,12 +1,6 @@
 #include <stdio.h>
 #include <stdbool.h>
 
-typedef struct _Allocator Allocator;  
-  
-Allocator * new_allocator();
-void * allocate (Allocator * a, long size);
-void free_allocator (Allocator * a);
-
 typedef struct _Node Node;
 struct _Node {
   int kind, line;
