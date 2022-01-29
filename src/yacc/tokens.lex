@@ -1,6 +1,7 @@
 %option bison-bridge
 %option nounput
 %option noyywrap
+%option yylineno
 
 %e  1019
 %p  2807
@@ -32,24 +33,7 @@ WS  [ \t\v\n\f]
 #include "basilisk.h"
 
 #define YYSTYPE Node *
-#define YY_DECL int yylex(YYSTYPE * yylval_param,			\
-			  Allocator * alloc,				\
-			  char ** bison_input, int * bison_line)
-static char ** binput;
-static int * bline;
-
-#define YY_USER_INIT binput = bison_input, (*binput)--, bline = bison_line
-
-#define YY_INPUT(buf,result,max_size)			      \
-  {							      \
-    (*binput)++;					      \
-    int c = **binput;					      \
-    if (c == '\0') result = YY_NULL;			      \
-    else {						      \
-      if (c == '\n') (*bline)++;			      \
-      buf[0] = c; result = 1;				      \
-    }							      \
-  }
+#define YY_DECL int yylex (YYSTYPE * yylval_param, Allocator * alloc)
 
 extern void yyerror (const char * s);
 extern int token_symbol (int token);
@@ -72,30 +56,17 @@ static Node * new_node (Allocator * alloc,
   n->after = end;
   return n;
 }
-  
-#define CNODE()								\
-  char * s = *binput;							\
-  while (*s != yytext[0])						\
-    s--;								\
-  *yylval = new_node (alloc, yytext[0], *bline, s, s);			\
- return yytext[0];
- 
-#define SNODE(t) {							\
-    int len = strlen(yytext);						\
-    if (len == 1) {							\
-      char * s = *binput;						\
-      while (*s != yytext[0])						\
-	s--;								\
-      *yylval = new_node (alloc, t, *bline, s, s);			\
-    }									\
-    else								\
-      *yylval = new_node (alloc, t, *bline,				\
-			  *binput - len, *binput - 1);			\
-  }									\
-  return t;
-  
-%}
 
+#define CNODE()								\
+  *yylval = new_node (alloc, yytext[0], yylineno, yytext, yytext);	\
+  return yytext[0];
+  
+#define SNODE(t) 							\
+  *yylval = new_node (alloc, t, yylineno, yytext, yytext + strlen(yytext) - 1);	\
+  return t;
+
+%}
+	 
 %%
 
 "/*"                                    { comment(); }
@@ -303,4 +274,10 @@ static int check_type (void)
   default:                          /* includes undefined */
     return IDENTIFIER;
   }
+}
+
+void lexer_setup (char * buffer, size_t len)
+{
+  yylineno = 1;
+  yy_scan_buffer (buffer, len);
 }

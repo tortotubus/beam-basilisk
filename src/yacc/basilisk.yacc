@@ -1,6 +1,4 @@
 %param { Allocator * alloc }
-%param { char ** input }
-%param { int * line }
 %parse-param { Node ** root }
 %define api.pure full
 %define api.value.type { Node * }
@@ -15,10 +13,9 @@
 static Node * reduce_node (Allocator * alloc, Node ** children, int yyn);
 #define YY_REDUCE_PRINT(yyn) yyval = reduce_node (alloc, yyvsp, yyn)
   
-static int yyparse (Allocator * alloc, char ** input, int * line, Node ** root);
-int yylex (Node ** lvalp, Allocator * alloc, char ** input, int * line);
-void yyerror (Allocator * alloc, char ** input, int * line,
-	      Node ** root, char const *);
+static int yyparse (Allocator * alloc, Node ** root);
+int yylex (Node ** lvalp, Allocator * alloc);
+void yyerror (Allocator * alloc, Node ** root, char const *);
 void yylex_destroy();
 
 const char * symbol_name (int sym);
@@ -712,11 +709,9 @@ root
 
 /* Called by yyparse on error.  */
 void
-yyerror (Allocator * alloc,
-	 char ** input, int * line,
-	 Node ** root, char const *s)
+yyerror (Allocator * alloc, Node ** root, char const *s)
 {
-#if 1
+#if 0
   fprintf (stderr, "%d: %s near '", *line, s);
   char * s1 = *input - 1;
   while (!strchr("}{;\n", *s1)) s1--;
@@ -728,27 +723,27 @@ yyerror (Allocator * alloc,
 #endif
 }
 
-static char * copy_range (char * start, char * end)
+static char * copy_range (const char * start, const char * end, size_t offset)
 {
   char * c = NULL;
   int len = end - start;
   if (len > 0) {
     char * s = c = malloc (len + 1);
-    for (char * i = start; i < end; i++, s++)
-      *s = *i;
+    for (const char * i = start; i < end; i++, s++)
+      *s = *(i + offset);
     *s = '\0';
   }
   return c;
 }
 
-static char * copy_strings (char * i, Node * n)
+static const char * copy_strings (const char * i, Node * n, size_t offset)
 {
   if (n->start) {
-    n->before = copy_range (i, n->start);
+    n->before = copy_range (i, n->start, offset);
     if (n->start > i)
       i = n->start;
 
-    n->start = copy_range (i, n->after + 1);
+    n->start = copy_range (i, n->after + 1, offset);
     if (n->after + 1 > i)
       i = n->after + 1;
     n->after = NULL;
@@ -756,7 +751,7 @@ static char * copy_strings (char * i, Node * n)
     
   if (n->child && n->child[0])
     for (Node ** c = n->child; *c; c++)
-      i = copy_strings (i, *c);
+      i = copy_strings (i, *c, offset);
   return i;
 }
 
@@ -810,29 +805,34 @@ static Node * reduce_node (Allocator * alloc, Node ** children, int yyn)
   return node;
 }
 
-Node * parse_node (char * code)
+Node * parse_node (const char * code)
 {
   Node * root = NULL;
   Allocator * alloc = new_allocator();
-  int line = 1;
-  char * code1 = code;
+  extern void lexer_setup (char * buffer, size_t len);
+  size_t len = strlen (code) + 1;
+  char * buffer = malloc (len + 1);
+  memcpy (buffer, code, len);
+  buffer[len] = '\0';
+  lexer_setup (buffer, len + 1);
   //  yydebug = 1;
-  yyparse (alloc, &code1, &line, &root);
+  yyparse (alloc, &root);
   assert (root);
-  yylex_destroy();
-  char * i = copy_strings (code, root);
+  const char * i = copy_strings (buffer, root, code - buffer);
   root = recopy_node (root);
-  char * end = i; while (*end != '\0') end++;
-  root->after = copy_range (i, end);
+  const char * end = i; while (*end != '\0') end++;
+  root->after = copy_range (i, end, code - buffer);
+  free (buffer);
   free_allocator (alloc);
   typedef_cleanup();
+  yylex_destroy();
   return root;
 }
 
 int token_symbol (int token)
 {
    // just to avoid unused warning
-  if (0) yy_reduce_print (NULL, NULL, 0, NULL, NULL, NULL, NULL);
+  if (0) yy_reduce_print (NULL, NULL, 0, NULL, NULL);
   return YYTRANSLATE (token);
 }
 
