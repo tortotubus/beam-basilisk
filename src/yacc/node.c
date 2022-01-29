@@ -7,43 +7,9 @@
 #include <assert.h>
 #include <stdarg.h>
 
-#include "node.h"
+#include "parser.h"
 #include "basilisk.h"
 #include "symbols.h"
-
-struct _Allocator {
-  void * m;
-  long len, maxlen;
-  Allocator * next;
-};
-
-Allocator * new_allocator()
-{
-  Allocator * a = calloc (1, sizeof (Allocator));
-  a->maxlen = 1 << 22;
-  a->m = calloc (a->maxlen, 1);
-  return a;
-}
-
-void * allocate (Allocator * a, long size)
-{
-  Allocator * last = a;
-  while (a && a->len + size >= a->maxlen)
-    last = a, a = a->next;
-  if (a == NULL)
-    a = last->next = new_allocator();
-  assert (a->len + size < a->maxlen);
-  void * p = (void *)(((char *)a->m) + a->len);
-  a->len += size;
-  return p;
-}
-
-void free_allocator (Allocator * a)
-{
-  free (a->m);
-  if (a->next) free_allocator (a->next);
-  free (a);
-}
 
 void free_node (Node * n)
 {

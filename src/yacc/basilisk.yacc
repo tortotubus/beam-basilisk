@@ -8,7 +8,7 @@
 #include <assert.h>
 #include <stdlib.h>
   
-#include "node.h"
+#include "parser.h"
 
 static Node * reduce_node (Allocator * alloc, Node ** children, int yyn);
 #define YY_REDUCE_PRINT(yyn) yyval = reduce_node (alloc, yyvsp, yyn)

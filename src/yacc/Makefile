@@ -1,6 +1,6 @@
 CFLAGS += -Wall -g -I$(BASILISK)
 
-libbasilisk.a: node.o tokens.o basilisk.o transform.o typedef.o
+libbasilisk.a: node.o tokens.o basilisk.o transform.o typedef.o allocator.o
 	ar cr $@ $^
 
 basilisk.c: basilisk.yacc
@@ -16,15 +16,17 @@ symbols.h: basilisk.c Makefile
 tokens.c: tokens.lex
 	flex -o tokens.c tokens.lex
 
-basilisk.o: node.h 
+basilisk.o: node.h parser.h
 
-node.o: node.h symbols.h
+node.o: node.h parser.h symbols.h
 
-typedef.o: node.h symbols.h
+typedef.o: node.h parser.h symbols.h
 
 tokens.o: node.h basilisk.c
 
 transform.o: node.h symbols.h
+
+allocator.o: allocator.h
 
 clean:
 	rm -f *.o *.a
