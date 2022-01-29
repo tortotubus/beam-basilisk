@@ -23,13 +23,13 @@ qcc: qcc.c include.o rotate.o stencils.o config
 		-DBASILISK="\"$(BASILISK)\"" \
 		qcc.c include.o rotate.o stencils.o -o qcc
 
-qcc1: qcc1.c include.o postproc.o yacc/libbasilisk.a config
+qcc1: qcc1.c include.o postproc.o ast/libast.a config
 	$(CC) $(CFLAGS) -DLIBDIR=\"`pwd`\" \
 		-DCC99="\"$(CC99)\"" \
 		-DCPP99="\"$(CPP99)\"" \
 		-DCADNACC="\"$(CADNACC)\"" \
 		-DBASILISK="\"$(BASILISK)\"" \
-		qcc1.c include.o postproc.o -o qcc1 -Lyacc -lbasilisk
+		qcc1.c include.o postproc.o -o qcc1 -Last -last
 
 rotate.c: rotate.lex
 	flex -P rot -o rotate.c rotate.lex
