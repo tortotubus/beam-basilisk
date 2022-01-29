@@ -49,14 +49,14 @@ static int line = 1;
 SP     [ \t]
 WS     [ \t\v\n\f]
 ES     (\\([\'\"\?\\abfnrtv]|[0-7]{1,3}|x[a-fA-F0-9]+))
-STRING ({SP}?\"([^"\\\n]|{ES})*\"{WS}*)
+STRING ({SP}?\"([^"\\\n]|{ES})*\"{SP}*)
   
 %%
 
 "/*"                                    { comment(); }
 "//".*                                  { ECHO; /* consume //-comment */ }
 
-^{SP}*#{SP}+[0-9]+{SP}+{STRING}+.* {
+^{SP}*#{SP}+[0-9]+{SP}+{STRING}+({SP}+[0-9]+)* {
   /* replace # 3 "machin.h" 2 4 with #line 3 "machin.h" */
   char * s = strchr(yytext, '#') + 1;
   line = atoi(s);

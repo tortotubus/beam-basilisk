@@ -23,16 +23,33 @@ static void foreach_statement (Node * n)
   if (n->kind == sym_foreach_statement) {
     Node * statement = node_last_child (n);
     if (statement->child[0]->kind == sym_compound_statement)
-      str_prepend (statement->after, " end_", n->child[0]->start, "();");
+      node_after (statement, " end_", n->child[0]->start, "();");
     else {
-      str_append (statement->before, "{");
-      str_prepend (statement->after, "} end_", n->child[0]->start, "();");
+      node_before (statement, "{");
+      node_after (statement, "} end_", n->child[0]->start, "();");
     }
     no_nested_foreach (statement, n->line);
   }
   else if (n->child)
     for (Node ** c = n->child; *c; c++)
       foreach_statement (*c);
+}
+
+static void trace_return (Node * n, Node * identifier)
+{
+  if (n->kind == sym_jump_statement && n->child[0]->kind == sym_RETURN) {
+    Node * ret = n->child[0];
+    if (!n->child[2]) {
+      node_before (ret,
+		   "{ end_trace (\"", identifier->start, "\", ",
+		   node_file_line (ret), "); ");
+      node_after (n->child[1], " }");
+    }
+    // else ... // fixme
+  }
+  if (n->child)
+    for (Node ** c = n->child; *c; c++)
+      trace_return (*c, identifier);
 }
 
 typedef struct {
@@ -50,10 +67,10 @@ static void various_transforms (Node * n)
   case sym_foreach_inner_statement: {
     Node * statement = node_last_child (n);
     if (statement->child[0]->kind == sym_compound_statement)
-      str_prepend (statement->after, " end_", n->child[0]->start, "();");
+      node_after (statement, " end_", n->child[0]->start, "();");
     else {
-      str_append (statement->before, "{");
-      str_prepend (statement->after, "} end_", n->child[0]->start, "();");
+      node_before (statement, "{");
+      node_after (statement, "} end_", n->child[0]->start, "();");
     }
     break;
   }
@@ -104,7 +121,7 @@ static void various_transforms (Node * n)
 	  free (identifier->start);
 	  identifier->start = strdup (i->replacement);
 	  assert (n->child[3]);
-	  str_append (n->child[3]->before, ",__func__,__FILE__,__LINE__");
+	  node_before (n->child[3], ",__func__,__FILE__,__LINE__");
 	}
 	i++;
       }
@@ -123,19 +140,18 @@ static void various_transforms (Node * n)
 				0, sym_TRACE,
 				-1);
     if (trace) {
-      for (char * s = trace->start; *s != '\0'; s++)
-	*s = ' ';
+      node_hide (trace);
       Node * identifier = declarator_identifier (n->child[1]);
       Node * compound_statement = node_last_child (n);
-      char line[10]; snprintf (line, 9, "%d", identifier->line);
-      str_prepend (compound_statement->child[0]->after,
-		   " trace (\"", identifier->start, "\", \"file\", ",
-		   line, ");");
+      node_after (compound_statement->child[0],
+		  " trace (\"", identifier->start, "\", ",
+		  node_file_line (identifier), "); ");
       Node * end = node_last_child (compound_statement);
-      snprintf (line, 9, "%d", end->line);
-      str_append (end->before,
-		  " end_trace (\"", identifier->start,
-		  "\", \"file\", ", line, ");");
+      node_before (end,
+		   " end_trace (\"", identifier->start, "\", ",
+		   node_file_line (end), "); ");
+      if (compound_statement->child[1]->kind == sym_block_item_list)
+	trace_return (compound_statement->child[1], identifier);
     }
     break;
   }

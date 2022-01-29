@@ -14,7 +14,7 @@ struct _Node {
   Node ** child, * parent;
 };
 
-Node * parse_node   (char * code);
+Node * parse_node   (const char * code);
 void   free_node    (Node * n);
 void   print_node   (Node * n, FILE * fp, bool kind);
 
@@ -38,3 +38,15 @@ char * str_append_realloc (char * dst, ...);
 char * str_prepend_realloc (char * dst, ...);
 #define str_prepend(dst, ...)						\
   do { dst = str_prepend_realloc (dst, __VA_ARGS__, NULL); } while(0)
+
+#define node_before(n,...) str_append((n)->before, __VA_ARGS__)
+#define node_after(n,...) str_prepend((n)->after, __VA_ARGS__)
+
+static inline void node_hide (Node * n)
+{
+  for (char * s = n->start; *s != '\0'; s++)
+    *s = ' ';
+}
+
+char * node_line (Node * n);
+#define node_file_line(n) "\"file\", ", node_line(n)

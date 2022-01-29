@@ -58,6 +58,13 @@ void free_node (Node * n)
   free (n);
 }
 
+char * node_line (Node * n)
+{
+  static char s[20];
+  snprintf (s, 19, "%d", n->line);
+  return s;
+}
+
 void print_node (Node * n, FILE * fp, bool kind)
 {
   if (n->before)
