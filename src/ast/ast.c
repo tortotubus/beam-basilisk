@@ -11,10 +11,10 @@
 #include "basilisk.h"
 #include "symbols.h"
 
-static void free_children (Node * n)
+static void free_children (Ast * n)
 {
   if (n->child) {
-    for (Node ** c = n->child; *c; c++)
+    for (Ast ** c = n->child; *c; c++)
       free_children (*c);
     free (n->child);
   }
@@ -24,9 +24,9 @@ static void free_children (Node * n)
   free (n);
 }
 
-void free_node (Node * root)
+void ast_destroy (Ast * root)
 {
-  NodeRoot * r = root->data;
+  AstRoot * r = root->data;
   if (r) {
     for (int i = 0; i < r->nf; i++)
       free (r->file[i]);
@@ -36,38 +36,38 @@ void free_node (Node * root)
   free_children (root);
 }
 
-char * node_line (Node * n)
+char * ast_line (Ast * n)
 {
   static char s[20];
   snprintf (s, 19, "%d", n->line);
   return s;
 }
 
-void print_node (Node * n, FILE * fp, bool kind)
+void ast_print (Ast * n, FILE * fp, bool sym)
 {
   if (n->before)
     fputs (n->before, fp);
 
   if (n->start) {
-    if (kind) {
+    if (sym) {
       fputc ('|', fp);
-      fputs (symbol_name (n->kind), fp);
+      fputs (symbol_name (n->sym), fp);
       fputc ('|', fp);
     }
     fputs (n->start, fp);
-    if (kind)
+    if (sym)
       fputc ('/', fp);
   }
 
   if (n->child)
-    for (Node ** c = n->child; *c; c++)
-      print_node (*c, fp, kind);
+    for (Ast ** c = n->child; *c; c++)
+      ast_print (*c, fp, sym);
 
   if (n->after)
     fputs (n->after, fp);
 }
 
-Node * node_schema_internal (Node * n, ...)
+Ast * ast_schema_internal (Ast * n, ...)
 {
   va_list ap;
   va_start (ap, n);
@@ -80,8 +80,8 @@ Node * node_schema_internal (Node * n, ...)
     if (i <= c)
       return NULL;
     n = n->child[c];
-    int kind = va_arg(ap, int);
-    if (n->kind != kind)
+    int sym = va_arg(ap, int);
+    if (n->sym != sym)
       return NULL;
     c = va_arg(ap, int);
   }
@@ -89,20 +89,20 @@ Node * node_schema_internal (Node * n, ...)
   return n;
 }
 
-Node * declarator_identifier (Node * declarator)
+Ast * ast_declarator_identifier (Ast * declarator)
 {
   while (declarator->child) {
-    Node * c = declarator->child[0];
-    if (c->kind != sym_init_declarator_list &&
-	c->kind != sym_init_declarator &&
-	c->kind != sym_declarator &&
-	c->kind != sym_direct_declarator &&
-	c->kind != sym_generic_identifier &&
-	c->kind != sym_IDENTIFIER)
+    Ast * c = declarator->child[0];
+    if (c->sym != sym_init_declarator_list &&
+	c->sym != sym_init_declarator &&
+	c->sym != sym_declarator &&
+	c->sym != sym_direct_declarator &&
+	c->sym != sym_generic_identifier &&
+	c->sym != sym_IDENTIFIER)
       c = declarator->child[1];
     declarator = c;
   }
-  assert (declarator->kind == sym_IDENTIFIER);
+  assert (declarator->sym == sym_IDENTIFIER);
   return declarator;
 }
     

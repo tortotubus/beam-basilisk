@@ -1,7 +1,7 @@
-%param { NodeRoot * parse }
-%parse-param { Node ** root }
+%param { AstRoot * parse }
+%parse-param { Ast ** root }
 %define api.pure full
-%define api.value.type { Node * }
+%define api.value.type { Ast * }
 
 %{
 #include <string.h>
@@ -10,12 +10,10 @@
   
 #include "parser.h"
 
-static Node * reduce_node (Allocator * alloc, Node ** children, int yyn);
-#define YY_REDUCE_PRINT(yyn) yyval = reduce_node (parse->alloc, yyvsp, yyn)
+static Ast * ast_reduce (Allocator * alloc, Ast ** children, int yyn);
+#define YY_REDUCE_PRINT(yyn) yyval = ast_reduce (parse->alloc, yyvsp, yyn)
+static int yyparse (AstRoot * parse, Ast ** root);
 
-static int yyparse (NodeRoot * parse, Node ** root);
-
-const char * symbol_name (int sym);
 %}
 
 %token	IDENTIFIER I_CONSTANT F_CONSTANT STRING_LITERAL FUNC_NAME SIZEOF
@@ -691,10 +689,10 @@ attribute
 
 root
         : translation_unit {
-	  $$ = *root = allocate (parse->alloc, sizeof(Node));
-	  memset ($$, 0, sizeof(Node));
-	  $$->kind = yyr1[yyn];
-	  $$->child = allocate (parse->alloc, 2*sizeof(Node *));
+	  $$ = *root = allocate (parse->alloc, sizeof(Ast));
+	  memset ($$, 0, sizeof(Ast));
+	  $$->sym = yyr1[yyn];
+	  $$->child = allocate (parse->alloc, 2*sizeof(Ast *));
 	  $$->child[0] = $1;
 	  $$->child[1] = NULL;
         }
@@ -704,7 +702,7 @@ root
 
 /* Called by yyparse on error.  */
 void
-yyerror (NodeRoot * parse, Node ** root, char const *s)
+yyerror (AstRoot * parse, Ast ** root, char const *s)
 {
 #if 0
   fprintf (stderr, "%d: %s near '", *line, s);
@@ -731,7 +729,7 @@ static char * copy_range (const char * start, const char * end, size_t offset)
   return c;
 }
 
-static const char * copy_strings (const char * i, Node * n, size_t offset)
+static const char * copy_strings (const char * i, Ast * n, size_t offset)
 {
   if (n->start) {
     n->before = copy_range (i, n->start, offset);
@@ -745,35 +743,35 @@ static const char * copy_strings (const char * i, Node * n, size_t offset)
   }
     
   if (n->child && n->child[0])
-    for (Node ** c = n->child; *c; c++)
+    for (Ast ** c = n->child; *c; c++)
       i = copy_strings (i, *c, offset);
   return i;
 }
 
-static Node * recopy_node (Node * n)
+static Ast * recopy_ast (Ast * n)
 {
-  Node * c = malloc (sizeof (Node));
-  memcpy (c, n, sizeof (Node));
+  Ast * c = malloc (sizeof (Ast));
+  memcpy (c, n, sizeof (Ast));
   n->before = NULL;
   n->start = NULL;
   if (n->child) {
     int len = 0;
-    for (Node ** i = n->child; *i; i++, len++);
-    c->child = malloc ((len + 1)*sizeof (Node *));
+    for (Ast ** i = n->child; *i; i++, len++);
+    c->child = malloc ((len + 1)*sizeof (Ast *));
     c->child[len] = NULL;
-    for (Node ** i = n->child, ** j = c->child; *i; i++, j++) {
-      *j = recopy_node (*i);
+    for (Ast ** i = n->child, ** j = c->child; *i; i++, j++) {
+      *j = recopy_ast (*i);
       (*j)->parent = c;
     }
   }
   return c;
 }
 
-static void remove_child (Node * c)
+static void remove_child (Ast * c)
 {
   if (!c->parent)
     return;
-  Node ** i = c->parent->child;
+  Ast ** i = c->parent->child;
   for (; *i && *i != c; i++);
   assert (*i == c);
   for (; *i; i++)
@@ -781,29 +779,29 @@ static void remove_child (Node * c)
   c->parent = NULL;
 }
 
-static Node * reduce_node (Allocator * alloc, Node ** children, int yyn)
+static Ast * ast_reduce (Allocator * alloc, Ast ** children, int yyn)
 {
-  Node * node = allocate (alloc, sizeof(Node));
-  memset (node, 0, sizeof(Node));
-  node->kind = yyr1[yyn];
+  Ast * ast = allocate (alloc, sizeof(Ast));
+  memset (ast, 0, sizeof(Ast));
+  ast->sym = yyr1[yyn];
   int n = yyr2[yyn];
-  node->child = allocate (alloc, (n + 1)*sizeof(Node *));
+  ast->child = allocate (alloc, (n + 1)*sizeof(Ast *));
   for (int i = 0; i < n; i++) {
-    Node * c = children[i + 1 - n];
+    Ast * c = children[i + 1 - n];
     if (c->parent)
       remove_child (c);
-    c->parent = node;
-    node->child[i] = c;
-    node->child[i + 1] = NULL;
+    c->parent = ast;
+    ast->child[i] = c;
+    ast->child[i + 1] = NULL;
   }
-  node->line = node->child[0]->line;
-  return node;
+  ast->line = ast->child[0]->line;
+  return ast;
 }
 
-Node * parse_node (const char * code)
+Ast * ast_parse (const char * code)
 {
-  Node * root = NULL;
-  NodeRoot * parse = calloc (1, sizeof (NodeRoot));
+  Ast * root = NULL;
+  AstRoot * parse = calloc (1, sizeof (AstRoot));
   parse->file = malloc (sizeof (char *));
   parse->nf = 1;
   parse->file[0] = strdup ("<basilisk>");
@@ -818,7 +816,7 @@ Node * parse_node (const char * code)
   yyparse (parse, &root);
   assert (root);
   const char * i = copy_strings (buffer, root, code - buffer);
-  root = recopy_node (root);
+  root = recopy_ast (root);
   const char * end = i; while (*end != '\0') end++;
   root->after = copy_range (i, end, code - buffer);
   root->data = parse;
