@@ -1,4 +1,4 @@
-%param { Allocator * alloc }
+%param { NodeRoot * parse }
 %parse-param { Node ** root }
 %define api.pure full
 %define api.value.type { Node * }
@@ -11,16 +11,11 @@
 #include "parser.h"
 
 static Node * reduce_node (Allocator * alloc, Node ** children, int yyn);
-#define YY_REDUCE_PRINT(yyn) yyval = reduce_node (alloc, yyvsp, yyn)
-  
-static int yyparse (Allocator * alloc, Node ** root);
-int yylex (Node ** lvalp, Allocator * alloc);
-void yyerror (Allocator * alloc, Node ** root, char const *);
-void yylex_destroy();
+#define YY_REDUCE_PRINT(yyn) yyval = reduce_node (parse->alloc, yyvsp, yyn)
+
+static int yyparse (NodeRoot * parse, Node ** root);
 
 const char * symbol_name (int sym);
-void type_definition (Allocator * alloc, Node * declaration);
-void typedef_cleanup(); 
 %}
 
 %token	IDENTIFIER I_CONSTANT F_CONSTANT STRING_LITERAL FUNC_NAME SIZEOF
@@ -259,7 +254,7 @@ constant_expression
 declaration
         : declaration_specifiers ';' 
 	| declaration_specifiers init_declarator_list ';' {
-	      type_definition (alloc, $$);
+	      type_definition (parse->alloc, $$);
         }
 	| static_assert_declaration
 	;
@@ -696,10 +691,10 @@ attribute
 
 root
         : translation_unit {
-	  $$ = *root = allocate (alloc, sizeof(Node));
+	  $$ = *root = allocate (parse->alloc, sizeof(Node));
 	  memset ($$, 0, sizeof(Node));
 	  $$->kind = yyr1[yyn];
-	  $$->child = allocate (alloc, 2*sizeof(Node *));
+	  $$->child = allocate (parse->alloc, 2*sizeof(Node *));
 	  $$->child[0] = $1;
 	  $$->child[1] = NULL;
         }
@@ -709,7 +704,7 @@ root
 
 /* Called by yyparse on error.  */
 void
-yyerror (Allocator * alloc, Node ** root, char const *s)
+yyerror (NodeRoot * parse, Node ** root, char const *s)
 {
 #if 0
   fprintf (stderr, "%d: %s near '", *line, s);
@@ -808,7 +803,11 @@ static Node * reduce_node (Allocator * alloc, Node ** children, int yyn)
 Node * parse_node (const char * code)
 {
   Node * root = NULL;
-  Allocator * alloc = new_allocator();
+  NodeRoot * parse = calloc (1, sizeof (NodeRoot));
+  parse->file = malloc (sizeof (char *));
+  parse->nf = 1;
+  parse->file[0] = strdup ("<basilisk>");
+  parse->alloc = new_allocator();
   extern void lexer_setup (char * buffer, size_t len);
   size_t len = strlen (code) + 1;
   char * buffer = malloc (len + 1);
@@ -816,14 +815,15 @@ Node * parse_node (const char * code)
   buffer[len] = '\0';
   lexer_setup (buffer, len + 1);
   //  yydebug = 1;
-  yyparse (alloc, &root);
+  yyparse (parse, &root);
   assert (root);
   const char * i = copy_strings (buffer, root, code - buffer);
   root = recopy_node (root);
   const char * end = i; while (*end != '\0') end++;
   root->after = copy_range (i, end, code - buffer);
+  root->data = parse;
   free (buffer);
-  free_allocator (alloc);
+  free_allocator (parse->alloc);
   typedef_cleanup();
   yylex_destroy();
   return root;

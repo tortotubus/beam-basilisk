@@ -110,6 +110,7 @@ static void various_transforms (Node * n)
     if (identifier) {
       static Replacement replacements[] = {
 	{ "malloc",  "pmalloc" },
+	{ "calloc",  "pcalloc" },
 	{ "realloc", "prealloc" },
 	{ "free",    "pfree" },
 	{ "strdup",  "pstrdup" },

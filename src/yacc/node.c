@@ -11,17 +11,29 @@
 #include "basilisk.h"
 #include "symbols.h"
 
-void free_node (Node * n)
+static void free_children (Node * n)
 {
   if (n->child) {
     for (Node ** c = n->child; *c; c++)
-      free_node (*c);
+      free_children (*c);
     free (n->child);
   }
   free (n->before);
   free (n->start);
   free (n->after);
   free (n);
+}
+
+void free_node (Node * root)
+{
+  NodeRoot * r = root->data;
+  if (r) {
+    for (int i = 0; i < r->nf; i++)
+      free (r->file[i]);
+    free (r->file);
+    free (r);
+  }
+  free_children (root);
 }
 
 char * node_line (Node * n)

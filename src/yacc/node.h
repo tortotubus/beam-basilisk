@@ -4,8 +4,9 @@
 typedef struct _Node Node;
 struct _Node {
   int kind, line;
-  char * before, * start, * after;
+  char * before, * start, * after, * file;
   Node ** child, * parent;
+  void * data;
 };
 
 Node * parse_node   (const char * code);
@@ -43,4 +44,4 @@ static inline void node_hide (Node * n)
 }
 
 char * node_line (Node * n);
-#define node_file_line(n) "\"file\", ", node_line(n)
+#define node_file_line(n) "\"", n->file, "\", ", node_line(n)
