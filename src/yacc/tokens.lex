@@ -25,6 +25,7 @@ CP  (u|U|L)
 SP  (u8|u|U|L)
 ES  (\\(['"\?\\abfnrtv]|[0-7]{1,3}|x[a-fA-F0-9]+))
 WS  [ \t\v\n\f]
+STRING \"([^"\\\n]|{ES})*\"
 
 %{
 #include <stdio.h>
@@ -33,24 +34,22 @@ WS  [ \t\v\n\f]
 #include "basilisk.h"
 
 #define YYSTYPE Node *
-#define YY_DECL int yylex (YYSTYPE * yylval_param, Allocator * alloc)
-
-extern void yyerror (const char * s);
-extern int token_symbol (int token);
-extern int sym_type (const char * name);
+#define YY_DECL int yylex (YYSTYPE * yylval_param, NodeRoot * parse)
  
 static void comment (void);
 static void preproc (void);
 static void bpreproc (void);
 static void ompreproc (void);
-static int check_type(void);
+static void file_line (NodeRoot * parse, const char * text);
+static int  check_type(void);
 
-static Node * new_node (Allocator * alloc,
+static Node * new_node (NodeRoot * parse,
 			int token, int line, char * start, char * end)
 {
-  Node * n = allocate (alloc, sizeof(Node));
+  Node * n = allocate (parse->alloc, sizeof(Node));
   memset (n, 0, sizeof(Node));
   n->kind = token_symbol (token);
+  n->file = parse->file[parse->nf - 1];
   n->line = line;
   n->start = start;
   n->after = end;
@@ -58,19 +57,20 @@ static Node * new_node (Allocator * alloc,
 }
 
 #define CNODE()								\
-  *yylval = new_node (alloc, yytext[0], yylineno, yytext, yytext);	\
+  *yylval = new_node (parse, yytext[0], yylineno, yytext, yytext);	\
   return yytext[0];
   
 #define SNODE(t) 							\
-  *yylval = new_node (alloc, t, yylineno, yytext, yytext + strlen(yytext) - 1);	\
+  *yylval = new_node (parse, t, yylineno, yytext, yytext + strlen(yytext) - 1);	\
   return t;
-
+  
 %}
 	 
 %%
 
 "/*"                                    { comment(); }
 "//".*                                  { /* consume //-comment */ }
+^[ \t]*#[ \t]+[0-9]+[ \t]+{STRING}.*    { file_line (parse, yytext); }
 ^[ \t]*#	                        { preproc(); }
 ^[ \t]*@[ \t]*def[ \t].*                { bpreproc(); }
 ^[ \t]*@.*
@@ -226,7 +226,7 @@ static void comment (void)
       if (c == 0)
 	break;
     }
-  yyerror ("unterminated comment");
+  //  yyerror ("unterminated comment");
 }
 
 static void preproc (void)
@@ -237,7 +237,7 @@ static void preproc (void)
       return;
     c1 = c;
   }
-  yyerror ("unterminated preprocessor directive");
+  //  yyerror ("unterminated preprocessor directive");
 }
 
 static void bpreproc (void)
@@ -246,7 +246,7 @@ static void bpreproc (void)
   while ((c = input()) != 0)
     if (c == '@')
       return;
-  yyerror ("unterminated @def");
+  //  yyerror ("unterminated @def");
 }
 
 static void ompreproc (void)
@@ -261,7 +261,21 @@ static void ompreproc (void)
 	return;
     }
   }
-  yyerror ("unterminated OMP");
+  //  yyerror ("unterminated OMP");
+}
+
+static void file_line (NodeRoot * parse, const char * text)
+{
+  char * s = strchr (text, '#') + 1;
+  yylineno = atoi(s) - 1;
+  s = strchr (s, '"') + 1;
+  char * end = strchr (s, '"');
+  parse->nf++;
+  parse->file = realloc (parse->file, parse->nf*sizeof (char *));
+  char * file = calloc (end - s + 1, sizeof (char));
+  parse->file[parse->nf - 1] = file;
+  strncpy (file, s, end - s);
+  //  fprintf (stderr, "%s: \"%s\" %d\n", text, file, yylineno);
 }
 
 static int check_type (void)
