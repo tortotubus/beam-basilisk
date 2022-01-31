@@ -10,6 +10,7 @@ basilisk.c: basilisk.yacc
 symbols.h: basilisk.c Makefile
 	echo "// Automatically generated from basilisk.yacc" > symbols.h
 	@echo 'const char * symbol_name (int sym);' >> symbols.h
+	@echo 'int token_symbol (int token);' >> symbols.h
 	@awk '/^enum yysymbol_kind_t/{a=1}{if(a)print $$0;}/};/{a=0}' \
 		basilisk.c | sed 's/YYSYMBOL_/sym_/g' >> symbols.h
 

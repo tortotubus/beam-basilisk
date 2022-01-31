@@ -25,8 +25,9 @@ typedef struct {
 Ast * ast_parse            (const char * code);
 void  ast_destroy          (Ast * n);
 Ast * ast_parse_expression (const char * expr);
+void  ast_replace          (Ast * dst, Ast * src);
 void  ast_print            (Ast * n, FILE * fp, bool kind);
-void  ast_print_graph      (Ast * n, FILE * fp, int indent);
+void  ast_print_tree       (Ast * n, FILE * fp, const char * indent);
 
 static inline Ast * ast_last_child (Ast * n)
 {
@@ -55,6 +56,10 @@ Ast * ast_declarator_identifier (Ast * declarator);
 
 Ast * ast_schema_internal (Ast * n, ...);
 #define ast_schema(n,...) ast_schema_internal (n, __VA_ARGS__, -1)
+Ast * ast_find_internal (Ast * n, ...);
+#define ast_find(n,...) ast_find_internal (n, __VA_ARGS__, -1)
+Ast * ast_copy_internal (Ast * n, ...);
+#define ast_copy(n,...) ast_copy_internal (n, __VA_ARGS__ + 0, -1)
 
 char * str_append_realloc (char * dst, ...);
 #define str_append(dst, ...)						\

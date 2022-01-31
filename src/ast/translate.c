@@ -36,35 +36,11 @@ static void foreach_statement (Ast * n)
       foreach_statement (*c);
 }
 
-static void type_before (Ast * before, Ast * n)
-{
-  if (!n->child) {
-    if (n->parent->sym == sym_type_specifier)
-      // ignores atomic_type_specifier and struct_or_union_specifier
-      ast_before (before, ast_terminal(n)->start, " ");
-  }
-  else
-    for (Ast ** c = n->child; *c; c++)
-      type_before (before, *c);
-}
-
-static void pointer_before (Ast * before, Ast * n)
-{
-  if (!n->child) {
-    if (n->parent->sym == sym_pointer)
-      ast_before (before, ast_terminal(n)->start, " ");
-  }
-  else if (n->sym == sym_direct_declarator ||
-	   n->sym == sym_declarator ||
-	   n->sym == sym_pointer)
-    for (Ast ** c = n->child; *c; c++)
-      pointer_before (before, *c);
-}
-
-static void trace_return (Ast * function_definition, Ast * n,
+static void trace_return (Ast * n,
+			  Ast * function_definition,
 			  AstTerminal * function_identifier)
 {
-  if (n->sym == sym_jump_statement && n->child[0]->sym == sym_RETURN) {
+  if (ast_schema (n, sym_jump_statement, 0, sym_RETURN)) {
     Ast * ret = n->child[0];
     if (!n->child[2]) { // return ;
       ast_before (ret,
@@ -73,15 +49,33 @@ static void trace_return (Ast * function_definition, Ast * n,
       ast_after (n->child[1], " }");
     }
     else { // return sthg;
-      ast_before (ret, "{ ");
-      type_before (ret, function_definition->child[0]);
-      pointer_before (ret, function_definition->child[1]);
-      ast_before (ret, "ret = ");
+      Ast * compound =
+	ast_parse_expression ("{ void ret = val; return ret; }");
+      Ast * type_specifier =
+	ast_copy (ast_find (function_definition, sym_declaration_specifiers,
+			    0, sym_type_specifier));
+      Ast * declarator =
+	ast_copy (ast_find (function_definition, sym_declarator),
+		  sym_IDENTIFIER);
+      AstTerminal * identifier =
+	ast_terminal (ast_find (declarator, sym_IDENTIFIER));
+      free (identifier->start);
+      identifier->start = strdup ("ret");
+      ast_replace (ast_find (compound, sym_type_specifier), type_specifier);
+      ast_replace (ast_find (compound, sym_declarator), declarator);
+      ast_replace (ast_find (compound, sym_assignment_expression),
+		   ast_find (n, sym_assignment_expression));
+      ast_before (ast_find (compound, sym_RETURN),
+		  "end_trace (\"", function_identifier->start, "\", ",
+		  ast_file_line (ret), "); ");
+      // fixme: file, line of compound terminals are not initialized
+      ast_replace (n, compound);
     }
   }
-  if (n->child)
-    for (Ast ** c = n->child; *c; c++)
-      trace_return (function_definition, *c, function_identifier);
+  else
+    if (n->child)
+      for (Ast ** c = n->child; *c; c++)
+	trace_return (*c, function_definition, function_identifier);
 }
 
 typedef struct {
@@ -135,7 +129,7 @@ static void various_transforms (Ast * n)
   */
 
   case sym_function_call: {
-    Ast * identifier = ast_schema (n,
+    Ast * identifier = ast_schema (n, sym_function_call,
 				   0, sym_postfix_expression,
 				   0, sym_primary_expression,
 				   0, sym_generic_identifier,
@@ -169,7 +163,7 @@ static void various_transforms (Ast * n)
   */
 
   case sym_function_definition: {
-    Ast * trace = ast_schema (n,
+    Ast * trace = ast_schema (n, sym_function_definition,
 			      0, sym_declaration_specifiers,
 			      0, sym_storage_class_specifier,
 			      0, sym_TRACE);
@@ -185,7 +179,7 @@ static void various_transforms (Ast * n)
 		  " end_trace (\"", ast_terminal (identifier)->start, "\", ",
 		  ast_file_line (end), "); ");
       if (compound_statement->child[1]->sym == sym_block_item_list)
-	trace_return (n, compound_statement->child[1],
+	trace_return (compound_statement->child[1], n,
 		      ast_terminal (identifier));
     }
     break;
@@ -195,6 +189,11 @@ static void various_transforms (Ast * n)
   if (n->child)
     for (Ast ** c = n->child; *c; c++)
       various_transforms (*c);
+}
+
+void ast_symbols (Ast * n)
+{
+  
 }
 
 void endfor (FILE * fin, FILE * fout)
@@ -223,6 +222,13 @@ void endfor (FILE * fin, FILE * fout)
   
   Ast * root = ast_parse (buffer);
 
+#if 0
+  Ast * copy = ast_copy (root, -1);
+  ast_destroy (root);
+  root = copy;
+#endif
+
+  
 #if 0
   fp = fopen (".endfor.after", "w");
   fputs (buffer, fp);
