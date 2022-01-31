@@ -3,15 +3,30 @@
 
 typedef struct _Ast Ast;
 struct _Ast {
-  int sym, line;
-  char * before, * start, * after, * file;
+  int sym;
   Ast ** child, * parent;
-  void * data;
 };
 
-Ast * ast_parse   (const char * code);
-void  ast_destroy (Ast * n);
-void  ast_print   (Ast * n, FILE * fp, bool kind);
+typedef struct {
+  Ast ast;
+  char * before, * start, * after;
+  char * file;
+  int line;
+} AstTerminal;
+
+typedef struct {
+  Ast ast;
+  char * before, * after;
+  char ** file;
+  int nf;
+  void * data;
+} AstRoot;
+
+Ast * ast_parse            (const char * code);
+void  ast_destroy          (Ast * n);
+Ast * ast_parse_expression (const char * expr);
+void  ast_print            (Ast * n, FILE * fp, bool kind);
+void  ast_print_graph      (Ast * n, FILE * fp, int indent);
 
 static inline Ast * ast_last_child (Ast * n)
 {
@@ -20,6 +35,20 @@ static inline Ast * ast_last_child (Ast * n)
     return NULL;
   while (*(c + 1)) c++;
   return *c;
+}
+
+static inline AstTerminal * ast_left_terminal (Ast * n)
+{
+  while (n->child)
+    n = n->child[0];
+  return (AstTerminal *) n;
+}
+
+static inline AstTerminal * ast_right_terminal (Ast * n)
+{
+  while (n->child)
+    n = ast_last_child (n);
+  return (AstTerminal *) n;
 }
 
 Ast * ast_declarator_identifier (Ast * declarator);
@@ -34,14 +63,17 @@ char * str_prepend_realloc (char * dst, ...);
 #define str_prepend(dst, ...)						\
   do { dst = str_prepend_realloc (dst, __VA_ARGS__, NULL); } while(0)
 
-#define ast_before(n,...) str_append((n)->before, __VA_ARGS__)
-#define ast_after(n,...) str_prepend((n)->after, __VA_ARGS__)
+#define ast_before(n,...) str_append(ast_left_terminal (n)->before, __VA_ARGS__)
+#define ast_after(n,...)  str_prepend(ast_right_terminal (n)->after, __VA_ARGS__)
+#define ast_terminal(n) ((n)->child ? NULL : (AstTerminal *)(n))
+#define ast_root(n) ((n)->parent ? NULL : (AstRoot *)(n))
 
-static inline void ast_hide (Ast * n)
+static inline void ast_hide (AstTerminal * n)
 {
   for (char * s = n->start; *s != '\0'; s++)
     *s = ' ';
 }
 
-char * ast_line (Ast * n);
-#define ast_file_line(n) "\"", n->file, "\", ", ast_line(n)
+char * ast_line (AstTerminal * t);
+#define ast_file_line(n) "\"", ast_terminal(n)->file, \
+    "\", ", ast_line(ast_terminal(n))

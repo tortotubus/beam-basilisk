@@ -5,12 +5,6 @@
 #include "ast.h"
 #include "allocator.h"
 
-typedef struct {
-  char ** file;
-  int nf;
-  Allocator * alloc;
-} AstRoot;
-
 void type_definition (Allocator * alloc, Ast * declaration);
 void typedef_cleanup(); 
 int  yylex (Ast ** lvalp, AstRoot * parse);

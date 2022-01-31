@@ -7,10 +7,11 @@
 static void no_nested_foreach (Ast * n, int parent)
 {
   if (n->sym == sym_foreach_statement) {
+    int line = ast_terminal(n->child[0])->line;
     fprintf (stderr, "%d: error: foreach*() iterators cannot be nested \n",
-	     n->line);
+	     line);
     fprintf (stderr, "%d: error: parent foreach*() is at line %d\n",
-	     n->line, parent);
+	     line, parent);
     exit (1);
   }
   if (n->child)
@@ -23,33 +24,64 @@ static void foreach_statement (Ast * n)
   if (n->sym == sym_foreach_statement) {
     Ast * statement = ast_last_child (n);
     if (statement->child[0]->sym == sym_compound_statement)
-      ast_after (statement, " end_", n->child[0]->start, "();");
+      ast_after (statement, " end_", ast_left_terminal(n)->start, "();");
     else {
       ast_before (statement, "{");
-      ast_after (statement, "} end_", n->child[0]->start, "();");
+      ast_after (statement, "} end_", ast_left_terminal(n)->start, "();");
     }
-    no_nested_foreach (statement, n->line);
+    no_nested_foreach (statement, ast_terminal(n->child[0])->line);
   }
   else if (n->child)
     for (Ast ** c = n->child; *c; c++)
       foreach_statement (*c);
 }
 
-static void trace_return (Ast * n, Ast * identifier)
+static void type_before (Ast * before, Ast * n)
+{
+  if (!n->child) {
+    if (n->parent->sym == sym_type_specifier)
+      // ignores atomic_type_specifier and struct_or_union_specifier
+      ast_before (before, ast_terminal(n)->start, " ");
+  }
+  else
+    for (Ast ** c = n->child; *c; c++)
+      type_before (before, *c);
+}
+
+static void pointer_before (Ast * before, Ast * n)
+{
+  if (!n->child) {
+    if (n->parent->sym == sym_pointer)
+      ast_before (before, ast_terminal(n)->start, " ");
+  }
+  else if (n->sym == sym_direct_declarator ||
+	   n->sym == sym_declarator ||
+	   n->sym == sym_pointer)
+    for (Ast ** c = n->child; *c; c++)
+      pointer_before (before, *c);
+}
+
+static void trace_return (Ast * function_definition, Ast * n,
+			  AstTerminal * function_identifier)
 {
   if (n->sym == sym_jump_statement && n->child[0]->sym == sym_RETURN) {
     Ast * ret = n->child[0];
-    if (!n->child[2]) {
+    if (!n->child[2]) { // return ;
       ast_before (ret,
-		  "{ end_trace (\"", identifier->start, "\", ",
+		  "{ end_trace (\"", function_identifier->start, "\", ",
 		  ast_file_line (ret), "); ");
       ast_after (n->child[1], " }");
     }
-    // else ... // fixme
+    else { // return sthg;
+      ast_before (ret, "{ ");
+      type_before (ret, function_definition->child[0]);
+      pointer_before (ret, function_definition->child[1]);
+      ast_before (ret, "ret = ");
+    }
   }
   if (n->child)
     for (Ast ** c = n->child; *c; c++)
-      trace_return (*c, identifier);
+      trace_return (function_definition, *c, function_identifier);
 }
 
 typedef struct {
@@ -67,10 +99,10 @@ static void various_transforms (Ast * n)
   case sym_foreach_inner_statement: {
     Ast * statement = ast_last_child (n);
     if (statement->child[0]->sym == sym_compound_statement)
-      ast_after (statement, " end_", n->child[0]->start, "();");
+      ast_after (statement, " end_", ast_left_terminal(n)->start, "();");
     else {
       ast_before (statement, "{");
-      ast_after (statement, "} end_", n->child[0]->start, "();");
+      ast_after (statement, "} end_", ast_left_terminal(n)->start, "();");
     }
     break;
   }
@@ -80,18 +112,20 @@ static void various_transforms (Ast * n)
   */
 
   case sym_generic_identifier: {
-    static Replacement replacements[] = {
-      { "stderr", "ferr" },
-      { NULL, NULL }
-    };
-    Replacement * i = replacements;
-    Ast * identifier = n->child[0];
-    while (i->target) {
-      if (!strcmp (identifier->start, i->target)) {
-	free (identifier->start);
-	identifier->start = strdup (i->replacement);
+    if (n->parent->sym == sym_primary_expression) {
+      static Replacement replacements[] = {
+	{ "stderr", "ferr" },
+	{ NULL, NULL }
+      };
+      Replacement * i = replacements;
+      AstTerminal * identifier = ast_terminal (n->child[0]);
+      while (i->target) {
+	if (!strcmp (identifier->start, i->target)) {
+	  free (identifier->start);
+	  identifier->start = strdup (i->replacement);
+	}
+	i++;
       }
-      i++;
     }
     break;
   }
@@ -105,8 +139,7 @@ static void various_transforms (Ast * n)
 				   0, sym_postfix_expression,
 				   0, sym_primary_expression,
 				   0, sym_generic_identifier,
-				   0, sym_IDENTIFIER,
-				   -1);
+				   0, sym_IDENTIFIER);
     if (identifier) {
       static Replacement replacements[] = {
 	{ "malloc",  "pmalloc" },
@@ -117,10 +150,11 @@ static void various_transforms (Ast * n)
 	{ NULL, NULL }
       };
       Replacement * i = replacements;
+      AstTerminal * t = ast_terminal (identifier);
       while (i->target) {
-	if (!strcmp (identifier->start, i->target)) {
-	  free (identifier->start);
-	  identifier->start = strdup (i->replacement);
+	if (!strcmp (t->start, i->target)) {
+	  free (t->start);
+	  t->start = strdup (i->replacement);
 	  assert (n->child[3]);
 	  ast_before (n->child[3], ",__func__,__FILE__,__LINE__");
 	}
@@ -138,21 +172,21 @@ static void various_transforms (Ast * n)
     Ast * trace = ast_schema (n,
 			      0, sym_declaration_specifiers,
 			      0, sym_storage_class_specifier,
-			      0, sym_TRACE,
-			      -1);
+			      0, sym_TRACE);
     if (trace) {
-      ast_hide (trace);
+      ast_hide (ast_terminal (trace));
       Ast * identifier = ast_declarator_identifier (n->child[1]);
       Ast * compound_statement = ast_last_child (n);
       ast_after (compound_statement->child[0],
-		 " trace (\"", identifier->start, "\", ",
+		 " trace (\"", ast_terminal (identifier)->start, "\", ",
 		 ast_file_line (identifier), "); ");
       Ast * end = ast_last_child (compound_statement);
       ast_before (end,
-		  " end_trace (\"", identifier->start, "\", ",
+		  " end_trace (\"", ast_terminal (identifier)->start, "\", ",
 		  ast_file_line (end), "); ");
       if (compound_statement->child[1]->sym == sym_block_item_list)
-	trace_return (compound_statement->child[1], identifier);
+	trace_return (n, compound_statement->child[1],
+		      ast_terminal (identifier));
     }
     break;
   }
@@ -181,25 +215,34 @@ void endfor (FILE * fin, FILE * fout)
   }
   buffer[len++] = '\0';
 
-#if 0
+#if 1
   FILE * fp = fopen (".endfor", "w");
   fputs (buffer, fp);
   fclose (fp);
 #endif
   
-  Ast * root = parse_node (buffer);
+  Ast * root = ast_parse (buffer);
+
+#if 0
+  fp = fopen (".endfor.after", "w");
+  fputs (buffer, fp);
+  fclose (fp);
+#endif
+  
   free (buffer);
   
   if (root) {
+#if 1
     foreach_statement (root);
     various_transforms (root);
-    print_node (root, fout, false);
-#if 0
+#endif
+    ast_print (root, fout, false);
+#if 1
     FILE * fp = fopen (".endfor.out", "w");
-    print_node (root, fp, false);
+    ast_print (root, fp, true);
     fclose (fp);
 #endif
     
-    free_node (root);
+    ast_destroy (root);
   }
 }

@@ -27,7 +27,7 @@ static void init_types()
   }  
 }
 
-static char * get_node_value (Allocator * alloc, Ast * n)
+static char * get_node_value (Allocator * alloc, AstTerminal * n)
 {
   char * name = allocate (alloc, (n->after - n->start + 2)*sizeof (char));
   char * s = name;
@@ -52,7 +52,7 @@ void type_definition (Allocator * alloc, Ast * declaration)
 #endif
     init_types();
     
-    char * name = get_node_value (alloc, declarator);
+    char * name = get_node_value (alloc, ast_terminal (declarator));
     int ret;
     khiter_t k = kh_put(khStrNode, types, name, &ret);
     kh_value (types, k) = declaration;
