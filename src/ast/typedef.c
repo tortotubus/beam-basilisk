@@ -41,7 +41,7 @@ void type_definition (Allocator * alloc, Ast * declaration)
 {
   Ast * specifiers = declaration->child[0],
     * declarator = declaration->child[1];
-  if (ast_schema (specifiers,
+  if (ast_schema (specifiers, sym_declaration_specifiers,
 		  0, sym_storage_class_specifier,
 		  0, sym_TYPEDEF)) {
     declarator = ast_declarator_identifier (declarator);
@@ -70,6 +70,8 @@ int sym_type (const char * name)
 
 void typedef_cleanup()
 {
-  if (types)
+  if (types) {
     kh_destroy (khStrNode, types);
+    types = NULL;
+  }
 }
