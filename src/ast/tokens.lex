@@ -46,13 +46,15 @@ static int  check_type(void);
 static Ast * new_ast (AstRoot * parse,
 		      int token, int line, char * start, char * end)
 {
-  Ast * n = allocate (parse->alloc, sizeof(Ast));
-  memset (n, 0, sizeof(Ast));
+  Allocator * alloc = parse->data;
+  Ast * n = allocate (alloc, sizeof(AstTerminal));
+  memset (n, 0, sizeof(AstTerminal));
   n->sym = token_symbol (token);
-  n->file = parse->file[parse->nf - 1];
-  n->line = line;
-  n->start = start;
-  n->after = end;
+  AstTerminal * t = ast_terminal (n);
+  t->start = start;
+  t->after = end;
+  t->file = parse->file[parse->nf - 1];
+  t->line = line;
   return n;
 }
 

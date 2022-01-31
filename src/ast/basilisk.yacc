@@ -10,8 +10,9 @@
   
 #include "parser.h"
 
-static Ast * ast_reduce (Allocator * alloc, Ast ** children, int yyn);
-#define YY_REDUCE_PRINT(yyn) yyval = ast_reduce (parse->alloc, yyvsp, yyn)
+static Ast * ast_reduce (Allocator * alloc, int sym, Ast ** children, int n);
+#define DEFAULT_ACTION(yyn)					\
+  yyval = ast_reduce ((Allocator *)parse->data, yyr1[yyn], yyvsp, yyr2[yyn])
 static int yyparse (AstRoot * parse, Ast ** root);
 
 %}
@@ -47,10 +48,10 @@ static int yyparse (AstRoot * parse, Ast ** root);
 
 translation_unit
         : external_declaration
-	| translation_unit external_declaration
-        | translation_unit error ';'
-        | translation_unit error '}'
-        | translation_unit error ')'
+	| translation_unit external_declaration	
+        | translation_unit error ';'  { $2->sym = YYSYMBOL_YYerror; }
+        | translation_unit error '}'  { $2->sym = YYSYMBOL_YYerror; }
+        | translation_unit error ')'  { $2->sym = YYSYMBOL_YYerror; }
         ;
 
 primary_expression
@@ -63,7 +64,7 @@ primary_expression
 
 expression_error
         : expression
-	| error
+	| error         { $1->sym = YYSYMBOL_YYerror; }
 	;
 
 constant
@@ -155,6 +156,8 @@ cast_expression
 	: unary_expression
 	| '(' type_name ')' cast_expression
 	;
+
+/* fixme: simplify using precedence rules */
 
 multiplicative_expression
 	: cast_expression
@@ -252,7 +255,7 @@ constant_expression
 declaration
         : declaration_specifiers ';' 
 	| declaration_specifiers init_declarator_list ';' {
-	      type_definition (parse->alloc, $$);
+	  type_definition ((Allocator *)parse->data, $$);
         }
 	| static_assert_declaration
 	;
@@ -313,8 +316,8 @@ struct_or_union_specifier
 	: struct_or_union '{' struct_declaration_list '}'
 	| struct_or_union generic_identifier '{' struct_declaration_list '}'
 	| struct_or_union generic_identifier
-	| struct_or_union '{' error '}'
-	| struct_or_union generic_identifier '{' error '}'
+	| struct_or_union '{' error '}'                     { $3->sym = YYSYMBOL_YYerror; }
+	| struct_or_union generic_identifier '{' error '}'  { $4->sym = YYSYMBOL_YYerror; }
 	;
 
 struct_or_union
@@ -409,7 +412,7 @@ direct_declarator
 	| direct_declarator '[' type_qualifier_list ']'
 	| direct_declarator '[' assignment_expression ']'
 	| direct_declarator '(' parameter_type_list ')'
-	| direct_declarator '(' error ')'
+	| direct_declarator '(' error ')'    { $3->sym = YYSYMBOL_YYerror; }
 	| direct_declarator '(' ')'
 	| direct_declarator '(' identifier_list ')'
 	;
@@ -527,7 +530,7 @@ statement
 	| iteration_statement
 	| jump_statement
 	| basilisk_statements /* Basilisk C extension */
-	| error ';'
+	| error ';'  { $1->sym = YYSYMBOL_YYerror; }
 	;
 
 labeled_statement
@@ -538,7 +541,7 @@ labeled_statement
 
 compound_statement
 	: '{' '}'
-	| '{'  block_item_list '}'
+	| '{' block_item_list '}'
 	;
 
 block_item_list
@@ -587,7 +590,7 @@ external_declaration
 	| boundary_definition /* Basilisk C extension */
 	| external_foreach_dimension /* Basilisk C extension */
 	| attribute /* Basilisk C extension */
-	| error compound_statement
+	| error compound_statement    { $1->sym = YYSYMBOL_YYerror; }
 	;
 
 function_definition
@@ -608,6 +611,10 @@ basilisk_statements
         | foreach_dimension_statement
 	| forin_statement
 	;
+
+/*
+fixme: All foreach() rules could be replaced with 'MACRO () statement'
+*/
 
 foreach_statement
         : FOREACH '(' ')' statement
@@ -689,10 +696,10 @@ attribute
 
 root
         : translation_unit {
-	  $$ = *root = allocate (parse->alloc, sizeof(Ast));
-	  memset ($$, 0, sizeof(Ast));
+	  $$ = *root = allocate ((Allocator *)parse->data, sizeof(AstRoot));
+	  memset ($$, 0, sizeof(AstRoot));
 	  $$->sym = yyr1[yyn];
-	  $$->child = allocate (parse->alloc, 2*sizeof(Ast *));
+	  $$->child = allocate ((Allocator *)parse->data, 2*sizeof(Ast *));
 	  $$->child[0] = $1;
 	  $$->child[1] = NULL;
         }
@@ -716,7 +723,7 @@ yyerror (AstRoot * parse, Ast ** root, char const *s)
 #endif
 }
 
-static char * copy_range (const char * start, const char * end, size_t offset)
+static char * copy_range (const char * start, const char * end, long offset)
 {
   char * c = NULL;
   int len = end - start;
@@ -729,20 +736,20 @@ static char * copy_range (const char * start, const char * end, size_t offset)
   return c;
 }
 
-static const char * copy_strings (const char * i, Ast * n, size_t offset)
+static const char * copy_strings (const char * i, Ast * n, long offset)
 {
-  if (n->start) {
-    n->before = copy_range (i, n->start, offset);
-    if (n->start > i)
-      i = n->start;
+  AstTerminal * t = ast_terminal (n);
+  if (t) {
+    t->before = copy_range (i, t->start, offset);
+    if (t->start > i)
+      i = t->start;
 
-    n->start = copy_range (i, n->after + 1, offset);
-    if (n->after + 1 > i)
-      i = n->after + 1;
-    n->after = NULL;
+    t->start = copy_range (i, t->after + 1, offset);
+    if (t->after + 1 > i)
+      i = t->after + 1;
+    t->after = NULL;
   }
-    
-  if (n->child && n->child[0])
+  else
     for (Ast ** c = n->child; *c; c++)
       i = copy_strings (i, *c, offset);
   return i;
@@ -750,11 +757,16 @@ static const char * copy_strings (const char * i, Ast * n, size_t offset)
 
 static Ast * recopy_ast (Ast * n)
 {
-  Ast * c = malloc (sizeof (Ast));
-  memcpy (c, n, sizeof (Ast));
-  n->before = NULL;
-  n->start = NULL;
-  if (n->child) {
+  AstRoot * r = ast_root (n);
+  AstTerminal * t = ast_terminal (n);
+  size_t size = r ? sizeof (AstRoot) : t ? sizeof (AstTerminal) : sizeof (Ast);
+  Ast * c = malloc (size);
+  memcpy (c, n, size);
+  if (t) {
+    t->before = NULL;
+    t->start = NULL;
+  }
+  else {
     int len = 0;
     for (Ast ** i = n->child; *i; i++, len++);
     c->child = malloc ((len + 1)*sizeof (Ast *));
@@ -779,12 +791,11 @@ static void remove_child (Ast * c)
   c->parent = NULL;
 }
 
-static Ast * ast_reduce (Allocator * alloc, Ast ** children, int yyn)
+static Ast * ast_reduce (Allocator * alloc, int sym, Ast ** children, int n)
 {
   Ast * ast = allocate (alloc, sizeof(Ast));
   memset (ast, 0, sizeof(Ast));
-  ast->sym = yyr1[yyn];
-  int n = yyr2[yyn];
+  ast->sym = sym;
   ast->child = allocate (alloc, (n + 1)*sizeof(Ast *));
   for (int i = 0; i < n; i++) {
     Ast * c = children[i + 1 - n];
@@ -794,18 +805,16 @@ static Ast * ast_reduce (Allocator * alloc, Ast ** children, int yyn)
     ast->child[i] = c;
     ast->child[i + 1] = NULL;
   }
-  ast->line = ast->child[0]->line;
   return ast;
 }
 
 Ast * ast_parse (const char * code)
 {
-  Ast * root = NULL;
-  AstRoot * parse = calloc (1, sizeof (AstRoot));
-  parse->file = malloc (sizeof (char *));
-  parse->nf = 1;
-  parse->file[0] = strdup ("<basilisk>");
-  parse->alloc = new_allocator();
+  AstRoot parse;
+  parse.file = malloc (sizeof (char *));
+  parse.nf = 1;
+  parse.file[0] = strdup ("<basilisk>");
+  parse.data = new_allocator();
   extern void lexer_setup (char * buffer, size_t len);
   size_t len = strlen (code) + 1;
   char * buffer = malloc (len + 1);
@@ -813,24 +822,25 @@ Ast * ast_parse (const char * code)
   buffer[len] = '\0';
   lexer_setup (buffer, len + 1);
   //  yydebug = 1;
-  yyparse (parse, &root);
-  assert (root);
-  const char * i = copy_strings (buffer, root, code - buffer);
-  root = recopy_ast (root);
+  Ast * n = NULL;
+  yyparse (&parse, &n);
+  assert (n);
+  const char * i = copy_strings (buffer, n, code - buffer);
+  n = recopy_ast (n);
   const char * end = i; while (*end != '\0') end++;
+  AstRoot * root = ast_root (n);
   root->after = copy_range (i, end, code - buffer);
-  root->data = parse;
+  root->file = parse.file;
+  root->nf = parse.nf;
   free (buffer);
-  free_allocator (parse->alloc);
+  free_allocator (parse.data);
   typedef_cleanup();
   yylex_destroy();
-  return root;
+  return n;
 }
 
 int token_symbol (int token)
 {
-   // just to avoid unused warning
-  if (0) yy_reduce_print (NULL, NULL, 0, NULL, NULL);
   return YYTRANSLATE (token);
 }
 

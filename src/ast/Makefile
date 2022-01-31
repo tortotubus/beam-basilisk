@@ -1,11 +1,11 @@
 CFLAGS += -Wall -g -I$(BASILISK)
 
-libast.a: ast.o tokens.o basilisk.o transform.o typedef.o allocator.o
+libast.a: ast.o tokens.o basilisk.o translate.o typedef.o allocator.o
 	ar cr $@ $^
 
 basilisk.c: basilisk.yacc
 	bison -Dparse.trace -d -o basilisk.c basilisk.yacc
-	sed -i 's/# define YY_REDUCE_PRINT(Rule)/# define YY_REDUCE_PRINT1(Rule)/' basilisk.c
+	sed -i 's/^ *YY_REDUCE_PRINT *(yyn);/ YY_REDUCE_PRINT (yyn); DEFAULT_ACTION (yyn);/' basilisk.c
 
 symbols.h: basilisk.c Makefile
 	echo "// Automatically generated from basilisk.yacc" > symbols.h
@@ -24,7 +24,7 @@ typedef.o: ast.h parser.h symbols.h
 
 tokens.o: ast.h basilisk.c
 
-transform.o: ast.h symbols.h
+translate.o: ast.h symbols.h
 
 allocator.o: allocator.h
 
@@ -33,3 +33,6 @@ clean:
 
 qcc: qcc.c libast.a
 	$(CC) $(CFLAGS) -o $@ $^
+
+expr: expr.c ast.h libast.a
+	$(CC) $(CFLAGS) -o $@ $< -L. -last
