@@ -1,6 +1,6 @@
-CFLAGS += -Wall -g -I$(BASILISK)
+CFLAGS += -Wall -g -I$(BASILISK) -DBASILISK=\"$(BASILISK)\"
 
-libast.a: ast.o tokens.o basilisk.o translate.o typedef.o allocator.o
+libast.a: ast.o tokens.o basilisk.o translate.o typedef.o allocator.o stack.o
 	ar cr $@ $^
 
 basilisk.c: basilisk.yacc
@@ -20,6 +20,8 @@ tokens.c: tokens.lex
 basilisk.o: ast.h parser.h
 
 ast.o: ast.h parser.h symbols.h
+
+stack.o: stack.h
 
 typedef.o: ast.h parser.h symbols.h
 

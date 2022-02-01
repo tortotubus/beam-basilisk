@@ -571,7 +571,11 @@ iteration_statement
 	| DO statement WHILE '(' expression ')' ';'
 	| FOR '(' expression_statement expression_statement ')' statement
 	| FOR '(' expression_statement expression_statement expression ')' statement
-	| FOR '(' declaration expression_statement ')' statement
+	| for_declaration_statement
+	;
+
+for_declaration_statement
+        : FOR '(' declaration expression_statement ')' statement
 	| FOR '(' declaration expression_statement expression ')' statement
 	;
 
@@ -609,6 +613,7 @@ basilisk_statements
         : foreach_statement
 	| foreach_inner_statement
         | foreach_dimension_statement
+	| forin_declaration_statement
 	| forin_statement
 	;
 
@@ -650,9 +655,12 @@ foreach_dimension_statement
         | FOREACH_DIMENSION '(' expression ')' statement
 	;
 
+forin_declaration_statement
+        : FOR '(' declaration_specifiers init_declarator IN field_list ')' statement
+	;
+
 forin_statement
-        : FOR '(' TYPEDEF_NAME generic_identifier IN field_list ')' statement
-        | FOR '(' expression IN field_list ')' statement
+        : FOR '(' expression IN field_list ')' statement
 	;
 
 field_list
@@ -824,14 +832,15 @@ Ast * ast_parse (const char * code)
   //  yydebug = 1;
   Ast * n = NULL;
   yyparse (&parse, &n);
-  assert (n);
-  const char * i = copy_strings (buffer, n, code - buffer);
-  n = recopy_ast (n);
-  const char * end = i; while (*end != '\0') end++;
-  AstRoot * root = ast_root (n);
-  root->after = copy_range (i, end, code - buffer);
-  root->file = parse.file;
-  root->nf = parse.nf;
+  if (n) {
+    const char * i = copy_strings (buffer, n, code - buffer);
+    n = recopy_ast (n);
+    const char * end = i; while (*end != '\0') end++;
+    AstRoot * root = ast_root (n);
+    root->after = copy_range (i, end, code - buffer);
+    root->file = parse.file;
+    root->nf = parse.nf;
+  }
   free (buffer);
   free_allocator (parse.data);
   typedef_cleanup();
