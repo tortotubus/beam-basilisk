@@ -90,12 +90,18 @@ void ast_print (Ast * n, FILE * fp, bool sym)
   }
 }
 
+void ast_print_file_line (Ast * n, FILE * fp)
+{
+  assert (n);
+  AstTerminal * t = ast_left_terminal (n);
+  assert (t);
+  fprintf (fp, "%s:%d: %s\n", t->file, t->line,
+	   ast_terminal(n) ? t->start : symbol_name (n->sym));
+}
+
 static void print_child_tree (Ast * n, FILE * fp,
 			      const char * indent, bool isLast)
 {
-  static const char * _cross = "├─", * _corner = "└─",
-    * _vertical = "│ ", * _space = "  ";
-
   char * ind;
   if (indent) {
     fputs (indent, fp);
@@ -105,12 +111,12 @@ static void print_child_tree (Ast * n, FILE * fp,
     ind = strdup ("");
     
   if (isLast) {
-    fputs (_corner, fp);
-    str_append (ind, _space);
+    fputs ("└─", fp);
+    str_append (ind, "  ");
   }
   else {
-    fputs (_cross, fp);
-    str_append (ind, _vertical);
+    fputs ("├─", fp);
+    str_append (ind, "│ ");
   }
   ast_print_tree (n, fp, ind);
   free (ind);
@@ -295,10 +301,35 @@ Ast * ast_parse_expression (const char * expr)
   str_append (s, "void main() {", expr, "}");
   Ast * n = ast_parse (s);  
   free (s);
-  Ast * c = ast_find (n, sym_statement)->child[0];
-  ast_detach (c);
-  ast_destroy (n);
-  return c;
+  if (n) {
+    Ast * c = ast_find (n, sym_statement)->child[0];
+    ast_detach (c);
+    ast_destroy (n);
+    n = c;
+  }
+  return n;
+}
+
+Ast * ast_parse_file (FILE * fp)
+{
+  char * buffer = NULL;
+  size_t len = 0, maxlen = 0;
+  int c;
+  while ((c = fgetc (fp)) != EOF) {
+    if (len >= maxlen) {
+      maxlen += 4096;
+      buffer = realloc (buffer, maxlen);      
+    }
+    buffer[len++] = c;
+  }
+  if (len >= maxlen) {
+    maxlen++;
+    buffer = realloc (buffer, maxlen);      
+  }
+  buffer[len++] = '\0';
+  Ast * root = ast_parse (buffer);
+  free (buffer);
+  return root;
 }
 
 Ast * ast_declarator_identifier (Ast * declarator)
@@ -380,4 +411,3 @@ char * str_prepend_realloc (char * src, ...)
   free (src);
   return dst;
 }
-

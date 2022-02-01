@@ -3,6 +3,33 @@
 #include <string.h>
 #include "ast.h"
 #include "symbols.h"
+#include "stack.h"
+
+Ast * ast_find_function (Ast * n, const char * name)
+{
+  Ast * found = NULL;
+  if (n->sym == sym_function_definition) {
+    Ast * identifier = ast_find (n, sym_direct_declarator,
+				 0, sym_generic_identifier,
+				 0, sym_IDENTIFIER);
+    if (!strcmp (ast_terminal(identifier)->start, name))
+      found = n;
+  }
+  if (n->child)
+    for (Ast ** c = n->child; *c && !found; c++)
+      found = ast_find_function (*c, name);
+  return found;
+}
+
+Ast * ast_identifier_declaration (Stack * stack, AstTerminal * identifier)
+{
+  Ast ** d;
+  for (int i = 0; (d = stack_index (stack, i)); i++)
+    if ((*d)->sym == sym_IDENTIFIER &&
+	!strcmp (ast_terminal(*d)->start, identifier->start))
+      return *d;
+  return NULL;
+}
 
 static void no_nested_foreach (Ast * n, int parent)
 {
@@ -17,23 +44,6 @@ static void no_nested_foreach (Ast * n, int parent)
   if (n->child)
     for (Ast ** c = n->child; *c; c++)
       no_nested_foreach (*c, parent);
-}
-
-static void foreach_statement (Ast * n)
-{
-  if (n->sym == sym_foreach_statement) {
-    Ast * statement = ast_last_child (n);
-    if (statement->child[0]->sym == sym_compound_statement)
-      ast_after (statement, " end_", ast_left_terminal(n)->start, "();");
-    else {
-      ast_before (statement, "{");
-      ast_after (statement, "} end_", ast_left_terminal(n)->start, "();");
-    }
-    no_nested_foreach (statement, ast_terminal(n->child[0])->line);
-  }
-  else if (n->child)
-    for (Ast ** c = n->child; *c; c++)
-      foreach_statement (*c);
 }
 
 static void trace_return (Ast * n,
@@ -82,13 +92,27 @@ typedef struct {
   char * target, * replacement;
 } Replacement;
 
-static void various_transforms (Ast * n)
+static void translate (Ast * n, Stack * stack)
 {
   switch (n->sym) {
 
   /**
-  ## Foreach inner statements
-  */
+  ## Foreach statements */
+
+  case sym_foreach_statement: {
+    Ast * statement = ast_last_child (n);
+    if (statement->child[0]->sym == sym_compound_statement)
+      ast_after (statement, " end_", ast_left_terminal(n)->start, "();");
+    else {
+      ast_before (statement, "{");
+      ast_after (statement, "} end_", ast_left_terminal(n)->start, "();");
+    }
+    no_nested_foreach (statement, ast_terminal(n->child[0])->line);
+    break;
+  }
+
+  /**
+  ## Foreach inner statements */
     
   case sym_foreach_inner_statement: {
     Ast * statement = ast_last_child (n);
@@ -102,8 +126,7 @@ static void various_transforms (Ast * n)
   }
     
   /**
-  ## Identifiers
-  */
+  ## Identifiers */
 
   case sym_generic_identifier: {
     if (n->parent->sym == sym_primary_expression) {
@@ -113,6 +136,19 @@ static void various_transforms (Ast * n)
       };
       Replacement * i = replacements;
       AstTerminal * identifier = ast_terminal (n->child[0]);
+#if 1
+      Ast * found = ast_identifier_declaration (stack, identifier);
+      if (found) {
+#if 1
+	fprintf (stderr, "%s:%d: ‘%s’ identifier declared at %s:%d\n",
+		 identifier->file, identifier->line, identifier->start,
+		 ast_terminal (found)->file, ast_terminal (found)->line);
+#endif
+      }
+      else if (1)
+	fprintf (stderr, "%s:%d: error: ‘%s’ identifier undeclared\n",
+		 identifier->file, identifier->line, identifier->start);
+#endif      
       while (i->target) {
 	if (!strcmp (identifier->start, i->target)) {
 	  free (identifier->start);
@@ -125,8 +161,7 @@ static void various_transforms (Ast * n)
   }
 
   /**
-  ## Memory allocation tracing
-  */
+  ## Memory allocation tracing */
 
   case sym_function_call: {
     Ast * identifier = ast_schema (n, sym_function_call,
@@ -159,8 +194,7 @@ static void various_transforms (Ast * n)
   }
 
   /**
-  ## Function profiling with `trace`
-  */
+  ## Function profiling with `trace` */
 
   case sym_function_definition: {
     Ast * trace = ast_schema (n, sym_function_definition,
@@ -186,14 +220,110 @@ static void various_transforms (Ast * n)
   }
     
   }
-  if (n->child)
-    for (Ast ** c = n->child; *c; c++)
-      various_transforms (*c);
 }
 
-void ast_symbols (Ast * n)
+#if 0
+#define stack_push(a,b)							\
+  do {									\
+    AstTerminal * t = ast_left_terminal(*(b));				\
+    fprintf (stderr, "%s:%d: push: %s\n",				\
+	     t->file, t->line,						\
+	     ast_terminal (*(b)) ? t->start :				\
+	     symbol_name ((*(b))->sym));				\
+    stack_push(a,b);							\
+  }									\
+  while (0)
+#endif
+
+static void push_declaration (Stack * stack, Ast * n)
 {
-  
+  if (n->sym == sym_parameter_type_list ||
+      n->sym == sym_struct_declaration_list)
+    return; // skip function arguments and struct members
+  Ast * identifier = ast_schema (n, sym_direct_declarator,
+				 0, sym_generic_identifier,
+				 0, sym_IDENTIFIER);
+  if (identifier)
+    stack_push (stack, &identifier);
+  else {
+    identifier = ast_schema (n, sym_enumeration_constant,
+			     0, sym_generic_identifier,
+			     0, sym_IDENTIFIER);
+    if (identifier)
+      stack_push (stack, &identifier);
+  }
+  if (n->child)
+    for (Ast ** c = n->child; *c; c++)
+      push_declaration (stack, *c);
+}
+
+static void symbol_stack_pop (Stack * stack, Ast * scope)
+{
+  Ast * n;
+  while ((n = *((Ast **)stack_pop (stack))) != scope) {
+#if 0    
+    AstTerminal * t = ast_terminal(n);    
+    if (t)
+      fprintf (stderr, "  pop: %s\n", t->start);
+    else
+      fprintf (stderr, "  pop: %s\n", symbol_name(n->sym));
+#endif
+  }
+#if 0  
+  fprintf (stderr, "%s:%d: pop: %s\n",
+	   ast_right_terminal (scope)->file,
+	   ast_right_terminal (scope)->line,
+	   ast_terminal(scope) ?
+	   ast_terminal(scope)->start : symbol_name(scope->sym));
+#endif
+}
+
+void ast_traverse (Ast * n, Stack * stack, void func (Ast *, Stack *))
+{
+  func (n, stack);
+
+  switch (n->sym) {
+    
+  case sym_function_definition: {
+    Ast * identifier = ast_find (n, sym_direct_declarator,
+				 0, sym_generic_identifier,
+				 0, sym_IDENTIFIER);
+    stack_push (stack, &identifier);
+    stack_push (stack, &identifier);
+    Ast * parameters = ast_find (n, sym_parameter_list);
+    if (parameters)
+      push_declaration (stack, parameters);
+    for (Ast ** c = n->child; *c; c++)
+      ast_traverse (*c, stack, func);
+    symbol_stack_pop (stack, identifier);
+    return;
+  }
+    
+  case sym_compound_statement: case sym_for_declaration_statement: {
+    stack_push (stack, &n);
+    for (Ast ** c = n->child; *c; c++)
+      ast_traverse (*c, stack, func);
+    symbol_stack_pop (stack, n);
+    return;
+  }
+
+  case sym_forin_declaration_statement: {
+    stack_push (stack, &n);
+    push_declaration (stack, n->child[3]);
+    for (Ast ** c = n->child; *c; c++)
+      ast_traverse (*c, stack, func);
+    symbol_stack_pop (stack, n);
+    return;
+  }
+
+  case sym_declaration:
+    push_declaration (stack, n);
+
+  default:
+    if (n->child)
+      for (Ast ** c = n->child; *c; c++)
+	ast_traverse (*c, stack, func);
+  }
 }
 
 void endfor (FILE * fin, FILE * fout)
@@ -221,34 +351,40 @@ void endfor (FILE * fin, FILE * fout)
 #endif
   
   Ast * root = ast_parse (buffer);
-
-#if 0
-  Ast * copy = ast_copy (root, -1);
-  ast_destroy (root);
-  root = copy;
-#endif
-
-  
-#if 0
-  fp = fopen (".endfor.after", "w");
-  fputs (buffer, fp);
-  fclose (fp);
-#endif
-  
   free (buffer);
   
-  if (root) {
-#if 1
-    foreach_statement (root);
-    various_transforms (root);
-#endif
-    ast_print (root, fout, false);
-#if 1
-    FILE * fp = fopen (".endfor.out", "w");
-    ast_print (root, fp, true);
-    fclose (fp);
-#endif
-    
-    ast_destroy (root);
+  Stack * stack = stack_new (sizeof (Ast *));
+  fp = fopen (BASILISK "/ast/defaults.h", "r");
+  assert (fp);
+  Ast * d = ast_parse_file (fp);
+  fclose (fp);
+  push_declaration (stack, d);
+  ast_traverse (root, stack, translate);
+#if 0
+  { // list global declarations
+    Ast ** n;
+    for (int i = 0; (n = stack_index (stack, i)); i++)
+      fprintf (stderr, "global: "), ast_print_file_line (*n, stderr);
   }
+#endif
+  stack_destroy (stack);
+  ast_destroy (d);
+
+  ast_print (root, fout, false);
+#if 1
+  fp = fopen (".endfor.out", "w");
+  ast_print (root, fp, true);
+  fclose (fp);
+#endif
+
+#if 1
+  Ast * main = ast_find_function (root, "main");
+  if (main) {
+    fp = fopen (".endfor.main", "w");
+    ast_print_tree (main, fp, 0);
+    fclose (fp);
+  }
+#endif
+  
+  ast_destroy (root);
 }

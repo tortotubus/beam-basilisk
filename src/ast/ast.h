@@ -25,9 +25,11 @@ typedef struct {
 Ast * ast_parse            (const char * code);
 void  ast_destroy          (Ast * n);
 Ast * ast_parse_expression (const char * expr);
+Ast * ast_parse_file       (FILE * fp);
 void  ast_replace          (Ast * dst, Ast * src);
 void  ast_print            (Ast * n, FILE * fp, bool kind);
 void  ast_print_tree       (Ast * n, FILE * fp, const char * indent);
+void  ast_print_file_line  (Ast * n, FILE * fp);
 
 static inline Ast * ast_last_child (Ast * n)
 {
