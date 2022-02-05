@@ -1,3 +1,8 @@
+/**
+# Yacc Grammar for Basilisk C
+
+Closely based on the [C99 grammar](c.yacc). */
+
 %param { AstRoot * parse }
 %parse-param { Ast ** root }
 %define api.pure full
@@ -7,15 +12,17 @@
 #include <string.h>
 #include <assert.h>
 #include <stdlib.h>
-  
+
 #include "parser.h"
 
 static Ast * ast_reduce (Allocator * alloc, int sym, Ast ** children, int n);
 #define DEFAULT_ACTION(yyn)					\
-  yyval = ast_reduce ((Allocator *)parse->data, yyr1[yyn], yyvsp, yyr2[yyn])
+  yyval = ast_reduce ((Allocator *)parse->alloc, yyr1[yyn], yyvsp, yyr2[yyn])
 static int yyparse (AstRoot * parse, Ast ** root);
-
 %}
+
+/**
+## C99 tokens */
 
 %token	IDENTIFIER I_CONSTANT F_CONSTANT STRING_LITERAL FUNC_NAME SIZEOF
 %token	PTR_OP INC_OP DEC_OP LEFT_OP RIGHT_OP LE_OP GE_OP EQ_OP NE_OP
@@ -34,13 +41,17 @@ static int yyparse (AstRoot * parse, Ast ** root);
 
 %token	ALIGNAS ALIGNOF ATOMIC GENERIC NORETURN STATIC_ASSERT THREAD_LOCAL
 
- /* Basilisk C tokens */
+/**
+## Basilisk C tokens */
 
 %token MAYBECONST IN NEW_FIELD TRACE
 %token FOREACH FOREACH_INNER FOREACH_DIMENSION
 %token REDUCTION
 
- /* End of Basilisk C tokens */
+/**
+## Grammar
+
+Note that 4 shift/reduce conflicts are expected. */
 
 %start root
 
@@ -129,6 +140,7 @@ argument_expression_list
 
 argument_expression_list_item
         : assignment_expression
+	| generic_identifier '=' initializer  /* Basilisk C extension */
 	| field_list /* Basilisk C extension */
 	;
 
@@ -225,8 +237,6 @@ conditional_expression
 assignment_expression
 	: conditional_expression
 	| unary_expression assignment_operator assignment_expression
-	   /* Basilisk C extension */
-	| unary_expression assignment_operator initializer
 	;
 
 assignment_operator
@@ -253,10 +263,9 @@ constant_expression
 	;
 
 declaration
-        : declaration_specifiers ';' 
-	| declaration_specifiers init_declarator_list ';' {
-	  type_definition ((Allocator *)parse->data, $$);
-        }
+        : declaration_specifiers ';'                      { ast_push_declaration (parse->stack, $$); }
+	| declaration_specifiers init_declarator_list ';' { type_definition ((Allocator *)parse->alloc, $$);
+                                                            ast_push_declaration (parse->stack, $$); }
 	| static_assert_declaration
 	;
 
@@ -412,14 +421,14 @@ direct_declarator
 	| direct_declarator '[' type_qualifier_list ']'
 	| direct_declarator '[' assignment_expression ']'
 	| direct_declarator '(' parameter_type_list ')'
-	| direct_declarator '(' error ')'    { $3->sym = YYSYMBOL_YYerror; }
+	| direct_declarator '(' error ')'                               { $3->sym = YYSYMBOL_YYerror; }
 	| direct_declarator '(' ')'
 	| direct_declarator '(' identifier_list ')'
 	;
 
 generic_identifier
         : IDENTIFIER
-	| TYPEDEF_NAME  /* workaround when variable name = type name */
+	| TYPEDEF_NAME  /* fixme: workaround when variable name = type name */
 	;
 
 pointer
@@ -529,7 +538,7 @@ statement
 	| selection_statement
 	| iteration_statement
 	| jump_statement
-	| basilisk_statements /* Basilisk C extension */
+        | basilisk_statements /* Basilisk C extension */
 	| error ';'  { $1->sym = YYSYMBOL_YYerror; }
 	;
 
@@ -541,7 +550,10 @@ labeled_statement
 
 compound_statement
 	: '{' '}'
-	| '{' block_item_list '}'
+	|
+	'{'                { stack_push (parse->stack, &($1)); $$->sym = YYSYMBOL_YYUNDEF; }
+	block_item_list
+	'}'	           { ast_pop_scope (parse->stack, $1); }
 	;
 
 block_item_list
@@ -557,7 +569,6 @@ block_item
 expression_statement
 	: ';'
 	| expression ';'
-        | expression compound_statement
 	;
 
 selection_statement
@@ -566,17 +577,25 @@ selection_statement
 	| SWITCH '(' expression_error ')' statement
 	;
 
+for_scope
+        : FOR { stack_push (parse->stack, &($$)); }
+        ;
+
 iteration_statement
         : WHILE '(' expression ')' statement                                            
 	| DO statement WHILE '(' expression ')' ';'
-	| FOR '(' expression_statement expression_statement ')' statement
-	| FOR '(' expression_statement expression_statement expression ')' statement
+	| for_scope '(' expression_statement expression_statement ')' statement
+	            { ast_pop_scope (parse->stack, $1); }
+	| for_scope '(' expression_statement expression_statement expression ')' statement
+		    { ast_pop_scope (parse->stack, $1); }
 	| for_declaration_statement
 	;
 
 for_declaration_statement
-        : FOR '(' declaration expression_statement ')' statement
-	| FOR '(' declaration expression_statement expression ')' statement
+        : for_scope '(' declaration expression_statement ')' statement
+	            { ast_pop_scope (parse->stack, $1); }	
+	| for_scope '(' declaration expression_statement expression ')' statement
+	            { ast_pop_scope (parse->stack, $1); }	
 	;
 
 jump_statement
@@ -594,12 +613,18 @@ external_declaration
 	| boundary_definition /* Basilisk C extension */
 	| external_foreach_dimension /* Basilisk C extension */
 	| attribute /* Basilisk C extension */
-	| error compound_statement    { $1->sym = YYSYMBOL_YYerror; }
+	| error compound_statement              { $1->sym = YYSYMBOL_YYerror; }
 	;
 
+function_declaration
+        : declaration_specifiers declarator     { ast_push_function_definition (parse->stack, $2); }
+	;
+	
 function_definition
-        : declaration_specifiers declarator declaration_list compound_statement
-	| declaration_specifiers declarator compound_statement
+        : function_declaration declaration_list compound_statement
+                              	                { ast_pop_scope (parse->stack, $1->child[1]); }
+	| function_declaration compound_statement
+	                                        { ast_pop_scope (parse->stack, $1->child[1]); }
 	;
 
 declaration_list
@@ -607,33 +632,40 @@ declaration_list
 	| declaration_list declaration
 	;
 
-/************************* Basilisk C extensions ******************************/
+/**
+## Basilisk C grammar extensions */
 
 basilisk_statements
-        : foreach_statement
+        : macro_statement
+        | foreach_statement
 	| foreach_inner_statement
-        | foreach_dimension_statement
+	| foreach_dimension_statement
 	| forin_declaration_statement
 	| forin_statement
 	;
 
-/*
-fixme: All foreach() rules could be replaced with 'MACRO () statement'
-*/
+macro_statement
+        : function_call compound_statement
+        ;
 
 foreach_statement
         : FOREACH '(' ')' statement
-        | FOREACH '(' foreach_parameters ')' statement
+	| FOREACH '(' foreach_parameters ')' statement
 	;
 
 foreach_parameters
         : foreach_parameter
-	| foreach_parameters foreach_parameter
+	| foreach_parameters ',' foreach_parameter
 	;
 
 foreach_parameter
-        : expression
-        | reduction
+        : assignment_expression
+        | reduction_list
+	;
+
+reduction_list
+        : reduction
+	| reduction_list reduction
 	;
 
 reduction
@@ -656,16 +688,22 @@ foreach_dimension_statement
 	;
 
 forin_declaration_statement
-        : FOR '(' declaration_specifiers init_declarator IN field_list ')' statement
-	;
+        : for_scope '(' declaration_specifiers init_declarator IN forin_arguments ')' statement
+	            { ast_pop_scope (parse->stack, $1); }
+        ;
 
 forin_statement
-        : FOR '(' expression IN field_list ')' statement
+        : for_scope '(' expression IN forin_arguments ')' statement
+	            { ast_pop_scope (parse->stack, $1); }
+	;
+
+forin_arguments
+        : expression
+	| field_list
 	;
 
 field_list
-        : expression
-	| '{' field_item_list '}'
+        : '{' field_item_list '}'
 	;
 
 field_item_list
@@ -677,16 +715,15 @@ event_definition
         : generic_identifier generic_identifier '(' event_parameters ')' statement
 	;
 
-event_parameter
-        : expression
-	| generic_identifier '=' initializer
-	| generic_identifier '=' expression
-        ;
-
 event_parameters
         : event_parameter
 	| event_parameters ',' event_parameter
 	| event_parameters ';' event_parameter
+        ;
+
+event_parameter
+        : assignment_expression
+	| generic_identifier '=' initializer
         ;
 
 boundary_definition
@@ -704,16 +741,19 @@ attribute
 
 root
         : translation_unit {
-	  $$ = *root = allocate ((Allocator *)parse->data, sizeof(AstRoot));
+	  $$ = *root = allocate ((Allocator *)parse->alloc, sizeof(AstRoot));
 	  memset ($$, 0, sizeof(AstRoot));
 	  $$->sym = yyr1[yyn];
-	  $$->child = allocate ((Allocator *)parse->data, 2*sizeof(Ast *));
+	  $$->child = allocate ((Allocator *)parse->alloc, 2*sizeof(Ast *));
 	  $$->child[0] = $1;
 	  $$->child[1] = NULL;
         }
         ;
 
 %%
+
+/**
+# Parsing functions */
 
 /* Called by yyparse on error.  */
 void
@@ -804,14 +844,25 @@ static Ast * ast_reduce (Allocator * alloc, int sym, Ast ** children, int n)
   Ast * ast = allocate (alloc, sizeof(Ast));
   memset (ast, 0, sizeof(Ast));
   ast->sym = sym;
-  ast->child = allocate (alloc, (n + 1)*sizeof(Ast *));
+  int ndef = 0;
   for (int i = 0; i < n; i++) {
     Ast * c = children[i + 1 - n];
-    if (c->parent)
-      remove_child (c);
-    c->parent = ast;
-    ast->child[i] = c;
-    ast->child[i + 1] = NULL;
+    if (c->sym != YYSYMBOL_YYUNDEF)
+      ndef++;
+  }  
+  ast->child = allocate (alloc, (ndef + 1)*sizeof(Ast *));
+  ndef = 0;
+  for (int i = 0; i < n; i++) {
+    Ast * c = children[i + 1 - n];
+    if (c->sym == YYSYMBOL_YYUNDEF)
+      assert (!c->parent);
+    else {
+      if (c->parent)
+	remove_child (c);
+      c->parent = ast;
+      ast->child[ndef++] = c;
+      ast->child[ndef] = NULL;
+    }
   }
   return ast;
 }
@@ -822,7 +873,8 @@ Ast * ast_parse (const char * code)
   parse.file = malloc (sizeof (char *));
   parse.nf = 1;
   parse.file[0] = strdup ("<basilisk>");
-  parse.data = new_allocator();
+  parse.alloc = new_allocator();
+  parse.stack = stack_new (sizeof (Ast *));
   extern void lexer_setup (char * buffer, size_t len);
   size_t len = strlen (code) + 1;
   char * buffer = malloc (len + 1);
@@ -832,6 +884,13 @@ Ast * ast_parse (const char * code)
   //  yydebug = 1;
   Ast * n = NULL;
   yyparse (&parse, &n);
+#if 0
+  { // list global declarations
+    Ast ** n;
+    for (int i = 0; (n = stack_index (parse.stack, i)); i++)
+      fprintf (stderr, "global: "), ast_print_file_line (*n, stderr);
+  }
+#endif
   if (n) {
     const char * i = copy_strings (buffer, n, code - buffer);
     n = recopy_ast (n);
@@ -842,9 +901,11 @@ Ast * ast_parse (const char * code)
     root->nf = parse.nf;
   }
   free (buffer);
-  free_allocator (parse.data);
+  free_allocator (parse.alloc);
+  stack_destroy (parse.stack);
   typedef_cleanup();
   yylex_destroy();
+  //  exit (1);
   return n;
 }
 
@@ -856,4 +917,18 @@ int token_symbol (int token)
 const char * symbol_name (int sym)
 {
   return yytname[sym];
+}
+
+Ast * internal_identifier_declaration (Stack * stack, const char * identifier)
+{
+  Ast ** d;
+  for (int i = 0; (d = stack_index (stack, i)); i++)
+    if (*d && (*d)->sym == YYSYMBOL_IDENTIFIER) {
+      char * s = ast_terminal(*d)->start, * end = ast_terminal(*d)->after;
+      const char * i = identifier;
+      for (; *i != '\0' && s <= end && *s == *i; s++, i++);
+      if (*i == '\0' && s == end + 1)
+	return *d;
+    }
+  return NULL;
 }

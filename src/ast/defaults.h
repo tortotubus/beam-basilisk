@@ -1,7 +1,7 @@
 /**
 # Default variables/function declarations 
 
-So that we can avoid parsing system libraries.
+So that we can avoid parsing system libraries (maybe we should just do it...)
 
 A list of declarations can be generated using something like
 
