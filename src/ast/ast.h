@@ -1,5 +1,7 @@
 #include <stdio.h>
 #include <stdbool.h>
+#include "allocator.h"
+#include "stack.h"
 
 typedef struct _Ast Ast;
 struct _Ast {
@@ -19,7 +21,8 @@ typedef struct {
   char * before, * after;
   char ** file;
   int nf;
-  void * data;
+  Allocator * alloc;
+  Stack * stack;
 } AstRoot;
 
 Ast * ast_parse            (const char * code);
@@ -54,7 +57,10 @@ static inline AstTerminal * ast_right_terminal (Ast * n)
   return (AstTerminal *) n;
 }
 
-Ast * ast_declarator_identifier (Ast * declarator);
+Ast * ast_is_enumeration_constant (Ast * identifier);
+Ast * ast_is_typedef              (Ast * identifier);
+Ast * ast_identifier_declaration (Stack * stack, const char * identifier);
+Ast * ast_declarator_identifier (Ast * declarator); // fixme: only used in typedef.c
 
 Ast * ast_schema_internal (Ast * n, ...);
 #define ast_schema(n,...) ast_schema_internal (n, __VA_ARGS__, -1)
@@ -84,3 +90,10 @@ static inline void ast_hide (AstTerminal * n)
 char * ast_line (AstTerminal * t);
 #define ast_file_line(n) "\"", ast_terminal(n)->file, \
     "\", ", ast_line(ast_terminal(n))
+
+/**
+# Grammar-specific functions */
+
+void  ast_push_declaration         (Stack * stack, Ast * declaration);
+Ast * ast_push_function_definition (Stack * stack, Ast * declarator);
+void  ast_pop_scope                (Stack * stack, Ast * scope);

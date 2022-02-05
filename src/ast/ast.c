@@ -229,7 +229,8 @@ static Ast * root_copy (const AstRoot * src)
   }
   else
     dst->file = NULL, dst->nf = 0;
-  dst->data = NULL;
+  dst->alloc = NULL;
+  dst->stack = NULL;
   ((Ast *)dst)->parent = NULL;
   return (Ast *)dst;
 }
@@ -332,6 +333,17 @@ Ast * ast_parse_file (FILE * fp)
   return root;
 }
 
+Ast * ast_identifier_declaration (Stack * stack, const char * identifier)
+{
+  Ast ** d;
+  for (int i = 0; (d = stack_index (stack, i)); i++)
+    if ((*d)->sym == sym_IDENTIFIER &&
+	!strcmp (ast_terminal(*d)->start, identifier))
+      return *d;
+  return NULL;
+}
+
+// fixme: only used in typedef.c
 Ast * ast_declarator_identifier (Ast * declarator)
 {
   while (declarator->child) {

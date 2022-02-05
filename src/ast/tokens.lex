@@ -1,3 +1,8 @@
+/**
+# Lexer for Basilisk C
+
+Closely based on the [C99 lexer](c.lex). */
+
 %option bison-bridge
 %option nounput
 %option noyywrap
@@ -41,12 +46,12 @@ static void preproc (void);
 static void bpreproc (void);
 static void ompreproc (void);
 static void file_line (AstRoot * parse, const char * text);
-static int  check_type(void);
+static int  check_type (AstRoot * parse);
 
 static Ast * new_ast (AstRoot * parse,
 		      int token, int line, char * start, char * end)
 {
-  Allocator * alloc = parse->data;
+  Allocator * alloc = parse->alloc;
   Ast * n = allocate (alloc, sizeof(AstTerminal));
   memset (n, 0, sizeof(AstTerminal));
   n->sym = token_symbol (token);
@@ -146,7 +151,7 @@ static Ast * new_ast (AstRoot * parse,
 
                     /* End of Basilisk C tokens */
 
-{L}{A}*					{ SAST(check_type()); }
+{L}{A}*					{ SAST(check_type (parse)); }
 
 {HP}{H}+{IS}?				{ SAST(I_CONSTANT); }
 {NZ}{D}*{IS}?				{ SAST(I_CONSTANT); }
@@ -280,11 +285,27 @@ static void file_line (AstRoot * parse, const char * text)
   //  fprintf (stderr, "%s: \"%s\" %d\n", text, file, yylineno);
 }
 
-static int check_type (void)
+static int check_type (AstRoot * parse)
 {
+  Ast * declaration = internal_identifier_declaration (parse->stack, yytext);
+#if 0  
+  if (declaration) {
+    if (ast_is_typedef (declaration))
+      fprintf (stderr, "%s:%d: typedef '%s' declared at %s:%d\n",
+	       parse->file[parse->nf - 1], yylineno, yytext,
+	       ast_terminal(declaration)->file, ast_terminal(declaration)->line);
+  }
+  else
+    fprintf (stderr, "%s:%d: '%s' undeclared\n",
+	     parse->file[parse->nf - 1], yylineno, yytext); 
+#endif
   switch (sym_type (yytext)) {
-  case TYPEDEF_NAME:                /* previously defined */
+  case TYPEDEF_NAME: {               /* previously defined */
+    if (!declaration || !ast_is_typedef (declaration))
+      fprintf (stderr, "%s:%d: typedef '%s' undeclared\n",
+	       parse->file[parse->nf - 1], yylineno, yytext);       
     return TYPEDEF_NAME;
+  }
   case ENUMERATION_CONSTANT:        /* previously defined */
     return ENUMERATION_CONSTANT;
   default:                          /* includes undefined */

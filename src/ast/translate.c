@@ -5,6 +5,26 @@
 #include "symbols.h"
 #include "stack.h"
 
+Ast * ast_is_enumeration_constant (Ast * identifier)
+{
+  if (identifier->parent->parent->sym == sym_enumeration_constant)
+    return identifier->parent->parent;
+  return NULL;
+}
+
+Ast * ast_is_typedef (Ast * identifier)
+{
+  Ast * declaration = identifier;
+  while (declaration && declaration->sym != sym_declaration)
+    declaration = declaration->parent;
+  if (declaration)
+    return ast_schema (declaration, sym_declaration,
+		       0, sym_declaration_specifiers,
+		       0, sym_storage_class_specifier,
+		       0, sym_TYPEDEF);
+  return NULL;
+}
+
 Ast * ast_find_function (Ast * n, const char * name)
 {
   Ast * found = NULL;
@@ -21,16 +41,7 @@ Ast * ast_find_function (Ast * n, const char * name)
   return found;
 }
 
-Ast * ast_identifier_declaration (Stack * stack, AstTerminal * identifier)
-{
-  Ast ** d;
-  for (int i = 0; (d = stack_index (stack, i)); i++)
-    if ((*d)->sym == sym_IDENTIFIER &&
-	!strcmp (ast_terminal(*d)->start, identifier->start))
-      return *d;
-  return NULL;
-}
-
+// fixme: replace with scope lookup
 static void no_nested_foreach (Ast * n, int parent)
 {
   if (n->sym == sym_foreach_statement) {
@@ -198,12 +209,15 @@ static void translate (Ast * n, Stack * stack)
 
   case sym_function_definition: {
     Ast * trace = ast_schema (n, sym_function_definition,
+			      0, sym_function_declaration,
 			      0, sym_declaration_specifiers,
 			      0, sym_storage_class_specifier,
 			      0, sym_TRACE);
     if (trace) {
       ast_hide (ast_terminal (trace));
-      Ast * identifier = ast_declarator_identifier (n->child[1]);
+      Ast * identifier = ast_find (n, sym_direct_declarator,
+				   0, sym_generic_identifier,
+				   0, sym_IDENTIFIER);
       Ast * compound_statement = ast_last_child (n);
       ast_after (compound_statement->child[0],
 		 " trace (\"", ast_terminal (identifier)->start, "\", ",
@@ -235,7 +249,7 @@ static void translate (Ast * n, Stack * stack)
   while (0)
 #endif
 
-static void push_declaration (Stack * stack, Ast * n)
+void ast_push_declaration (Stack * stack, Ast * n)
 {
   if (n->sym == sym_parameter_type_list ||
       n->sym == sym_struct_declaration_list)
@@ -243,39 +257,48 @@ static void push_declaration (Stack * stack, Ast * n)
   Ast * identifier = ast_schema (n, sym_direct_declarator,
 				 0, sym_generic_identifier,
 				 0, sym_IDENTIFIER);
-  if (identifier)
-    stack_push (stack, &identifier);
-  else {
+  if (!identifier)
     identifier = ast_schema (n, sym_enumeration_constant,
 			     0, sym_generic_identifier,
 			     0, sym_IDENTIFIER);
-    if (identifier)
-      stack_push (stack, &identifier);
+  if (identifier) {
+    stack_push (stack, &identifier);
+#if 0    
+    fputs ("push ", stderr);
+    ast_print_file_line (identifier, stderr);
+#endif
   }
   if (n->child)
     for (Ast ** c = n->child; *c; c++)
-      push_declaration (stack, *c);
+      ast_push_declaration (stack, *c);
 }
 
-static void symbol_stack_pop (Stack * stack, Ast * scope)
+void ast_pop_scope (Stack * stack, Ast * scope)
 {
   Ast * n;
   while ((n = *((Ast **)stack_pop (stack))) != scope) {
-#if 0    
-    AstTerminal * t = ast_terminal(n);    
-    if (t)
-      fprintf (stderr, "  pop: %s\n", t->start);
-    else
-      fprintf (stderr, "  pop: %s\n", symbol_name(n->sym));
+#if 0
+    fputs ("  pop: ", stderr);
+    ast_print_file_line (n, stderr);
 #endif
   }
-#if 0  
-  fprintf (stderr, "%s:%d: pop: %s\n",
-	   ast_right_terminal (scope)->file,
-	   ast_right_terminal (scope)->line,
-	   ast_terminal(scope) ?
-	   ast_terminal(scope)->start : symbol_name(scope->sym));
+#if 0
+  fputs ("scope: ", stderr);
+  ast_print_file_line (n, stderr);
 #endif
+}
+
+Ast * ast_push_function_definition (Stack * stack, Ast * declarator)
+{
+  stack_push (stack, &declarator);
+  Ast * identifier = ast_find (declarator, sym_direct_declarator,
+			       0, sym_generic_identifier,
+			       0, sym_IDENTIFIER);
+  stack_push (stack, &identifier);
+  Ast * parameters = ast_find (declarator, sym_parameter_list);
+  if (parameters)
+    ast_push_declaration (stack, parameters);
+  return identifier;
 }
 
 void ast_traverse (Ast * n, Stack * stack, void func (Ast *, Stack *))
@@ -283,8 +306,13 @@ void ast_traverse (Ast * n, Stack * stack, void func (Ast *, Stack *))
   func (n, stack);
 
   switch (n->sym) {
+
+  /**
+  These should match the corresponding mid-action rules in
+  [basilisk.yacc](). */
     
   case sym_function_definition: {
+    // fixme: use ast_push_function_definition
     Ast * identifier = ast_find (n, sym_direct_declarator,
 				 0, sym_generic_identifier,
 				 0, sym_IDENTIFIER);
@@ -292,32 +320,33 @@ void ast_traverse (Ast * n, Stack * stack, void func (Ast *, Stack *))
     stack_push (stack, &identifier);
     Ast * parameters = ast_find (n, sym_parameter_list);
     if (parameters)
-      push_declaration (stack, parameters);
+      ast_push_declaration (stack, parameters);
     for (Ast ** c = n->child; *c; c++)
       ast_traverse (*c, stack, func);
-    symbol_stack_pop (stack, identifier);
+    ast_pop_scope (stack, identifier);
     return;
   }
     
-  case sym_compound_statement: case sym_for_declaration_statement: {
+  case sym_compound_statement:
+  case sym_for_declaration_statement: {
     stack_push (stack, &n);
     for (Ast ** c = n->child; *c; c++)
       ast_traverse (*c, stack, func);
-    symbol_stack_pop (stack, n);
+    ast_pop_scope (stack, n);
     return;
   }
-
+    
   case sym_forin_declaration_statement: {
     stack_push (stack, &n);
-    push_declaration (stack, n->child[3]);
+    ast_push_declaration (stack, n->child[3]);
     for (Ast ** c = n->child; *c; c++)
       ast_traverse (*c, stack, func);
-    symbol_stack_pop (stack, n);
+    ast_pop_scope (stack, n);
     return;
   }
 
   case sym_declaration:
-    push_declaration (stack, n);
+    ast_push_declaration (stack, n);
 
   default:
     if (n->child)
@@ -358,7 +387,7 @@ void endfor (FILE * fin, FILE * fout)
   assert (fp);
   Ast * d = ast_parse_file (fp);
   fclose (fp);
-  push_declaration (stack, d);
+  ast_push_declaration (stack, d);
   ast_traverse (root, stack, translate);
 #if 0
   { // list global declarations
