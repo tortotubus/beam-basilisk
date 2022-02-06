@@ -1,7 +1,24 @@
 /**
 # Yacc Grammar for Basilisk C
 
-Closely based on the [C99 grammar](c.yacc). */
+Closely based on the [C99 grammar](c.yacc). 
+
+## References
+
+~~~bib
+@hal{jourdan2017, hal-01633123}
+
+@article{scarpazza2007,
+author = {Scarpazza, D.P.},
+year = {2007},
+pages = {48-55},
+title = {Practical parsing for ANSI C},
+volume = {32},
+journal = {Dr. Dobb's Journal}
+}
+~~~
+
+See also [/home/popinet/local/src/C11parser/](). */
 
 %param { AstRoot * parse }
 %parse-param { Ast ** root }
@@ -66,7 +83,7 @@ translation_unit
         ;
 
 primary_expression
-        : generic_identifier
+        : IDENTIFIER
 	| constant
 	| string
 	| '(' expression_error ')'
@@ -85,7 +102,7 @@ constant
 	;
 
 enumeration_constant		/* before it has been defined as such */
-	: generic_identifier
+	: IDENTIFIER
 	;
 
 string
@@ -140,7 +157,7 @@ argument_expression_list
 
 argument_expression_list_item
         : assignment_expression
-	| generic_identifier '=' initializer  /* Basilisk C extension */
+	| IDENTIFIER '=' initializer  /* Basilisk C extension */
 	| field_list /* Basilisk C extension */
 	;
 
@@ -263,9 +280,8 @@ constant_expression
 	;
 
 declaration
-        : declaration_specifiers ';'                      { ast_push_declaration (parse->stack, $$); }
-	| declaration_specifiers init_declarator_list ';' { type_definition ((Allocator *)parse->alloc, $$);
-                                                            ast_push_declaration (parse->stack, $$); }
+        : declaration_specifiers ';' type_not_specified                        { ast_push_declaration (parse->stack, $$); }
+	| declaration_specifiers init_declarator_list ';' type_not_specified   { ast_push_declaration (parse->stack, $$); }
 	| static_assert_declaration
 	;
 
@@ -303,7 +319,11 @@ storage_class_specifier
 	;
 
 type_specifier
-	: VOID
+        : types    { parse->type_already_specified = true; }
+        ;
+
+types
+        : VOID
 	| CHAR
 	| SHORT
 	| INT
@@ -340,8 +360,8 @@ struct_declaration_list
 	;
 
 struct_declaration
-	: specifier_qualifier_list ';'	/* for anonymous struct/union */
-	| specifier_qualifier_list struct_declarator_list ';'
+        : specifier_qualifier_list ';' type_not_specified      /* for anonymous struct/union */
+	| specifier_qualifier_list struct_declarator_list ';' type_not_specified
 	| static_assert_declaration
 	;
 
@@ -404,12 +424,12 @@ alignment_specifier
 	;
 
 declarator
-        : pointer direct_declarator
-	| direct_declarator
+        : pointer direct_declarator type_not_specified
+	| direct_declarator type_not_specified
 	;
 
 direct_declarator
-	: generic_identifier
+        : generic_identifier
 	| '(' declarator ')'
 	| direct_declarator '[' ']'
 	| direct_declarator '[' '*' ']'
@@ -420,15 +440,15 @@ direct_declarator
 	| direct_declarator '[' type_qualifier_list assignment_expression ']'
 	| direct_declarator '[' type_qualifier_list ']'
 	| direct_declarator '[' assignment_expression ']'
-	| direct_declarator '(' parameter_type_list ')'
-	| direct_declarator '(' error ')'                               { $3->sym = YYSYMBOL_YYerror; }
-	| direct_declarator '(' ')'
-	| direct_declarator '(' identifier_list ')'
+	| direct_declarator '(' type_not_specified parameter_type_list ')'
+	| direct_declarator '(' type_not_specified error ')'                               { $4->sym = YYSYMBOL_YYerror; }
+	| direct_declarator '(' type_not_specified ')'
+	| direct_declarator '(' type_not_specified identifier_list ')'
 	;
 
 generic_identifier
         : IDENTIFIER
-	| TYPEDEF_NAME  /* fixme: workaround when variable name = type name */
+	| TYPEDEF_NAME
 	;
 
 pointer
@@ -443,15 +463,14 @@ type_qualifier_list
 	| type_qualifier_list type_qualifier
 	;
 
-
 parameter_type_list
 	: parameter_list ',' ELLIPSIS
 	| parameter_list
 	;
 
 parameter_list
-	: parameter_declaration
-	| parameter_list ',' parameter_declaration
+        : parameter_declaration type_not_specified
+	| parameter_list ',' parameter_declaration type_not_specified
 	;
 
 parameter_declaration
@@ -461,13 +480,13 @@ parameter_declaration
 	;
 
 identifier_list
-	: generic_identifier
-	| identifier_list ',' generic_identifier
+	: IDENTIFIER
+	| identifier_list ',' IDENTIFIER
 	;
 
 type_name
-	: specifier_qualifier_list abstract_declarator
-	| specifier_qualifier_list
+        : specifier_qualifier_list abstract_declarator type_not_specified
+	| specifier_qualifier_list type_not_specified
 	;
 
 abstract_declarator
@@ -496,9 +515,13 @@ direct_abstract_declarator
 	| direct_abstract_declarator '[' assignment_expression ']'
 	| '(' ')'
 	| '(' parameter_type_list ')'
-	| direct_abstract_declarator '(' ')'
-	| direct_abstract_declarator '(' parameter_type_list ')'
+	| direct_abstract_declarator '(' type_not_specified ')'
+	| direct_abstract_declarator '(' type_not_specified parameter_type_list ')'
 	;
+
+type_not_specified
+        :  { parse->type_already_specified = false; }
+        ;
 
 initializer
 	: '{' initializer_list '}'
@@ -617,7 +640,7 @@ external_declaration
 	;
 
 function_declaration
-        : declaration_specifiers declarator     { ast_push_function_definition (parse->stack, $2); }
+        : declaration_specifiers declarator { ast_push_function_definition (parse->stack, $2);  }
 	;
 	
 function_definition
@@ -847,24 +870,46 @@ static Ast * ast_reduce (Allocator * alloc, int sym, Ast ** children, int n)
   int ndef = 0;
   for (int i = 0; i < n; i++) {
     Ast * c = children[i + 1 - n];
-    if (c->sym != YYSYMBOL_YYUNDEF)
+    if (c->sym != YYSYMBOL_YYUNDEF && c->sym != YYSYMBOL_type_not_specified)
       ndef++;
-  }  
+  }
   ast->child = allocate (alloc, (ndef + 1)*sizeof(Ast *));
   ndef = 0;
   for (int i = 0; i < n; i++) {
     Ast * c = children[i + 1 - n];
-    if (c->sym == YYSYMBOL_YYUNDEF)
+    if (c->sym == YYSYMBOL_YYUNDEF || c->sym == YYSYMBOL_type_not_specified)
       assert (!c->parent);
     else {
       if (c->parent)
 	remove_child (c);
       c->parent = ast;
       ast->child[ndef++] = c;
-      ast->child[ndef] = NULL;
     }
   }
+  ast->child[ndef] = NULL;
   return ast;
+}
+
+static Stack * stack_internalize (Stack * stack)
+{
+  Ast ** n;
+  for (int i = 0; (n = stack_index (stack, i)); i++)
+    if ((*n)->sym == YYSYMBOL_IDENTIFIER) {
+      AstTerminal * t = ast_terminal (*n);
+      assert (t->after == NULL);
+      t->after = t->start + strlen (t->start) - 1;
+    }
+  return stack;
+}
+
+static void stack_externalize (Stack * stack)
+{
+  Ast ** n;
+  for (int i = 0; (n = stack_index (stack, i)); i++)
+    if ((*n)->sym == YYSYMBOL_IDENTIFIER) {
+      AstTerminal * t = ast_terminal (*n);
+      t->after = NULL;
+    }
 }
 
 Ast * ast_parse (const char * code)
@@ -875,6 +920,7 @@ Ast * ast_parse (const char * code)
   parse.file[0] = strdup ("<basilisk>");
   parse.alloc = new_allocator();
   parse.stack = stack_new (sizeof (Ast *));
+  parse.type_already_specified = false;
   extern void lexer_setup (char * buffer, size_t len);
   size_t len = strlen (code) + 1;
   char * buffer = malloc (len + 1);
@@ -903,9 +949,7 @@ Ast * ast_parse (const char * code)
   free (buffer);
   free_allocator (parse.alloc);
   stack_destroy (parse.stack);
-  typedef_cleanup();
   yylex_destroy();
-  //  exit (1);
   return n;
 }
 
@@ -917,18 +961,4 @@ int token_symbol (int token)
 const char * symbol_name (int sym)
 {
   return yytname[sym];
-}
-
-Ast * internal_identifier_declaration (Stack * stack, const char * identifier)
-{
-  Ast ** d;
-  for (int i = 0; (d = stack_index (stack, i)); i++)
-    if (*d && (*d)->sym == YYSYMBOL_IDENTIFIER) {
-      char * s = ast_terminal(*d)->start, * end = ast_terminal(*d)->after;
-      const char * i = identifier;
-      for (; *i != '\0' && s <= end && *s == *i; s++, i++);
-      if (*i == '\0' && s == end + 1)
-	return *d;
-    }
-  return NULL;
 }

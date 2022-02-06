@@ -23,6 +23,7 @@ typedef struct {
   int nf;
   Allocator * alloc;
   Stack * stack;
+  bool type_already_specified;
 } AstRoot;
 
 Ast * ast_parse            (const char * code);
@@ -60,7 +61,6 @@ static inline AstTerminal * ast_right_terminal (Ast * n)
 Ast * ast_is_enumeration_constant (Ast * identifier);
 Ast * ast_is_typedef              (Ast * identifier);
 Ast * ast_identifier_declaration (Stack * stack, const char * identifier);
-Ast * ast_declarator_identifier (Ast * declarator); // fixme: only used in typedef.c
 
 Ast * ast_schema_internal (Ast * n, ...);
 #define ast_schema(n,...) ast_schema_internal (n, __VA_ARGS__, -1)
