@@ -337,28 +337,32 @@ Ast * ast_identifier_declaration (Stack * stack, const char * identifier)
 {
   Ast ** d;
   for (int i = 0; (d = stack_index (stack, i)); i++)
-    if ((*d)->sym == sym_IDENTIFIER &&
-	!strcmp (ast_terminal(*d)->start, identifier))
-      return *d;
-  return NULL;
-}
+    if (*d && (*d)->sym == sym_IDENTIFIER) {
 
-// fixme: only used in typedef.c
-Ast * ast_declarator_identifier (Ast * declarator)
-{
-  while (declarator->child) {
-    Ast * c = declarator->child[0];
-    if (c->sym != sym_init_declarator_list &&
-	c->sym != sym_init_declarator &&
-	c->sym != sym_declarator &&
-	c->sym != sym_direct_declarator &&
-	c->sym != sym_generic_identifier &&
-	c->sym != sym_IDENTIFIER)
-      c = declarator->child[1];
-    declarator = c;
-  }
-  assert (declarator->sym == sym_IDENTIFIER);
-  return declarator;
+      /**
+      WARNING: this assumes that the "after" string is never modified
+      for the declaration identifiers stored in the stack. */
+
+      if (!ast_terminal(*d)->after) {
+	if (!strcmp (ast_terminal(*d)->start, identifier))
+	  return *d;
+      }
+
+      /**
+      If 'after' is defined, we assume that the function is called
+      from the [lexer](tokens.lex) and that 'after' is the last
+      character of the declaration identifier (as set by the
+      lexer). */
+      
+      else {
+	char * s = ast_terminal(*d)->start, * end = ast_terminal(*d)->after;
+	const char * i = identifier;
+	for (; *i != '\0' && s <= end && *s == *i; s++, i++);
+	if (*i == '\0' && s == end + 1)
+	  return *d;
+      }
+    }
+  return NULL;
 }
     
 char * str_append_realloc (char * src, ...)

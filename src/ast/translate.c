@@ -139,15 +139,15 @@ static void translate (Ast * n, Stack * stack)
   /**
   ## Identifiers */
 
-  case sym_generic_identifier: {
+  case sym_IDENTIFIER: {
     if (n->parent->sym == sym_primary_expression) {
       static Replacement replacements[] = {
 	{ "stderr", "ferr" },
 	{ NULL, NULL }
       };
       Replacement * i = replacements;
-      AstTerminal * identifier = ast_terminal (n->child[0]);
-#if 1
+      AstTerminal * identifier = ast_terminal (n);
+#if 0
       Ast * found = ast_identifier_declaration (stack, identifier);
       if (found) {
 #if 1
@@ -178,7 +178,6 @@ static void translate (Ast * n, Stack * stack)
     Ast * identifier = ast_schema (n, sym_function_call,
 				   0, sym_postfix_expression,
 				   0, sym_primary_expression,
-				   0, sym_generic_identifier,
 				   0, sym_IDENTIFIER);
     if (identifier) {
       static Replacement replacements[] = {

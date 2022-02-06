@@ -3,10 +3,7 @@
 
 Closely based on the [C99 lexer](c.lex). */
 
-%option bison-bridge
-%option nounput
-%option noyywrap
-%option yylineno
+%option bison-bridge noyywrap yylineno nounput
 
 %e  1019
 %p  2807
@@ -287,30 +284,50 @@ static void file_line (AstRoot * parse, const char * text)
 
 static int check_type (AstRoot * parse)
 {
-  Ast * declaration = internal_identifier_declaration (parse->stack, yytext);
-#if 0  
+  if (parse->type_already_specified)
+    return IDENTIFIER;
+  
+  Ast * declaration = ast_identifier_declaration (parse->stack, yytext);
   if (declaration) {
     if (ast_is_typedef (declaration))
-      fprintf (stderr, "%s:%d: typedef '%s' declared at %s:%d\n",
-	       parse->file[parse->nf - 1], yylineno, yytext,
-	       ast_terminal(declaration)->file, ast_terminal(declaration)->line);
-  }
-  else
-    fprintf (stderr, "%s:%d: '%s' undeclared\n",
-	     parse->file[parse->nf - 1], yylineno, yytext); 
-#endif
-  switch (sym_type (yytext)) {
-  case TYPEDEF_NAME: {               /* previously defined */
-    if (!declaration || !ast_is_typedef (declaration))
-      fprintf (stderr, "%s:%d: typedef '%s' undeclared\n",
-	       parse->file[parse->nf - 1], yylineno, yytext);       
-    return TYPEDEF_NAME;
-  }
-  case ENUMERATION_CONSTANT:        /* previously defined */
-    return ENUMERATION_CONSTANT;
-  default:                          /* includes undefined */
+      return TYPEDEF_NAME;
     return IDENTIFIER;
   }
+  
+#if 1 // fixme
+  if (!strcmp (yytext, "FILE"))
+    return TYPEDEF_NAME;
+  else if (!strcmp (yytext, "size_t"))
+    return TYPEDEF_NAME;
+  else if (!strcmp (yytext, "bool"))
+    return TYPEDEF_NAME;
+  else if (!strcmp (yytext, "_Attributes"))
+    return TYPEDEF_NAME;
+  else if (!strcmp (yytext, "extrae_type_t"))
+    return TYPEDEF_NAME;  
+  else if (!strcmp (yytext, "extrae_value_t"))
+    return TYPEDEF_NAME;  
+  else if (!strcmp (yytext, "MPI_Status"))
+    return TYPEDEF_NAME;  
+  else if (!strcmp (yytext, "MPI_Datatype"))
+    return TYPEDEF_NAME;  
+  else if (!strcmp (yytext, "MPI_Request"))
+    return TYPEDEF_NAME;  
+  else if (!strcmp (yytext, "MPI_Comm"))
+    return TYPEDEF_NAME;  
+  else if (!strcmp (yytext, "MPI_Op"))
+    return TYPEDEF_NAME;  
+  else if (!strcmp (yytext, "Node"))
+    return TYPEDEF_NAME;  
+  else if (!strcmp (yytext, "GLfloat"))
+    return TYPEDEF_NAME;  
+  else if (!strcmp (yytext, "int64_t"))
+    return TYPEDEF_NAME;  
+  else if (!strcmp (yytext, "clock_t"))
+    return TYPEDEF_NAME;  
+#endif
+  
+  return IDENTIFIER;
 }
 
 void lexer_setup (char * buffer, size_t len)
