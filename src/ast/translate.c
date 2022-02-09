@@ -71,7 +71,8 @@ static void trace_return (Ast * n,
     }
     else { // return sthg;
       Ast * compound =
-	ast_parse_expression ("{ void ret = val; return ret; }");
+	ast_parse_expression ("{ void ret = val; return ret; }",
+			      ast_get_root(function_definition)->alloc);
       Ast * type_specifier =
 	ast_copy (ast_find (function_definition, sym_declaration_specifiers,
 			    0, sym_type_specifier));
@@ -378,13 +379,13 @@ void endfor (FILE * fin, FILE * fout)
   fclose (fp);
 #endif
   
-  Ast * root = ast_parse (buffer);
+  Ast * root = ast_parse (buffer, NULL);
   free (buffer);
   
   Stack * stack = stack_new (sizeof (Ast *));
   fp = fopen (BASILISK "/ast/defaults.h", "r");
   assert (fp);
-  Ast * d = ast_parse_file (fp);
+  Ast * d = ast_parse_file (fp, NULL);
   fclose (fp);
   ast_push_declaration (stack, d);
   ast_traverse (root, stack, translate);

@@ -16,6 +16,9 @@ title = {Practical parsing for ANSI C},
 volume = {32},
 journal = {Dr. Dobb's Journal}
 }
+
+Jim Roskind's C grammar
+https://blog.robertelder.org/jim-roskind-grammar/c%2B%2Bgrammar2.0.tar.Z
 ~~~
 
 See also [/home/popinet/local/src/C11parser/](). */
@@ -769,6 +772,7 @@ root
 	  $$->sym = yyr1[yyn];
 	  $$->child = allocate ((Allocator *)parse->alloc, 2*sizeof(Ast *));
 	  $$->child[0] = $1;
+	  $1->parent = $$;
 	  $$->child[1] = NULL;
         }
         ;
@@ -824,30 +828,6 @@ static const char * copy_strings (const char * i, Ast * n, long offset)
     for (Ast ** c = n->child; *c; c++)
       i = copy_strings (i, *c, offset);
   return i;
-}
-
-static Ast * recopy_ast (Ast * n)
-{
-  AstRoot * r = ast_root (n);
-  AstTerminal * t = ast_terminal (n);
-  size_t size = r ? sizeof (AstRoot) : t ? sizeof (AstTerminal) : sizeof (Ast);
-  Ast * c = malloc (size);
-  memcpy (c, n, size);
-  if (t) {
-    t->before = NULL;
-    t->start = NULL;
-  }
-  else {
-    int len = 0;
-    for (Ast ** i = n->child; *i; i++, len++);
-    c->child = malloc ((len + 1)*sizeof (Ast *));
-    c->child[len] = NULL;
-    for (Ast ** i = n->child, ** j = c->child; *i; i++, j++) {
-      *j = recopy_ast (*i);
-      (*j)->parent = c;
-    }
-  }
-  return c;
 }
 
 static void remove_child (Ast * c)
@@ -912,13 +892,13 @@ static void stack_externalize (Stack * stack)
     }
 }
 
-Ast * ast_parse (const char * code)
+Ast * ast_parse (const char * code, Allocator * alloc)
 {
   AstRoot parse;
   parse.file = malloc (sizeof (char *));
   parse.nf = 1;
   parse.file[0] = strdup ("<basilisk>");
-  parse.alloc = new_allocator();
+  parse.alloc = alloc ? alloc : new_allocator();
   parse.stack = stack_new (sizeof (Ast *));
   parse.type_already_specified = false;
   extern void lexer_setup (char * buffer, size_t len);
@@ -939,16 +919,20 @@ Ast * ast_parse (const char * code)
 #endif
   if (n) {
     const char * i = copy_strings (buffer, n, code - buffer);
-    n = recopy_ast (n);
     const char * end = i; while (*end != '\0') end++;
     AstRoot * root = ast_root (n);
     root->after = copy_range (i, end, code - buffer);
     root->file = parse.file;
-    root->nf = parse.nf;
+    root->nf = parse.nf;    
+    root->alloc = alloc ? NULL : parse.alloc;
+    root->stack = parse.stack;
+  }
+  else {
+    if (!alloc)
+      free_allocator (parse.alloc);
+    stack_destroy (parse.stack);
   }
   free (buffer);
-  free_allocator (parse.alloc);
-  stack_destroy (parse.stack);
   yylex_destroy();
   return n;
 }

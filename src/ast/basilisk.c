@@ -67,7 +67,7 @@
 
 
 /* First part of user prologue.  */
-#line 28 "basilisk.yacc"
+#line 31 "basilisk.yacc"
 
 #include <string.h>
 #include <assert.h>
@@ -715,41 +715,41 @@ static const yytype_int8 yytranslate[] =
   /* YYRLINE[YYN] -- Source line where rule number YYN was defined.  */
 static const yytype_int16 yyrline[] =
 {
-       0,    78,    78,    79,    80,    81,    82,    86,    87,    88,
-      89,    90,    94,    95,    99,   100,   101,   105,   109,   110,
-     114,   118,   119,   123,   124,   128,   129,   130,   131,   132,
-     133,   134,   135,   136,   140,   141,   145,   146,   150,   154,
-     155,   159,   160,   161,   165,   166,   167,   168,   169,   170,
-     171,   172,   176,   177,   178,   179,   180,   181,   185,   186,
-     192,   193,   194,   195,   199,   200,   201,   205,   206,   207,
-     211,   212,   213,   214,   215,   219,   220,   221,   225,   226,
-     230,   231,   235,   236,   240,   241,   245,   246,   250,   251,
-     255,   256,   260,   261,   262,   263,   264,   265,   266,   267,
-     268,   269,   270,   274,   275,   279,   283,   284,   285,   289,
-     290,   291,   292,   293,   294,   295,   296,   297,   298,   302,
-     303,   307,   308,   312,   313,   314,   315,   316,   317,   318,
-     322,   326,   327,   328,   329,   330,   331,   332,   333,   334,
-     335,   336,   337,   338,   339,   340,   341,   345,   346,   347,
-     348,   349,   353,   354,   358,   359,   363,   364,   365,   369,
-     370,   371,   372,   376,   377,   381,   382,   383,   387,   388,
-     389,   390,   391,   395,   396,   400,   401,   405,   409,   410,
-     411,   412,   413,   417,   418,   422,   423,   427,   428,   432,
-     433,   434,   435,   436,   437,   438,   439,   440,   441,   442,
-     443,   444,   445,   446,   450,   451,   455,   456,   457,   458,
-     462,   463,   467,   468,   472,   473,   477,   478,   479,   483,
-     484,   488,   489,   493,   494,   495,   499,   500,   501,   502,
-     503,   504,   505,   506,   507,   508,   509,   510,   511,   512,
-     513,   514,   515,   516,   517,   518,   519,   523,   527,   528,
-     529,   533,   534,   535,   536,   540,   544,   545,   549,   550,
-     554,   558,   559,   560,   561,   562,   563,   564,   565,   569,
-     570,   571,   575,   577,   577,   583,   584,   588,   589,   593,
-     594,   598,   599,   600,   604,   608,   609,   610,   612,   614,
-     618,   620,   625,   626,   627,   628,   629,   633,   634,   635,
-     636,   637,   638,   639,   643,   647,   649,   654,   655,   662,
-     663,   664,   665,   666,   667,   671,   675,   676,   680,   681,
-     685,   686,   690,   691,   695,   699,   700,   704,   705,   709,
-     710,   714,   719,   724,   725,   729,   733,   734,   738,   742,
-     743,   744,   748,   749,   753,   757,   758,   762,   766
+       0,    81,    81,    82,    83,    84,    85,    89,    90,    91,
+      92,    93,    97,    98,   102,   103,   104,   108,   112,   113,
+     117,   121,   122,   126,   127,   131,   132,   133,   134,   135,
+     136,   137,   138,   139,   143,   144,   148,   149,   153,   157,
+     158,   162,   163,   164,   168,   169,   170,   171,   172,   173,
+     174,   175,   179,   180,   181,   182,   183,   184,   188,   189,
+     195,   196,   197,   198,   202,   203,   204,   208,   209,   210,
+     214,   215,   216,   217,   218,   222,   223,   224,   228,   229,
+     233,   234,   238,   239,   243,   244,   248,   249,   253,   254,
+     258,   259,   263,   264,   265,   266,   267,   268,   269,   270,
+     271,   272,   273,   277,   278,   282,   286,   287,   288,   292,
+     293,   294,   295,   296,   297,   298,   299,   300,   301,   305,
+     306,   310,   311,   315,   316,   317,   318,   319,   320,   321,
+     325,   329,   330,   331,   332,   333,   334,   335,   336,   337,
+     338,   339,   340,   341,   342,   343,   344,   348,   349,   350,
+     351,   352,   356,   357,   361,   362,   366,   367,   368,   372,
+     373,   374,   375,   379,   380,   384,   385,   386,   390,   391,
+     392,   393,   394,   398,   399,   403,   404,   408,   412,   413,
+     414,   415,   416,   420,   421,   425,   426,   430,   431,   435,
+     436,   437,   438,   439,   440,   441,   442,   443,   444,   445,
+     446,   447,   448,   449,   453,   454,   458,   459,   460,   461,
+     465,   466,   470,   471,   475,   476,   480,   481,   482,   486,
+     487,   491,   492,   496,   497,   498,   502,   503,   504,   505,
+     506,   507,   508,   509,   510,   511,   512,   513,   514,   515,
+     516,   517,   518,   519,   520,   521,   522,   526,   530,   531,
+     532,   536,   537,   538,   539,   543,   547,   548,   552,   553,
+     557,   561,   562,   563,   564,   565,   566,   567,   568,   572,
+     573,   574,   578,   580,   580,   586,   587,   591,   592,   596,
+     597,   601,   602,   603,   607,   611,   612,   613,   615,   617,
+     621,   623,   628,   629,   630,   631,   632,   636,   637,   638,
+     639,   640,   641,   642,   646,   650,   652,   657,   658,   665,
+     666,   667,   668,   669,   670,   674,   678,   679,   683,   684,
+     688,   689,   693,   694,   698,   702,   703,   707,   708,   712,
+     713,   717,   722,   727,   728,   732,   736,   737,   741,   745,
+     746,   747,   751,   752,   756,   760,   761,   765,   769
 };
 #endif
 
@@ -2380,170 +2380,171 @@ yyreduce:
   switch (yyn)
     {
   case 4: /* translation_unit: translation_unit error ';'  */
-#line 80 "basilisk.yacc"
+#line 83 "basilisk.yacc"
                                       { yyvsp[-1]->sym = YYSYMBOL_YYerror; }
 #line 2386 "basilisk.c"
     break;
 
   case 5: /* translation_unit: translation_unit error '}'  */
-#line 81 "basilisk.yacc"
+#line 84 "basilisk.yacc"
                                       { yyvsp[-1]->sym = YYSYMBOL_YYerror; }
 #line 2392 "basilisk.c"
     break;
 
   case 6: /* translation_unit: translation_unit error ')'  */
-#line 82 "basilisk.yacc"
+#line 85 "basilisk.yacc"
                                       { yyvsp[-1]->sym = YYSYMBOL_YYerror; }
 #line 2398 "basilisk.c"
     break;
 
   case 13: /* expression_error: error  */
-#line 95 "basilisk.yacc"
+#line 98 "basilisk.yacc"
                         { yyvsp[0]->sym = YYSYMBOL_YYerror; }
 #line 2404 "basilisk.c"
     break;
 
   case 106: /* declaration: declaration_specifiers ';' type_not_specified  */
-#line 283 "basilisk.yacc"
+#line 286 "basilisk.yacc"
                                                                                { ast_push_declaration (parse->stack, yyval); }
 #line 2410 "basilisk.c"
     break;
 
   case 107: /* declaration: declaration_specifiers init_declarator_list ';' type_not_specified  */
-#line 284 "basilisk.yacc"
+#line 287 "basilisk.yacc"
                                                                                { ast_push_declaration (parse->stack, yyval); }
 #line 2416 "basilisk.c"
     break;
 
   case 130: /* type_specifier: types  */
-#line 322 "basilisk.yacc"
+#line 325 "basilisk.yacc"
                    { parse->type_already_specified = true; }
 #line 2422 "basilisk.c"
     break;
 
   case 150: /* struct_or_union_specifier: struct_or_union '{' error '}'  */
-#line 348 "basilisk.yacc"
+#line 351 "basilisk.yacc"
                                                             { yyvsp[-1]->sym = YYSYMBOL_YYerror; }
 #line 2428 "basilisk.c"
     break;
 
   case 151: /* struct_or_union_specifier: struct_or_union generic_identifier '{' error '}'  */
-#line 349 "basilisk.yacc"
+#line 352 "basilisk.yacc"
                                                             { yyvsp[-1]->sym = YYSYMBOL_YYerror; }
 #line 2434 "basilisk.c"
     break;
 
   case 201: /* direct_declarator: direct_declarator '(' type_not_specified error ')'  */
-#line 444 "basilisk.yacc"
+#line 447 "basilisk.yacc"
                                                                                            { yyvsp[-1]->sym = YYSYMBOL_YYerror; }
 #line 2440 "basilisk.c"
     break;
 
   case 247: /* type_not_specified: %empty  */
-#line 523 "basilisk.yacc"
+#line 526 "basilisk.yacc"
            { parse->type_already_specified = false; }
 #line 2446 "basilisk.c"
     break;
 
   case 268: /* statement: error ';'  */
-#line 565 "basilisk.yacc"
+#line 568 "basilisk.yacc"
                      { yyvsp[-1]->sym = YYSYMBOL_YYerror; }
 #line 2452 "basilisk.c"
     break;
 
   case 273: /* @1: %empty  */
-#line 577 "basilisk.yacc"
+#line 580 "basilisk.yacc"
                            { stack_push (parse->stack, &(yyvsp[0])); yyval->sym = YYSYMBOL_YYUNDEF; }
 #line 2458 "basilisk.c"
     break;
 
   case 274: /* compound_statement: '{' @1 block_item_list '}'  */
-#line 579 "basilisk.yacc"
+#line 582 "basilisk.yacc"
                            { ast_pop_scope (parse->stack, yyvsp[-3]); }
 #line 2464 "basilisk.c"
     break;
 
   case 284: /* for_scope: FOR  */
-#line 604 "basilisk.yacc"
+#line 607 "basilisk.yacc"
               { stack_push (parse->stack, &(yyval)); }
 #line 2470 "basilisk.c"
     break;
 
   case 287: /* iteration_statement: for_scope '(' expression_statement expression_statement ')' statement  */
-#line 611 "basilisk.yacc"
+#line 614 "basilisk.yacc"
                     { ast_pop_scope (parse->stack, yyvsp[-5]); }
 #line 2476 "basilisk.c"
     break;
 
   case 288: /* iteration_statement: for_scope '(' expression_statement expression_statement expression ')' statement  */
-#line 613 "basilisk.yacc"
+#line 616 "basilisk.yacc"
                     { ast_pop_scope (parse->stack, yyvsp[-6]); }
 #line 2482 "basilisk.c"
     break;
 
   case 290: /* for_declaration_statement: for_scope '(' declaration expression_statement ')' statement  */
-#line 619 "basilisk.yacc"
+#line 622 "basilisk.yacc"
                     { ast_pop_scope (parse->stack, yyvsp[-5]); }
 #line 2488 "basilisk.c"
     break;
 
   case 291: /* for_declaration_statement: for_scope '(' declaration expression_statement expression ')' statement  */
-#line 621 "basilisk.yacc"
+#line 624 "basilisk.yacc"
                     { ast_pop_scope (parse->stack, yyvsp[-6]); }
 #line 2494 "basilisk.c"
     break;
 
   case 303: /* external_declaration: error compound_statement  */
-#line 639 "basilisk.yacc"
+#line 642 "basilisk.yacc"
                                                 { yyvsp[-1]->sym = YYSYMBOL_YYerror; }
 #line 2500 "basilisk.c"
     break;
 
   case 304: /* function_declaration: declaration_specifiers declarator  */
-#line 643 "basilisk.yacc"
+#line 646 "basilisk.yacc"
                                             { ast_push_function_definition (parse->stack, yyvsp[0]);  }
 #line 2506 "basilisk.c"
     break;
 
   case 305: /* function_definition: function_declaration declaration_list compound_statement  */
-#line 648 "basilisk.yacc"
+#line 651 "basilisk.yacc"
                                                 { ast_pop_scope (parse->stack, yyvsp[-2]->child[1]); }
 #line 2512 "basilisk.c"
     break;
 
   case 306: /* function_definition: function_declaration compound_statement  */
-#line 650 "basilisk.yacc"
+#line 653 "basilisk.yacc"
                                                 { ast_pop_scope (parse->stack, yyvsp[-1]->child[1]); }
 #line 2518 "basilisk.c"
     break;
 
   case 331: /* forin_declaration_statement: for_scope '(' declaration_specifiers init_declarator IN forin_arguments ')' statement  */
-#line 715 "basilisk.yacc"
+#line 718 "basilisk.yacc"
                     { ast_pop_scope (parse->stack, yyvsp[-7]); }
 #line 2524 "basilisk.c"
     break;
 
   case 332: /* forin_statement: for_scope '(' expression IN forin_arguments ')' statement  */
-#line 720 "basilisk.yacc"
+#line 723 "basilisk.yacc"
                     { ast_pop_scope (parse->stack, yyvsp[-6]); }
 #line 2530 "basilisk.c"
     break;
 
   case 348: /* root: translation_unit  */
-#line 766 "basilisk.yacc"
+#line 769 "basilisk.yacc"
                            {
 	  yyval = *root = allocate ((Allocator *)parse->alloc, sizeof(AstRoot));
 	  memset (yyval, 0, sizeof(AstRoot));
 	  yyval->sym = yyr1[yyn];
 	  yyval->child = allocate ((Allocator *)parse->alloc, 2*sizeof(Ast *));
 	  yyval->child[0] = yyvsp[0];
+	  yyvsp[0]->parent = yyval;
 	  yyval->child[1] = NULL;
         }
-#line 2543 "basilisk.c"
+#line 2544 "basilisk.c"
     break;
 
 
-#line 2547 "basilisk.c"
+#line 2548 "basilisk.c"
 
       default: break;
     }
@@ -2737,7 +2738,7 @@ yyreturn:
   return yyresult;
 }
 
-#line 776 "basilisk.yacc"
+#line 780 "basilisk.yacc"
 
 
 /**
@@ -2789,30 +2790,6 @@ static const char * copy_strings (const char * i, Ast * n, long offset)
     for (Ast ** c = n->child; *c; c++)
       i = copy_strings (i, *c, offset);
   return i;
-}
-
-static Ast * recopy_ast (Ast * n)
-{
-  AstRoot * r = ast_root (n);
-  AstTerminal * t = ast_terminal (n);
-  size_t size = r ? sizeof (AstRoot) : t ? sizeof (AstTerminal) : sizeof (Ast);
-  Ast * c = malloc (size);
-  memcpy (c, n, size);
-  if (t) {
-    t->before = NULL;
-    t->start = NULL;
-  }
-  else {
-    int len = 0;
-    for (Ast ** i = n->child; *i; i++, len++);
-    c->child = malloc ((len + 1)*sizeof (Ast *));
-    c->child[len] = NULL;
-    for (Ast ** i = n->child, ** j = c->child; *i; i++, j++) {
-      *j = recopy_ast (*i);
-      (*j)->parent = c;
-    }
-  }
-  return c;
 }
 
 static void remove_child (Ast * c)
@@ -2877,13 +2854,13 @@ static void stack_externalize (Stack * stack)
     }
 }
 
-Ast * ast_parse (const char * code)
+Ast * ast_parse (const char * code, Allocator * alloc)
 {
   AstRoot parse;
   parse.file = malloc (sizeof (char *));
   parse.nf = 1;
   parse.file[0] = strdup ("<basilisk>");
-  parse.alloc = new_allocator();
+  parse.alloc = alloc ? alloc : new_allocator();
   parse.stack = stack_new (sizeof (Ast *));
   parse.type_already_specified = false;
   extern void lexer_setup (char * buffer, size_t len);
@@ -2904,16 +2881,20 @@ Ast * ast_parse (const char * code)
 #endif
   if (n) {
     const char * i = copy_strings (buffer, n, code - buffer);
-    n = recopy_ast (n);
     const char * end = i; while (*end != '\0') end++;
     AstRoot * root = ast_root (n);
     root->after = copy_range (i, end, code - buffer);
     root->file = parse.file;
-    root->nf = parse.nf;
+    root->nf = parse.nf;    
+    root->alloc = alloc ? NULL : parse.alloc;
+    root->stack = parse.stack;
+  }
+  else {
+    if (!alloc)
+      free_allocator (parse.alloc);
+    stack_destroy (parse.stack);
   }
   free (buffer);
-  free_allocator (parse.alloc);
-  stack_destroy (parse.stack);
   yylex_destroy();
   return n;
 }
