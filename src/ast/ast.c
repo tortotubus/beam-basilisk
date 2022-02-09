@@ -35,24 +35,24 @@ void ast_detach (Ast * n)
 
 void ast_destroy (Ast * n)
 {
-  AstRoot * r = ast_root (n);
-  if (r) {
-    for (int i = 0; i < r->nf; i++)
-      free (r->file[i]);
-    free (r->file);
-  }
-  if (n->child) {
+  if (n->child)
     for (Ast ** c = n->child; *c; c++)
       ast_destroy (*c);
-    free (n->child);
-  }
   else {
     AstTerminal * t = ast_terminal (n);
     free (t->before);
     free (t->start);
     free (t->after);
   }
-  free (n);
+  AstRoot * r = ast_root (n);
+  if (r) {
+    stack_destroy (r->stack);
+    for (int i = 0; i < r->nf; i++)
+      free (r->file[i]);
+    free (r->file);
+    if (r->alloc)
+      free_allocator (r->alloc);
+  }
 }
 
 char * ast_line (AstTerminal * t)
@@ -60,6 +60,14 @@ char * ast_line (AstTerminal * t)
   static char s[20];
   snprintf (s, 19, "%d", t->line);
   return s;
+}
+
+AstRoot * ast_get_root (Ast * n)
+{
+  Ast * root = n;
+  while (root->parent)
+    root = root->parent;
+  return ast_root (root);
 }
 
 void ast_print (Ast * n, FILE * fp, bool sym)
@@ -202,7 +210,8 @@ static Ast * terminal_copy (const AstTerminal * src,
 			    const AstRoot * dst_root, const AstRoot * src_root)
 {
   AstTerminal * dst =
-    (AstTerminal *) copy_ast (malloc (sizeof (AstTerminal)), (Ast *)src);
+    (AstTerminal *) copy_ast (allocate (dst_root->alloc, sizeof (AstTerminal)),
+			      (Ast *)src);
   dst->before = src->before ? strdup (src->before) : NULL;
   dst->start = strdup (src->start);
   dst->after = src->after ? strdup (src->after) : NULL;
@@ -218,7 +227,10 @@ static Ast * terminal_copy (const AstTerminal * src,
 
 static Ast * root_copy (const AstRoot * src)
 {
-  AstRoot * dst = (AstRoot *) copy_ast (malloc (sizeof (AstRoot)), (Ast *)src);
+  Allocator * alloc = new_allocator();
+  AstRoot * dst = (AstRoot *) copy_ast (allocate (alloc, sizeof (AstRoot)),
+					(Ast *)src);
+  dst->alloc = alloc;
   dst->before = src->before ? strdup (src->before) : NULL;
   dst->after = src->after ? strdup (src->after) : NULL;
   if (src->nf) {
@@ -229,7 +241,6 @@ static Ast * root_copy (const AstRoot * src)
   }
   else
     dst->file = NULL, dst->nf = 0;
-  dst->alloc = NULL;
   dst->stack = NULL;
   ((Ast *)dst)->parent = NULL;
   return (Ast *)dst;
@@ -249,7 +260,7 @@ static Ast * vast_copy_internal (Ast * n, va_list ap, bool * found,
   if (t)
     c = terminal_copy (t, dst_root, src_root);
   else if (!c)
-    c = copy_ast (malloc (sizeof (Ast)), n);
+    c = copy_ast (allocate (dst_root->alloc, sizeof (Ast)), n);
 
   va_list cp;
   va_copy (cp, ap);
@@ -260,7 +271,7 @@ static Ast * vast_copy_internal (Ast * n, va_list ap, bool * found,
   if (!t) {
     int len = 0;
     for (Ast ** i = n->child; *i; i++, len++);
-    c->child = malloc ((len + 1)*sizeof (Ast *));
+    c->child = allocate (dst_root->alloc, (len + 1)*sizeof (Ast *));
     len = 0;
     for (Ast ** i = n->child, ** j = c->child;
 	 *i && !(*found); i++, j++, len++) {
@@ -271,13 +282,14 @@ static Ast * vast_copy_internal (Ast * n, va_list ap, bool * found,
   }
   return c;
 }
-  
+
 Ast * ast_copy_internal (Ast * n, ...)
 {
   va_list ap;
   va_start (ap, n);
   bool found = false;
-  n = vast_copy_internal (n, ap, &found, NULL, NULL);
+  AstRoot * src_root = ast_get_root (n);
+  n = vast_copy_internal (n, ap, &found, src_root, src_root);
   va_end (ap);
   return n;
 }
@@ -296,11 +308,11 @@ void ast_replace (Ast * dst, Ast * src)
   ast_destroy (dst);
 }
 
-Ast * ast_parse_expression (const char * expr)
+Ast * ast_parse_expression (const char * expr, Allocator * alloc)
 {
   char * s = NULL;
   str_append (s, "void main() {", expr, "}");
-  Ast * n = ast_parse (s);  
+  Ast * n = ast_parse (s, alloc);
   free (s);
   if (n) {
     Ast * c = ast_find (n, sym_statement)->child[0];
@@ -311,7 +323,7 @@ Ast * ast_parse_expression (const char * expr)
   return n;
 }
 
-Ast * ast_parse_file (FILE * fp)
+Ast * ast_parse_file (FILE * fp, Allocator * alloc)
 {
   char * buffer = NULL;
   size_t len = 0, maxlen = 0;
@@ -328,7 +340,7 @@ Ast * ast_parse_file (FILE * fp)
     buffer = realloc (buffer, maxlen);      
   }
   buffer[len++] = '\0';
-  Ast * root = ast_parse (buffer);
+  Ast * root = ast_parse (buffer, alloc);
   free (buffer);
   return root;
 }

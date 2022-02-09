@@ -7,9 +7,9 @@ int main (int argc, char * argv[])
     fprintf (stderr, "usage: %s 'code'\n", argv[0]);
     return 1;
   }
-  Ast * n = ast_parse (argv[1]);
+  Ast * n = ast_parse (argv[1], NULL);
   if (!n)
-    n = ast_parse_expression (argv[1]);
+    n = ast_parse_expression (argv[1], NULL);
   if (!n) {
     fprintf (stderr, "%s: error: could not parse code\n", argv[0]);
     return 1;
