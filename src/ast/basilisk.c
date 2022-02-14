@@ -78,7 +78,7 @@
 static Ast * ast_reduce (Allocator * alloc, int sym, Ast ** children, int n);
 #define DEFAULT_ACTION(yyn)					\
   yyval = ast_reduce ((Allocator *)parse->alloc, yyr1[yyn], yyvsp, yyr2[yyn])
-static int yyparse (AstRoot * parse, Ast ** root);
+static int yyparse (AstRoot * parse, Ast * root);
 
 #line 84 "basilisk.c"
 
@@ -1978,7 +1978,7 @@ do {                                                                      \
 
 static void
 yy_symbol_value_print (FILE *yyo,
-                       yysymbol_kind_t yykind, YYSTYPE const * const yyvaluep, AstRoot * parse, Ast ** root)
+                       yysymbol_kind_t yykind, YYSTYPE const * const yyvaluep, AstRoot * parse, Ast * root)
 {
   FILE *yyoutput = yyo;
   YY_USE (yyoutput);
@@ -2002,7 +2002,7 @@ yy_symbol_value_print (FILE *yyo,
 
 static void
 yy_symbol_print (FILE *yyo,
-                 yysymbol_kind_t yykind, YYSTYPE const * const yyvaluep, AstRoot * parse, Ast ** root)
+                 yysymbol_kind_t yykind, YYSTYPE const * const yyvaluep, AstRoot * parse, Ast * root)
 {
   YYFPRINTF (yyo, "%s %s (",
              yykind < YYNTOKENS ? "token" : "nterm", yysymbol_name (yykind));
@@ -2041,7 +2041,7 @@ do {                                                            \
 
 static void
 yy_reduce_print (yy_state_t *yyssp, YYSTYPE *yyvsp,
-                 int yyrule, AstRoot * parse, Ast ** root)
+                 int yyrule, AstRoot * parse, Ast * root)
 {
   int yylno = yyrline[yyrule];
   int yynrhs = yyr2[yyrule];
@@ -2103,7 +2103,7 @@ int yydebug;
 
 static void
 yydestruct (const char *yymsg,
-            yysymbol_kind_t yykind, YYSTYPE *yyvaluep, AstRoot * parse, Ast ** root)
+            yysymbol_kind_t yykind, YYSTYPE *yyvaluep, AstRoot * parse, Ast * root)
 {
   YY_USE (yyvaluep);
   YY_USE (parse);
@@ -2127,7 +2127,7 @@ yydestruct (const char *yymsg,
 `----------*/
 
 int
-yyparse (AstRoot * parse, Ast ** root)
+yyparse (AstRoot * parse, Ast * root)
 {
 /* Lookahead token kind.  */
 int yychar;
@@ -2532,19 +2532,18 @@ yyreduce:
   case 348: /* root: translation_unit  */
 #line 769 "basilisk.yacc"
                            {
-	  yyval = *root = allocate ((Allocator *)parse->alloc, sizeof(AstRoot));
-	  memset (yyval, 0, sizeof(AstRoot));
+	  yyval = root;
 	  yyval->sym = yyr1[yyn];
 	  yyval->child = allocate ((Allocator *)parse->alloc, 2*sizeof(Ast *));
 	  yyval->child[0] = yyvsp[0];
 	  yyvsp[0]->parent = yyval;
 	  yyval->child[1] = NULL;
         }
-#line 2544 "basilisk.c"
+#line 2543 "basilisk.c"
     break;
 
 
-#line 2548 "basilisk.c"
+#line 2547 "basilisk.c"
 
       default: break;
     }
@@ -2738,7 +2737,7 @@ yyreturn:
   return yyresult;
 }
 
-#line 780 "basilisk.yacc"
+#line 779 "basilisk.yacc"
 
 
 /**
@@ -2746,7 +2745,7 @@ yyreturn:
 
 /* Called by yyparse on error.  */
 void
-yyerror (AstRoot * parse, Ast ** root, char const *s)
+yyerror (AstRoot * parse, Ast * root, char const *s)
 {
 #if 0
   fprintf (stderr, "%d: %s near '", *line, s);
@@ -2819,14 +2818,14 @@ static Ast * ast_reduce (Allocator * alloc, int sym, Ast ** children, int n)
   ndef = 0;
   for (int i = 0; i < n; i++) {
     Ast * c = children[i + 1 - n];
-    if (c->sym == YYSYMBOL_YYUNDEF || c->sym == YYSYMBOL_type_not_specified)
-      assert (!c->parent);
-    else {
+    if (c->sym != YYSYMBOL_YYUNDEF && c->sym != YYSYMBOL_type_not_specified) {
       if (c->parent)
 	remove_child (c);
       c->parent = ast;
       ast->child[ndef++] = c;
     }
+    else
+      assert (!c->parent);
   }
   ast->child[ndef] = NULL;
   return ast;
@@ -2838,7 +2837,11 @@ static Stack * stack_internalize (Stack * stack)
   for (int i = 0; (n = stack_index (stack, i)); i++)
     if ((*n)->sym == YYSYMBOL_IDENTIFIER) {
       AstTerminal * t = ast_terminal (*n);
-      assert (t->after == NULL);
+      if (t->after != NULL) {
+	fprintf (stderr, "%s:%d: %s after: %s\n",
+		 t->file, t->line, t->start, t->after);
+	abort();
+      }
       t->after = t->start + strlen (t->start) - 1;
     }
   return stack;
@@ -2849,19 +2852,33 @@ static void stack_externalize (Stack * stack)
   Ast ** n;
   for (int i = 0; (n = stack_index (stack, i)); i++)
     if ((*n)->sym == YYSYMBOL_IDENTIFIER) {
-      AstTerminal * t = ast_terminal (*n);
-      t->after = NULL;
+      AstTerminal * t = ast_terminal(*n);
+      if (t->after != NULL) {
+	if (t->after[1] != '\0') {
+	  
+	  /**
+	  This is a declaration which has not been through
+	  copy_strings() i.e. which is not connected to the root, due
+	  to a syntax error which lead to the corresponding branch being
+	  discarded. We set the symbol to UNDEF. */
+
+	  t->start = t->before = NULL;
+	  (*n)->sym = YYSYMBOL_YYUNDEF;
+	}
+	t->after = NULL;
+      }
     }
 }
 
-Ast * ast_parse (const char * code, Allocator * alloc)
+AstRoot * ast_parse (const char * code, AstRoot * parent)
 {
   AstRoot parse;
   parse.file = malloc (sizeof (char *));
   parse.nf = 1;
   parse.file[0] = strdup ("<basilisk>");
-  parse.alloc = alloc ? alloc : new_allocator();
-  parse.stack = stack_new (sizeof (Ast *));
+  parse.alloc = parent ? parent->alloc : new_allocator();
+  parse.stack = parent ? parent->stack : stack_new (sizeof (Ast *));
+  stack_internalize (parse.stack);
   parse.type_already_specified = false;
   extern void lexer_setup (char * buffer, size_t len);
   size_t len = strlen (code) + 1;
@@ -2870,33 +2887,32 @@ Ast * ast_parse (const char * code, Allocator * alloc)
   buffer[len] = '\0';
   lexer_setup (buffer, len + 1);
   //  yydebug = 1;
-  Ast * n = NULL;
-  yyparse (&parse, &n);
-#if 0
-  { // list global declarations
-    Ast ** n;
-    for (int i = 0; (n = stack_index (parse.stack, i)); i++)
-      fprintf (stderr, "global: "), ast_print_file_line (*n, stderr);
-  }
-#endif
-  if (n) {
-    const char * i = copy_strings (buffer, n, code - buffer);
+  AstRoot * root = allocate ((Allocator *)parse.alloc, sizeof(AstRoot));
+  memset (root, 0, sizeof(AstRoot));
+  stack_push (parse.stack, &root);
+  yyparse (&parse, (Ast *) root);
+  if (((Ast *)root)->child) {
+    const char * i = copy_strings (buffer, (Ast *) root, code - buffer);
     const char * end = i; while (*end != '\0') end++;
-    AstRoot * root = ast_root (n);
     root->after = copy_range (i, end, code - buffer);
     root->file = parse.file;
     root->nf = parse.nf;    
-    root->alloc = alloc ? NULL : parse.alloc;
-    root->stack = parse.stack;
+    root->alloc = parent ? NULL : parse.alloc;
+    root->stack = parent ? NULL : parse.stack;
+    stack_externalize (parse.stack);
   }
   else {
-    if (!alloc)
+    root = NULL;
+    if (parent)
+      stack_externalize (parse.stack);
+    else {
       free_allocator (parse.alloc);
-    stack_destroy (parse.stack);
+      stack_destroy (parse.stack);
+    }
   }
   free (buffer);
   yylex_destroy();
-  return n;
+  return root;
 }
 
 int token_symbol (int token)

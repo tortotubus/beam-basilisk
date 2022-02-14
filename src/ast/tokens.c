@@ -2927,40 +2927,7 @@ static int check_type (AstRoot * parse)
       return TYPEDEF_NAME;
     return IDENTIFIER;
   }
-  
-#if 1 // fixme
-  if (!strcmp (yytext, "FILE"))
-    return TYPEDEF_NAME;
-  else if (!strcmp (yytext, "size_t"))
-    return TYPEDEF_NAME;
-  else if (!strcmp (yytext, "bool"))
-    return TYPEDEF_NAME;
-  else if (!strcmp (yytext, "_Attributes"))
-    return TYPEDEF_NAME;
-  else if (!strcmp (yytext, "extrae_type_t"))
-    return TYPEDEF_NAME;  
-  else if (!strcmp (yytext, "extrae_value_t"))
-    return TYPEDEF_NAME;  
-  else if (!strcmp (yytext, "MPI_Status"))
-    return TYPEDEF_NAME;  
-  else if (!strcmp (yytext, "MPI_Datatype"))
-    return TYPEDEF_NAME;  
-  else if (!strcmp (yytext, "MPI_Request"))
-    return TYPEDEF_NAME;  
-  else if (!strcmp (yytext, "MPI_Comm"))
-    return TYPEDEF_NAME;  
-  else if (!strcmp (yytext, "MPI_Op"))
-    return TYPEDEF_NAME;  
-  else if (!strcmp (yytext, "Node"))
-    return TYPEDEF_NAME;  
-  else if (!strcmp (yytext, "GLfloat"))
-    return TYPEDEF_NAME;  
-  else if (!strcmp (yytext, "int64_t"))
-    return TYPEDEF_NAME;  
-  else if (!strcmp (yytext, "clock_t"))
-    return TYPEDEF_NAME;  
-#endif
-  
+
   return IDENTIFIER;
 }
 
