@@ -1,3 +1,5 @@
+# 2 "ast/defaults.h"
+
 /**
 # Default variables/function declarations 
 
@@ -10,6 +12,15 @@ grep -o '‘.*’' /tmp/errors | sort | uniq | sed 's/[‘’]//g' > /tmp/list
 for f in `cat /tmp/list`; do man 3 $f | grep -m1 "$f.*;"; done 
 ~~~
 
+## Type definitions */
+
+typedef void FILE, _Attributes, extrae_type_t, extrae_value_t;
+typedef void MPI_Datatype, MPI_Request, MPI_Comm, MPI_Op, Node;
+typedef int bool, MPI_Status;
+typedef long size_t, clock_t, int64_t;
+typedef float GLfloat;
+
+/**
 ## From standard C libraries */
 
 void abort(void);

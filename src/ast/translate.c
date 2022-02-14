@@ -57,10 +57,10 @@ static void no_nested_foreach (Ast * n, int parent)
       no_nested_foreach (*c, parent);
 }
 
-static void trace_return (Ast * n,
-			  Ast * function_definition,
-			  AstTerminal * function_identifier)
+static void trace_return (Ast * n, Stack * stack, void * data)
 {
+  Ast * function_definition = ((void **)data)[0];
+  AstTerminal * function_identifier = ((void **)data)[1];
   if (ast_schema (n, sym_jump_statement, 0, sym_RETURN)) {
     Ast * ret = n->child[0];
     if (!n->child[2]) { // return ;
@@ -72,7 +72,7 @@ static void trace_return (Ast * n,
     else { // return sthg;
       Ast * compound =
 	ast_parse_expression ("{ void ret = val; return ret; }",
-			      ast_get_root(function_definition)->alloc);
+			      ast_get_root (function_definition));
       Ast * type_specifier =
 	ast_copy (ast_find (function_definition, sym_declaration_specifiers,
 			    0, sym_type_specifier));
@@ -94,17 +94,13 @@ static void trace_return (Ast * n,
       ast_replace (n, compound);
     }
   }
-  else
-    if (n->child)
-      for (Ast ** c = n->child; *c; c++)
-	trace_return (*c, function_definition, function_identifier);
 }
 
 typedef struct {
   char * target, * replacement;
 } Replacement;
 
-static void translate (Ast * n, Stack * stack)
+static void translate (Ast * n, Stack * stack, void * data)
 {
   switch (n->sym) {
 
@@ -226,9 +222,10 @@ static void translate (Ast * n, Stack * stack)
       ast_before (end,
 		  " end_trace (\"", ast_terminal (identifier)->start, "\", ",
 		  ast_file_line (end), "); ");
-      if (compound_statement->child[1]->sym == sym_block_item_list)
-	trace_return (compound_statement->child[1], n,
-		      ast_terminal (identifier));
+      if (compound_statement->child[1]->sym == sym_block_item_list) {
+	void * data[] = { n, identifier };
+	ast_traverse (compound_statement, stack, trace_return, data);
+      }
     }
     break;
   }
@@ -263,7 +260,7 @@ void ast_push_declaration (Stack * stack, Ast * n)
 			     0, sym_IDENTIFIER);
   if (identifier) {
     stack_push (stack, &identifier);
-#if 0    
+#if 0  
     fputs ("push ", stderr);
     ast_print_file_line (identifier, stderr);
 #endif
@@ -278,8 +275,10 @@ void ast_pop_scope (Stack * stack, Ast * scope)
   Ast * n;
   while ((n = *((Ast **)stack_pop (stack))) != scope) {
 #if 0
-    fputs ("  pop: ", stderr);
-    ast_print_file_line (n, stderr);
+    if (n->sym == sym_IDENTIFIER) {
+      fputs ("  pop: ", stderr);
+      ast_identifier_print (n, stderr);
+    }
 #endif
   }
 #if 0
@@ -290,40 +289,38 @@ void ast_pop_scope (Stack * stack, Ast * scope)
 
 Ast * ast_push_function_definition (Stack * stack, Ast * declarator)
 {
-  stack_push (stack, &declarator);
   Ast * identifier = ast_find (declarator, sym_direct_declarator,
 			       0, sym_generic_identifier,
 			       0, sym_IDENTIFIER);
   stack_push (stack, &identifier);
+  stack_push (stack, &declarator);
   Ast * parameters = ast_find (declarator, sym_parameter_list);
   if (parameters)
     ast_push_declaration (stack, parameters);
   return identifier;
 }
 
-void ast_traverse (Ast * n, Stack * stack, void func (Ast *, Stack *))
+void ast_traverse (Ast * n, Stack * stack, void func (Ast *, Stack *, void *), void * data)
 {
-  func (n, stack);
+  if (ast_root (n)) {
+    ast_pop_scope (stack, n);
+    stack_push (stack, &n);
+  }
+  
+  func (n, stack, data);
 
   switch (n->sym) {
 
   /**
-  These should match the corresponding mid-action rules in
+  These should match the corresponding action/mid-action rules in
   [basilisk.yacc](). */
     
   case sym_function_definition: {
-    // fixme: use ast_push_function_definition
-    Ast * identifier = ast_find (n, sym_direct_declarator,
-				 0, sym_generic_identifier,
-				 0, sym_IDENTIFIER);
-    stack_push (stack, &identifier);
-    stack_push (stack, &identifier);
-    Ast * parameters = ast_find (n, sym_parameter_list);
-    if (parameters)
-      ast_push_declaration (stack, parameters);
+    Ast * declarator = ast_find (n, sym_direct_declarator);
+    ast_push_function_definition (stack, declarator);
     for (Ast ** c = n->child; *c; c++)
-      ast_traverse (*c, stack, func);
-    ast_pop_scope (stack, identifier);
+      ast_traverse (*c, stack, func, data);
+    ast_pop_scope (stack, declarator);
     return;
   }
     
@@ -331,7 +328,7 @@ void ast_traverse (Ast * n, Stack * stack, void func (Ast *, Stack *))
   case sym_for_declaration_statement: {
     stack_push (stack, &n);
     for (Ast ** c = n->child; *c; c++)
-      ast_traverse (*c, stack, func);
+      ast_traverse (*c, stack, func, data);
     ast_pop_scope (stack, n);
     return;
   }
@@ -340,7 +337,7 @@ void ast_traverse (Ast * n, Stack * stack, void func (Ast *, Stack *))
     stack_push (stack, &n);
     ast_push_declaration (stack, n->child[3]);
     for (Ast ** c = n->child; *c; c++)
-      ast_traverse (*c, stack, func);
+      ast_traverse (*c, stack, func, data);
     ast_pop_scope (stack, n);
     return;
   }
@@ -351,7 +348,7 @@ void ast_traverse (Ast * n, Stack * stack, void func (Ast *, Stack *))
   default:
     if (n->child)
       for (Ast ** c = n->child; *c; c++)
-	ast_traverse (*c, stack, func);
+	ast_traverse (*c, stack, func, data);
   }
 }
 
@@ -378,36 +375,32 @@ void endfor (FILE * fin, FILE * fout)
   fputs (buffer, fp);
   fclose (fp);
 #endif
-  
-  Ast * root = ast_parse (buffer, NULL);
-  free (buffer);
-  
-  Stack * stack = stack_new (sizeof (Ast *));
+
   fp = fopen (BASILISK "/ast/defaults.h", "r");
   assert (fp);
-  Ast * d = ast_parse_file (fp, NULL);
+  AstRoot * d = ast_parse_file (fp, NULL);
   fclose (fp);
-  ast_push_declaration (stack, d);
-  ast_traverse (root, stack, translate);
-#if 0
-  { // list global declarations
-    Ast ** n;
-    for (int i = 0; (n = stack_index (stack, i)); i++)
-      fprintf (stderr, "global: "), ast_print_file_line (*n, stderr);
-  }
-#endif
-  stack_destroy (stack);
-  ast_destroy (d);
+  
+  AstRoot * root = ast_parse (buffer, d);
+  free (buffer);
+  root->stack = d->stack; d->stack = NULL;
+  root->alloc = d->alloc; d->alloc = NULL;
+  
+  //  ast_stack_print (root->stack, stderr);
+  
+  ast_traverse ((Ast *) root, root->stack, translate, NULL);
 
-  ast_print (root, fout, false);
+  //  ast_stack_print (root->stack, stderr);
+
+  ast_print ((Ast *) root, fout, false);
 #if 1
   fp = fopen (".endfor.out", "w");
-  ast_print (root, fp, true);
+  ast_print ((Ast *) root, fp, true);
   fclose (fp);
 #endif
 
 #if 1
-  Ast * main = ast_find_function (root, "main");
+  Ast * main = ast_find_function ((Ast *) root, "main");
   if (main) {
     fp = fopen (".endfor.main", "w");
     ast_print_tree (main, fp, 0);
@@ -415,5 +408,6 @@ void endfor (FILE * fin, FILE * fout)
   }
 #endif
   
-  ast_destroy (root);
+  ast_destroy ((Ast *) d);
+  ast_destroy ((Ast *) root);
 }

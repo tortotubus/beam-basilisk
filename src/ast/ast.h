@@ -26,18 +26,17 @@ typedef struct {
   bool type_already_specified;
 } AstRoot;
 
-Ast *     ast_parse            (const char * code,
-				Allocator * alloc);
+AstRoot * ast_parse            (const char * code, AstRoot * parent);
+Ast *     ast_parse_expression (const char * expr, AstRoot * parent);
 void      ast_destroy          (Ast * n);
-Ast *     ast_parse_expression (const char * expr,
-				Allocator * alloc);
-Ast *     ast_parse_file       (FILE * fp,
-				Allocator * alloc);
+AstRoot * ast_parse_file       (FILE * fp, AstRoot * parent);
 void      ast_replace          (Ast * dst, Ast * src);
 void      ast_print            (Ast * n, FILE * fp, bool kind);
 void      ast_print_tree       (Ast * n, FILE * fp, const char * indent);
 void      ast_print_file_line  (Ast * n, FILE * fp);
 AstRoot * ast_get_root         (Ast * n);
+void      ast_identifier_print (Ast * identifier, FILE * fp);
+void      ast_stack_print      (Stack * stack, FILE * fp);
 
 static inline Ast * ast_last_child (Ast * n)
 {
@@ -101,3 +100,5 @@ char * ast_line (AstTerminal * t);
 void  ast_push_declaration         (Stack * stack, Ast * declaration);
 Ast * ast_push_function_definition (Stack * stack, Ast * declarator);
 void  ast_pop_scope                (Stack * stack, Ast * scope);
+void  ast_traverse                 (Ast * n, Stack * stack,
+				    void func (Ast *, Stack *, void *), void * data);

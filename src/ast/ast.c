@@ -46,7 +46,8 @@ void ast_destroy (Ast * n)
   }
   AstRoot * r = ast_root (n);
   if (r) {
-    stack_destroy (r->stack);
+    if (r->stack)
+      stack_destroy (r->stack);
     for (int i = 0; i < r->nf; i++)
       free (r->file[i]);
     free (r->file);
@@ -308,13 +309,17 @@ void ast_replace (Ast * dst, Ast * src)
   ast_destroy (dst);
 }
 
-Ast * ast_parse_expression (const char * expr, Allocator * alloc)
+Ast * ast_parse_expression (const char * expr, AstRoot * parent)
 {
   char * s = NULL;
   str_append (s, "void main() {", expr, "}");
-  Ast * n = ast_parse (s, alloc);
+  Ast * n = (Ast *) ast_parse (s, parent);
   free (s);
   if (n) {
+    Ast * identifier = ast_find (n, sym_direct_declarator,
+				 0, sym_generic_identifier,
+				 0, sym_IDENTIFIER);
+    ast_pop_scope (parent->stack, identifier);
     Ast * c = ast_find (n, sym_statement)->child[0];
     ast_detach (c);
     ast_destroy (n);
@@ -323,7 +328,7 @@ Ast * ast_parse_expression (const char * expr, Allocator * alloc)
   return n;
 }
 
-Ast * ast_parse_file (FILE * fp, Allocator * alloc)
+AstRoot * ast_parse_file (FILE * fp, AstRoot * parent)
 {
   char * buffer = NULL;
   size_t len = 0, maxlen = 0;
@@ -340,7 +345,7 @@ Ast * ast_parse_file (FILE * fp, Allocator * alloc)
     buffer = realloc (buffer, maxlen);      
   }
   buffer[len++] = '\0';
-  Ast * root = ast_parse (buffer, alloc);
+  AstRoot * root = ast_parse (buffer, parent);
   free (buffer);
   return root;
 }
@@ -438,4 +443,26 @@ char * str_prepend_realloc (char * src, ...)
 
   free (src);
   return dst;
+}
+
+void ast_identifier_print (Ast * identifier, FILE * fp)
+{
+  AstTerminal * t = ast_terminal (identifier);
+  fprintf (fp, "%s:%d: %p ", t->file, t->line, t);
+  if (!t->after)
+    fprintf (fp, "* %s", t->start);
+  else {
+    char * s = t->start, * end = t->after;
+    for (; s <= end; s++)
+      fputc (*s, fp);
+  }
+  fputc ('\n', fp);
+}
+
+void ast_stack_print (Stack * stack, FILE * fp)
+{
+  Ast ** n;
+  for (int i = 0; (n = stack_index (stack, i)); i++)
+    if (*n && (*n)->sym == sym_IDENTIFIER)
+      ast_identifier_print (*n, fp);
 }
