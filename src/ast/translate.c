@@ -41,22 +41,6 @@ Ast * ast_find_function (Ast * n, const char * name)
   return found;
 }
 
-// fixme: replace with scope lookup
-static void no_nested_foreach (Ast * n, int parent)
-{
-  if (n->sym == sym_foreach_statement) {
-    int line = ast_terminal(n->child[0])->line;
-    fprintf (stderr, "%d: error: foreach*() iterators cannot be nested \n",
-	     line);
-    fprintf (stderr, "%d: error: parent foreach*() is at line %d\n",
-	     line, parent);
-    exit (1);
-  }
-  if (n->child)
-    for (Ast ** c = n->child; *c; c++)
-      no_nested_foreach (*c, parent);
-}
-
 static void trace_return (Ast * n, Stack * stack, void * data)
 {
   Ast * function_definition = ((void **)data)[0];
@@ -213,6 +197,22 @@ static void translate (Ast * n, Stack * stack, void * data)
   ## Foreach statements */
 
   case sym_foreach_statement: {
+    Ast * parent = n->parent;
+    while (parent) {
+      if (parent->sym == sym_foreach_statement) {
+	AstTerminal * t = ast_terminal (n->child[0]);
+	AstTerminal * p = ast_terminal (parent->child[0]);
+	fprintf (stderr,
+		 "%s:%d: error: foreach*() iterators cannot be nested \n",
+		 t->file, t->line);
+	fprintf (stderr,
+		 "%s:%d: error: this is the location of the parent foreach*()\n",
+		 p->file, p->line);
+	exit (1);
+      }
+      parent = parent->parent;
+    }
+    
     Ast * statement = ast_last_child (n);
     if (statement->child[0]->sym == sym_compound_statement)
       ast_after (statement, " end_", ast_left_terminal(n)->start, "();");
@@ -220,7 +220,6 @@ static void translate (Ast * n, Stack * stack, void * data)
       ast_before (statement, "{");
       ast_after (statement, "} end_", ast_left_terminal(n)->start, "();");
     }
-    no_nested_foreach (statement, ast_terminal(n->child[0])->line);
     break;
   }
 
