@@ -165,7 +165,7 @@ static Ast * expression_type (Ast * expr, Stack * stack)
   return NULL;
 }
 
-static bool type_is_scalar (Ast * type)
+static bool type_is_typedef (Ast * type, const char * typedef_name)
 {
   Ast * declarator = type;
   while (declarator->sym != sym_declarator)
@@ -174,15 +174,93 @@ static bool type_is_scalar (Ast * type)
   if (!ast_schema (declarator, sym_declarator,
 		   0, sym_direct_declarator,
 		   0, sym_generic_identifier,
+		   0, sym_IDENTIFIER) &&
+      !ast_schema (declarator, sym_declarator,
+		   0, sym_direct_declarator,
+		   0, sym_direct_declarator,
+		   0, sym_generic_identifier,
 		   0, sym_IDENTIFIER))
     return false; // this is a pointer
 
   Ast * declaration = ast_find (declaration_from_type (type), sym_types), * n;
   if ((n = ast_schema (declaration, sym_types, 0, sym_TYPEDEF_NAME)) &&
-      !strcmp (ast_terminal(n)->start, "scalar"))
+      !strcmp (ast_terminal(n)->start, typedef_name))
     return true;
   
   return false;
+}
+
+static void ast_rotate (Ast * n, int dimension)
+{
+  switch (n->sym) {
+
+  case sym_IDENTIFIER: {
+    AstTerminal * t = ast_terminal (n);
+    int len = strlen (t->start);
+    if (len >= 2 && t->start[len - 2] == '_' &&
+	strchr ("xyz", t->start[len - 1]))
+      t->start[len - 1] = 'x' + (t->start[len - 1] + 1 - 'x') % dimension;
+    break;
+  }
+
+  case sym_member_identifier: {
+    AstTerminal * t = ast_terminal (ast_schema (n, sym_member_identifier,
+						0, sym_generic_identifier,
+						0, sym_IDENTIFIER));
+    if (t->start[1] == '\0' && strchr ("xyz", *t->start))
+      *t->start = 'x' + (*t->start + 1 - 'x') % dimension;
+    break;
+  }
+    
+  }
+
+  if (n->child)
+    for (Ast ** c = n->child; *c; c++)
+      ast_rotate (*c, dimension);
+}
+
+static Ast * inforeach (Ast * n)
+{
+  Ast * parent = n->parent;
+  while (parent) {
+    if (parent->sym == sym_foreach_statement)
+      return parent;
+    parent = parent->parent;
+  }
+  return NULL;
+}
+
+static bool point_declaration (Stack * stack)
+{
+  Ast * type = ast_identifier_declaration (stack, "point");
+  return type && type_is_typedef (type, "Point");
+}
+
+/**
+Append to `dst` the elements of a list following the standard list grammar:
+
+~~~c
+list
+    : list_item
+    | list ',' list_item
+    ;
+~~~
+*/
+
+static Ast ** append_list (Ast ** dst, Ast * list)
+{
+  if (list->child[1]) {
+    dst = append_list (dst, list->child[0]);
+    list = list->child[2];
+  }
+  else
+    list = list->child[0];
+  int len = 0;
+  for (Ast ** i = dst; i && *i; i++, len++);
+  dst = realloc (dst, (len + 2)*sizeof (Ast *));
+  dst[len] = list;
+  dst[len + 1] = NULL;
+  return dst;
 }
 
 typedef struct {
@@ -197,20 +275,19 @@ static void translate (Ast * n, Stack * stack, void * data)
   ## Foreach statements */
 
   case sym_foreach_statement: {
-    Ast * parent = n->parent;
-    while (parent) {
-      if (parent->sym == sym_foreach_statement) {
-	AstTerminal * t = ast_terminal (n->child[0]);
-	AstTerminal * p = ast_terminal (parent->child[0]);
-	fprintf (stderr,
-		 "%s:%d: error: foreach*() iterators cannot be nested \n",
-		 t->file, t->line);
-	fprintf (stderr,
-		 "%s:%d: error: this is the location of the parent foreach*()\n",
-		 p->file, p->line);
-	exit (1);
-      }
-      parent = parent->parent;
+    Ast * foreach = inforeach (n);
+    if (foreach) {
+      AstTerminal * t = ast_terminal (n->child[0]);
+      AstTerminal * p = ast_terminal (foreach->child[0]);
+      fprintf (stderr,
+	       "%s:%d: error: foreach*() iterators cannot be nested \n",
+	       t->file, t->line);      
+      fprintf (stderr,
+	       "%s:%d: error: this is the location of the parent %s\n",
+	       p->file, p->line,
+	       foreach->sym == sym_foreach_statement ?
+	       "foreach*()" : "point function");
+      exit (1);
     }
     
     Ast * statement = ast_last_child (n);
@@ -236,23 +313,65 @@ static void translate (Ast * n, Stack * stack, void * data)
     }
     break;
   }
-    
+
+  /**
+  ## foreach_dimension() */
+#if 0
+  case sym_foreach_dimension_statement: {
+    Ast * body = ast_copy (ast_last_child (n));
+    ast_print (body, stderr, 0);
+    fputc ('\n', stderr);
+    ast_rotate (body, 2);
+    ast_print (body, stderr, 0);
+    fprintf (stderr, "\n---------------------------\n");    
+    ast_destroy (body);
+    break;
+  }
+#endif
   /**
   ## Stencil access */
 
   case sym_array_access: {
     Ast * type = expression_type (n->child[0], stack);
-    if (type && type_is_scalar (type)) {
-#if 0      
+#if 0
+    if (type/* && type_is_typedef (type, "scalar")*/) {      
       AstTerminal * t = ast_terminal (ast_find (n, token_symbol('[')));
       fprintf (stderr, "%s:%d: array access\n", t->file, t->line);
       ast_print (n->child[0], stderr, 0);
+      //      ast_print_tree (n, stderr, 0);
       fputc ('\n', stderr);
+
+      Ast * declarator = type;
+      while (declarator->sym != sym_declarator)
+	declarator = declarator->parent;
+      ast_print_tree (declarator, stderr, 0);
+    }
 #endif
+    if (type && type_is_typedef (type, "scalar") &&
+	(inforeach (n) || point_declaration (stack))) {
+      Ast * expr = ast_parse_expression ("val(a,0,0,0);", ast_get_root (n));
+      Ast * call = ast_find (expr, sym_function_call);
+      ast_detach (call);
+      ast_destroy (expr);
+      AstTerminal * left = ast_left_terminal (n);
+      ast_left_terminal (call)->before = left->before;
+      left->before = NULL;
+      ast_replace (ast_find (call->child[2], sym_postfix_expression),
+		   n->child[0]);
+      if (n->child[2]) {
+	Ast ** expr = append_list (NULL, n->child[1]);
+	Ast ** args =
+	  append_list (NULL, ast_find (call, sym_argument_expression_list));
+	for (Ast ** i = expr, ** j = args + 1; *i && *j; i++, j++)
+	  ast_replace (*j, *i);
+	free (expr);
+	free (args);
+      }
+      ast_replace (n, call);
     }
     break;
   }
-    
+
   /**
   ## Identifiers */
 
@@ -349,7 +468,7 @@ static void translate (Ast * n, Stack * stack, void * data)
     }
     break;
   }
-    
+
   }
 }
 
@@ -428,8 +547,6 @@ void ast_traverse (Ast * n, Stack * stack,
     stack_push (stack, &n);
   }
   
-  func (n, stack, data);
-
   switch (n->sym) {
 
   /**
@@ -442,6 +559,7 @@ void ast_traverse (Ast * n, Stack * stack,
     for (Ast ** c = n->child; *c; c++)
       ast_traverse (*c, stack, func, data);
     ast_pop_scope (stack, declarator);
+    func (n, stack, data);
     return;
   }
     
@@ -451,6 +569,7 @@ void ast_traverse (Ast * n, Stack * stack,
     for (Ast ** c = n->child; *c; c++)
       ast_traverse (*c, stack, func, data);
     ast_pop_scope (stack, n);
+    func (n, stack, data);
     return;
   }
     
@@ -460,6 +579,7 @@ void ast_traverse (Ast * n, Stack * stack,
     for (Ast ** c = n->child; *c; c++)
       ast_traverse (*c, stack, func, data);
     ast_pop_scope (stack, n);
+    func (n, stack, data);
     return;
   }
 
@@ -470,6 +590,7 @@ void ast_traverse (Ast * n, Stack * stack,
     if (n->child)
       for (Ast ** c = n->child; *c; c++)
 	ast_traverse (*c, stack, func, data);
+    func (n, stack, data);
   }
 }
 

@@ -4,6 +4,7 @@
 #include "stack.h"
 
 typedef struct _Ast Ast;
+
 struct _Ast {
   int sym;
   Ast ** child, * parent;
@@ -61,7 +62,7 @@ static inline AstTerminal * ast_right_terminal (Ast * n)
   return (AstTerminal *) n;
 }
 
-Ast * ast_is_enumeration_constant (Ast * identifier);
+Ast * ast_is_enumeration_constant (Ast * identifier); // fixme: not used?
 Ast * ast_is_typedef              (Ast * identifier);
 Ast * ast_identifier_declaration (Stack * stack, const char * identifier);
 
@@ -80,7 +81,7 @@ char * str_prepend_realloc (char * dst, ...);
   do { dst = str_prepend_realloc (dst, __VA_ARGS__, NULL); } while(0)
 
 #define ast_before(n,...) str_append(ast_left_terminal (n)->before, __VA_ARGS__)
-#define ast_after(n,...)  str_prepend(ast_right_terminal (n)->after, __VA_ARGS__)
+#define ast_after(n,...)  str_append(ast_right_terminal (n)->after, __VA_ARGS__)
 #define ast_terminal(n) ((n)->child ? NULL : (AstTerminal *)(n))
 #define ast_root(n) ((n)->parent ? NULL : (AstRoot *)(n))
 
