@@ -352,6 +352,14 @@ AstRoot * ast_parse_file (FILE * fp, AstRoot * parent)
 
 Ast * ast_identifier_declaration (Stack * stack, const char * identifier)
 {
+  /**
+  This is to ignore "face " and "vertex " typedef prefixes. */
+
+  const char * s = strstr (identifier, "face ");
+  if (s == identifier) identifier += strlen ("face ");
+  else if ((s = strstr (identifier, "vertex ")) == identifier)
+    identifier += strlen ("vertex ");
+  
   Ast ** d;
   for (int i = 0; (d = stack_index (stack, i)); i++)
     if (*d && (*d)->sym == sym_IDENTIFIER) {

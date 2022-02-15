@@ -96,6 +96,111 @@ static void trace_return (Ast * n, Stack * stack, void * data)
   }
 }
 
+static Ast * find_struct_member (Ast * n, Ast * member)
+{
+  Ast * identifier = ast_schema (n, sym_struct_declarator,
+				 0, sym_declarator,
+				 0, sym_direct_declarator,
+				 0, sym_generic_identifier,
+				 0, sym_IDENTIFIER);
+  if (identifier && !strcmp (ast_terminal (identifier)->start,
+			     ast_terminal (member)->start))
+    return identifier;
+  if (n->child)
+    for (Ast ** c = n->child; *c; c++) {
+      Ast * found = find_struct_member (*c, member);
+      if (found)
+	return found;
+    }
+  return NULL;
+}
+
+static Ast * declaration_from_type (Ast * type)
+{
+  while (type->sym != sym_declaration &&
+	 type->sym != sym_parameter_declaration &&
+	 type->sym != sym_struct_declaration &&
+	 type->sym != sym_forin_declaration_statement)
+    type = type->parent;
+  assert (type);
+  return type;
+}
+
+static Ast * expression_type (Ast * expr, Stack * stack)
+{
+  switch (expr->sym) {
+
+  case sym_primary_expression:
+    if (expr->child[0]->sym == sym_IDENTIFIER)
+      return ast_identifier_declaration (stack,
+					 ast_terminal (expr->child[0])->start);
+    break;
+    
+  case sym_postfix_expression:
+    assert (expr->child && expr->child[0]);
+    if (expr->child[1] == NULL || expr->child[2] == NULL)
+      return expression_type (expr->child[0], stack);
+    if (expr->child[1]->sym == token_symbol('.')) {
+      // struct member access
+      Ast * str = expression_type (expr->child[0], stack);
+      if (str) {
+	Ast * member = ast_find (expr->child[2], sym_member_identifier,
+				 0, sym_generic_identifier,
+				 0, sym_IDENTIFIER);
+	Ast * declaration = ast_find (declaration_from_type (str), sym_types);
+	assert (declaration);
+	AstTerminal * typename =
+	  (AstTerminal *) ast_schema (declaration, sym_types,
+				      0, sym_TYPEDEF_NAME);
+	if (typename) {
+	  Ast * type = ast_identifier_declaration (stack, typename->start);
+	  if (!type) {
+	    fprintf (stderr, "%s:%d: warning: unknown type name '%s'\n",
+		     typename->file, typename->line, typename->start);
+	    return NULL;
+	  }
+	  while (type->sym != sym_declaration)
+	    type = type->parent;
+	  return
+	    find_struct_member (ast_find (type, sym_struct_declaration_list),
+				member);
+	}
+	else if ((str = ast_schema (declaration, sym_types,
+				    0, sym_struct_or_union_specifier,
+				    2, sym_struct_declaration_list)))
+	  return find_struct_member (str, member);
+      }
+    }
+    else if (expr->child[1]->sym == sym_PTR_OP) {
+      // struct member pointer access
+      //      ast_print_tree (expr, stderr, 0);
+    }
+    break;
+    
+  }  
+  return NULL;
+}
+
+static bool type_is_scalar (Ast * type)
+{
+  Ast * declarator = type;
+  while (declarator->sym != sym_declarator)
+    declarator = declarator->parent;
+  
+  if (!ast_schema (declarator, sym_declarator,
+		   0, sym_direct_declarator,
+		   0, sym_generic_identifier,
+		   0, sym_IDENTIFIER))
+    return false; // this is a pointer
+
+  Ast * declaration = ast_find (declaration_from_type (type), sym_types), * n;
+  if ((n = ast_schema (declaration, sym_types, 0, sym_TYPEDEF_NAME)) &&
+      !strcmp (ast_terminal(n)->start, "scalar"))
+    return true;
+  
+  return false;
+}
+
 typedef struct {
   char * target, * replacement;
 } Replacement;
@@ -129,6 +234,22 @@ static void translate (Ast * n, Stack * stack, void * data)
     else {
       ast_before (statement, "{");
       ast_after (statement, "} end_", ast_left_terminal(n)->start, "();");
+    }
+    break;
+  }
+    
+  /**
+  ## Stencil access */
+
+  case sym_array_access: {
+    Ast * type = expression_type (n->child[0], stack);
+    if (type && type_is_scalar (type)) {
+#if 0      
+      AstTerminal * t = ast_terminal (ast_find (n, token_symbol('[')));
+      fprintf (stderr, "%s:%d: array access\n", t->file, t->line);
+      ast_print (n->child[0], stderr, 0);
+      fputc ('\n', stderr);
+#endif
     }
     break;
   }
@@ -300,7 +421,8 @@ Ast * ast_push_function_definition (Stack * stack, Ast * declarator)
   return identifier;
 }
 
-void ast_traverse (Ast * n, Stack * stack, void func (Ast *, Stack *, void *), void * data)
+void ast_traverse (Ast * n, Stack * stack,
+		   void func (Ast *, Stack *, void *), void * data)
 {
   if (ast_root (n)) {
     ast_pop_scope (stack, n);
