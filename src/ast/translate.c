@@ -237,40 +237,149 @@ static bool point_declaration (Stack * stack)
 }
 
 /**
-Append to `dst` the elements of a list following the standard list grammar:
+Appends `item` to `list`. The list and list item symbols are
+`sym_list` and `sym_list_item` respectively. */
 
-~~~c
-list
-    : list_item
-    | list ',' list_item
-    ;
-~~~
-*/
-
-static Ast ** append_list (Ast ** dst, Ast * list)
+Ast * ast_list_append (int sym_list, Ast * list,
+		       int sym_list_item, Ast * item)
 {
-  if (list->child[1]) {
-    dst = append_list (dst, list->child[0]);
-    list = list->child[2];
-  }
-  else
-    list = list->child[0];
-  int len = 0;
-  for (Ast ** i = dst; i && *i; i++, len++);
-  dst = realloc (dst, (len + 2)*sizeof (Ast *));
-  dst[len] = list;
-  dst[len + 1] = NULL;
-  return dst;
+  Ast * l = ast_new (list, sym_list);
+  l->child = allocate (ast_get_root (list)->alloc, 4*sizeof (Ast *));
+  ast_set_child (l, 1, (Ast *) ast_terminal_new (item, token_symbol(','), ","));
+  ast_set_child (l, 2, ast_new (item, sym_list_item));
+  ast_attach (l->child[2], item);
+  ast_set_child (l, 0, list);
+  l->child[3] = NULL;
+  return l;
 }
 
+/**
+Prepends `item` to `list`. The list and list item symbols are
+`sym_list` and `sym_list_item` respectively. */
+
+Ast * ast_list_prepend (int sym_list, Ast * list,
+			int sym_list_item, Ast * item)
+{
+  Ast * r = list;
+  while (r->child[0]->sym != sym_list_item)
+    r = r->child[0];
+  Ast * parent = r->parent;
+  Ast * l = ast_list_append (sym_list, r, sym_list_item, item);
+  
+  Ast * tmp = r->child[0];
+  ast_set_child (r, 0, l->child[2]);
+  ast_set_child (l, 2, tmp);
+
+  if (r != list) {
+    ast_set_child (parent, 0, l);
+    return list;
+  }
+
+  return l;
+}
+
+/**
+Transforms a list of expressions into a list of arguments. */
+
+void ast_argument_list (Ast * expression)
+{
+  while (expression->sym == sym_expression) {
+    int child = expression->child[1] ? 2 : 0;
+    expression->sym = sym_argument_expression_list;
+    Ast * item = ast_new (expression, sym_argument_expression_list_item);
+    item->child = allocate (ast_get_root(expression)->alloc, 2*sizeof(Ast *));
+    ast_set_child (item, 0, expression->child[child]);
+    item->child[1] = NULL;
+    ast_set_child (expression, child, item);
+    expression = expression->child[0];
+  }
+}
+
+Ast * ast_new_unary_expression (Ast * parent)
+{
+  return ast_new (parent,
+		  sym_assignment_expression,
+		  sym_conditional_expression,
+		  sym_logical_or_expression,
+		  sym_logical_and_expression,
+		  sym_inclusive_or_expression,
+		  sym_exclusive_or_expression,
+		  sym_and_expression,
+		  sym_equality_expression,
+		  sym_relational_expression,
+		  sym_shift_expression,
+		  sym_additive_expression,
+		  sym_multiplicative_expression,
+		  sym_cast_expression,
+		  sym_unary_expression);
+}
+
+Ast * ast_new_constant (Ast * parent, int symbol, const char * value)
+{
+  return ast_attach (ast_new_unary_expression (parent),
+		     ast_new (parent,
+			      sym_postfix_expression,
+			      sym_primary_expression,
+			      sym_constant),
+		     ast_terminal_new (parent, symbol, value));
+}
+
+Ast * ast_new_identifier (Ast * parent, const char * name)
+{
+  return ast_attach (ast_new (parent,
+			      sym_postfix_expression,
+			      sym_primary_expression),
+		     ast_terminal_new (parent, sym_IDENTIFIER, name));
+}
+
+/**
+Add arguments ('0') to `function_call` so that the call has exactly
+`n` arguments. */
+
+static void complete_arguments (Ast * function_call, int n)
+{
+  if (!function_call->child[3]) { // function call without arguments
+    Ast ** child = allocate (ast_get_root (function_call)->alloc,
+			     5*sizeof (Ast *));
+    child[0] = function_call->child[0];
+    child[1] = function_call->child[1];
+    child[3] = function_call->child[2];
+    child[4] = NULL;
+    function_call->child = child;
+    ast_set_child (function_call, 2,
+		   ast_attach (ast_new (function_call,
+					sym_argument_expression_list,
+					sym_argument_expression_list_item),
+			       ast_new_constant (function_call->child[1],
+						 sym_I_CONSTANT, "0")));
+  }
+  
+  Ast * args = function_call->child[2];
+  int i = 0;
+  foreach_item (args, item)
+    i++;
+  for (; i < n; i++) {
+    args = ast_list_append (sym_argument_expression_list, args,
+			    sym_argument_expression_list_item,
+			    ast_new_constant (function_call->child[3],
+					      sym_I_CONSTANT, "0"));
+    ast_set_child (function_call, 2, args);
+  }
+}
+  
 typedef struct {
-  char * target, * replacement;
-} Replacement;
+  int dimension;
+} TranslateData;
 
 static void translate (Ast * n, Stack * stack, void * data)
 {
+  TranslateData * d = data;
+  typedef struct {
+    char * target, * replacement;
+  } Replacement;
+  
   switch (n->sym) {
-
+#if 1
   /**
   ## Foreach statements */
 
@@ -321,7 +430,7 @@ static void translate (Ast * n, Stack * stack, void * data)
     Ast * body = ast_copy (ast_last_child (n));
     ast_print (body, stderr, 0);
     fputc ('\n', stderr);
-    ast_rotate (body, 2);
+    ast_rotate (body, d->dimension);
     ast_print (body, stderr, 0);
     fprintf (stderr, "\n---------------------------\n");    
     ast_destroy (body);
@@ -329,52 +438,40 @@ static void translate (Ast * n, Stack * stack, void * data)
   }
 #endif
   /**
-  ## Stencil access */
+  ## Stencil access 
 
+  This transforms stencil accesses of the form `s[i,j]` into the
+  function call `val(s,i,j,0)`. */
+#endif
   case sym_array_access: {
     Ast * type = expression_type (n->child[0], stack);
-#if 0
-    if (type/* && type_is_typedef (type, "scalar")*/) {      
-      AstTerminal * t = ast_terminal (ast_find (n, token_symbol('[')));
-      fprintf (stderr, "%s:%d: array access\n", t->file, t->line);
-      ast_print (n->child[0], stderr, 0);
-      //      ast_print_tree (n, stderr, 0);
-      fputc ('\n', stderr);
-
-      Ast * declarator = type;
-      while (declarator->sym != sym_declarator)
-	declarator = declarator->parent;
-      ast_print_tree (declarator, stderr, 0);
-    }
-#endif
     if (type && type_is_typedef (type, "scalar") &&
 	(inforeach (n) || point_declaration (stack))) {
-      Ast * expr = ast_parse_expression ("val(a,0,0,0);", ast_get_root (n));
-      Ast * call = ast_find (expr, sym_function_call);
-      ast_detach (call);
-      ast_destroy (expr);
-      AstTerminal * left = ast_left_terminal (n);
-      ast_left_terminal (call)->before = left->before;
-      left->before = NULL;
-      ast_replace (ast_find (call->child[2], sym_postfix_expression),
-		   n->child[0]);
-      if (n->child[2]) {
-	Ast ** expr = append_list (NULL, n->child[1]);
-	Ast ** args =
-	  append_list (NULL, ast_find (call, sym_argument_expression_list));
-	for (Ast ** i = expr, ** j = args + 1; *i && *j; i++, j++)
-	  ast_replace (*j, *i);
-	free (expr);
-	free (args);
-      }
-      ast_replace (n, call);
+      n->sym = sym_function_call;
+      ast_set_char (n->child[1], '(');
+
+      if (n->child[3])
+	ast_argument_list (n->child[2]);
+      complete_arguments (n, 3);
+      
+      ast_set_child (n, 2,
+		     ast_list_prepend (sym_argument_expression_list, n->child[2],
+				       sym_argument_expression_list_item,
+				       ast_attach (ast_new_unary_expression (n),
+						   n->child[0])));
+      ast_set_char (n->child[3], ')');
+		     
+      char * before = ast_left_terminal (n)->before;
+      ast_left_terminal (n)->before = NULL;      
+      n->child[0] = ast_new_identifier (n, "val");
+      ast_left_terminal (n)->before = before;
     }
     break;
   }
-
+#if 1
   /**
   ## Identifiers */
-
+  
   case sym_IDENTIFIER: {
     if (n->parent->sym == sym_primary_expression) {
       static Replacement replacements[] = {
@@ -408,7 +505,7 @@ static void translate (Ast * n, Stack * stack, void * data)
   }
 
   /**
-  ## Memory allocation tracing */
+  ## Function calls */
 
   case sym_function_call: {
     Ast * identifier = ast_schema (n, sym_function_call,
@@ -416,6 +513,11 @@ static void translate (Ast * n, Stack * stack, void * data)
 				   0, sym_primary_expression,
 				   0, sym_IDENTIFIER);
     if (identifier) {
+      AstTerminal * t = ast_terminal (identifier);
+
+      /**
+      ### Memory allocation tracing */
+
       static Replacement replacements[] = {
 	{ "malloc",  "pmalloc" },
 	{ "calloc",  "pcalloc" },
@@ -425,7 +527,6 @@ static void translate (Ast * n, Stack * stack, void * data)
 	{ NULL, NULL }
       };
       Replacement * i = replacements;
-      AstTerminal * t = ast_terminal (identifier);
       while (i->target) {
 	if (!strcmp (t->start, i->target)) {
 	  free (t->start);
@@ -434,6 +535,21 @@ static void translate (Ast * n, Stack * stack, void * data)
 	  ast_before (n->child[3], ",__func__,__FILE__,__LINE__");
 	}
 	i++;
+      }
+
+      /**
+      ### Stencil functions */
+
+      if (inforeach (n) || point_declaration (stack)) {
+	if (!strcmp (t->start, "val") || !strcmp (t->start, "fine") ||
+	    !strcmp (t->start, "coarse"))
+	  complete_arguments (n, 4);
+	else if (!strcmp (t->start, "allocated") ||
+		 !strcmp (t->start, "allocated_child") ||
+		 !strcmp (t->start, "neighbor") ||
+		 !strcmp (t->start, "neighborp") ||
+		 !strcmp (t->start, "aparent"))
+	  complete_arguments (n, 3);
       }
     }
     break;
@@ -468,7 +584,7 @@ static void translate (Ast * n, Stack * stack, void * data)
     }
     break;
   }
-
+#endif
   }
 }
 
@@ -629,8 +745,9 @@ void endfor (FILE * fin, FILE * fout)
   root->alloc = d->alloc; d->alloc = NULL;
   
   //  ast_stack_print (root->stack, stderr);
-  
-  ast_traverse ((Ast *) root, root->stack, translate, NULL);
+
+  TranslateData data = { .dimension = 2 };
+  ast_traverse ((Ast *) root, root->stack, translate, &data);
 
   //  ast_stack_print (root->stack, stderr);
 

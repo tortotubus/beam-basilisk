@@ -66,12 +66,24 @@ Ast * ast_is_enumeration_constant (Ast * identifier); // fixme: not used?
 Ast * ast_is_typedef              (Ast * identifier);
 Ast * ast_identifier_declaration (Stack * stack, const char * identifier);
 
+AstTerminal * ast_terminal_new (Ast * parent, int symbol, const char * start);
+
+Ast * ast_new_internal (Ast * parent, ...);
+#define ast_new(parent,...) ast_new_internal (parent, __VA_ARGS__, -1)
 Ast * ast_schema_internal (Ast * n, ...);
 #define ast_schema(n,...) ast_schema_internal (n, __VA_ARGS__, -1)
 Ast * ast_find_internal (Ast * n, ...);
 #define ast_find(n,...) ast_find_internal (n, __VA_ARGS__, -1)
 Ast * ast_copy_internal (Ast * n, ...);
 #define ast_copy(n,...) ast_copy_internal (n, __VA_ARGS__ + 0, -1)
+Ast * ast_attach_internal (Ast * parent, ...);
+#define ast_attach(p,...) ast_attach_internal (p, __VA_ARGS__, NULL)
+
+static inline void ast_set_child (Ast * parent, int index, Ast * child)
+{
+  parent->child[index] = child;
+  child->parent = parent;
+}
 
 char * str_append_realloc (char * dst, ...);
 #define str_append(dst, ...)						\
@@ -102,4 +114,14 @@ void  ast_push_declaration         (Stack * stack, Ast * declaration);
 Ast * ast_push_function_definition (Stack * stack, Ast * declarator);
 void  ast_pop_scope                (Stack * stack, Ast * scope);
 void  ast_traverse                 (Ast * n, Stack * stack,
-				    void func (Ast *, Stack *, void *), void * data);
+				    void func (Ast *, Stack *, void *),
+				    void * data);
+#define foreach_item(list, item)					\
+  for (Ast * _list = list, * item = _list ? \
+	 (_list->child[1] ? _list->child[2] : _list->child[0]) : NULL;	\
+       item;								\
+       _list = _list->child[1] ? _list->child[0] : NULL,		\
+	 item = _list ? (_list->child[1] ? _list->child[2] :		\
+			 _list->child[0]) : NULL			\
+       )
+void ast_set_char (Ast * n, int c);

@@ -21,6 +21,32 @@ static void cancel_file_line (Ast * n)
       cancel_file_line (*c);
 }
 
+static Ast * ast_attach_single (Ast * parent, Ast * n)
+{
+  AstRoot * root = ast_get_root (parent);
+  while (parent->child)
+    parent = parent->child[0];
+  parent->child = allocate (root->alloc, 2*sizeof (Ast *));
+  parent->child[0] = n;
+  parent->child[1] = NULL;
+  n->parent = parent;
+  return parent;
+}
+
+Ast * ast_attach_internal (Ast * parent, ...)
+{
+  va_list ap;
+  va_start (ap, parent);
+  Ast * p = parent, * n = va_arg (ap, Ast *);
+  while (n) {
+    ast_attach_single (p, n);
+    p = n;
+    n = va_arg (ap, Ast *);
+  }
+  va_end (ap);
+  return parent;
+}
+
 void ast_detach (Ast * n)
 {
   assert (n->parent);
@@ -30,7 +56,7 @@ void ast_detach (Ast * n)
   for (; *c; c++)
     *c = *(c + 1);
   n->parent = n;
-  cancel_file_line (n);
+  cancel_file_line (n); // fixme
 }
 
 void ast_destroy (Ast * n)
@@ -142,6 +168,54 @@ void ast_print_tree (Ast * n, FILE * fp, const char * indent)
     for (Ast **c = n->child; *c; c++)
       print_child_tree (*c, fp, indent, *(c + 1) == NULL);
   }
+}
+
+AstTerminal * ast_terminal_new (Ast * parent, int symbol, const char * start)
+{
+  AstTerminal * t = allocate (ast_get_root (parent)->alloc,
+			      sizeof (AstTerminal));
+  memset (t, 0, sizeof (AstTerminal));
+  ((Ast *)t)->sym = symbol;
+  ((Ast *)t)->parent = parent;
+  t->start = strdup (start);
+  AstTerminal * r = ast_right_terminal (parent);
+  t->file = r->file;
+  t->line = r->line;
+  return t;
+}
+
+static Ast * vast_new_internal (Ast * parent, va_list ap)
+{
+  int sym = va_arg (ap, int);
+  if (sym < 0)
+    return NULL;
+  AstRoot * root = ast_get_root (parent);
+  Ast * n = allocate (root->alloc, sizeof (Ast));
+  n->sym = sym;
+  n->parent = parent;
+  n->child = NULL;
+  Ast * m = n;
+  sym = va_arg (ap, int);
+  while (sym >= 0) {
+    Ast * c = allocate (root->alloc, sizeof (Ast));
+    c->sym = sym;
+    c->parent = m;
+    m->child = allocate (root->alloc, 2*sizeof (Ast *));
+    m->child[0] = c;
+    m->child[1] = NULL;
+    m = c;
+    sym = va_arg (ap, int);
+  }
+  return n;
+}
+
+Ast * ast_new_internal (Ast * parent, ...)
+{
+  va_list ap;
+  va_start (ap, parent);
+  Ast * n = vast_new_internal (parent, ap);
+  va_end (ap);
+  return n;
 }
 
 static Ast * vast_schema_internal (Ast * n, va_list ap)
@@ -473,4 +547,9 @@ void ast_stack_print (Stack * stack, FILE * fp)
   for (int i = 0; (n = stack_index (stack, i)); i++)
     if (*n && (*n)->sym == sym_IDENTIFIER)
       ast_identifier_print (*n, fp);
+}
+
+void ast_set_char (Ast * n, int c)
+{
+  n->sym = token_symbol(c), ast_terminal (n)->start[0] = c;
 }
