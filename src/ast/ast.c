@@ -11,6 +11,36 @@
 #include "basilisk.h"
 #include "symbols.h"
 
+Ast * const ast_placeholder = (Ast *) 128;
+
+Ast * ast_new_children_internal (Ast * parent, ...)
+{
+  va_list ap;
+  va_start (ap, parent);
+  int n = 1;
+  Ast * c = va_arg (ap, Ast *);
+  while (c) {
+    n++;
+    c = va_arg (ap, Ast *);
+  }
+  va_end (ap);
+
+  if (n > 1) {
+    parent->child = allocate (ast_get_root (parent)->alloc, n*sizeof (Ast *));
+    parent->child[n - 1] = NULL;
+    va_start (ap, parent);
+    n = 0;
+    c = va_arg (ap, Ast *);
+    while (c) {
+      ast_set_child (parent, n++, c);
+      c = va_arg (ap, Ast *);
+    }
+    va_end (ap);
+  }
+  
+  return parent;
+}
+
 static void cancel_file_line (Ast * n)
 {
   AstTerminal * t = ast_terminal(n);
@@ -47,12 +77,13 @@ Ast * ast_attach_internal (Ast * parent, ...)
   return parent;
 }
 
-void ast_detach (Ast * n)
+void ast_detach (Ast * n) // fixme
 {
   assert (n->parent);
   Ast ** c;
   for (c = n->parent->child; *c && *c != n; c++);
-  assert (*c == n);
+  if (*c != n)
+    return;
   for (; *c; c++)
     *c = *(c + 1);
   n->parent = n;
@@ -72,6 +103,8 @@ void ast_destroy (Ast * n)
   }
   AstRoot * r = ast_root (n);
   if (r) {
+    free (r->before);
+    free (r->after);
     if (r->stack)
       stack_destroy (r->stack);
     for (int i = 0; i < r->nf; i++)
@@ -364,9 +397,10 @@ Ast * ast_copy_internal (Ast * n, ...)
   va_start (ap, n);
   bool found = false;
   AstRoot * src_root = ast_get_root (n);
-  n = vast_copy_internal (n, ap, &found, src_root, src_root);
+  Ast * c = vast_copy_internal (n, ap, &found, src_root, src_root);
+  c->parent = n;
   va_end (ap);
-  return n;
+  return c;
 }
 
 void ast_replace (Ast * dst, Ast * src)
@@ -552,4 +586,22 @@ void ast_stack_print (Stack * stack, FILE * fp)
 void ast_set_char (Ast * n, int c)
 {
   n->sym = token_symbol(c), ast_terminal (n)->start[0] = c;
+}
+
+void ast_remove (Ast * n, AstTerminal * before)
+{
+  if (n->child) {
+    for (Ast ** c = n->child; *c; c++)
+      if (*c != ast_placeholder)
+	ast_remove (*c, before);
+  }
+  else {
+    AstTerminal * t = ast_terminal (n);
+    if (t->before) {
+      str_prepend (before->before, t->before);
+      free (t->before);
+    }
+    free (t->start);
+    free (t->after);
+  }
 }
