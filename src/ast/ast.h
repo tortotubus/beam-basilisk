@@ -78,9 +78,19 @@ Ast * ast_copy_internal (Ast * n, ...);
 #define ast_copy(n,...) ast_copy_internal (n, __VA_ARGS__ + 0, -1)
 Ast * ast_attach_internal (Ast * parent, ...);
 #define ast_attach(p,...) ast_attach_internal (p, __VA_ARGS__, NULL)
+Ast * ast_new_children_internal (Ast * parent, ...);
+#define ast_new_children(p,...) ast_new_children_internal (p, __VA_ARGS__, NULL)
+
+extern Ast * const ast_placeholder;
 
 static inline void ast_set_child (Ast * parent, int index, Ast * child)
 {
+  if (child->parent && child->parent != parent) {
+    Ast * oldparent = child->parent, ** c;
+    for (c = oldparent->child; *c && *c != child; c++);
+    if (*c == child)
+      *c = ast_placeholder;
+  }  
   parent->child[index] = child;
   child->parent = parent;
 }
@@ -113,15 +123,22 @@ char * ast_line (AstTerminal * t);
 void  ast_push_declaration         (Stack * stack, Ast * declaration);
 Ast * ast_push_function_definition (Stack * stack, Ast * declarator);
 void  ast_pop_scope                (Stack * stack, Ast * scope);
-void  ast_traverse                 (Ast * n, Stack * stack,
-				    void func (Ast *, Stack *, void *),
-				    void * data);
-#define foreach_item(list, item)					\
-  for (Ast * _list = list, * item = _list ? \
-	 (_list->child[1] ? _list->child[2] : _list->child[0]) : NULL;	\
+
+typedef struct {
+  const char * name;
+  int line;
+} AstFile;
+
+void  ast_traverse (Ast * n, Stack * stack, AstFile * file,
+		    void func (Ast *, Stack *, AstFile *, void *),
+		    void * data);
+#define foreach_item(list, index, item)					\
+  for (Ast * _list = list, * item = _list ?				\
+	 (_list->child[1] ? _list->child[index] : _list->child[0]) : NULL; \
        item;								\
        _list = _list->child[1] ? _list->child[0] : NULL,		\
-	 item = _list ? (_list->child[1] ? _list->child[2] :		\
+	 item = _list ? (_list->child[1] ? _list->child[index] :	\
 			 _list->child[0]) : NULL			\
        )
 void ast_set_char (Ast * n, int c);
+void ast_remove (Ast * n, AstTerminal * before);

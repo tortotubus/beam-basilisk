@@ -41,7 +41,7 @@ Ast * ast_find_function (Ast * n, const char * name)
   return found;
 }
 
-static void trace_return (Ast * n, Stack * stack, void * data)
+static void trace_return (Ast * n, Stack * stack, AstFile * file, void * data)
 {
   Ast * function_definition = ((void **)data)[0];
   AstTerminal * function_identifier = ((void **)data)[1];
@@ -190,35 +190,6 @@ static bool type_is_typedef (Ast * type, const char * typedef_name)
   return false;
 }
 
-static void ast_rotate (Ast * n, int dimension)
-{
-  switch (n->sym) {
-
-  case sym_IDENTIFIER: {
-    AstTerminal * t = ast_terminal (n);
-    int len = strlen (t->start);
-    if (len >= 2 && t->start[len - 2] == '_' &&
-	strchr ("xyz", t->start[len - 1]))
-      t->start[len - 1] = 'x' + (t->start[len - 1] + 1 - 'x') % dimension;
-    break;
-  }
-
-  case sym_member_identifier: {
-    AstTerminal * t = ast_terminal (ast_schema (n, sym_member_identifier,
-						0, sym_generic_identifier,
-						0, sym_IDENTIFIER));
-    if (t->start[1] == '\0' && strchr ("xyz", *t->start))
-      *t->start = 'x' + (*t->start + 1 - 'x') % dimension;
-    break;
-  }
-    
-  }
-
-  if (n->child)
-    for (Ast ** c = n->child; *c; c++)
-      ast_rotate (*c, dimension);
-}
-
 static Ast * inforeach (Ast * n)
 {
   Ast * parent = n->parent;
@@ -237,25 +208,40 @@ static bool point_declaration (Stack * stack)
 }
 
 /**
-Appends `item` to `list`. The list and list item symbols are
-`sym_list` and `sym_list_item` respectively. */
+Appends (block) list `list1` to (block) list `list`. */
+
+Ast * ast_list_append_list (Ast * list, Ast * list1)
+{
+  assert (list->sym == list1->sym);
+  assert (list->sym == sym_block_item_list);
+  Ast * parent = list1;
+  while (parent->child[1])
+    parent = parent->child[0];
+  Ast * item = parent->child[0];
+  assert (item->sym == sym_block_item);
+  ast_new_children (parent, list, item);
+  return list1;
+}
+
+/**
+Appends `item` to (comma-separated) `list`. The list and list item
+symbols are `sym_list` and `sym_list_item` respectively. */
 
 Ast * ast_list_append (int sym_list, Ast * list,
 		       int sym_list_item, Ast * item)
 {
-  Ast * l = ast_new (list, sym_list);
-  l->child = allocate (ast_get_root (list)->alloc, 4*sizeof (Ast *));
-  ast_set_child (l, 1, (Ast *) ast_terminal_new (item, token_symbol(','), ","));
-  ast_set_child (l, 2, ast_new (item, sym_list_item));
+  Ast * l = 
+    ast_new_children (ast_new (list->parent, sym_list),
+		      list, 
+		      (Ast *) ast_terminal_new (item, token_symbol(','), ","),
+		      ast_new (item, sym_list_item));
   ast_attach (l->child[2], item);
-  ast_set_child (l, 0, list);
-  l->child[3] = NULL;
   return l;
 }
 
 /**
-Prepends `item` to `list`. The list and list item symbols are
-`sym_list` and `sym_list_item` respectively. */
+Prepends `item` to (comma-separated) `list`. The list and list item
+symbols are `sym_list` and `sym_list_item` respectively. */
 
 Ast * ast_list_prepend (int sym_list, Ast * list,
 			int sym_list_item, Ast * item)
@@ -287,9 +273,7 @@ void ast_argument_list (Ast * expression)
     int child = expression->child[1] ? 2 : 0;
     expression->sym = sym_argument_expression_list;
     Ast * item = ast_new (expression, sym_argument_expression_list_item);
-    item->child = allocate (ast_get_root(expression)->alloc, 2*sizeof(Ast *));
-    ast_set_child (item, 0, expression->child[child]);
-    item->child[1] = NULL;
+    ast_new_children (item, expression->child[child]);
     ast_set_child (expression, child, item);
     expression = expression->child[0];
   }
@@ -338,25 +322,20 @@ Add arguments ('0') to `function_call` so that the call has exactly
 
 static void complete_arguments (Ast * function_call, int n)
 {
-  if (!function_call->child[3]) { // function call without arguments
-    Ast ** child = allocate (ast_get_root (function_call)->alloc,
-			     5*sizeof (Ast *));
-    child[0] = function_call->child[0];
-    child[1] = function_call->child[1];
-    child[3] = function_call->child[2];
-    child[4] = NULL;
-    function_call->child = child;
-    ast_set_child (function_call, 2,
-		   ast_attach (ast_new (function_call,
-					sym_argument_expression_list,
-					sym_argument_expression_list_item),
-			       ast_new_constant (function_call->child[1],
-						 sym_I_CONSTANT, "0")));
-  }
+  if (!function_call->child[3]) // function call without arguments
+    ast_new_children (function_call,
+		      function_call->child[0],
+		      function_call->child[1],
+		      ast_attach (ast_new (function_call,
+					   sym_argument_expression_list,
+					   sym_argument_expression_list_item),
+				  ast_new_constant (function_call->child[1],
+						    sym_I_CONSTANT, "0")),
+		      function_call->child[2]);
   
   Ast * args = function_call->child[2];
   int i = 0;
-  foreach_item (args, item)
+  foreach_item (args, 2, item)
     i++;
   for (; i < n; i++) {
     args = ast_list_append (sym_argument_expression_list, args,
@@ -366,74 +345,99 @@ static void complete_arguments (Ast * function_call, int n)
     ast_set_child (function_call, 2, args);
   }
 }
-  
+
+static void rotate (Ast * n, int dimension, bool inforeach)
+{
+  switch (n->sym) {
+
+  case sym_IDENTIFIER: {
+    AstTerminal * t = ast_terminal (n);
+    int len = strlen (t->start);
+    if (len >= 2 && t->start[len - 2] == '_' &&
+	strchr ("xyz", t->start[len - 1]))
+      t->start[len - 1] = 'x' + (t->start[len - 1] + 1 - 'x') % dimension;
+    break;
+  }
+
+  case sym_member_identifier: {
+    AstTerminal * t = ast_terminal (ast_schema (n, sym_member_identifier,
+						0, sym_generic_identifier,
+						0, sym_IDENTIFIER));
+    if (t->start[1] == '\0' && strchr ("xyz", *t->start))
+      *t->start = 'x' + (*t->start + 1 - 'x') % dimension;
+    break;
+  }
+
+  case sym_function_call: {
+    Ast * identifier;
+    if (inforeach && (identifier = ast_schema (n, sym_function_call,
+					       0, sym_postfix_expression,
+					       0, sym_primary_expression,
+					       0, sym_IDENTIFIER))) {
+      AstTerminal * t = ast_terminal (identifier);
+      if (!strcmp (t->start, "val") || !strcmp (t->start, "fine") ||
+	  !strcmp (t->start, "coarse")) {
+	
+      }
+    }
+    break;
+  }
+
+  }
+
+  if (n->child)
+    for (Ast ** c = n->child; *c; c++)
+      rotate (*c, dimension, inforeach);
+}
+
 typedef struct {
   int dimension;
 } TranslateData;
 
-static void translate (Ast * n, Stack * stack, void * data)
+static void translate (Ast * n, Stack * stack, AstFile * file, void * data)
 {
-  TranslateData * d = data;
+#if 0
+  AstTerminal * t = ast_terminal (n);
+  if (t) {
+    assert (t->line == file->line);
+    assert (!strncmp (t->file, file->name, strlen(t->file)) &&
+	    file->name[strlen(t->file)] == '"');
+  }
+#endif
+  
   typedef struct {
     char * target, * replacement;
   } Replacement;
   
   switch (n->sym) {
-#if 1
-  /**
-  ## Foreach statements */
-
-  case sym_foreach_statement: {
-    Ast * foreach = inforeach (n);
-    if (foreach) {
-      AstTerminal * t = ast_terminal (n->child[0]);
-      AstTerminal * p = ast_terminal (foreach->child[0]);
-      fprintf (stderr,
-	       "%s:%d: error: foreach*() iterators cannot be nested \n",
-	       t->file, t->line);      
-      fprintf (stderr,
-	       "%s:%d: error: this is the location of the parent %s\n",
-	       p->file, p->line,
-	       foreach->sym == sym_foreach_statement ?
-	       "foreach*()" : "point function");
-      exit (1);
-    }
-    
-    Ast * statement = ast_last_child (n);
-    if (statement->child[0]->sym == sym_compound_statement)
-      ast_after (statement, " end_", ast_left_terminal(n)->start, "();");
-    else {
-      ast_before (statement, "{");
-      ast_after (statement, "} end_", ast_left_terminal(n)->start, "();");
-    }
-    break;
-  }
-
-  /**
-  ## Foreach inner statements */
-    
-  case sym_foreach_inner_statement: {
-    Ast * statement = ast_last_child (n);
-    if (statement->child[0]->sym == sym_compound_statement)
-      ast_after (statement, " end_", ast_left_terminal(n)->start, "();");
-    else {
-      ast_before (statement, "{");
-      ast_after (statement, "} end_", ast_left_terminal(n)->start, "();");
-    }
-    break;
-  }
 
   /**
   ## foreach_dimension() */
 #if 0
   case sym_foreach_dimension_statement: {
-    Ast * body = ast_copy (ast_last_child (n));
-    ast_print (body, stderr, 0);
-    fputc ('\n', stderr);
-    ast_rotate (body, d->dimension);
-    ast_print (body, stderr, 0);
-    fprintf (stderr, "\n---------------------------\n");    
-    ast_destroy (body);
+    Ast * item = n->parent->parent->parent;
+    if (item->sym == sym_block_item) {
+      Ast * body = ast_last_child (n);
+      Ast * compound = ast_schema (body, sym_statement,
+				   0, sym_compound_statement);
+      if (compound) {
+	Ast * list = compound->child[1];
+	if (list) {
+	  Ast * copy = ast_copy (list);
+	  TranslateData * d = data;        
+	  rotate (copy, d->dimension,
+		  inforeach (n) || point_declaration (stack));
+	  list = ast_list_append_list (list, copy);
+	  ast_print (list, stderr, 0);
+	  fprintf (stderr, "\n---------------------------\n");	  
+	  ast_set_child (compound, 1, list);
+	  ast_set_child (item, 0, body);
+	  AstTerminal * t = ast_left_terminal (compound);
+	  ast_print_file_line ((Ast *) t, stderr);
+	  ast_remove (n, t);
+	}
+      }
+    }
     break;
   }
 #endif
@@ -442,7 +446,7 @@ static void translate (Ast * n, Stack * stack, void * data)
 
   This transforms stencil accesses of the form `s[i,j]` into the
   function call `val(s,i,j,0)`. */
-#endif
+
   case sym_array_access: {
     Ast * type = expression_type (n->child[0], stack);
     if (type && type_is_typedef (type, "scalar") &&
@@ -468,7 +472,7 @@ static void translate (Ast * n, Stack * stack, void * data)
     }
     break;
   }
-#if 1
+
   /**
   ## Identifiers */
   
@@ -555,6 +559,65 @@ static void translate (Ast * n, Stack * stack, void * data)
     break;
   }
 
+  }
+}
+
+static void macros (Ast * n, Stack * stack, AstFile * file, void * data)
+{
+#if 0
+  AstTerminal * t = ast_terminal (n);
+  if (t) {
+    assert (t->line == file->line);
+    assert (!strncmp (t->file, file->name, strlen(t->file)) &&
+	    file->name[strlen(t->file)] == '"');
+  }
+#endif
+  
+  switch (n->sym) {
+
+  /**
+  ## Foreach statements */
+
+  case sym_foreach_statement: {
+    Ast * foreach = inforeach (n);
+    if (foreach) {
+      AstTerminal * t = ast_terminal (n->child[0]);
+      AstTerminal * p = ast_terminal (foreach->child[0]);
+      fprintf (stderr,
+	       "%s:%d: error: foreach*() iterators cannot be nested \n",
+	       t->file, t->line);      
+      fprintf (stderr,
+	       "%s:%d: error: this is the location of the parent %s\n",
+	       p->file, p->line,
+	       foreach->sym == sym_foreach_statement ?
+	       "foreach*()" : "point function");
+      exit (1);
+    }
+    
+    Ast * statement = ast_last_child (n);
+    if (statement->child[0]->sym == sym_compound_statement)
+      ast_after (statement, " end_", ast_left_terminal(n)->start, "();");
+    else {
+      ast_before (statement, "{");
+      ast_after (statement, "} end_", ast_left_terminal(n)->start, "();");
+    }
+    break;
+  }
+
+  /**
+  ## Foreach inner statements */
+    
+  case sym_foreach_inner_statement: {
+    Ast * statement = ast_last_child (n);
+    if (statement->child[0]->sym == sym_compound_statement)
+      ast_after (statement, " end_", ast_left_terminal(n)->start, "();");
+    else {
+      ast_before (statement, "{");
+      ast_after (statement, "} end_", ast_left_terminal(n)->start, "();");
+    }
+    break;
+  }
+
   /**
   ## Function profiling with `trace` */
 
@@ -574,17 +637,17 @@ static void translate (Ast * n, Stack * stack, void * data)
 		 " trace (\"", ast_terminal (identifier)->start, "\", ",
 		 ast_file_line (identifier), "); ");
       Ast * end = ast_last_child (compound_statement);
-      ast_before (end,
+       ast_before (end,
 		  " end_trace (\"", ast_terminal (identifier)->start, "\", ",
 		  ast_file_line (end), "); ");
       if (compound_statement->child[1]->sym == sym_block_item_list) {
 	void * data[] = { n, identifier };
-	ast_traverse (compound_statement, stack, trace_return, data);
+	ast_traverse (compound_statement, stack, file, trace_return, data);
       }
     }
     break;
   }
-#endif
+
   }
 }
 
@@ -655,13 +718,50 @@ Ast * ast_push_function_definition (Stack * stack, Ast * declarator)
   return identifier;
 }
 
-void ast_traverse (Ast * n, Stack * stack,
-		   void func (Ast *, Stack *, void *), void * data)
+static void update_line (AstFile * file, const char * s)
+{
+  if (s)
+    while (*s != '\0') {
+      if (*s == '\n')
+	file->line++;
+      s++;
+    }
+}
+
+void ast_traverse (Ast * n, Stack * stack, AstFile * file,
+		   void func (Ast *, Stack *, AstFile *, void *),
+		   void * data)
 {
   if (ast_root (n)) {
     ast_pop_scope (stack, n);
     stack_push (stack, &n);
   }
+
+#if 0 
+  AstTerminal * t = ast_terminal (n);
+  if (t) {
+    char * s = t->before;
+    if (s)
+      while (*s != '\0') {
+	if (*s == '#') {
+	  char * u = s - 1;
+	  while (u != t->before && !strchr ("\n\r", *u) && strchr (" \t", *u))
+	    u--;
+	  if (u == t->before || strchr ("\n\r", *u)) {
+	    file->line = atoi (s + 1) - 1;
+	    file->name = strchr (s, '"');
+	    assert (file->name); file->name++;
+	  }
+	}
+	else if (*s == '\n')
+	  file->line++;
+	s++;
+      }
+    update_line (file, t->start);
+    update_line (file, t->after);
+  }
+#endif
+  AstFile f = *file;
   
   switch (n->sym) {
 
@@ -673,41 +773,41 @@ void ast_traverse (Ast * n, Stack * stack,
     Ast * declarator = ast_find (n, sym_direct_declarator);
     ast_push_function_definition (stack, declarator);
     for (Ast ** c = n->child; *c; c++)
-      ast_traverse (*c, stack, func, data);
+      ast_traverse (*c, stack, file, func, data);
     ast_pop_scope (stack, declarator);
-    func (n, stack, data);
-    return;
+    break;
   }
     
   case sym_compound_statement:
   case sym_for_declaration_statement: {
     stack_push (stack, &n);
     for (Ast ** c = n->child; *c; c++)
-      ast_traverse (*c, stack, func, data);
+      ast_traverse (*c, stack, file, func, data);
     ast_pop_scope (stack, n);
-    func (n, stack, data);
-    return;
+    break;
   }
     
   case sym_forin_declaration_statement: {
     stack_push (stack, &n);
     ast_push_declaration (stack, n->child[3]);
     for (Ast ** c = n->child; *c; c++)
-      ast_traverse (*c, stack, func, data);
+      ast_traverse (*c, stack, file, func, data);
     ast_pop_scope (stack, n);
-    func (n, stack, data);
-    return;
+    break;
   }
 
   case sym_declaration:
     ast_push_declaration (stack, n);
-
+    // fall through
+    
   default:
     if (n->child)
       for (Ast ** c = n->child; *c; c++)
-	ast_traverse (*c, stack, func, data);
-    func (n, stack, data);
+	ast_traverse (*c, stack, file, func, data);
+    break;
   }
+  
+  func (n, stack, &f, data);
 }
 
 void endfor (FILE * fin, FILE * fout)
@@ -747,7 +847,9 @@ void endfor (FILE * fin, FILE * fout)
   //  ast_stack_print (root->stack, stderr);
 
   TranslateData data = { .dimension = 2 };
-  ast_traverse ((Ast *) root, root->stack, translate, &data);
+  AstFile file = {0};
+  ast_traverse ((Ast *) root, root->stack, &file, translate, &data);
+  ast_traverse ((Ast *) root, root->stack, &file, macros, &data);
 
   //  ast_stack_print (root->stack, stderr);
 
