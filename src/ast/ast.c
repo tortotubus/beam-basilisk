@@ -605,3 +605,25 @@ void ast_remove (Ast * n, AstTerminal * before)
     free (t->after);
   }
 }
+
+static void ast_check_children (Ast * n)
+{
+  if (n->child)
+    for (Ast ** c = n->child; *c; c++) {
+      assert ((*c)->parent == n);
+      ast_check_children (*c);
+    }
+}
+
+void ast_check (Ast * n)
+{
+  ast_check_children (n);
+  while (n->parent) {
+    assert (n->parent->child);
+    Ast ** c;
+    for (c = n->parent->child; *c && *c != n; c++);
+    assert (*c == n);
+    assert (n->parent != n);
+    n = n->parent;
+  }
+}

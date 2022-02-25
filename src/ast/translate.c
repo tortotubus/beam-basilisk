@@ -224,44 +224,51 @@ Ast * ast_list_append_list (Ast * list, Ast * list1)
 }
 
 /**
-Appends `item` to (comma-separated) `list`. The list and list item
-symbols are `sym_list` and `sym_list_item` respectively. */
+Appends `item` to (block) `list`. The list item symbol is `item_sym`. */
 
-Ast * ast_list_append (int sym_list, Ast * list,
-		       int sym_list_item, Ast * item)
+Ast * ast_block_list_append (Ast * list, int item_sym, Ast * item)
 {
-  Ast * l = 
-    ast_new_children (ast_new (list->parent, sym_list),
-		      list, 
-		      (Ast *) ast_terminal_new (item, token_symbol(','), ","),
-		      ast_new (item, sym_list_item));
-  ast_attach (l->child[2], item);
+  Ast ** c;
+  for (c = list->parent->child; *c && *c != list; c++);
+  assert (*c == list);
+  Ast * l = ast_new_children (ast_new (list->parent, list->sym),
+			      list, 
+			      ast_attach (ast_new (item, item_sym), item));
+  *c = l;
   return l;
 }
 
 /**
-Prepends `item` to (comma-separated) `list`. The list and list item
-symbols are `sym_list` and `sym_list_item` respectively. */
+Appends `item` to (comma-separated) `list`. The list item symbol is
+`item_sym`. */
 
-Ast * ast_list_prepend (int sym_list, Ast * list,
-			int sym_list_item, Ast * item)
+Ast * ast_list_append (Ast * list, int item_sym, Ast * item)
+{
+  Ast ** c;
+  for (c = list->parent->child; *c && *c != list; c++);
+  assert (*c == list);
+  Ast * l =  ast_new_children (ast_new (list->parent, list->sym),
+			       list, 
+			       ast_terminal_new_char (item, ","),
+			       ast_new (item, item_sym));
+  ast_attach (l->child[2], item);
+  *c = l;
+  return l;
+}
+
+/**
+Prepends `item` to (comma-separated) `list`. The list item symbol is
+`item_sym`. */
+
+Ast * ast_list_prepend (Ast * list, int item_sym, Ast * item)
 {
   Ast * r = list;
-  while (r->child[0]->sym != sym_list_item)
+  while (r->child[0]->sym != item_sym)
     r = r->child[0];
-  Ast * parent = r->parent;
-  Ast * l = ast_list_append (sym_list, r, sym_list_item, item);
-  
-  Ast * tmp = r->child[0];
+  Ast * l = ast_list_append (r, item_sym, item), * tmp = r->child[0];
   ast_set_child (r, 0, l->child[2]);
   ast_set_child (l, 2, tmp);
-
-  if (r != list) {
-    ast_set_child (parent, 0, l);
-    return list;
-  }
-
-  return l;
+  return r != list ? list : l;
 }
 
 /**
@@ -338,12 +345,34 @@ static void complete_arguments (Ast * function_call, int n)
   foreach_item (args, 2, item)
     i++;
   for (; i < n; i++) {
-    args = ast_list_append (sym_argument_expression_list, args,
+    args = ast_list_append (args,
 			    sym_argument_expression_list_item,
 			    ast_new_constant (function_call->child[3],
 					      sym_I_CONSTANT, "0"));
     ast_set_child (function_call, 2, args);
   }
+}
+
+static Ast * rotate_arguments (Ast * list, int dimension)
+{
+  Ast * next = list->child[0], * item = list->child[2];
+  for (int i = 1; i < dimension && next; i++) {
+    if (next->child[1]) {
+      list->child[2] = next->child[2];
+      list = next;
+      next = list->child[0];
+    }
+    else {
+      list->child[2] = next->child[0];
+      list = next;
+      next = NULL;
+    }	    
+  }
+  if (list->child[1])
+    list->child[2] = item;
+  else
+    list->child[0] = item;
+  return list;
 }
 
 static void rotate (Ast * n, int dimension, bool inforeach)
@@ -374,11 +403,16 @@ static void rotate (Ast * n, int dimension, bool inforeach)
 					       0, sym_postfix_expression,
 					       0, sym_primary_expression,
 					       0, sym_IDENTIFIER))) {
-      AstTerminal * t = ast_terminal (identifier);
-      if (!strcmp (t->start, "val") || !strcmp (t->start, "fine") ||
-	  !strcmp (t->start, "coarse")) {
-	
-      }
+      const char * name = ast_terminal (identifier)->start;
+      if (!strcmp (name, "val") ||
+	  !strcmp (name, "fine") ||
+	  !strcmp (name, "coarse") ||
+	  !strcmp (name, "allocated") ||
+	  !strcmp (name, "allocated_child") ||
+	  !strcmp (name, "neighbor") ||
+	  !strcmp (name, "neighborp") ||
+	  !strcmp (name, "aparent"))
+	rotate_arguments (n->child[2], dimension);
     }
     break;
   }
@@ -413,34 +447,43 @@ static void translate (Ast * n, Stack * stack, AstFile * file, void * data)
 
   /**
   ## foreach_dimension() */
-#if 0
+
   case sym_foreach_dimension_statement: {
-    Ast * item = n->parent->parent->parent;
-    if (item->sym == sym_block_item) {
-      Ast * body = ast_last_child (n);
-      Ast * compound = ast_schema (body, sym_statement,
-				   0, sym_compound_statement);
-      if (compound) {
-	Ast * list = compound->child[1];
-	if (list) {
-	  Ast * copy = ast_copy (list);
-	  TranslateData * d = data;        
-	  rotate (copy, d->dimension,
-		  inforeach (n) || point_declaration (stack));
-	  list = ast_list_append_list (list, copy);
-	  ast_print (list, stderr, 0);
-	  fprintf (stderr, "\n---------------------------\n");	  
-	  ast_set_child (compound, 1, list);
-	  ast_set_child (item, 0, body);
-	  AstTerminal * t = ast_left_terminal (compound);
-	  ast_print_file_line ((Ast *) t, stderr);
-	  ast_remove (n, t);
-	}
-      }
+    Ast * statement = n->parent->parent, * item = statement->parent;
+    if (item->sym != sym_block_item) {
+      AstTerminal
+	* left = ast_left_terminal (n),
+	* right = ast_right_terminal (n);
+      Ast * parent = item, ** c;
+      int index = 0;
+      for (c = parent->child; *c && *c != statement; c++, index++);
+      assert (*c == statement);
+      item = ast_new_children (ast_new (parent, sym_block_item),
+			       statement);
+      Ast * list = ast_new_children (ast_new (parent, sym_block_item_list),
+				     item);
+      Ast * compound =
+	ast_new_children (ast_new (parent, sym_compound_statement),
+			  ast_terminal_new_char ((Ast *) left, "{"),
+			  list,
+			  ast_terminal_new_char ((Ast *) right, "}"));
+      ast_set_child (parent, index, compound);
     }
+    Ast * list = item->parent;
+    Ast * body = ast_last_child (n), * copy = body;
+    TranslateData * d = data;
+    for (int i = 1; i < d->dimension; i++) {
+      copy = ast_copy (copy);
+      rotate (copy, d->dimension,
+	      inforeach (n) || point_declaration (stack));
+      list = ast_block_list_append (list, sym_block_item, copy);
+    }
+    ast_set_child (item, 0, body);
+    AstTerminal * t = ast_left_terminal (body);
+    ast_remove (n, t);
     break;
   }
-#endif
+
   /**
   ## Stencil access 
 
@@ -459,7 +502,7 @@ static void translate (Ast * n, Stack * stack, AstFile * file, void * data)
       complete_arguments (n, 3);
       
       ast_set_child (n, 2,
-		     ast_list_prepend (sym_argument_expression_list, n->child[2],
+		     ast_list_prepend (n->child[2],
 				       sym_argument_expression_list_item,
 				       ast_attach (ast_new_unary_expression (n),
 						   n->child[0])));
@@ -846,7 +889,7 @@ void endfor (FILE * fin, FILE * fout)
   
   //  ast_stack_print (root->stack, stderr);
 
-  TranslateData data = { .dimension = 2 };
+  TranslateData data = { .dimension = 3 };
   AstFile file = {0};
   ast_traverse ((Ast *) root, root->stack, &file, translate, &data);
   ast_traverse ((Ast *) root, root->stack, &file, macros, &data);
