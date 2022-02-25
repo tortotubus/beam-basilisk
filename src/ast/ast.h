@@ -67,6 +67,8 @@ Ast * ast_is_typedef              (Ast * identifier);
 Ast * ast_identifier_declaration (Stack * stack, const char * identifier);
 
 AstTerminal * ast_terminal_new (Ast * parent, int symbol, const char * start);
+#define ast_terminal_new_char(p,s)			\
+  (Ast *) ast_terminal_new (p, token_symbol((s)[0]), s)
 
 Ast * ast_new_internal (Ast * parent, ...);
 #define ast_new(parent,...) ast_new_internal (parent, __VA_ARGS__, -1)
@@ -86,10 +88,13 @@ extern Ast * const ast_placeholder;
 static inline void ast_set_child (Ast * parent, int index, Ast * child)
 {
   if (child->parent && child->parent != parent) {
-    Ast * oldparent = child->parent, ** c;
-    for (c = oldparent->child; *c && *c != child; c++);
-    if (*c == child)
-      *c = ast_placeholder;
+    Ast * oldparent = child->parent;
+    if (oldparent->child) {
+      Ast ** c;
+      for (c = oldparent->child; *c && *c != child; c++);
+      if (*c == child)
+	*c = ast_placeholder;
+    }
   }  
   parent->child[index] = child;
   child->parent = parent;
@@ -142,3 +147,4 @@ void  ast_traverse (Ast * n, Stack * stack, AstFile * file,
        )
 void ast_set_char (Ast * n, int c);
 void ast_remove (Ast * n, AstTerminal * before);
+void ast_check (Ast * n);
