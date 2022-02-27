@@ -213,13 +213,16 @@ Appends (block) list `list1` to (block) list `list`. */
 Ast * ast_list_append_list (Ast * list, Ast * list1)
 {
   assert (list->sym == list1->sym);
-  assert (list->sym == sym_block_item_list);
+  Ast ** c, * oldparent = list->parent;
+  int index = 0;
+  for (c = oldparent->child; *c && *c != list; c++) index++;
+  assert (*c == list);
   Ast * parent = list1;
   while (parent->child[1])
     parent = parent->child[0];
   Ast * item = parent->child[0];
-  assert (item->sym == sym_block_item);
   ast_new_children (parent, list, item);
+  ast_set_child (oldparent, index, list1);
   return list1;
 }
 
@@ -228,13 +231,14 @@ Appends `item` to (block) `list`. The list item symbol is `item_sym`. */
 
 Ast * ast_block_list_append (Ast * list, int item_sym, Ast * item)
 {
-  Ast ** c;
-  for (c = list->parent->child; *c && *c != list; c++);
+  Ast ** c, * parent = list->parent;
+  for (c = parent->child; *c && *c != list; c++);
   assert (*c == list);
   Ast * l = ast_new_children (ast_new (list->parent, list->sym),
 			      list, 
 			      ast_attach (ast_new (item, item_sym), item));
   *c = l;
+  l->parent = parent;
   return l;
 }
 
@@ -600,7 +604,45 @@ static void translate (Ast * n, Stack * stack, AstFile * file, void * data)
     }
     break;
   }
-    
+
+  /**
+  ## Attribute declaration */
+
+  case sym_attribute: {
+    Ast * identifier = ast_schema (n, sym_attribute,
+				   0, sym_generic_identifier,
+				   0, sym_IDENTIFIER);
+    if (identifier && !strcmp (ast_terminal (identifier)->start, "attribute")) {
+
+      /**
+      Remove 'attribute' from external declarations. */
+
+      Ast * translation = n->parent->parent;
+      assert (translation->child[1]);
+      Ast * next = translation->child[0];
+      assert (translation->parent->child[1]);
+      ast_set_child (translation->parent, 0, next);
+      assert (next->child[1]);
+      str_prepend (ast_left_terminal (translation->parent->child[1])->before,
+		   ast_left_terminal (n)->before);
+
+      /**
+      Add attributes to typedef '_Attributes'. */
+      
+      Ast * attr = ast_identifier_declaration (stack, "_Attributes");
+      while (attr->sym != sym_declaration)
+	attr = attr->parent;
+      ast_list_append_list (ast_find (attr, sym_struct_declaration_list),
+			    n->child[2]);
+
+      /**
+      Cleanup. */
+      
+      ast_destroy (translation);
+    }
+    break;
+  }
+  
   /**
   ## Identifiers */
   
@@ -988,7 +1030,7 @@ void endfor (FILE * fin, FILE * fout)
   fclose (fp);
 #endif
 
-#if 1
+#if 0
   Ast * main = ast_find_function ((Ast *) root, "main");
   if (main) {
     fp = fopen (".endfor.main", "w");
