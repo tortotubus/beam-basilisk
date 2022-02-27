@@ -323,6 +323,14 @@ Ast * ast_new_identifier (Ast * parent, const char * name)
 		     ast_terminal_new (parent, sym_IDENTIFIER, name));
 }
 
+Ast * ast_new_member_identifier (Ast * parent, const char * name)
+{
+  return ast_attach (ast_new (parent,
+			      sym_member_identifier,
+			      sym_generic_identifier),
+		     ast_terminal_new (parent, sym_IDENTIFIER, name));
+}
+
 /**
 Add arguments ('0') to `function_call` so that the call has exactly
 `n` arguments. */
@@ -424,6 +432,54 @@ static void rotate (Ast * n, int dimension, bool inforeach)
       rotate (*c, dimension, inforeach);
 }
 
+Ast * ast_replace_identifier (Ast * n, const char * identifier, Ast * with)
+{
+  AstTerminal * t = ast_terminal (n);
+  if (t && !t->file) {
+    AstTerminal * left = ast_left_terminal (with);
+    t->file = left->file, t->line = left->line;
+    if (left->before) {
+      assert (!t->before);
+      t->before = left->before;
+      left->before = NULL;
+    }
+  }
+  if (n->sym == sym_IDENTIFIER &&
+      !strcmp (ast_terminal(n)->start, identifier)) {
+    while (n && n->sym != with->sym)
+      n = n->parent;
+    if (n) {
+      assert (n->parent);
+      Ast ** c;
+      int index = 0;
+      for (c = n->parent->child; *c && *c != n; c++, index++);
+      assert (*c == n);
+      ast_set_child (n->parent, index, with);
+      ast_destroy (n);
+    }
+    return n;
+  }
+  if (n->child)
+    for (Ast ** c = n->child; *c; c++) {
+      Ast * r = ast_replace_identifier (*c, identifier, with);
+      if (r)
+	return r;
+    }
+  return NULL;
+}
+
+void ast_set_file_line (Ast * n, AstTerminal * l)
+{
+  AstTerminal * t = ast_terminal (n);
+  if (t && !t->file) {
+    t->file = l->file;
+    t->line = l->line;
+  }
+  if (n->child)
+    for (Ast ** c = n->child; *c; c++)
+      ast_set_file_line (*c, l);
+}
+
 typedef struct {
   int dimension;
 } TranslateData;
@@ -516,6 +572,35 @@ static void translate (Ast * n, Stack * stack, AstFile * file, void * data)
     break;
   }
 
+  /**
+  ## Attribute access */
+
+  case sym_postfix_expression: {
+    if (n->child[1] && n->child[1]->sym == token_symbol('.')) {
+      Ast * type = expression_type (n->child[0], stack);
+      if (type && type_is_typedef (type, "scalar")) {
+	Ast * member = ast_find (n->child[2], sym_member_identifier,
+				 0, sym_generic_identifier,
+				 0, sym_IDENTIFIER);
+	type = ast_identifier_declaration (stack, "scalar");
+	while (type->sym != sym_declaration)
+	  type = type->parent;
+	assert (type);
+	if (!find_struct_member (ast_find (type, sym_struct_declaration_list),
+				 member)) {
+	  Ast * scalar = n->child[0];
+	  Ast * expr =
+	    ast_parse_expression ("_attribute[s.i];", ast_get_root (n));
+	  ast_replace_identifier (expr, "s", scalar);
+	  ast_set_file_line (expr, ast_right_terminal (scalar));
+	  ast_set_child (n, 0, ast_find (expr, sym_postfix_expression));
+	  ast_destroy (expr);
+	}
+      }
+    }
+    break;
+  }
+    
   /**
   ## Identifiers */
   

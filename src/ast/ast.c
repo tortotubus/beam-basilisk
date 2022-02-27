@@ -92,9 +92,11 @@ void ast_detach (Ast * n) // fixme
 
 void ast_destroy (Ast * n)
 {
-  if (n->child)
+  if (n->child) {
     for (Ast ** c = n->child; *c; c++)
-      ast_destroy (*c);
+      if (*c != ast_placeholder)
+	ast_destroy (*c);
+  }
   else {
     AstTerminal * t = ast_terminal (n);
     free (t->before);
@@ -195,7 +197,7 @@ void ast_print_tree (Ast * n, FILE * fp, const char * indent)
   fprintf (fp, "%s", symbol_name (n->sym));
   AstTerminal * t = ast_terminal (n);
   if (t)
-    fprintf (fp, " %s\n", t->start);
+    fprintf (fp, " %s %s:%d\n", t->start, t->file, t->line);
   else {
     fputc ('\n', fp);
     for (Ast **c = n->child; *c; c++)
