@@ -710,7 +710,7 @@ foreach_inner_statement
 
 foreach_dimension_statement
         : FOREACH_DIMENSION '(' ')' statement
-        | FOREACH_DIMENSION '(' expression ')' statement
+        | FOREACH_DIMENSION '(' I_CONSTANT ')' statement
 	;
 
 forin_declaration_statement
