@@ -62,10 +62,6 @@ static inline AstTerminal * ast_right_terminal (Ast * n)
   return (AstTerminal *) n;
 }
 
-Ast * ast_is_enumeration_constant (Ast * identifier); // fixme: not used?
-Ast * ast_is_typedef              (Ast * identifier);
-Ast * ast_identifier_declaration (Stack * stack, const char * identifier);
-
 AstTerminal * ast_terminal_new (Ast * parent, int symbol, const char * start);
 #define ast_terminal_new_char(p,s)			\
   (Ast *) ast_terminal_new (p, token_symbol((s)[0]), s)
@@ -153,6 +149,10 @@ void  ast_traverse (Ast * n, Stack * stack,
 	 item = _list ? (_list->child[1] ? _list->child[index] :	\
 			 _list->child[0]) : NULL			\
        )
+
+Ast * ast_is_typedef              (Ast * identifier);
+Ast * ast_identifier_declaration (Stack * stack, const char * identifier);
+
 void ast_set_char (Ast * n, int c);
 void ast_remove (Ast * n, AstTerminal * before);
 void ast_check (Ast * n);
@@ -163,8 +163,11 @@ Ast * ast_list_append_list (Ast * list, Ast * list1);
 Ast * ast_block_list_append (Ast * list, int item_sym, Ast * item);
 Ast * ast_list_append (Ast * list, int item_sym, Ast * item);
 Ast * ast_list_prepend (Ast * list, int item_sym, Ast * item);
-void ast_argument_list (Ast * expression);
+void  ast_argument_list (Ast * expression);
 Ast * ast_new_unary_expression (Ast * parent);
 Ast * ast_new_constant (Ast * parent, int symbol, const char * value);
 Ast * ast_new_identifier (Ast * parent, const char * name);
 Ast * ast_new_member_identifier (Ast * parent, const char * name);
+Ast * ast_is_unary_expression (Ast * n);
+Ast * ast_is_identifier_expression (Ast * n);
+Ast * ast_get_struct_name (Ast * declaration_specifiers);

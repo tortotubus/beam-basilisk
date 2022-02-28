@@ -151,6 +151,46 @@ void ast_argument_list (Ast * expression)
   }
 }
 
+/**
+Transforms a list of arguments ('argument_expression_list') into a
+list of initializers ('initializer_list'). */
+
+Ast * ast_initializer_list (Ast * list)
+{
+  Ast * start = list;
+  while (list->sym == sym_argument_expression_list) {
+    list->sym = sym_initializer_list;
+    Ast * initializer = list->child[1] ? list->child[2] : list->child[0];
+    initializer->sym = sym_initializer;
+    if (initializer->child[1]) {
+      Ast * designator = ast_new (initializer, sym_designator);
+      Ast * identifier = ast_new (initializer, sym_generic_identifier);
+      Ast * dot = ast_terminal_new_char (initializer, ".");
+      ast_new_children (designator, dot, identifier);
+      ast_new_children (identifier, initializer->child[0]);
+      AstTerminal * left = ast_left_terminal (identifier);
+      ast_terminal (dot)->line = left->line;
+      ast_terminal (dot)->before = left->before; left->before = NULL;      
+      Ast * designator_list =
+	ast_new_children (ast_new (initializer, sym_designator_list),
+			  designator);
+      Ast * designation =
+	ast_new_children (ast_new (initializer, sym_designation),
+			  designator_list,
+			  initializer->child[1]);
+      if (list->child[1])
+	ast_new_children (list,
+			  list->child[0], list->child[1],
+			  designation, initializer->child[2]);
+      else
+	ast_new_children (list,
+			  designation, initializer->child[2]);
+    }
+    list = list->child[0];    
+  }
+  return start;
+}
+
 Ast * ast_new_unary_expression (Ast * parent)
 {
   return ast_new (parent,
@@ -168,6 +208,35 @@ Ast * ast_new_unary_expression (Ast * parent)
 		  sym_multiplicative_expression,
 		  sym_cast_expression,
 		  sym_unary_expression);
+}
+
+Ast * ast_is_unary_expression (Ast * n)
+{
+  return ast_schema (n, sym_assignment_expression,
+		     0, sym_conditional_expression,
+		     0, sym_logical_or_expression,
+		     0, sym_logical_and_expression,
+		     0, sym_inclusive_or_expression,
+		     0, sym_exclusive_or_expression,
+		     0, sym_and_expression,
+		     0, sym_equality_expression,
+		     0, sym_relational_expression,
+		     0, sym_shift_expression,
+		     0, sym_additive_expression,
+		     0, sym_multiplicative_expression,
+		     0, sym_cast_expression,
+		     0, sym_unary_expression);  
+}
+
+Ast * ast_is_identifier_expression (Ast * n)
+{
+  n = ast_is_unary_expression (n);
+  if (n)
+    n = ast_schema (n, sym_unary_expression,
+		    0, sym_postfix_expression,
+		    0, sym_primary_expression,
+		    0, sym_IDENTIFIER);
+  return n;
 }
 
 Ast * ast_new_constant (Ast * parent, int symbol, const char * value)
@@ -194,6 +263,16 @@ Ast * ast_new_member_identifier (Ast * parent, const char * name)
 			      sym_member_identifier,
 			      sym_generic_identifier),
 		     ast_terminal_new (parent, sym_IDENTIFIER, name));
+}
+
+Ast * ast_get_struct_name (Ast * declaration_specifiers)
+{
+  return ast_schema (declaration_specifiers, sym_declaration_specifiers,
+		     0, sym_type_specifier,
+		     0, sym_types,
+		     0, sym_struct_or_union_specifier,
+		     1, sym_generic_identifier,
+		     0, sym_IDENTIFIER);
 }
 
 static void trace_return (Ast * n, Stack * stack, void * data)
@@ -502,6 +581,37 @@ static void rotate_list_item (Ast * item, Ast * n,
   d->dimension = dimension;
 }
 
+/**
+This function returns a block_item containing the (basilisk_statement)
+*n*. */
+
+static Ast * get_block_list_item (Ast * n)
+{
+  Ast * statement = n->parent->parent, * item = statement->parent;
+
+  /**
+  if *item* is not already a block item we need to replace it with a
+  compound statement containing a new block_item_list. */
+  
+  if (item->sym != sym_block_item) {
+    AstTerminal * l = ast_left_terminal (n);
+    Ast * left = ast_terminal_new_char ((Ast *) l, "{"),
+      * right = ast_terminal_new_char ((Ast *) ast_right_terminal (n), "}");
+    ast_terminal (left)->before = l->before, l->before = NULL;
+    Ast * parent = item;
+    int index = ast_child_index (statement);
+    item = ast_new_children (ast_new (parent, sym_block_item), statement);
+    Ast * list = ast_new_children (ast_new (parent, sym_block_item_list),
+				   item);
+    Ast * compound =
+      ast_new_children (ast_new (parent, sym_compound_statement),
+			left, list, right);
+    ast_set_child (parent, index, compound);
+  }
+  
+  return item;
+}
+
 static void translate (Ast * n, Stack * stack, void * data)
 {
   typedef struct {
@@ -514,23 +624,7 @@ static void translate (Ast * n, Stack * stack, void * data)
   ## foreach_dimension() */
 
   case sym_foreach_dimension_statement: {
-    Ast * statement = n->parent->parent, * item = statement->parent;
-    if (item->sym != sym_block_item) {
-      AstTerminal * l = ast_left_terminal (n);
-      Ast * left = ast_terminal_new_char ((Ast *) l, "{"),
-	* right = ast_terminal_new_char ((Ast *) ast_right_terminal (n), "}");
-      ast_terminal (left)->before = l->before, l->before = NULL;
-      Ast * parent = item;
-      int index = ast_child_index (statement);
-      item = ast_new_children (ast_new (parent, sym_block_item),
-			       statement);
-      Ast * list = ast_new_children (ast_new (parent, sym_block_item_list),
-				     item);
-      Ast * compound =
-	ast_new_children (ast_new (parent, sym_compound_statement),
-			  left, list, right);
-      ast_set_child (parent, index, compound);
-    }
+    Ast * item = get_block_list_item (n);
     rotate_list_item (item, n, stack, data);
     break;
   }
@@ -653,19 +747,6 @@ static void translate (Ast * n, Stack * stack, void * data)
       };
       Replacement * i = replacements;
       AstTerminal * identifier = ast_terminal (n);
-#if 0
-      Ast * found = ast_identifier_declaration (stack, identifier);
-      if (found) {
-#if 1
-	fprintf (stderr, "%s:%d: ‘%s’ identifier declared at %s:%d\n",
-		 identifier->file, identifier->line, identifier->start,
-		 ast_terminal (found)->file, ast_terminal (found)->line);
-#endif
-      }
-      else if (1)
-	fprintf (stderr, "%s:%d: error: ‘%s’ identifier undeclared\n",
-		 identifier->file, identifier->line, identifier->start);
-#endif      
       while (i->target) {
 	if (!strcmp (identifier->start, i->target)) {
 	  free (identifier->start);
@@ -724,6 +805,62 @@ static void translate (Ast * n, Stack * stack, void * data)
 		 !strcmp (t->start, "aparent"))
 	  complete_arguments (n, 3);
       }
+
+      /**
+      ### Functions with optional arguments */
+
+      Ast * type = ast_identifier_declaration (stack, t->start);
+      if (type) {
+	while (type->sym != sym_declaration &&
+	       type->sym != sym_function_definition)
+	  type = type->parent;
+	assert (type);
+	Ast * parameters = ast_find (type, sym_parameter_list);
+	if (parameters && !parameters->child[1]) {
+	  Ast * struct_name =
+	    ast_get_struct_name (ast_schema (parameters, sym_parameter_list,
+					     0, sym_parameter_declaration,
+					     0, sym_declaration_specifiers));
+	  if (struct_name &&
+	      ast_schema (parameters, sym_parameter_list,
+			  0, sym_parameter_declaration,
+			  1, sym_declarator,
+			  0, sym_direct_declarator,
+			  0, sym_generic_identifier,
+			  0, sym_IDENTIFIER)) {
+	    Ast * arguments = ast_find (n, sym_argument_expression_list);
+	    Ast * struct_arg = arguments->child[1] ? NULL :
+	      ast_is_identifier_expression (arguments->child[0]->child[0]);
+	    if (struct_arg) {
+	      Ast * type =
+		ast_identifier_declaration (stack,
+					    ast_terminal (struct_arg)->start);
+	      while (type->sym != sym_declaration)
+		type = type->parent;
+	      Ast * struct_namep =
+		ast_get_struct_name (ast_schema (type, sym_declaration,
+						 0, sym_declaration_specifiers));
+	      if (!struct_namep ||
+		  strcmp (ast_terminal (struct_namep)->start,
+			  ast_terminal (struct_name)->start))
+		struct_arg = NULL;
+	    }
+	    if (!struct_arg) {
+	      Ast * expr = ast_parse_expression ("func((struct Name){a});",
+						 ast_get_root (n));
+	      Ast * list = ast_find (expr, sym_argument_expression_list);
+	      AstTerminal * t = ast_terminal (ast_find (list, sym_IDENTIFIER));
+	      free (t->start);
+	      t->start = strdup (ast_terminal (struct_name)->start);
+	      ast_replace (list, "a", ast_initializer_list (arguments));
+	      ast_set_file_line (list, ast_right_terminal (n));
+	      ast_set_child (n, 2, list);
+	      ast_destroy (expr);
+	    }
+	  }
+	}
+      }
+      
     }
     break;
   }
