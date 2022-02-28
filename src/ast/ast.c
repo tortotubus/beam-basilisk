@@ -77,19 +77,6 @@ Ast * ast_attach_internal (Ast * parent, ...)
   return parent;
 }
 
-void ast_detach (Ast * n) // fixme
-{
-  assert (n->parent);
-  Ast ** c;
-  for (c = n->parent->child; *c && *c != n; c++);
-  if (*c != n)
-    return;
-  for (; *c; c++)
-    *c = *(c + 1);
-  n->parent = n;
-  cancel_file_line (n); // fixme
-}
-
 void ast_destroy (Ast * n)
 {
   if (n->child) {
@@ -132,32 +119,96 @@ AstRoot * ast_get_root (Ast * n)
   return ast_root (root);
 }
 
-void ast_print (Ast * n, FILE * fp, bool sym)
+static int count_lines (const char * s)
 {
+  int line = 0;
+  while (*s != '\0') {
+    if (*s == '\n')
+      line++;
+    s++;
+  }
+  return line;
+}
+
+typedef struct {
+  const char * name;
+  int line;
+} File;
+
+static void update_file_line (const char * preproc, File * file)
+{
+  const char * s = preproc;
+  while (*s != '\0') {
+    if (*s == '#') {
+      const char * u = s > preproc ? s - 1 : preproc;
+      while (u != preproc && !strchr ("\n\r", *u) && strchr (" \t", *u))
+	u--;
+      if (u == preproc || strchr ("\n\r", *u)) {
+	file->line = atoi (s + 1) - 1;
+	file->name = strchr (s, '"');
+	assert (file->name); file->name++;
+      }
+    }
+    else if (*s == '\n')
+      file->line++;
+    s++;
+  }  
+}
+
+static void ast_print_internal (Ast * n, FILE * fp, bool sym, File * file)
+{
+  //  ast_print_file_line (n, stderr);
   AstTerminal * t = ast_terminal (n);
   if (t) {
-    if (t->before)
+    if (t->before) {
       fputs (t->before, fp);
+      update_file_line (t->before, file);
+    }
+#if 1
+    int len = strlen (t->file);
+    if (strncmp (t->file, file->name, len) ||
+	(file->name[len] != '"' && file->name[len] != '\0')) {
+      fprintf (fp, "\n#line %d \"%s\"\n", t->line, t->file);
+      file->line = t->line;
+      file->name = t->file;      
+    }
+    else if (t->line != file->line) {
+      fprintf (fp, "\n#line %d\n", t->line);
+      file->line = t->line;
+    }
+#endif
     if (sym) {
       fputc ('|', fp);
       fputs (symbol_name (n->sym), fp);
       fputc ('|', fp);
-    }
+    }    
     fputs (t->start, fp);
+    file->line += count_lines (t->start);
     if (sym)
       fputc ('/', fp);
-    if (t->after)
+    if (t->after) {
       fputs (t->after, fp);
+      file->line += count_lines (t->after);
+    }
   }
   else {
     AstRoot * r = ast_root (n);
-    if (r && r->before)
-      fputs (r->before, fp);    
+    if (r && r->before) {
+      fputs (r->before, fp);
+      update_file_line (r->before, file);
+    }
     for (Ast ** c = n->child; *c; c++)
-      ast_print (*c, fp, sym);
-    if (r && r->after)
+      ast_print_internal (*c, fp, sym, file);
+    if (r && r->after) {
       fputs (r->after, fp);
+      file->line += count_lines (r->after);
+    }
   }
+}
+
+void ast_print (Ast * n, FILE * fp, bool sym)
+{
+  ast_print_internal (n, fp, sym, &(File){0});
 }
 
 void ast_print_file_line (Ast * n, FILE * fp)
@@ -194,6 +245,10 @@ static void print_child_tree (Ast * n, FILE * fp,
 
 void ast_print_tree (Ast * n, FILE * fp, const char * indent)
 {
+  if (n == ast_placeholder) {
+    fputs ("_placeholder_\n", fp);
+    return;
+  }
   fprintf (fp, "%s", symbol_name (n->sym));
   AstTerminal * t = ast_terminal (n);
   if (t)
@@ -213,7 +268,7 @@ AstTerminal * ast_terminal_new (Ast * parent, int symbol, const char * start)
   ((Ast *)t)->sym = symbol;
   ((Ast *)t)->parent = parent;
   t->start = strdup (start);
-  AstTerminal * r = ast_right_terminal (parent);
+  AstTerminal * r = ast_left_terminal (parent);
   t->file = r->file;
   t->line = r->line;
   return t;
@@ -405,20 +460,6 @@ Ast * ast_copy_internal (Ast * n, ...)
   return c;
 }
 
-void ast_replace (Ast * dst, Ast * src)
-{
-  assert (dst->parent);
-  if (src->parent && src->parent != src)
-    ast_detach (src);
-  Ast ** c;
-  for (c = dst->parent->child; *c && *c != dst; c++);
-  assert (*c == dst);
-  *c = src;
-  src->parent = dst->parent;
-  dst->parent = dst;
-  ast_destroy (dst);
-}
-
 Ast * ast_parse_expression (const char * expr, AstRoot * parent)
 {
   char * s = NULL;
@@ -431,7 +472,10 @@ Ast * ast_parse_expression (const char * expr, AstRoot * parent)
 				 0, sym_IDENTIFIER);
     ast_pop_scope (parent->stack, identifier);
     Ast * c = ast_find (n, sym_statement)->child[0];
-    ast_detach (c);
+    cancel_file_line (c);
+    Ast ** i;
+    for (i = c->parent->child; *i && *i != c; i++);
+    *i = ast_placeholder;
     ast_destroy (n);
     n = c;
   }
@@ -628,4 +672,37 @@ void ast_check (Ast * n)
     assert (n->parent != n);
     n = n->parent;
   }
+}
+
+void ast_set_file_line (Ast * n, AstTerminal * l)
+{
+  AstTerminal * t = ast_terminal (n);
+  if (t && !t->file) {
+    t->file = l->file;
+    t->line = l->line;
+  }
+  if (n->child)
+    for (Ast ** c = n->child; *c; c++)
+      ast_set_file_line (*c, l);
+}
+
+Ast * ast_flatten (Ast * n, AstTerminal * t)
+{
+  AstTerminal * r = ast_terminal (n);
+  if (r) {
+    if (r->before) {
+      free (r->before);
+      r->before = strdup (" ");
+    }
+    if (r->after) {
+      free (r->after);
+      r->after = NULL;
+    }
+    r->file = t->file;
+    r->line = t->line;
+  }
+  if (n->child)
+    for (Ast ** c = n->child; *c; c++)
+      ast_flatten (*c, t);
+  return n;
 }

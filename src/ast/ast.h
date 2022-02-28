@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include <stdbool.h>
+#include <assert.h>
 #include "allocator.h"
 #include "stack.h"
 
@@ -31,7 +32,6 @@ AstRoot * ast_parse            (const char * code, AstRoot * parent);
 Ast *     ast_parse_expression (const char * expr, AstRoot * parent);
 void      ast_destroy          (Ast * n);
 AstRoot * ast_parse_file       (FILE * fp, AstRoot * parent);
-void      ast_replace          (Ast * dst, Ast * src);
 void      ast_print            (Ast * n, FILE * fp, bool kind);
 void      ast_print_tree       (Ast * n, FILE * fp, const char * indent);
 void      ast_print_file_line  (Ast * n, FILE * fp);
@@ -81,7 +81,8 @@ Ast * ast_copy_internal (Ast * n, ...);
 Ast * ast_attach_internal (Ast * parent, ...);
 #define ast_attach(p,...) ast_attach_internal (p, __VA_ARGS__, NULL)
 Ast * ast_new_children_internal (Ast * parent, ...);
-#define ast_new_children(p,...) ast_new_children_internal (p, __VA_ARGS__, NULL)
+#define ast_new_children(p,...) \
+  ast_new_children_internal (p, __VA_ARGS__, NULL)
 
 extern Ast * const ast_placeholder;
 
@@ -98,6 +99,16 @@ static inline void ast_set_child (Ast * parent, int index, Ast * child)
   }  
   parent->child[index] = child;
   child->parent = parent;
+}
+
+static inline int ast_child_index (Ast * n)
+{
+  assert (n->parent);
+  int index = 0;
+  Ast ** c;
+  for (c = n->parent->child; *c && *c != n; c++, index++);
+  assert (*c == n);
+  return index;
 }
 
 char * str_append_realloc (char * dst, ...);
@@ -121,6 +132,8 @@ static inline void ast_hide (AstTerminal * n)
 char * ast_line (AstTerminal * t);
 #define ast_file_line(n) "\"", ast_terminal(n)->file, \
     "\", ", ast_line(ast_terminal(n))
+void ast_set_file_line (Ast * n, AstTerminal * l);
+Ast * ast_flatten (Ast * n, AstTerminal * t);
 
 /**
 # Grammar-specific functions */
@@ -129,13 +142,8 @@ void  ast_push_declaration         (Stack * stack, Ast * declaration);
 Ast * ast_push_function_definition (Stack * stack, Ast * declarator);
 void  ast_pop_scope                (Stack * stack, Ast * scope);
 
-typedef struct {
-  const char * name;
-  int line;
-} AstFile;
-
-void  ast_traverse (Ast * n, Stack * stack, AstFile * file,
-		    void func (Ast *, Stack *, AstFile *, void *),
+void  ast_traverse (Ast * n, Stack * stack,
+		    void func (Ast *, Stack *, void *),
 		    void * data);
 #define foreach_item(list, index, item)					\
   for (Ast * _list = list, * item = _list ?				\
@@ -148,3 +156,15 @@ void  ast_traverse (Ast * n, Stack * stack, AstFile * file,
 void ast_set_char (Ast * n, int c);
 void ast_remove (Ast * n, AstTerminal * before);
 void ast_check (Ast * n);
+Ast * ast_is_typedef (Ast * identifier);
+Ast * ast_find_function (Ast * n, const char * name);
+Ast * ast_replace (Ast * n, const char * terminal, Ast * with);
+Ast * ast_list_append_list (Ast * list, Ast * list1);
+Ast * ast_block_list_append (Ast * list, int item_sym, Ast * item);
+Ast * ast_list_append (Ast * list, int item_sym, Ast * item);
+Ast * ast_list_prepend (Ast * list, int item_sym, Ast * item);
+void ast_argument_list (Ast * expression);
+Ast * ast_new_unary_expression (Ast * parent);
+Ast * ast_new_constant (Ast * parent, int symbol, const char * value);
+Ast * ast_new_identifier (Ast * parent, const char * name);
+Ast * ast_new_member_identifier (Ast * parent, const char * name);

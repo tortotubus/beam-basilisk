@@ -56,6 +56,11 @@ static Ast * new_ast (AstRoot * parse,
   t->start = start;
   t->after = end;
   t->file = parse->file[parse->nf - 1];
+  while (start != end) {
+    if (*start == '\n')
+      line--;
+    start++;
+  }
   t->line = line;
   return n;
 }
