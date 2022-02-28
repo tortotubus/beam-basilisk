@@ -919,6 +919,11 @@ static Ast * new_ast (AstRoot * parse,
   t->start = start;
   t->after = end;
   t->file = parse->file[parse->nf - 1];
+  while (start != end) {
+    if (*start == '\n')
+      line--;
+    start++;
+  }
   t->line = line;
   return n;
 }
@@ -931,8 +936,8 @@ static Ast * new_ast (AstRoot * parse,
   *yylval = new_ast (parse, t, yylineno, yytext, yytext + strlen(yytext) - 1); \
   return t;
   
-#line 935 "tokens.c"
-#line 936 "tokens.c"
+#line 940 "tokens.c"
+#line 941 "tokens.c"
 
 #define INITIAL 0
 
@@ -1160,10 +1165,10 @@ YY_DECL
 		}
 
 	{
-#line 73 "tokens.lex"
+#line 78 "tokens.lex"
 
 
-#line 1167 "tokens.c"
+#line 1172 "tokens.c"
 
 	while ( /*CONSTCOND*/1 )		/* loops until end-of-file is reached */
 		{
@@ -1233,643 +1238,643 @@ do_action:	/* This label is used only to access EOF actions. */
 
 case 1:
 YY_RULE_SETUP
-#line 75 "tokens.lex"
+#line 80 "tokens.lex"
 { comment(); }
 	YY_BREAK
 case 2:
 YY_RULE_SETUP
-#line 76 "tokens.lex"
+#line 81 "tokens.lex"
 { /* consume //-comment */ }
 	YY_BREAK
 case 3:
 YY_RULE_SETUP
-#line 77 "tokens.lex"
+#line 82 "tokens.lex"
 { file_line (parse, yytext); }
 	YY_BREAK
 case 4:
 YY_RULE_SETUP
-#line 78 "tokens.lex"
+#line 83 "tokens.lex"
 { preproc(); }
 	YY_BREAK
 case 5:
 YY_RULE_SETUP
-#line 79 "tokens.lex"
+#line 84 "tokens.lex"
 { bpreproc(); }
 	YY_BREAK
 case 6:
 YY_RULE_SETUP
-#line 80 "tokens.lex"
+#line 85 "tokens.lex"
 
 	YY_BREAK
 case 7:
 YY_RULE_SETUP
-#line 81 "tokens.lex"
+#line 86 "tokens.lex"
 { ompreproc(); }
 	YY_BREAK
 case 8:
 YY_RULE_SETUP
-#line 83 "tokens.lex"
+#line 88 "tokens.lex"
 { SAST(AUTO); }
 	YY_BREAK
 case 9:
 YY_RULE_SETUP
-#line 84 "tokens.lex"
+#line 89 "tokens.lex"
 { SAST(BREAK); }
 	YY_BREAK
 case 10:
 YY_RULE_SETUP
-#line 85 "tokens.lex"
+#line 90 "tokens.lex"
 { SAST(CASE); }
 	YY_BREAK
 case 11:
 YY_RULE_SETUP
-#line 86 "tokens.lex"
+#line 91 "tokens.lex"
 { SAST(CHAR); }
 	YY_BREAK
 case 12:
 YY_RULE_SETUP
-#line 87 "tokens.lex"
+#line 92 "tokens.lex"
 { SAST(CONST); }
 	YY_BREAK
 case 13:
 YY_RULE_SETUP
-#line 88 "tokens.lex"
+#line 93 "tokens.lex"
 { SAST(CONTINUE); }
 	YY_BREAK
 case 14:
 YY_RULE_SETUP
-#line 89 "tokens.lex"
+#line 94 "tokens.lex"
 { SAST(DEFAULT); }
 	YY_BREAK
 case 15:
 YY_RULE_SETUP
-#line 90 "tokens.lex"
+#line 95 "tokens.lex"
 { SAST(DO); }
 	YY_BREAK
 case 16:
 YY_RULE_SETUP
-#line 91 "tokens.lex"
+#line 96 "tokens.lex"
 { SAST(DOUBLE); }
 	YY_BREAK
 case 17:
 YY_RULE_SETUP
-#line 92 "tokens.lex"
+#line 97 "tokens.lex"
 { SAST(ELSE); }
 	YY_BREAK
 case 18:
 YY_RULE_SETUP
-#line 93 "tokens.lex"
+#line 98 "tokens.lex"
 { SAST(ENUM); }
 	YY_BREAK
 case 19:
 YY_RULE_SETUP
-#line 94 "tokens.lex"
+#line 99 "tokens.lex"
 { SAST(EXTERN); }
 	YY_BREAK
 case 20:
 YY_RULE_SETUP
-#line 95 "tokens.lex"
+#line 100 "tokens.lex"
 { SAST(FLOAT); }
 	YY_BREAK
 case 21:
 YY_RULE_SETUP
-#line 96 "tokens.lex"
+#line 101 "tokens.lex"
 { SAST(FOR); }
 	YY_BREAK
 case 22:
 YY_RULE_SETUP
-#line 97 "tokens.lex"
+#line 102 "tokens.lex"
 { SAST(GOTO); }
 	YY_BREAK
 case 23:
 YY_RULE_SETUP
-#line 98 "tokens.lex"
+#line 103 "tokens.lex"
 { SAST(IF); }
 	YY_BREAK
 case 24:
 YY_RULE_SETUP
-#line 99 "tokens.lex"
+#line 104 "tokens.lex"
 { SAST(INLINE); }
 	YY_BREAK
 case 25:
 YY_RULE_SETUP
-#line 100 "tokens.lex"
+#line 105 "tokens.lex"
 { SAST(INT); }
 	YY_BREAK
 case 26:
 YY_RULE_SETUP
-#line 101 "tokens.lex"
+#line 106 "tokens.lex"
 { SAST(LONG); }
 	YY_BREAK
 case 27:
 YY_RULE_SETUP
-#line 102 "tokens.lex"
+#line 107 "tokens.lex"
 { SAST(REGISTER); }
 	YY_BREAK
 case 28:
 YY_RULE_SETUP
-#line 103 "tokens.lex"
+#line 108 "tokens.lex"
 { SAST(RESTRICT); }
 	YY_BREAK
 case 29:
 YY_RULE_SETUP
-#line 104 "tokens.lex"
+#line 109 "tokens.lex"
 { SAST(RETURN); }
 	YY_BREAK
 case 30:
 YY_RULE_SETUP
-#line 105 "tokens.lex"
+#line 110 "tokens.lex"
 { SAST(SHORT); }
 	YY_BREAK
 case 31:
 YY_RULE_SETUP
-#line 106 "tokens.lex"
+#line 111 "tokens.lex"
 { SAST(SIGNED); }
 	YY_BREAK
 case 32:
 YY_RULE_SETUP
-#line 107 "tokens.lex"
+#line 112 "tokens.lex"
 { SAST(SIZEOF); }
 	YY_BREAK
 case 33:
 YY_RULE_SETUP
-#line 108 "tokens.lex"
+#line 113 "tokens.lex"
 { SAST(STATIC); }
 	YY_BREAK
 case 34:
 YY_RULE_SETUP
-#line 109 "tokens.lex"
+#line 114 "tokens.lex"
 { SAST(STRUCT); }
 	YY_BREAK
 case 35:
 YY_RULE_SETUP
-#line 110 "tokens.lex"
+#line 115 "tokens.lex"
 { SAST(SWITCH); }
 	YY_BREAK
 case 36:
 YY_RULE_SETUP
-#line 111 "tokens.lex"
+#line 116 "tokens.lex"
 { SAST(TYPEDEF); }
 	YY_BREAK
 case 37:
 YY_RULE_SETUP
-#line 112 "tokens.lex"
+#line 117 "tokens.lex"
 { SAST(UNION); }
 	YY_BREAK
 case 38:
 YY_RULE_SETUP
-#line 113 "tokens.lex"
+#line 118 "tokens.lex"
 { SAST(UNSIGNED); }
 	YY_BREAK
 case 39:
 YY_RULE_SETUP
-#line 114 "tokens.lex"
+#line 119 "tokens.lex"
 { SAST(VOID); }
 	YY_BREAK
 case 40:
 YY_RULE_SETUP
-#line 115 "tokens.lex"
+#line 120 "tokens.lex"
 { SAST(VOLATILE); }
 	YY_BREAK
 case 41:
 YY_RULE_SETUP
-#line 116 "tokens.lex"
+#line 121 "tokens.lex"
 { SAST(WHILE); }
 	YY_BREAK
 case 42:
 YY_RULE_SETUP
-#line 117 "tokens.lex"
+#line 122 "tokens.lex"
 { SAST(ALIGNAS); }
 	YY_BREAK
 case 43:
 YY_RULE_SETUP
-#line 118 "tokens.lex"
+#line 123 "tokens.lex"
 { SAST(ALIGNOF); }
 	YY_BREAK
 case 44:
 YY_RULE_SETUP
-#line 119 "tokens.lex"
+#line 124 "tokens.lex"
 { SAST(ATOMIC); }
 	YY_BREAK
 case 45:
 YY_RULE_SETUP
-#line 120 "tokens.lex"
+#line 125 "tokens.lex"
 { SAST(BOOL); }
 	YY_BREAK
 case 46:
 YY_RULE_SETUP
-#line 121 "tokens.lex"
+#line 126 "tokens.lex"
 { SAST(COMPLEX); }
 	YY_BREAK
 case 47:
 YY_RULE_SETUP
-#line 122 "tokens.lex"
+#line 127 "tokens.lex"
 { SAST(GENERIC); }
 	YY_BREAK
 case 48:
 YY_RULE_SETUP
-#line 123 "tokens.lex"
+#line 128 "tokens.lex"
 { SAST(IMAGINARY); }
 	YY_BREAK
 case 49:
 YY_RULE_SETUP
-#line 124 "tokens.lex"
+#line 129 "tokens.lex"
 { SAST(NORETURN); }
 	YY_BREAK
 case 50:
 YY_RULE_SETUP
-#line 125 "tokens.lex"
+#line 130 "tokens.lex"
 { SAST(STATIC_ASSERT); }
 	YY_BREAK
 case 51:
 YY_RULE_SETUP
-#line 126 "tokens.lex"
+#line 131 "tokens.lex"
 { SAST(THREAD_LOCAL); }
 	YY_BREAK
 case 52:
 YY_RULE_SETUP
-#line 127 "tokens.lex"
+#line 132 "tokens.lex"
 { SAST(FUNC_NAME); }
 	YY_BREAK
 /* Basilisk C tokens */
 case 53:
 /* rule 53 can match eol */
 YY_RULE_SETUP
-#line 131 "tokens.lex"
+#line 136 "tokens.lex"
 { SAST(NEW_FIELD); }
 	YY_BREAK
 case 54:
 /* rule 54 can match eol */
 YY_RULE_SETUP
-#line 132 "tokens.lex"
+#line 137 "tokens.lex"
 { SAST(NEW_FIELD); }
 	YY_BREAK
 case 55:
 /* rule 55 can match eol */
 YY_RULE_SETUP
-#line 133 "tokens.lex"
+#line 138 "tokens.lex"
 { SAST(NEW_FIELD); }
 	YY_BREAK
 case 56:
 /* rule 56 can match eol */
 YY_RULE_SETUP
-#line 134 "tokens.lex"
+#line 139 "tokens.lex"
 { SAST(TYPEDEF_NAME); }
 	YY_BREAK
 case 57:
 /* rule 57 can match eol */
 YY_RULE_SETUP
-#line 135 "tokens.lex"
+#line 140 "tokens.lex"
 { SAST(TYPEDEF_NAME); }
 	YY_BREAK
 case 58:
 YY_RULE_SETUP
-#line 136 "tokens.lex"
+#line 141 "tokens.lex"
 { SAST(MAYBECONST); }
 	YY_BREAK
 case 59:
 YY_RULE_SETUP
-#line 137 "tokens.lex"
+#line 142 "tokens.lex"
 { SAST(IN); }
 	YY_BREAK
 case 60:
 YY_RULE_SETUP
-#line 138 "tokens.lex"
+#line 143 "tokens.lex"
 { SAST(TRACE); }
 	YY_BREAK
 case 61:
 YY_RULE_SETUP
-#line 139 "tokens.lex"
+#line 144 "tokens.lex"
 { SAST(REDUCTION); }
 	YY_BREAK
 case 62:
-#line 142 "tokens.lex"
+#line 147 "tokens.lex"
 case 63:
 YY_RULE_SETUP
-#line 142 "tokens.lex"
+#line 147 "tokens.lex"
 { SAST(FOREACH_INNER); }
 	YY_BREAK
 case 64:
 YY_RULE_SETUP
-#line 144 "tokens.lex"
+#line 149 "tokens.lex"
 { SAST(FOREACH_DIMENSION); }
 	YY_BREAK
 case 65:
-#line 147 "tokens.lex"
+#line 152 "tokens.lex"
 case 66:
 YY_RULE_SETUP
-#line 147 "tokens.lex"
+#line 152 "tokens.lex"
 { SAST(FOREACH); }
 	YY_BREAK
 /* End of Basilisk C tokens */
 case 67:
 YY_RULE_SETUP
-#line 151 "tokens.lex"
+#line 156 "tokens.lex"
 { SAST(check_type (parse)); }
 	YY_BREAK
 case 68:
 YY_RULE_SETUP
-#line 153 "tokens.lex"
+#line 158 "tokens.lex"
 { SAST(I_CONSTANT); }
 	YY_BREAK
 case 69:
 YY_RULE_SETUP
-#line 154 "tokens.lex"
+#line 159 "tokens.lex"
 { SAST(I_CONSTANT); }
 	YY_BREAK
 case 70:
 YY_RULE_SETUP
-#line 155 "tokens.lex"
+#line 160 "tokens.lex"
 { SAST(I_CONSTANT); }
 	YY_BREAK
 case 71:
 YY_RULE_SETUP
-#line 156 "tokens.lex"
+#line 161 "tokens.lex"
 { SAST(I_CONSTANT); }
 	YY_BREAK
 case 72:
 YY_RULE_SETUP
-#line 158 "tokens.lex"
+#line 163 "tokens.lex"
 { SAST(F_CONSTANT); }
 	YY_BREAK
 case 73:
 YY_RULE_SETUP
-#line 159 "tokens.lex"
+#line 164 "tokens.lex"
 { SAST(F_CONSTANT); }
 	YY_BREAK
 case 74:
 YY_RULE_SETUP
-#line 160 "tokens.lex"
+#line 165 "tokens.lex"
 { SAST(F_CONSTANT); }
 	YY_BREAK
 case 75:
 YY_RULE_SETUP
-#line 161 "tokens.lex"
+#line 166 "tokens.lex"
 { SAST(F_CONSTANT); }
 	YY_BREAK
 case 76:
 YY_RULE_SETUP
-#line 162 "tokens.lex"
+#line 167 "tokens.lex"
 { SAST(F_CONSTANT); }
 	YY_BREAK
 case 77:
 YY_RULE_SETUP
-#line 163 "tokens.lex"
+#line 168 "tokens.lex"
 { SAST(F_CONSTANT); }
 	YY_BREAK
 case 78:
 /* rule 78 can match eol */
 YY_RULE_SETUP
-#line 165 "tokens.lex"
+#line 170 "tokens.lex"
 { SAST(STRING_LITERAL); }
 	YY_BREAK
 case 79:
 YY_RULE_SETUP
-#line 167 "tokens.lex"
+#line 172 "tokens.lex"
 { SAST(ELLIPSIS); }
 	YY_BREAK
 case 80:
 YY_RULE_SETUP
-#line 168 "tokens.lex"
+#line 173 "tokens.lex"
 { SAST(RIGHT_ASSIGN); }
 	YY_BREAK
 case 81:
 YY_RULE_SETUP
-#line 169 "tokens.lex"
+#line 174 "tokens.lex"
 { SAST(LEFT_ASSIGN); }
 	YY_BREAK
 case 82:
 YY_RULE_SETUP
-#line 170 "tokens.lex"
+#line 175 "tokens.lex"
 { SAST(ADD_ASSIGN); }
 	YY_BREAK
 case 83:
 YY_RULE_SETUP
-#line 171 "tokens.lex"
+#line 176 "tokens.lex"
 { SAST(SUB_ASSIGN); }
 	YY_BREAK
 case 84:
 YY_RULE_SETUP
-#line 172 "tokens.lex"
+#line 177 "tokens.lex"
 { SAST(MUL_ASSIGN); }
 	YY_BREAK
 case 85:
 YY_RULE_SETUP
-#line 173 "tokens.lex"
+#line 178 "tokens.lex"
 { SAST(DIV_ASSIGN); }
 	YY_BREAK
 case 86:
 YY_RULE_SETUP
-#line 174 "tokens.lex"
+#line 179 "tokens.lex"
 { SAST(MOD_ASSIGN); }
 	YY_BREAK
 case 87:
 YY_RULE_SETUP
-#line 175 "tokens.lex"
+#line 180 "tokens.lex"
 { SAST(AND_ASSIGN); }
 	YY_BREAK
 case 88:
 YY_RULE_SETUP
-#line 176 "tokens.lex"
+#line 181 "tokens.lex"
 { SAST(XOR_ASSIGN); }
 	YY_BREAK
 case 89:
 YY_RULE_SETUP
-#line 177 "tokens.lex"
+#line 182 "tokens.lex"
 { SAST(OR_ASSIGN); }
 	YY_BREAK
 case 90:
 YY_RULE_SETUP
-#line 178 "tokens.lex"
+#line 183 "tokens.lex"
 { SAST(RIGHT_OP); }
 	YY_BREAK
 case 91:
 YY_RULE_SETUP
-#line 179 "tokens.lex"
+#line 184 "tokens.lex"
 { SAST(LEFT_OP); }
 	YY_BREAK
 case 92:
 YY_RULE_SETUP
-#line 180 "tokens.lex"
+#line 185 "tokens.lex"
 { SAST(INC_OP); }
 	YY_BREAK
 case 93:
 YY_RULE_SETUP
-#line 181 "tokens.lex"
+#line 186 "tokens.lex"
 { SAST(DEC_OP); }
 	YY_BREAK
 case 94:
 YY_RULE_SETUP
-#line 182 "tokens.lex"
+#line 187 "tokens.lex"
 { SAST(PTR_OP); }
 	YY_BREAK
 case 95:
 YY_RULE_SETUP
-#line 183 "tokens.lex"
+#line 188 "tokens.lex"
 { SAST(AND_OP); }
 	YY_BREAK
 case 96:
 YY_RULE_SETUP
-#line 184 "tokens.lex"
+#line 189 "tokens.lex"
 { SAST(OR_OP); }
 	YY_BREAK
 case 97:
 YY_RULE_SETUP
-#line 185 "tokens.lex"
+#line 190 "tokens.lex"
 { SAST(LE_OP); }
 	YY_BREAK
 case 98:
 YY_RULE_SETUP
-#line 186 "tokens.lex"
+#line 191 "tokens.lex"
 { SAST(GE_OP); }
 	YY_BREAK
 case 99:
 YY_RULE_SETUP
-#line 187 "tokens.lex"
+#line 192 "tokens.lex"
 { SAST(EQ_OP); }
 	YY_BREAK
 case 100:
 YY_RULE_SETUP
-#line 188 "tokens.lex"
+#line 193 "tokens.lex"
 { SAST(NE_OP); }
 	YY_BREAK
 case 101:
 YY_RULE_SETUP
-#line 189 "tokens.lex"
+#line 194 "tokens.lex"
 { CAST(); }
 	YY_BREAK
 case 102:
 YY_RULE_SETUP
-#line 190 "tokens.lex"
+#line 195 "tokens.lex"
 { CAST(); }
 	YY_BREAK
 case 103:
 YY_RULE_SETUP
-#line 191 "tokens.lex"
+#line 196 "tokens.lex"
 { CAST(); }
 	YY_BREAK
 case 104:
 YY_RULE_SETUP
-#line 192 "tokens.lex"
+#line 197 "tokens.lex"
 { CAST(); }
 	YY_BREAK
 case 105:
 YY_RULE_SETUP
-#line 193 "tokens.lex"
+#line 198 "tokens.lex"
 { CAST(); }
 	YY_BREAK
 case 106:
 YY_RULE_SETUP
-#line 194 "tokens.lex"
+#line 199 "tokens.lex"
 { CAST(); }
 	YY_BREAK
 case 107:
 YY_RULE_SETUP
-#line 195 "tokens.lex"
+#line 200 "tokens.lex"
 { CAST(); }
 	YY_BREAK
 case 108:
 YY_RULE_SETUP
-#line 196 "tokens.lex"
+#line 201 "tokens.lex"
 { CAST(); }
 	YY_BREAK
 case 109:
 YY_RULE_SETUP
-#line 197 "tokens.lex"
+#line 202 "tokens.lex"
 { CAST(); }
 	YY_BREAK
 case 110:
 YY_RULE_SETUP
-#line 198 "tokens.lex"
+#line 203 "tokens.lex"
 { CAST(); }
 	YY_BREAK
 case 111:
 YY_RULE_SETUP
-#line 199 "tokens.lex"
+#line 204 "tokens.lex"
 { CAST(); }
 	YY_BREAK
 case 112:
 YY_RULE_SETUP
-#line 200 "tokens.lex"
+#line 205 "tokens.lex"
 { CAST(); }
 	YY_BREAK
 case 113:
 YY_RULE_SETUP
-#line 201 "tokens.lex"
+#line 206 "tokens.lex"
 { CAST(); }
 	YY_BREAK
 case 114:
 YY_RULE_SETUP
-#line 202 "tokens.lex"
+#line 207 "tokens.lex"
 { CAST(); }
 	YY_BREAK
 case 115:
 YY_RULE_SETUP
-#line 203 "tokens.lex"
+#line 208 "tokens.lex"
 { CAST(); }
 	YY_BREAK
 case 116:
 YY_RULE_SETUP
-#line 204 "tokens.lex"
+#line 209 "tokens.lex"
 { CAST(); }
 	YY_BREAK
 case 117:
 YY_RULE_SETUP
-#line 205 "tokens.lex"
+#line 210 "tokens.lex"
 { CAST(); }
 	YY_BREAK
 case 118:
 YY_RULE_SETUP
-#line 206 "tokens.lex"
+#line 211 "tokens.lex"
 { CAST(); }
 	YY_BREAK
 case 119:
 YY_RULE_SETUP
-#line 207 "tokens.lex"
+#line 212 "tokens.lex"
 { CAST(); }
 	YY_BREAK
 case 120:
 YY_RULE_SETUP
-#line 208 "tokens.lex"
+#line 213 "tokens.lex"
 { CAST(); }
 	YY_BREAK
 case 121:
 YY_RULE_SETUP
-#line 209 "tokens.lex"
+#line 214 "tokens.lex"
 { CAST(); }
 	YY_BREAK
 case 122:
 YY_RULE_SETUP
-#line 210 "tokens.lex"
+#line 215 "tokens.lex"
 { CAST(); }
 	YY_BREAK
 case 123:
 YY_RULE_SETUP
-#line 211 "tokens.lex"
+#line 216 "tokens.lex"
 { CAST(); }
 	YY_BREAK
 case 124:
 YY_RULE_SETUP
-#line 212 "tokens.lex"
+#line 217 "tokens.lex"
 { CAST(); }
 	YY_BREAK
 case 125:
 /* rule 125 can match eol */
 YY_RULE_SETUP
-#line 214 "tokens.lex"
+#line 219 "tokens.lex"
 { /* whitespace separates tokens */ }
 	YY_BREAK
 case 126:
 YY_RULE_SETUP
-#line 215 "tokens.lex"
+#line 220 "tokens.lex"
 { /* discard bad characters */ }
 	YY_BREAK
 case 127:
 YY_RULE_SETUP
-#line 217 "tokens.lex"
+#line 222 "tokens.lex"
 ECHO;
 	YY_BREAK
-#line 1873 "tokens.c"
+#line 1878 "tokens.c"
 case YY_STATE_EOF(INITIAL):
 	yyterminate();
 
@@ -2847,7 +2852,7 @@ void yyfree (void * ptr )
 
 #define YYTABLES_NAME "yytables"
 
-#line 217 "tokens.lex"
+#line 222 "tokens.lex"
 
 
 static void comment (void)
