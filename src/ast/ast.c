@@ -332,6 +332,8 @@ static Ast * vast_schema_internal (Ast * n, va_list ap)
 
 Ast * ast_schema_internal (Ast * n, ...)
 {
+  if (!n)
+    return NULL;
   va_list ap;
   va_start (ap, n);
   n = vast_schema_internal (n, ap);
@@ -356,6 +358,8 @@ static Ast * vast_find_internal (Ast * n, va_list ap)
 
 Ast * ast_find_internal (Ast * n, ...)
 {
+  if (!n)
+    return NULL;
   va_list ap;
   va_start (ap, n);
   n = vast_find_internal (n, ap);
