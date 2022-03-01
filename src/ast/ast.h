@@ -33,7 +33,8 @@ Ast *     ast_parse_expression (const char * expr, AstRoot * parent);
 void      ast_destroy          (Ast * n);
 AstRoot * ast_parse_file       (FILE * fp, AstRoot * parent);
 void      ast_print            (Ast * n, FILE * fp, bool kind);
-void      ast_print_tree       (Ast * n, FILE * fp, const char * indent);
+void      ast_print_tree       (Ast * n, FILE * fp, const char * indent,
+				bool compress);
 void      ast_print_file_line  (Ast * n, FILE * fp);
 AstRoot * ast_get_root         (Ast * n);
 void      ast_identifier_print (Ast * identifier, FILE * fp);
