@@ -207,7 +207,6 @@ static void ast_print_internal (Ast * n, FILE * fp, bool sym, File * file)
       fputs (t->before, fp);
       update_file_line (t->before, file);
     }
-#if 1
     int len = strlen (t->file);
     if (!file->name || strncmp (t->file, file->name, len) ||
 	(file->name[len] != '"' && file->name[len] != '\0')) {
@@ -219,7 +218,6 @@ static void ast_print_internal (Ast * n, FILE * fp, bool sym, File * file)
       fprintf (fp, "\n#line %d\n", t->line);
       file->line = t->line;
     }
-#endif
     if (sym) {
       fputc ('|', fp);
       fputs (symbol_name (n->sym), fp);
@@ -252,6 +250,28 @@ static void ast_print_internal (Ast * n, FILE * fp, bool sym, File * file)
 void ast_print (Ast * n, FILE * fp, bool sym)
 {
   ast_print_internal (n, fp, sym, &(File){0});
+}
+
+char * ast_str_append (Ast * n, char * s)
+{
+  AstTerminal * t = ast_terminal (n);
+  if (t) {
+    if (t->before)
+      str_append (s, t->before);
+    str_append (s, t->start);
+    if (t->after)
+      str_append (s, t->after);
+  }
+  else {
+    AstRoot * r = ast_root (n);
+    if (r && r->before)
+      str_append (s, r->before);
+    for (Ast ** c = n->child; *c; c++)
+      s = ast_str_append (*c, s);
+    if (r && r->after)
+      str_append (s, r->after);
+  }
+  return s;
 }
 
 void ast_print_file_line (Ast * n, FILE * fp)

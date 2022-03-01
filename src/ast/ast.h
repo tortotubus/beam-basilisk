@@ -119,6 +119,7 @@ char * str_prepend_realloc (char * dst, ...);
 #define ast_after(n,...)  str_append(ast_right_terminal (n)->after, __VA_ARGS__)
 #define ast_terminal(n) ((n)->child ? NULL : (AstTerminal *)(n))
 #define ast_root(n) ((n)->parent ? NULL : (AstRoot *)(n))
+char *  ast_str_append (Ast * n, char * s);
 
 static inline void ast_hide (AstTerminal * n)
 {
