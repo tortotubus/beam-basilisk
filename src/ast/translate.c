@@ -34,42 +34,6 @@ Ast * ast_find_function (Ast * n, const char * name)
   return found;
 }
 
-Ast * ast_replace (Ast * n, const char * terminal, Ast * with)
-{
-  AstTerminal * t = ast_terminal (n);
-  if (t && !t->file) {
-    AstTerminal * left = ast_left_terminal (with);
-    t->file = left->file, t->line = left->line;
-    if (left->before) {
-      assert (!t->before);
-      t->before = left->before;
-      left->before = NULL;
-    }
-  }
-  if (t && !strcmp (t->start, terminal)) {
-    while (n && n->sym != with->sym)
-      n = n->parent;
-    if (n) {
-      AstTerminal * left = ast_left_terminal (with);
-      str_append (left->before, t->before);
-      if (t->file) {
-	left->file = t->file;
-	left->line = t->line;
-      }
-      ast_set_child (n->parent, ast_child_index (n), with);
-      ast_destroy (n);
-    }
-    return n;
-  }
-  if (n->child)
-    for (Ast ** c = n->child; *c; c++) {
-      Ast * r = ast_replace (*c, terminal, with);
-      if (r)
-	return r;
-    }
-  return NULL;
-}
-
 /**
 Appends (block) list `list1` to (block) list `list`. */
 
@@ -291,7 +255,8 @@ static void trace_return (Ast * n, Stack * stack, void * data)
       Ast * compound =
 	ast_parse_expression ("{ void _ret = val; return _ret; }",
 			      ast_get_root (n));
-      ast_replace (compound, "val", ast_find (n, sym_assignment_expression));
+      ast_replace (compound, "val", ast_find (n, sym_assignment_expression),
+		   false);
 
       Ast * declarator =
 	ast_flatten (ast_copy (ast_find (function_definition, sym_declarator),
@@ -299,14 +264,14 @@ static void trace_return (Ast * n, Stack * stack, void * data)
 		     ast_left_terminal (n));
       AstTerminal * t = ast_terminal (ast_find (declarator, sym_IDENTIFIER));
       free (t->start); t->start = strdup ("_ret");
-      ast_replace (compound, "_ret", declarator);
+      ast_replace (compound, "_ret", declarator, false);
       
       Ast * type_specifier =
 	ast_flatten (ast_copy (ast_find (function_definition,
 					 sym_declaration_specifiers,
 					 0, sym_type_specifier)),
 		     ast_left_terminal (n));
-      ast_replace (compound, "void", type_specifier);
+      ast_replace (compound, "void", type_specifier, false);
       ast_set_file_line (compound, ast_right_terminal (n));
       ast_before (ast_find (compound, sym_RETURN),
 		  "end_trace (\"", function_identifier->start, "\", ",
@@ -582,21 +547,21 @@ static void rotate_list_item (Ast * item, Ast * n,
 }
 
 /**
-This function returns a block_item containing the (basilisk_statement)
-*n*. */
+This function returns a block_item containing *statement*. */
 
-static Ast * get_block_list_item (Ast * n)
+static Ast * get_block_list_item (Ast * statement)
 {
-  Ast * statement = n->parent->parent, * item = statement->parent;
+  Ast * item = statement->parent;
 
   /**
   if *item* is not already a block item we need to replace it with a
   compound statement containing a new block_item_list. */
   
   if (item->sym != sym_block_item) {
-    AstTerminal * l = ast_left_terminal (n);
+    AstTerminal * l = ast_left_terminal (statement);
     Ast * left = ast_terminal_new_char ((Ast *) l, "{"),
-      * right = ast_terminal_new_char ((Ast *) ast_right_terminal (n), "}");
+      * right =
+      ast_terminal_new_char ((Ast *) ast_right_terminal (statement), "}");
     ast_terminal (left)->before = l->before, l->before = NULL;
     Ast * parent = item;
     int index = ast_child_index (statement);
@@ -624,7 +589,7 @@ static void translate (Ast * n, Stack * stack, void * data)
   ## foreach_dimension() */
 
   case sym_foreach_dimension_statement: {
-    Ast * item = get_block_list_item (n);
+    Ast * item = get_block_list_item (n->parent->parent);
     rotate_list_item (item, n, stack, data);
     break;
   }
@@ -634,6 +599,80 @@ static void translate (Ast * n, Stack * stack, void * data)
 
   case sym_external_foreach_dimension: {
     rotate_list_item (n->parent, n, stack, data);
+    break;
+  }
+    
+  /**
+  ## foreach_face() statements */
+
+  case sym_foreach_statement: {
+    if (!strcmp (ast_terminal (n->child[0])->start, "foreach_face")) {
+      char order[] = "xyz";
+
+      /**
+      The complicated stuff below is just to read each (optional) x, y
+      and z arguments, in the correct order, and update the *order*
+      string. */
+      
+      if (n->child[4]) {
+	char * s = order + 2;
+	Ast * parameters = n->child[2];
+	foreach_item (parameters, 2, param)
+	  if (param->child[0]->sym == sym_assignment_expression) {
+	    Ast * identifier = ast_find (param, sym_postfix_expression,
+					 0, sym_primary_expression,
+					 0, sym_IDENTIFIER);
+	    if (identifier && ast_terminal (identifier)->start[1] == '\0' &&
+		strchr ("xyz", ast_terminal (identifier)->start[0]))
+	      *s-- = ast_terminal (identifier)->start[0];
+	  }
+	if (s != order + 2)
+	  memmove (order, s + 1, strlen(s));
+      }
+
+      /**
+      Here we add the `if (is_face_x())` condition to the loop
+      statement. */
+
+      AstTerminal * right = ast_right_terminal (n);
+      Ast * expr = ast_parse_expression ("{if (is_face_x()){;}}",
+					 ast_get_root (n));
+      Ast * conditional = ast_find (expr, sym_statement);
+      Ast * cond = ast_find (conditional, sym_IDENTIFIER);
+      ast_terminal (cond)->start[strlen(ast_terminal (cond)->start) - 1] =
+	order[0];
+      ast_replace (conditional, ";", ast_last_child (n), true);
+      ast_set_file_line (conditional, right);
+      ast_set_child (n, n->child[4] ? 4 : 3, conditional);
+      ast_destroy (expr);
+
+      /**
+      Finally, we "dimension-rotate" the statement. */
+      
+      if (strlen (order) > 1) {
+	Ast * statement = ast_last_child (n);
+	Ast * item = get_block_list_item (statement);
+	TranslateData * d = data;
+	int dimension = d->dimension;
+	d->dimension = strlen (order);
+	if (d->dimension > dimension) d->dimension = dimension;
+	
+	Ast * list = item->parent, * copy = statement;
+	for (int i = 1; i < d->dimension; i++) {
+	  copy = ast_copy (copy);
+	  stack_push (stack, &copy);
+	  ast_traverse (copy, stack, rotate, d);
+	  ast_pop_scope (stack, copy);
+	  Ast * cond = ast_find (copy, sym_IDENTIFIER);
+	  ast_terminal (cond)->start[strlen(ast_terminal (cond)->start) - 1] =
+	    order[i];
+	  list = ast_block_list_append (list, item->sym, copy);
+	}
+	ast_set_child (item, 0, statement);
+
+	d->dimension = dimension;
+      }
+    }
     break;
   }
 
@@ -688,7 +727,7 @@ static void translate (Ast * n, Stack * stack, void * data)
 	  Ast * scalar = n->child[0];
 	  Ast * expr =
 	    ast_parse_expression ("_attribute[s.i];", ast_get_root (n));
-	  ast_replace (expr, "s", scalar);
+	  ast_replace (expr, "s", scalar, false);
 	  ast_set_file_line (expr, ast_right_terminal (scalar));
 	  ast_set_child (n, 0, ast_find (expr, sym_postfix_expression));
 	  ast_destroy (expr);
@@ -852,7 +891,7 @@ static void translate (Ast * n, Stack * stack, void * data)
 	      AstTerminal * t = ast_terminal (ast_find (list, sym_IDENTIFIER));
 	      free (t->start);
 	      t->start = strdup (ast_terminal (struct_name)->start);
-	      ast_replace (list, "a", ast_initializer_list (arguments));
+	      ast_replace (list, "a", ast_initializer_list (arguments), false);
 	      ast_set_file_line (list, ast_right_terminal (n));
 	      ast_set_child (n, 2, list);
 	      ast_destroy (expr);
