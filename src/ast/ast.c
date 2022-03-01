@@ -130,6 +130,49 @@ static int count_lines (const char * s)
   return line;
 }
 
+Ast * ast_replace (Ast * n, const char * terminal,
+		   Ast * with, bool before)
+{
+  AstTerminal * t = ast_terminal (n);
+  if (t && !t->file) {
+    AstTerminal * left = ast_left_terminal (with);
+    t->file = left->file, t->line = left->line;
+    if (left->before) {
+      if (before)
+	t->line -= count_lines (left->before);
+      else {
+	assert (!t->before);
+	t->before = left->before;
+	left->before = NULL;
+      }
+    }
+  }
+  if (t && !strcmp (t->start, terminal)) {
+    while (n && n->sym != with->sym)
+      n = n->parent;
+    if (n) {
+      if (!before) {
+	AstTerminal * left = ast_left_terminal (with);
+	str_append (left->before, t->before);
+	if (t->file) {
+	  left->file = t->file;
+	  left->line = t->line;
+	}
+      }
+      ast_set_child (n->parent, ast_child_index (n), with);
+      ast_destroy (n);
+    }
+    return n;
+  }
+  if (n->child)
+    for (Ast ** c = n->child; *c; c++) {
+      Ast * r = ast_replace (*c, terminal, with, before);
+      if (r)
+	return r;
+    }
+  return NULL;
+}
+
 typedef struct {
   const char * name;
   int line;
@@ -166,7 +209,7 @@ static void ast_print_internal (Ast * n, FILE * fp, bool sym, File * file)
     }
 #if 1
     int len = strlen (t->file);
-    if (strncmp (t->file, file->name, len) ||
+    if (!file->name || strncmp (t->file, file->name, len) ||
 	(file->name[len] != '"' && file->name[len] != '\0')) {
       fprintf (fp, "\n#line %d \"%s\"\n", t->line, t->file);
       file->line = t->line;
@@ -255,6 +298,9 @@ void ast_print_tree (Ast * n, FILE * fp, const char * indent)
     fprintf (fp, " %s %s:%d\n", t->start, t->file, t->line);
   else {
     fputc ('\n', fp);
+    Ast * unary = ast_is_unary_expression (n);
+    if (unary)
+      n = unary;
     for (Ast **c = n->child; *c; c++)
       print_child_tree (*c, fp, indent, *(c + 1) == NULL);
   }

@@ -130,6 +130,7 @@ char * ast_line (AstTerminal * t);
     "\", ", ast_line(ast_terminal(n))
 void ast_set_file_line (Ast * n, AstTerminal * l);
 Ast * ast_flatten (Ast * n, AstTerminal * t);
+Ast * ast_replace (Ast * n, const char * terminal, Ast * with, bool before);
 
 /**
 # Grammar-specific functions */
@@ -158,7 +159,6 @@ void ast_remove (Ast * n, AstTerminal * before);
 void ast_check (Ast * n);
 Ast * ast_is_typedef (Ast * identifier);
 Ast * ast_find_function (Ast * n, const char * name);
-Ast * ast_replace (Ast * n, const char * terminal, Ast * with);
 Ast * ast_list_append_list (Ast * list, Ast * list1);
 Ast * ast_block_list_append (Ast * list, int item_sym, Ast * item);
 Ast * ast_list_append (Ast * list, int item_sym, Ast * item);
