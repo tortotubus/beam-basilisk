@@ -369,7 +369,7 @@ static Ast * expression_type (Ast * expr, Stack * stack)
   return NULL;
 }
 
-static bool type_is_typedef (Ast * type, const char * typedef_name)
+static char * type_typedef (Ast * type)
 {
   Ast * declarator = type;
   while (declarator->sym != sym_declarator)
@@ -384,14 +384,19 @@ static bool type_is_typedef (Ast * type, const char * typedef_name)
 		   0, sym_direct_declarator,
 		   0, sym_generic_identifier,
 		   0, sym_IDENTIFIER))
-    return false; // this is a pointer
+    return NULL; // this is a pointer
 
   Ast * declaration = ast_find (declaration_from_type (type), sym_types), * n;
-  if ((n = ast_schema (declaration, sym_types, 0, sym_TYPEDEF_NAME)) &&
-      !strcmp (ast_terminal(n)->start, typedef_name))
-    return true;
+  if ((n = ast_schema (declaration, sym_types, 0, sym_TYPEDEF_NAME)))
+    return ast_terminal(n)->start;
   
-  return false;
+  return NULL;
+}
+
+static bool type_is_typedef (Ast * type, const char * typedef_name)
+{
+  char * name = type_typedef (type);
+  return name && !strcmp (name, typedef_name);
 }
 
 static Ast * inforeach (Ast * n)
@@ -1102,7 +1107,7 @@ static void macros (Ast * n, Stack * stack, void * data)
       AstTerminal * t = ast_terminal (n->child[0]);
       AstTerminal * p = ast_terminal (foreach->child[0]);
       fprintf (stderr,
-	       "%s:%d: error: foreach*() iterators cannot be nested \n",
+	       "%s:%d: error: foreach*() iterators cannot be nested\n",
 	       t->file, t->line);      
       fprintf (stderr,
 	       "%s:%d: error: this is the location of the parent %s\n",
@@ -1133,6 +1138,76 @@ static void macros (Ast * n, Stack * stack, void * data)
       ast_before (statement, "{");
       ast_after (statement, "} end_", ast_left_terminal(n)->start, "();");
     }
+    break;
+  }
+
+  /**
+  ## Forin statement */
+
+  case sym_forin_statement: {
+    Ast * arg = n->child[4]->child[0];
+    char * decl = strdup ("{"), * fors = strdup ("if(_i0)for("), * fore = NULL;
+    int index = 0;
+    foreach_item (n->child[2], 2, expr) {
+      Ast * identifier = ast_is_identifier_expression (expr);
+      if (!identifier) {
+	AstTerminal * t = ast_left_terminal (expr);
+	fprintf (stderr,
+		 "%s:%d: error: not a scalar, vector or tensor\n",
+		 t->file, t->line);
+	exit (1);
+      }
+      AstTerminal * t = ast_terminal (identifier);
+      Ast * type = ast_identifier_declaration (stack, t->start);
+      if (!type || (!type_is_typedef (type, "scalar") &&
+		    !type_is_typedef (type, "vector") &&
+		    !type_is_typedef (type, "tensor"))) {
+	fprintf (stderr,
+		 "%s:%d: error: `%s' is not a scalar, vector or tensor\n",
+		 t->file, t->line, t->start);
+	exit (1);
+      }
+      if (!arg) {
+	fprintf (stderr,
+		 "%s:%d: error: lists must have the same size\n",
+		 t->file, t->line);
+	exit (1);
+      }
+      Ast * l;
+      if (arg->sym == sym_field_list || !arg->child[1]) {
+	l = arg;
+	arg = NULL;
+      }
+      else {
+	l = arg->child[2];
+	arg = arg->child[0];
+      }
+      char ind[10];
+      snprintf (ind, 9, "%d", index);
+      str_append (decl, type_typedef (type), "*_i", ind, "=");
+      decl = ast_str_append (l, decl);
+      str_append (decl, ";");
+      str_append (fors, index > 0 ? "," : "", t->start, "=*_i", ind);
+      if (!fore)
+	str_append (fore, t->start,
+		    type_is_typedef (type, "scalar") ? ".i" :
+		    type_is_typedef (type, "vector") ? ".x.i" :
+		    ".x.x.i",
+		    ">= 0;");
+      str_append (fore, index > 0 ? "," : "", t->start, "=*++_i", ind);
+      index++;
+    }
+    str_append (decl, fors, ";", fore, "){_statement_;}}");
+    Ast * expr = ast_parse_expression (decl, ast_get_root (n));
+    free (decl); free (fors); free (fore);
+    AstTerminal * right = ast_right_terminal (n);
+    Ast * parent = n->parent;
+    ast_replace (expr, "_statement_", ast_last_child (n), true);
+    ast_left_terminal (expr)->before = ast_left_terminal (n)->before,
+      ast_left_terminal (n)->before = NULL;
+    ast_set_file_line (expr, right);
+    ast_set_child (parent->parent, ast_child_index (parent), expr);
+    ast_destroy (parent);
     break;
   }
 
