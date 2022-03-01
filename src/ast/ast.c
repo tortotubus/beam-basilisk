@@ -264,7 +264,7 @@ void ast_print_file_line (Ast * n, FILE * fp)
 }
 
 static void print_child_tree (Ast * n, FILE * fp,
-			      const char * indent, bool isLast)
+			      const char * indent, bool isLast, bool compress)
 {
   char * ind;
   if (indent) {
@@ -282,27 +282,27 @@ static void print_child_tree (Ast * n, FILE * fp,
     fputs ("├─", fp);
     str_append (ind, "│ ");
   }
-  ast_print_tree (n, fp, ind);
+  ast_print_tree (n, fp, ind, compress);
   free (ind);
 }
 
-void ast_print_tree (Ast * n, FILE * fp, const char * indent)
+void ast_print_tree (Ast * n, FILE * fp, const char * indent, bool compress)
 {
   if (n == ast_placeholder) {
     fputs ("_placeholder_\n", fp);
     return;
   }
+  if (compress)
+    while (n->child && !n->child[1])
+      n = n->child[0];
   fprintf (fp, "%s", symbol_name (n->sym));
   AstTerminal * t = ast_terminal (n);
   if (t)
     fprintf (fp, " %s %s:%d\n", t->start, t->file, t->line);
   else {
     fputc ('\n', fp);
-    Ast * unary = ast_is_unary_expression (n);
-    if (unary)
-      n = unary;
     for (Ast **c = n->child; *c; c++)
-      print_child_tree (*c, fp, indent, *(c + 1) == NULL);
+      print_child_tree (*c, fp, indent, *(c + 1) == NULL, compress);
   }
 }
 
@@ -326,6 +326,7 @@ static Ast * vast_new_internal (Ast * parent, va_list ap)
   if (sym < 0)
     return NULL;
   AstRoot * root = ast_get_root (parent);
+  assert (root->alloc);
   Ast * n = allocate (root->alloc, sizeof (Ast));
   n->sym = sym;
   n->parent = parent;

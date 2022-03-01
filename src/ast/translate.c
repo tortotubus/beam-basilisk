@@ -61,7 +61,7 @@ Ast * ast_block_list_append (Ast * list, int item_sym, Ast * item)
   assert (*c == list);
   Ast * l = ast_new_children (ast_new (list->parent, list->sym),
 			      list, 
-			      ast_attach (ast_new (item, item_sym), item));
+			      ast_attach (ast_new (list, item_sym), item));
   *c = l;
   l->parent = parent;
   return l;
@@ -577,6 +577,117 @@ static Ast * get_block_list_item (Ast * statement)
   return item;
 }
 
+static
+void maybeconstfield (Ast * n, Stack * stack,
+		      void func (Ast * n, Ast * type, void * data),
+		      void * data)
+{
+  Ast * identifier = ast_schema (n, sym_primary_expression,
+				 0, sym_IDENTIFIER);
+  if (identifier) {
+    Ast * type = ast_identifier_declaration (stack,
+					     ast_terminal (identifier)->start);
+    if (type) {
+      Ast * declaration = type;
+      while (declaration->sym != sym_declaration &&
+	     declaration->sym != sym_parameter_declaration)
+	declaration = declaration->parent;
+      if (ast_schema (declaration->child[0], sym_declaration_specifiers,
+		      0, sym_type_qualifier,
+		      0, sym_MAYBECONST))
+	func (n, type, data);
+    }
+  }
+  if (n->child)
+    for (Ast ** c = n->child; *c; c++)
+      maybeconstfield (*c, stack, func, data);  
+}
+
+static
+void maybeconst (Ast * n, Stack * stack,
+		 void func (Ast * n, Ast * type, void * data),
+		 void * data)
+{
+  if (n->child)
+    for (Ast ** c = n->child; *c; c++)
+      maybeconst (*c, stack, func, data);  
+  
+  Ast * identifier = ast_schema (n, sym_function_call,
+				 0, sym_postfix_expression,
+				 0, sym_primary_expression,
+				 0, sym_IDENTIFIER);
+  if (identifier) {
+    const char * name = ast_terminal (identifier)->start;
+    if (!strcmp (name, "val") || !strcmp (name, "fine") ||
+	!strcmp (name, "coarse"))
+      maybeconstfield (ast_find (n->child[2], sym_argument_expression_list_item),
+		       stack, func, data);
+  }
+}
+
+static
+void append_const (Ast * n, Ast * type, void * data)
+{
+  Ast *** m = data;
+  if (!*m) {
+    *m = malloc (2*sizeof (Ast *));
+    (*m)[0] = type;
+    (*m)[1] = NULL;
+  }
+  else {
+    int size = 0;
+    Ast ** c;
+    for (c = *m; *c && *c != type; c++, size++);
+    if (*c != type) {
+      *m = realloc (*m, (size + 2)*sizeof (Ast *));
+      (*m)[size] = type;
+      (*m)[size + 1] = NULL;
+    }
+  }
+}
+
+/**
+Replaces child at `index` of `parent` with `replacement` or with a
+parent of `replacement` of the same symbol as the child. */
+
+void ast_replace_child (Ast * parent, int index, Ast * replacement)
+{
+  while (replacement && replacement->sym != parent->child[index]->sym)
+    replacement = replacement->parent;
+  assert (replacement);
+  Ast * child = parent->child[index];
+  AstTerminal * left = ast_left_terminal (child);
+  ast_left_terminal (replacement)->before = left->before, left->before = NULL;
+  ast_set_child (parent, index, replacement);
+  ast_destroy (child);
+}
+
+typedef struct {
+  Ast ** consts;
+  int bits;
+} ReplaceConst;
+
+static
+void replace_const (Ast * n, Ast * type, void * data)
+{
+  ReplaceConst * r = data;
+  int index = 0;
+  Ast ** c;
+  for (c = r->consts; *c && *c != type; c++, index++);
+  assert (*c == type);
+  if (r->bits & (1 << index)) {
+    str_prepend (ast_terminal (n->child[0])->start, "_const_");
+    Ast * unary = n;
+    while (unary->sym != sym_unary_expression)
+      unary = unary->parent;
+    unary = unary->parent;
+    while (unary->sym != sym_unary_expression)
+      unary = unary->parent;
+    unary = unary->parent;
+    ast_replace_child (unary, 0, n);
+  }
+}
+
 static void translate (Ast * n, Stack * stack, void * data)
 {
   typedef struct {
@@ -603,9 +714,13 @@ static void translate (Ast * n, Stack * stack, void * data)
   }
     
   /**
-  ## foreach_face() statements */
+  ## Foreach statements */
 
   case sym_foreach_statement: {
+
+    /**
+    ### foreach_face() statements */
+    
     if (!strcmp (ast_terminal (n->child[0])->start, "foreach_face")) {
       char order[] = "xyz";
 
@@ -673,6 +788,72 @@ static void translate (Ast * n, Stack * stack, void * data)
 	d->dimension = dimension;
       }
     }
+
+    /**
+    ### (const) fields combinations */
+
+    Ast ** consts = NULL;
+    maybeconst (n, stack, append_const, &consts);
+    if (consts) {
+      Ast * item = get_block_list_item (n->parent->parent);
+      Ast * list = item->parent;
+      int nmaybeconst = 0;
+      for (Ast ** c = consts; *c; c++, nmaybeconst++);
+      int n2 = 1 << nmaybeconst;
+      for (int bits = 0; bits < n2; bits++) {
+	char * condition = strdup ("if (");
+	for (int i = 0; i < nmaybeconst; i++) {
+	  str_append (condition,
+		      (bits & (1 << i)) ? "" : "!",
+		      "is_constant(",
+		      ast_terminal (consts[i])->start,
+		      ")");
+	  if (i < nmaybeconst - 1)
+	    str_append (condition, " && ");
+	}
+	str_append (condition, "){");
+	for (int i = 0; i < nmaybeconst; i++)
+	  if (bits & (1 << i)) {
+	    const char * name = ast_terminal (consts[i])->start;
+	    if (type_is_typedef (consts[i], "vector") ||
+		type_is_typedef (consts[i], "face vector")) {
+	      str_append (condition,
+			  "const struct { double x");
+	      TranslateData * d = data;
+	      for (int j = 1; j < d->dimension; j++) {
+		char s[] = ", y"; s[2] = 'x' + j;
+		str_append (condition, s);
+	      }
+	      str_append (condition, "; } _const_", name, " = {_constant[",
+			  name,  ".x.i - _NVARMAX]");
+	      for (int j = 1; j < d->dimension; j++) {
+		char s[] = ".x.i - _NVARMAX]"; s[1] = 'x' + j;
+		str_append (condition, ", _constant[", name, s);
+	      }
+	      str_append (condition, "};");
+	    }
+	    else
+	      str_append (condition,
+			  " const double _const_", name, " = _constant[",
+			  name, ".i - _NVARMAX];");
+	  }
+	str_append (condition, "foreach();}");
+	Ast * copy = bits ? ast_copy (n) : n;
+	if (bits)
+	  maybeconst (copy, stack, replace_const, &(ReplaceConst){consts, bits});
+	Ast * conditional = ast_parse_expression (condition,
+						  ast_get_root (copy));
+	free (condition);
+	ast_replace (conditional, ";", copy, true);
+	ast_set_file_line (conditional, ast_right_terminal (copy));
+	if (bits)
+	  list = ast_block_list_append (list, item->sym, conditional);
+	else
+	  ast_set_child (item, 0, conditional);
+      }
+      free (consts);
+    }
+    
     break;
   }
 
@@ -744,7 +925,8 @@ static void translate (Ast * n, Stack * stack, void * data)
     Ast * identifier = ast_schema (n, sym_attribute,
 				   0, sym_generic_identifier,
 				   0, sym_IDENTIFIER);
-    if (identifier && !strcmp (ast_terminal (identifier)->start, "attribute")) {
+    if (identifier &&
+	!strcmp (ast_terminal (identifier)->start, "attribute")) {
 
       /**
       Remove 'attribute' from external declarations. */
@@ -987,19 +1169,6 @@ static void macros (Ast * n, Stack * stack, void * data)
   }
 }
 
-#if 0
-#define stack_push(a,b)							\
-  do {									\
-    AstTerminal * t = ast_left_terminal(*(b));				\
-    fprintf (stderr, "%s:%d: push: %s\n",				\
-	     t->file, t->line,						\
-	     ast_terminal (*(b)) ? t->start :				\
-	     symbol_name ((*(b))->sym));				\
-    stack_push(a,b);							\
-  }									\
-  while (0)
-#endif
-
 void ast_push_declaration (Stack * stack, Ast * n)
 {
   if (n->sym == sym_parameter_type_list ||
@@ -1012,13 +1181,8 @@ void ast_push_declaration (Stack * stack, Ast * n)
     identifier = ast_schema (n, sym_enumeration_constant,
 			     0, sym_generic_identifier,
 			     0, sym_IDENTIFIER);
-  if (identifier) {
+  if (identifier)
     stack_push (stack, &identifier);
-#if 0  
-    fputs ("push ", stderr);
-    ast_print_file_line (identifier, stderr);
-#endif
-  }
   if (n->child)
     for (Ast ** c = n->child; *c; c++)
       ast_push_declaration (stack, *c);
