@@ -207,16 +207,18 @@ static void ast_print_internal (Ast * n, FILE * fp, bool sym, File * file)
       fputs (t->before, fp);
       update_file_line (t->before, file);
     }
-    int len = strlen (t->file);
-    if (!file->name || strncmp (t->file, file->name, len) ||
-	(file->name[len] != '"' && file->name[len] != '\0')) {
-      fprintf (fp, "\n#line %d \"%s\"\n", t->line, t->file);
-      file->line = t->line;
-      file->name = t->file;      
-    }
-    else if (t->line != file->line) {
-      fprintf (fp, "\n#line %d\n", t->line);
-      file->line = t->line;
+    if (t->file) {
+      int len = strlen (t->file);
+      if (!file->name || strncmp (t->file, file->name, len) ||
+	  (file->name[len] != '"' && file->name[len] != '\0')) {
+	fprintf (fp, "\n#line %d \"%s\"\n", t->line, t->file);
+	file->line = t->line;
+	file->name = t->file;      
+      }
+      else if (t->line != file->line) {
+	fprintf (fp, "\n#line %d\n", t->line);
+	file->line = t->line;
+      }
     }
     if (sym) {
       fputc ('|', fp);
@@ -542,7 +544,11 @@ Ast * ast_parse_expression (const char * expr, AstRoot * parent)
 				 0, sym_generic_identifier,
 				 0, sym_IDENTIFIER);
     ast_pop_scope (parent->stack, identifier);
-    Ast * c = ast_find (n, sym_statement)->child[0];
+    Ast * c = ast_find (n, sym_statement);
+    if (c)
+      c = c->child[0];
+    else
+      c = ast_find (n, sym_declaration); 
     cancel_file_line (c);
     Ast ** i;
     for (i = c->parent->child; *i && *i != c; i++);

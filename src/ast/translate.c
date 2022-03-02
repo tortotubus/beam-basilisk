@@ -369,6 +369,14 @@ static Ast * expression_type (Ast * expr, Stack * stack)
   return NULL;
 }
 
+static char * typedef_name_from_declaration (Ast * declaration)
+{
+  Ast * types = ast_find (declaration, sym_types), * n;
+  if ((n = ast_schema (types, sym_types, 0, sym_TYPEDEF_NAME)))
+    return ast_terminal(n)->start;
+  return NULL;
+}
+
 static char * type_typedef (Ast * type)
 {
   Ast * declarator = type;
@@ -386,11 +394,7 @@ static char * type_typedef (Ast * type)
 		   0, sym_IDENTIFIER))
     return NULL; // this is a pointer
 
-  Ast * declaration = ast_find (declaration_from_type (type), sym_types), * n;
-  if ((n = ast_schema (declaration, sym_types, 0, sym_TYPEDEF_NAME)))
-    return ast_terminal(n)->start;
-  
-  return NULL;
+  return typedef_name_from_declaration (declaration_from_type (type));
 }
 
 static bool type_is_typedef (Ast * type, const char * typedef_name)
@@ -469,7 +473,30 @@ static Ast * rotate_arguments (Ast * list, int dimension)
 }
 
 typedef struct {
+  Ast * identifier, * initializer;
+  int index, dimension;
+} ConstantField;
+
+static char * constant_field_value (ConstantField * c)
+{
+  char * src = NULL;
+  for (int i = 0; i < c->dimension; i++) {
+    char s[10];
+    snprintf (s, 9, "%d", c->index + i);
+    str_append (src, "{_NVARMAX + ", s, "}",
+		i < c->dimension - 1 ? "," : "");	      
+  }
+  if (c->dimension > 1) {
+    str_prepend (src, "{");
+    str_append (src, "}");
+  }
+  return src;
+}
+
+typedef struct {
   int dimension;
+  ConstantField * constants;
+  int index;
 } TranslateData;
 
 static void rotate (Ast * n, Stack * stack, void * data)
@@ -1090,6 +1117,129 @@ static void translate (Ast * n, Stack * stack, void * data)
     }
     break;
   }
+    
+  /**
+  ## Constant fields initialization */
+
+  case sym_init_declarator: {
+    Ast * declarator;
+    if (n->child[1] &&
+	(declarator = ast_schema (n->child[0], sym_declarator,
+				  0, sym_direct_declarator)) &&
+	declarator->child[0]->sym == sym_direct_declarator &&
+	!declarator->child[3] &&
+	(declarator = declarator->child[0]->child[0])->sym ==
+	sym_generic_identifier) {
+      Ast * declaration = declaration_from_type (declarator);
+      if (ast_schema (declaration, sym_declaration,
+		      0, sym_declaration_specifiers,
+		      0, sym_type_qualifier,
+		      0, sym_CONST)) {
+	const char * typename = typedef_name_from_declaration (declaration);
+	if (typename && (!strcmp (typename, "scalar") ||
+			 !strcmp (typename, "vertex scalar") ||
+			 !strcmp (typename, "vector") ||
+			 !strcmp (typename, "face vector"))) {
+	  TranslateData * d = data;
+	  if (declaration->parent->sym == sym_external_declaration) {
+
+	    /**
+	    ### Global constant field declaration */
+	    
+	    int len = 0;
+	    for (ConstantField * c = d->constants; c->identifier; c++, len++);
+	    d->constants = realloc (d->constants,
+				    (len + 2)*sizeof (ConstantField));
+	    d->constants[len + 1] = (ConstantField){0};
+	    ConstantField * c = &d->constants[len];
+	    c->identifier = declarator->child[0];
+	    c->initializer = NULL;
+	    c->index = d->index;
+	    c->dimension = (!strcmp (typename, "scalar") ||
+			    !strcmp (typename, "vertex scalar")) ?
+	      1 : d->dimension;
+	    d->index += c->dimension;
+
+	    char * src = constant_field_value (c);
+	    str_prepend (src, typename, " s=");
+	    str_append (src, ";");
+	    Ast * expr = ast_parse_expression (src, ast_get_root (n));
+	    free (src);
+	    c->initializer = n->child[2];
+	    ast_set_file_line (expr, ast_left_terminal (n->child[2]));
+	    ast_set_child (n, 2, ast_find (expr, sym_initializer));
+	    ast_destroy (expr);
+	  }
+	  else {
+	    
+	    /**
+	    ### Local constant field declaration */
+
+	    char * src = NULL, * s = strchr (typename, ' ');
+	    if (s)
+	      typename = s + 1;
+	    char ind[10];
+	    snprintf (ind, 9, "%d", d->index);
+	    d->index += !strcmp (typename, "scalar") ? 1 : d->dimension;
+	    str_append (src, "double a = new_const_", typename,"(\"",
+			ast_terminal (declarator->child[0])->start,
+			"\",", ind, ",",
+			!strcmp (typename, "vector") ?
+			"(double[]){initializer});" : "initializer);");
+	    Ast * expr = ast_parse_expression (src, ast_get_root (n));
+	    free (src);
+	    AstTerminal * right = ast_right_terminal (n->child[2]);
+	    if (!strcmp (typename, "vector"))
+	      assert (ast_replace (expr, "initializer",
+				   ast_find (n->child[2], sym_initializer_list),
+				   true));
+	    else
+	      assert (ast_replace (expr, "initializer", n->child[2]->child[0],
+				   true));
+	    ast_destroy (n->child[2]);
+	    ast_set_file_line (expr, right);
+	    ast_set_child (n, 2, ast_find (expr, sym_initializer));
+	    ast_destroy (expr);
+	  }
+
+	  /**
+	  Remove '[]' from declarator. */
+	  
+	  declarator = n->child[0];
+	  Ast * direct = declarator->child[0];
+	  ast_set_child (declarator, 0, direct->child[0]);
+	  ast_destroy (direct);	  
+	}
+      }
+    }
+    else if (n->child[1] && declaration_from_type (n)->parent->sym
+	     == sym_external_declaration) {
+	    
+      /**
+      ### Global constant field initialization */
+
+      Ast * identifier = ast_is_identifier_expression (n->child[2]->child[0]);
+      if (identifier) {
+	TranslateData * d = data;
+	for (ConstantField * c = d->constants; c->identifier; c++)
+	  if (!strcmp (ast_terminal (c->identifier)->start,
+		       ast_terminal (identifier)->start)) {
+	    char * src = constant_field_value (c);
+	    str_prepend (src, "double s=");
+	    str_append (src, ";");
+	    Ast * expr = ast_parse_expression (src, ast_get_root (n));
+	    free (src);
+	    ast_set_file_line (expr, ast_left_terminal (n->child[2]));
+	    ast_destroy (n->child[2]);
+	    ast_set_child (n, 2, ast_find (expr, sym_initializer));
+	    ast_destroy (expr);
+	    break;
+	  }
+      }
+    }
+    
+    break;
+  }
 
   }
 }
@@ -1158,10 +1308,7 @@ static void macros (Ast * n, Stack * stack, void * data)
       exit (1);
     }
     char * name = ast_terminal(identifier)->start;
-    Ast * declaration = ast_find (n->child[2], sym_types), * type;
-    const char * typename =
-      (type = ast_schema (declaration, sym_types, 0, sym_TYPEDEF_NAME)) ?
-      ast_terminal(type)->start : NULL;
+    const char * typename = typedef_name_from_declaration (n->child[2]);
     if (!typename || (strcmp (typename, "scalar") &&
 		      strcmp (typename, "vector") &&
 		      strcmp (typename, "tensor"))) {
@@ -1236,8 +1383,8 @@ static void macros (Ast * n, Stack * stack, void * data)
 	l = arg->child[2];
 	arg = arg->child[0];
       }
-      char ind[10];
-      snprintf (ind, 9, "%d", index);
+      char ind[20];
+      snprintf (ind, 19, "%d", index);
       str_append (decl, type_typedef (type), "*_i", ind, "=");
       decl = ast_str_append (l, decl);
       str_append (decl, ";");
@@ -1264,7 +1411,7 @@ static void macros (Ast * n, Stack * stack, void * data)
     ast_destroy (parent);
     break;
   }
-
+    
   /**
   ## Function profiling with `trace` */
 
@@ -1418,7 +1565,7 @@ void ast_traverse (Ast * n, Stack * stack,
   func (n, stack, data);
 }
 
-void endfor (FILE * fin, FILE * fout)
+void endfor (FILE * fin, FILE * fout, int dimension)
 {
   char * buffer = NULL;
   size_t len = 0, maxlen = 0;
@@ -1454,10 +1601,21 @@ void endfor (FILE * fin, FILE * fout)
   
   //  ast_stack_print (root->stack, stderr);
 
-  TranslateData data = { .dimension = 3 };
+  TranslateData data = { .dimension = dimension, .index = 0 };
+  data.constants = calloc (1, sizeof (ConstantField));
   ast_traverse ((Ast *) root, root->stack, translate, &data);
   ast_traverse ((Ast *) root, root->stack, macros, &data);
-
+  for (ConstantField * c = data.constants; c->identifier; c++) {
+#if 0  
+    ast_print (c->identifier, stderr, 0);
+    ast_print (c->initializer, stderr, 0);
+    fprintf (stderr, "\nindex: %d\n", c->index);
+#endif
+    if (c->initializer)
+      ast_destroy (c->initializer);
+  }
+  free (data.constants);
+    
   //  ast_stack_print (root->stack, stderr);
 
   ast_print ((Ast *) root, fout, false);
