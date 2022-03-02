@@ -1173,10 +1173,11 @@ static void macros (Ast * n, Stack * stack, void * data)
     }
     char * src = NULL;
     str_append (src, "{", typename, "*_i=list;if(_i)"
-		"for(", typename, " ", name, "=*_i;_i",
-		!strcmp (typename, "scalar") ? "->i" :
-		!strcmp (typename, "vector") ? "->x.i" :
-		"->x.x.i",
+		"for(", typename, " ", name, "=*_i;(&",
+		name,
+		!strcmp (typename, "scalar") ? ")->i" :
+		!strcmp (typename, "vector") ? ")->x.i" :
+		")->x.x.i",
 		">=0;", name, "=*++_i){_statement_;}}");
     Ast * expr = ast_parse_expression (src, ast_get_root (n));
     free (src);
