@@ -1142,7 +1142,60 @@ static void macros (Ast * n, Stack * stack, void * data)
   }
 
   /**
-  ## Forin statement */
+  ## forin_declaration_statement */
+
+  case sym_forin_declaration_statement: {
+    Ast * declarator = n->child[3];
+    Ast * identifier = ast_schema (declarator, sym_declarator,
+				   0, sym_direct_declarator,
+				   0, sym_generic_identifier,
+				   0, sym_IDENTIFIER);
+    if (!identifier) {
+      AstTerminal * t = ast_left_terminal (n);
+      fprintf (stderr,
+	       "%s:%d: error: incorrect declaration\n",
+	       t->file, t->line);
+      exit (1);
+    }
+    char * name = ast_terminal(identifier)->start;
+    Ast * declaration = ast_find (n->child[2], sym_types), * type;
+    const char * typename =
+      (type = ast_schema (declaration, sym_types, 0, sym_TYPEDEF_NAME)) ?
+      ast_terminal(type)->start : NULL;
+    if (!typename || (strcmp (typename, "scalar") &&
+		      strcmp (typename, "vector") &&
+		      strcmp (typename, "tensor"))) {
+      AstTerminal * t = ast_left_terminal (n);
+      fprintf (stderr,
+	       "%s:%d: error: '%s' is not a scalar, vector or tensor\n",
+	       t->file, t->line, name);
+      exit (1);
+    }
+    char * src = NULL;
+    str_append (src, "{", typename, "*_i=list;if(_i)"
+		"for(", typename, " ", name, "=*_i;_i",
+		!strcmp (typename, "scalar") ? "->i" :
+		!strcmp (typename, "vector") ? "->x.i" :
+		"->x.x.i",
+		">=0;", name, "=*++_i){_statement_;}}");
+    Ast * expr = ast_parse_expression (src, ast_get_root (n));
+    free (src);
+    AstTerminal * right = ast_right_terminal (n);
+    Ast * parent = n->parent;
+    Ast * initializer = ast_find (expr, sym_initializer);
+    ast_destroy (initializer->child[0]);
+    ast_set_child (initializer, 0, n->child[5]->child[0]);
+    assert (ast_replace (expr, "_statement_", ast_last_child (n), true));
+    ast_left_terminal (expr)->before = ast_left_terminal (n)->before,
+      ast_left_terminal (n)->before = NULL;
+    ast_set_file_line (expr, right);
+    ast_set_child (parent->parent, ast_child_index (parent), expr);
+    ast_destroy (parent);
+    break;
+  }
+
+  /**
+  ## forin_statement */
 
   case sym_forin_statement: {
     Ast * arg = n->child[4]->child[0];
@@ -1189,10 +1242,10 @@ static void macros (Ast * n, Stack * stack, void * data)
       str_append (decl, ";");
       str_append (fors, index > 0 ? "," : "", t->start, "=*_i", ind);
       if (!fore)
-	str_append (fore, t->start,
-		    type_is_typedef (type, "scalar") ? ".i" :
-		    type_is_typedef (type, "vector") ? ".x.i" :
-		    ".x.x.i",
+	str_append (fore, "_i", ind,
+		    type_is_typedef (type, "scalar") ? "->i" :
+		    type_is_typedef (type, "vector") ? "->x.i" :
+		    "->x.x.i",
 		    ">= 0;");
       str_append (fore, index > 0 ? "," : "", t->start, "=*++_i", ind);
       index++;
@@ -1202,7 +1255,7 @@ static void macros (Ast * n, Stack * stack, void * data)
     free (decl); free (fors); free (fore);
     AstTerminal * right = ast_right_terminal (n);
     Ast * parent = n->parent;
-    ast_replace (expr, "_statement_", ast_last_child (n), true);
+    assert (ast_replace (expr, "_statement_", ast_last_child (n), true));
     ast_left_terminal (expr)->before = ast_left_terminal (n)->before,
       ast_left_terminal (n)->before = NULL;
     ast_set_file_line (expr, right);
