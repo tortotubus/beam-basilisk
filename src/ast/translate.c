@@ -1413,6 +1413,40 @@ static void macros (Ast * n, Stack * stack, void * data)
   }
     
   /**
+  ## Point point */
+  
+  case sym_IDENTIFIER: {
+    if (n->parent->parent->sym == sym_direct_declarator &&
+	!strcmp (ast_terminal (n)->start, "point")) {
+      Ast * decl = declaration_from_type (n);
+      if (decl->sym == sym_declaration)
+	;
+      else if (decl->sym == sym_parameter_declaration) {
+	while (decl->sym != sym_parameter_type_list)
+	  decl = decl->parent;
+	if ((decl = decl->parent)->sym != sym_direct_declarator ||
+	    (decl = decl->parent)->sym != sym_declarator ||
+	    (decl = decl->parent)->sym != sym_function_declaration ||
+	    (decl = decl->parent)->sym != sym_function_definition)	    
+	  decl = NULL;
+	else
+	  decl = ast_last_child (decl)->child[0];
+      }
+      else
+	decl = NULL;
+      if (decl) {
+	TranslateData * d = data;
+	static const char * name[3] = {"ig", "jg", "kg"};
+	for (int i = 0; i < d->dimension; i++)
+	  ast_after (decl, "int ", name[i], "=0;"
+		     "NOT_UNUSED(", name[i], ");");
+	ast_after (decl, "POINT_VARIABLES;");	
+      }
+    }
+    break;
+  }
+
+  /**
   ## Function profiling with `trace` */
 
   case sym_function_definition: {
