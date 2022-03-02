@@ -1294,6 +1294,21 @@ static void macros (Ast * n, Stack * stack, void * data)
     break;
   }
 
+  /**
+  ## Hide Basilisk C keywords */
+
+  case sym_MAYBECONST: ast_hide (ast_terminal (n)); break;
+  case sym_TYPEDEF_NAME: {
+    AstTerminal * t = ast_terminal (n);
+    if (!strcmp (t->start, "face vector") ||
+	!strcmp (t->start, "vertex scalar")) {
+      char * s = t->start;
+      while (*s != ' ')
+	*s++ = ' ';
+    }      
+    break;
+  }
+    
   }
 }
 
