@@ -714,7 +714,7 @@ foreach_dimension_statement
 	;
 
 forin_declaration_statement
-        : for_scope '(' declaration_specifiers init_declarator IN forin_arguments ')' statement
+        : for_scope '(' declaration_specifiers declarator IN forin_arguments ')' statement
 	            { ast_pop_scope (parse->stack, $1); }
         ;
 
