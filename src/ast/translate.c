@@ -239,53 +239,10 @@ Ast * ast_get_struct_name (Ast * declaration_specifiers)
 		     0, sym_IDENTIFIER);
 }
 
-static void trace_return (Ast * n, Stack * stack, void * data)
-{
-  Ast * function_definition = ((void **)data)[0];
-  AstTerminal * function_identifier = ((void **)data)[1];
-  if (ast_schema (n, sym_jump_statement, 0, sym_RETURN)) {
-    Ast * ret = n->child[0];
-    if (!n->child[2]) { // return ;
-      ast_before (ret,
-		  "{ end_trace (\"", function_identifier->start, "\", ",
-		  ast_file_line (ret), "); ");
-      ast_after (n->child[1], " }");
-    }
-    else { // return sthg;
-      Ast * compound =
-	ast_parse_expression ("{ void _ret = val; return _ret; }",
-			      ast_get_root (n));
-      ast_replace (compound, "val", ast_find (n, sym_assignment_expression),
-		   false);
-
-      Ast * declarator =
-	ast_flatten (ast_copy (ast_find (function_definition, sym_declarator),
-			       sym_IDENTIFIER),
-		     ast_left_terminal (n));
-      AstTerminal * t = ast_terminal (ast_find (declarator, sym_IDENTIFIER));
-      free (t->start); t->start = strdup ("_ret");
-      ast_replace (compound, "_ret", declarator, false);
-      
-      Ast * type_specifier =
-	ast_flatten (ast_copy (ast_find (function_definition,
-					 sym_declaration_specifiers,
-					 0, sym_type_specifier)),
-		     ast_left_terminal (n));
-      ast_replace (compound, "void", type_specifier, false);
-      ast_set_file_line (compound, ast_right_terminal (n));
-      ast_before (ast_find (compound, sym_RETURN),
-		  "end_trace (\"", function_identifier->start, "\", ",
-		  ast_file_line (ret), "); ");
-      ast_set_child (n->parent, 0, compound);
-      str_prepend (ast_left_terminal (compound)->before,
-		   ast_left_terminal (n)->before);
-      ast_destroy (n);
-    }
-  }
-}
-
 static Ast * find_struct_member (Ast * n, Ast * member)
 {
+  if (!n)
+    return NULL;
   Ast * identifier = ast_schema (n, sym_struct_declarator,
 				 0, sym_declarator,
 				 0, sym_direct_declarator,
@@ -306,6 +263,7 @@ static Ast * find_struct_member (Ast * n, Ast * member)
 static Ast * declaration_from_type (Ast * type)
 {
   while (type->sym != sym_declaration &&
+	 type->sym != sym_function_declaration &&
 	 type->sym != sym_parameter_declaration &&
 	 type->sym != sym_struct_declaration &&
 	 type->sym != sym_forin_declaration_statement)
@@ -318,6 +276,13 @@ static Ast * expression_type (Ast * expr, Stack * stack)
 {
   switch (expr->sym) {
 
+  case sym_initializer:
+  case sym_assignment_expression:
+    while (expr->child && expr->sym != sym_postfix_expression)
+      expr = expr->child[0];
+    return expr->sym == sym_postfix_expression ?
+      expression_type (expr, stack) : NULL;
+    
   case sym_primary_expression:
     if (expr->child[0]->sym == sym_IDENTIFIER)
       return ast_identifier_declaration (stack,
@@ -379,6 +344,8 @@ static char * typedef_name_from_declaration (Ast * declaration)
 
 static char * type_typedef (Ast * type)
 {
+  if (!type)
+    return NULL;
   Ast * declarator = type;
   while (declarator->sym != sym_declarator)
     declarator = declarator->parent;
@@ -393,7 +360,6 @@ static char * type_typedef (Ast * type)
 		   0, sym_generic_identifier,
 		   0, sym_IDENTIFIER))
     return NULL; // this is a pointer
-
   return typedef_name_from_declaration (declaration_from_type (type));
 }
 
@@ -718,6 +684,31 @@ void replace_const (Ast * n, Ast * type, void * data)
     unary = unary->parent;
     ast_replace_child (unary, 0, n);
   }
+}
+
+static int field_list_type (Ast * list, Stack * stack, bool mustbe)
+{
+  int type = 4; // tensor
+  foreach_item (list, 2, expr) {
+    const char * typename = type_typedef (expression_type (expr, stack));
+    if (!typename ||
+	(strcmp (typename, "scalar") &&
+	 strcmp (typename, "vector") &&
+	 strcmp (typename, "tensor"))) {
+      if (mustbe) {
+	AstTerminal * t = ast_left_terminal (expr);
+	fprintf (stderr,
+		 "%s:%d: error: '%s' is not a scalar, vector or tensor\n",
+		 t->file, t->line, ast_str_append (expr, NULL));
+	exit (1);
+      }
+      return -1;
+    }
+    if (type > 1 && !strcmp (typename, "scalar")) type = 1;
+    else if (type > 2 && !strcmp (typename, "vector")) type = 2;
+    else if (type > 3 && !strcmp (typename, "tensor")) type = 3;
+  }
+  return type > 3 ? -1 : type;
 }
 
 static void translate (Ast * n, Stack * stack, void * data)
@@ -1244,6 +1235,69 @@ static void translate (Ast * n, Stack * stack, void * data)
   }
 }
 
+static void trace_return (Ast * n, Stack * stack, void * data)
+{
+  Ast * function_definition = ((void **)data)[0];
+  AstTerminal * function_identifier = ((void **)data)[1];
+  if (ast_schema (n, sym_jump_statement, 0, sym_RETURN)) {
+    Ast * ret = n->child[0];
+    if (!n->child[2]) { // return ;
+      ast_before (ret,
+		  "{ end_tracing (\"", function_identifier->start, "\", ",
+		  ast_file_line (ret), "); ");
+      ast_after (n->child[1], " }");
+    }
+    else { // return sthg;
+      Ast * compound =
+	ast_parse_expression ("{ void _ret = val; return _ret; }",
+			      ast_get_root (n));
+      ast_replace (compound, "val", ast_find (n, sym_assignment_expression),
+		   false);
+
+      Ast * declarator =
+	ast_flatten (ast_copy (ast_find (function_definition, sym_declarator),
+			       sym_IDENTIFIER),
+		     ast_left_terminal (n));
+      AstTerminal * t = ast_terminal (ast_find (declarator, sym_IDENTIFIER));
+      free (t->start); t->start = strdup ("_ret");
+      ast_replace (compound, "_ret", declarator, false);
+      
+      Ast * type_specifier =
+	ast_flatten (ast_copy (ast_find (function_definition,
+					 sym_declaration_specifiers,
+					 0, sym_type_specifier)),
+		     ast_left_terminal (n));
+      ast_replace (compound, "void", type_specifier, false);
+      ast_set_file_line (compound, ast_right_terminal (n));
+      ast_before (ast_find (compound, sym_RETURN),
+		  "end_tracing (\"", function_identifier->start, "\", ",
+		  ast_file_line (ret), "); ");
+      ast_set_child (n->parent, 0, compound);
+      str_prepend (ast_left_terminal (compound)->before,
+		   ast_left_terminal (n)->before);
+      ast_destroy (n);
+    }
+  }
+}
+
+static const char * get_field_type (Ast * declaration, AstTerminal * t)
+{
+  if (declaration)
+    declaration = declaration_from_type (declaration);
+  const char * typename = NULL;
+  if (!declaration ||
+      !(typename = typedef_name_from_declaration (declaration)) ||
+      (strcmp (typename, "scalar") &&
+       strcmp (typename, "vector") &&
+       strcmp (typename, "tensor"))) {
+    fprintf (stderr,
+	     "%s:%d: error: '%s' is not a scalar, vector or tensor\n",
+	     t->file, t->line, t->start);
+    exit (1);
+  }
+  return typename;
+}
+
 static void macros (Ast * n, Stack * stack, void * data)
 {
   switch (n->sym) {
@@ -1307,18 +1361,9 @@ static void macros (Ast * n, Stack * stack, void * data)
 	       t->file, t->line);
       exit (1);
     }
-    char * name = ast_terminal(identifier)->start;
-    const char * typename = typedef_name_from_declaration (n->child[2]);
-    if (!typename || (strcmp (typename, "scalar") &&
-		      strcmp (typename, "vector") &&
-		      strcmp (typename, "tensor"))) {
-      AstTerminal * t = ast_left_terminal (n);
-      fprintf (stderr,
-	       "%s:%d: error: '%s' is not a scalar, vector or tensor\n",
-	       t->file, t->line, name);
-      exit (1);
-    }
-    char * src = NULL;
+    const char * typename =
+      get_field_type (n->child[2], ast_terminal(identifier));
+    char * src = NULL, * name = ast_terminal(identifier)->start;
     str_append (src, "{", typename, "*_i=list;if(_i)"
 		"for(", typename, " ", name, "=*_i;(&",
 		name,
@@ -1359,15 +1404,8 @@ static void macros (Ast * n, Stack * stack, void * data)
 	exit (1);
       }
       AstTerminal * t = ast_terminal (identifier);
-      Ast * type = ast_identifier_declaration (stack, t->start);
-      if (!type || (!type_is_typedef (type, "scalar") &&
-		    !type_is_typedef (type, "vector") &&
-		    !type_is_typedef (type, "tensor"))) {
-	fprintf (stderr,
-		 "%s:%d: error: `%s' is not a scalar, vector or tensor\n",
-		 t->file, t->line, t->start);
-	exit (1);
-      }
+      const char * typename =
+	get_field_type (ast_identifier_declaration (stack, t->start), t);
       if (!arg) {
 	fprintf (stderr,
 		 "%s:%d: error: lists must have the same size\n",
@@ -1385,14 +1423,14 @@ static void macros (Ast * n, Stack * stack, void * data)
       }
       char ind[20];
       snprintf (ind, 19, "%d", index);
-      str_append (decl, type_typedef (type), "*_i", ind, "=");
+      str_append (decl, typename, "*_i", ind, "=");
       decl = ast_str_append (l, decl);
       str_append (decl, ";");
       str_append (fors, index > 0 ? "," : "", t->start, "=*_i", ind);
       if (!fore)
 	str_append (fore, "_i", ind,
-		    type_is_typedef (type, "scalar") ? "->i" :
-		    type_is_typedef (type, "vector") ? "->x.i" :
+		    !strcmp (typename, "scalar") ? "->i" :
+		    !strcmp (typename, "vector") ? "->x.i" :
 		    "->x.x.i",
 		    ">= 0;");
       str_append (fore, index > 0 ? "," : "", t->start, "=*++_i", ind);
@@ -1411,7 +1449,7 @@ static void macros (Ast * n, Stack * stack, void * data)
     ast_destroy (parent);
     break;
   }
-    
+
   /**
   ## Point point */
   
@@ -1447,6 +1485,82 @@ static void macros (Ast * n, Stack * stack, void * data)
   }
 
   /**
+  Field lists */
+
+  case sym_postfix_initializer: {
+      
+    /**
+    Do not consider lists explicitly cast as structures. */
+
+    if (n->parent->sym == sym_postfix_expression &&
+	ast_child_index (n) == 3 &&
+	ast_schema (n->parent->child[1], sym_type_name,
+		    0, sym_specifier_qualifier_list,
+		    0, sym_type_specifier,
+		    0, sym_types,
+		    0, sym_struct_or_union_specifier,
+		    0, sym_struct_or_union,
+		    0, sym_STRUCT))
+      break;
+  }
+  case sym_field_list:
+  case sym_initializer: {
+    if (n->child[2]) {
+      Ast * list = n->child[1];
+      int type = field_list_type (list, stack, n->sym == sym_field_list);
+      if (type > 0) {
+	foreach_item (list, 2, expr) {
+	  AstTerminal * t = ast_right_terminal (expr);
+	  const char * typename = type_typedef (expression_type (expr, stack));
+	  if ((type == 1 && !strcmp (typename, "vector")) ||
+	      (type == 2 && !strcmp (typename, "tensor"))) {
+	    TranslateData * d = data;
+	    ast_after ((Ast *) t, ".x");
+	    for (int i = 1; i < d->dimension; i++) {
+	      char s[] = ".x"; s[1] = 'x' + i;
+	      ast_after ((Ast *) t, ",", t->start, s);
+	    }
+	  }
+	  else if (type == 1 && !strcmp (typename, "tensor")) {
+	    TranslateData * d = data;
+	    for (int i = 0; i < d->dimension; i++) {
+	      char a[] = ".x"; a[1] = 'x' + i;
+	      for (int j = 0; j < d->dimension; j++) {
+		char b[] = ".x"; b[1] = 'x' + j;
+		if (i > 0 || j > 0)
+		  ast_after ((Ast *) t, ",", t->start, a, b);
+		else
+		  ast_after ((Ast *) t, a, b);
+	      }
+	    }
+	  }
+	}
+	if (type == 1) // scalar
+	  ast_before (n->child[2], ",{-1}");
+	else if (type == 2) { // vector
+	  TranslateData * d = data;
+	  for (int i = 0; i < d->dimension; i++)
+	    ast_before (n->child[2], i == 0 ? ",{" : ",", "{-1}");
+	  ast_before (n->child[2], "}");
+	}
+	else { // tensor
+	  TranslateData * d = data;
+	  for (int j = 0; j < d->dimension; j++) {
+	    ast_before (n->child[2], j == 0 ? ",{" : ",");
+	    for (int i = 0; i < d->dimension; i++)
+	      ast_before (n->child[2], i == 0 ? "{" : ",", "{-1}");
+	    ast_before (n->child[2], "}");
+	  }
+	  ast_before (n->child[2], "}");
+	}    
+	ast_before (n, (type == 1 ? "(scalar[])" :
+			type == 2 ? "(vector[])" : "(tensor[])"));
+      }
+    }
+    break;
+  }
+    
+  /**
   ## Function profiling with `trace` */
 
   case sym_function_definition: {
@@ -1462,11 +1576,11 @@ static void macros (Ast * n, Stack * stack, void * data)
 				   0, sym_IDENTIFIER);
       Ast * compound_statement = ast_last_child (n);
       ast_after (compound_statement->child[0],
-		 " trace (\"", ast_terminal (identifier)->start, "\", ",
+		 " tracing (\"", ast_terminal (identifier)->start, "\", ",
 		 ast_file_line (identifier), "); ");
       Ast * end = ast_last_child (compound_statement);
        ast_before (end,
-		  " end_trace (\"", ast_terminal (identifier)->start, "\", ",
+		  " end_tracing (\"", ast_terminal (identifier)->start, "\", ",
 		  ast_file_line (end), "); ");
       if (compound_statement->child[1]->sym == sym_block_item_list) {
 	void * data[] = { n, identifier };
@@ -1484,12 +1598,20 @@ static void macros (Ast * n, Stack * stack, void * data)
     AstTerminal * t = ast_terminal (n);
     if (!strcmp (t->start, "face vector") ||
 	!strcmp (t->start, "vertex scalar")) {
-      char * s = t->start;
-      while (*s != ' ')
-	*s++ = ' ';
-    }      
+      char * s = strchr (t->start, ' ') + 1;
+      memmove (t->start, s, strlen (s) + 1);
+    }
     break;
   }
+
+#if 1    
+  case sym_YYerror: {
+    fprintf (stderr, "ERROR");
+    ast_print (n, stderr, 0);
+    fputc ('\n', stderr);
+    break;
+  }
+#endif
     
   }
 }

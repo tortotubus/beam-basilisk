@@ -151,7 +151,11 @@ static Ast * new_ast (AstRoot * parse,
 "foreach" |
 "foreach_"{L}{A}*                       { SAST(FOREACH); }
 
-                    /* End of Basilisk C tokens */
+                    /* GCC extensions */
+	   
+"__attribute__"{WS}*\(                  { ompreproc(); }
+	   
+                    /* End of GCC extensions */
 
 {L}{A}*					{ SAST(check_type (parse)); }
 

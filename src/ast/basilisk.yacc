@@ -135,10 +135,14 @@ postfix_expression
         | postfix_expression PTR_OP member_identifier
 	| postfix_expression INC_OP
 	| postfix_expression DEC_OP
-	| '(' type_name ')' '{' initializer_list '}'
-	| '(' type_name ')' '{' initializer_list ',' '}'
+	| '(' type_name ')' postfix_initializer
 	;
 
+postfix_initializer
+        : '{' initializer_list '}'
+	| '{' initializer_list ',' '}'
+	;
+	
 array_access
         : postfix_expression '[' ']' /* Basilisk C extension */
         | postfix_expression '[' expression ']'
@@ -729,13 +733,8 @@ forin_arguments
 	;
 
 field_list
-        : '{' field_item_list '}'
-	;
-
-field_item_list
-        : generic_identifier
-	| field_item_list ',' generic_identifier
-	;
+        : '{' expression '}'
+        ;
 
 event_definition
         : generic_identifier generic_identifier '(' event_parameters ')' statement
