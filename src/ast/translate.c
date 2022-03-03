@@ -848,10 +848,13 @@ static void translate (Ast * n, Stack * stack, void * data)
       for (int bits = 0; bits < n2; bits++) {
 	char * condition = strdup ("if (");
 	for (int i = 0; i < nmaybeconst; i++) {
+	  const char * name = ast_terminal (consts[i])->start;
+	  const char * typename = typedef_name (consts[i]);
 	  str_append (condition,
 		      (bits & (1 << i)) ? "" : "!",
-		      "is_constant(",
-		      ast_terminal (consts[i])->start,
+		      "is_constant(", name,
+		      !strcmp (typename, "vector") ||
+		      !strcmp (typename, "face vector") ? ".x" : "",
 		      ")");
 	  if (i < nmaybeconst - 1)
 	    str_append (condition, " && ");
