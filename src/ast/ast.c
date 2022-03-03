@@ -711,12 +711,12 @@ void ast_set_char (Ast * n, int c)
   n->sym = token_symbol(c), ast_terminal (n)->start[0] = c;
 }
 
-void ast_remove (Ast * n, AstTerminal * before)
+static void ast_remove_internal (Ast * n, AstTerminal * before)
 {
   if (n->child) {
     for (Ast ** c = n->child; *c; c++)
       if (*c != ast_placeholder)
-	ast_remove (*c, before);
+	ast_remove_internal (*c, before);
   }
   else {
     AstTerminal * t = ast_terminal (n);
@@ -727,6 +727,18 @@ void ast_remove (Ast * n, AstTerminal * before)
     free (t->start);
     free (t->after);
   }
+}
+
+void ast_remove (Ast * n, AstTerminal * before)
+{
+  if (n->parent) {
+    Ast ** c;
+    for (c = n->parent->child; *c && *c != n; c++);
+    if (*c == n)
+      for (; *c; c++)
+	*c = *(c + 1);
+  }
+  ast_remove_internal (n, before);
 }
 
 static void ast_check_children (Ast * n)

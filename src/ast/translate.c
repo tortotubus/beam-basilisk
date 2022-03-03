@@ -342,7 +342,7 @@ static char * typedef_name_from_declaration (Ast * declaration)
   return NULL;
 }
 
-static char * type_typedef (Ast * type)
+static char * typedef_name (Ast * type)
 {
   if (!type)
     return NULL;
@@ -363,12 +363,6 @@ static char * type_typedef (Ast * type)
   return typedef_name_from_declaration (declaration_from_type (type));
 }
 
-static bool type_is_typedef (Ast * type, const char * typedef_name)
-{
-  char * name = type_typedef (type);
-  return name && !strcmp (name, typedef_name);
-}
-
 static Ast * inforeach (Ast * n)
 {
   Ast * parent = n->parent;
@@ -382,8 +376,9 @@ static Ast * inforeach (Ast * n)
 
 static bool point_declaration (Stack * stack)
 {
-  Ast * type = ast_identifier_declaration (stack, "point");
-  return type && type_is_typedef (type, "Point");
+  const char * typename =
+    typedef_name (ast_identifier_declaration (stack, "point"));
+  return typename && !strcmp (typename, "Point");
 }
 
 /**
@@ -690,7 +685,7 @@ static int field_list_type (Ast * list, Stack * stack, bool mustbe)
 {
   int type = 4; // tensor
   foreach_item (list, 2, expr) {
-    const char * typename = type_typedef (expression_type (expr, stack));
+    const char * typename = typedef_name (expression_type (expr, stack));
     if (!typename ||
 	(strcmp (typename, "scalar") &&
 	 strcmp (typename, "vector") &&
@@ -838,8 +833,9 @@ static void translate (Ast * n, Stack * stack, void * data)
 	for (int i = 0; i < nmaybeconst; i++)
 	  if (bits & (1 << i)) {
 	    const char * name = ast_terminal (consts[i])->start;
-	    if (type_is_typedef (consts[i], "vector") ||
-		type_is_typedef (consts[i], "face vector")) {
+	    const char * typename = typedef_name (consts[i]);
+	    if (!strcmp (typename, "vector") ||
+		!strcmp (typename, "face vector")) {
 	      str_append (condition,
 			  "const struct { double x");
 	      TranslateData * d = data;
@@ -887,8 +883,10 @@ static void translate (Ast * n, Stack * stack, void * data)
   function call `val(s,i,j,0)`. */
 
   case sym_array_access: {
-    Ast * type = expression_type (n->child[0], stack);
-    if (type && type_is_typedef (type, "scalar") &&
+    const char * typename = typedef_name (expression_type (n->child[0], stack));
+    if (typename &&
+	(!strcmp (typename, "scalar") ||
+	 !strcmp (typename, "vertex scalar")) &&
 	(inforeach (n) || point_declaration (stack))) {
       n->sym = sym_function_call;
       ast_set_char (n->child[1], '(');
@@ -917,12 +915,14 @@ static void translate (Ast * n, Stack * stack, void * data)
 
   case sym_postfix_expression: {
     if (n->child[1] && n->child[1]->sym == token_symbol('.')) {
-      Ast * type = expression_type (n->child[0], stack);
-      if (type && type_is_typedef (type, "scalar")) {
+      const char * typename =
+	typedef_name (expression_type (n->child[0], stack));
+      if (typename && (!strcmp (typename, "scalar") ||
+		       !strcmp (typename, "vertex scalar"))) {
 	Ast * member = ast_find (n->child[2], sym_member_identifier,
 				 0, sym_generic_identifier,
 				 0, sym_IDENTIFIER);
-	type = ast_identifier_declaration (stack, "scalar");
+	Ast * type = ast_identifier_declaration (stack, "scalar");
 	while (type->sym != sym_declaration)
 	  type = type->parent;
 	assert (type);
@@ -1320,31 +1320,31 @@ static void macros (Ast * n, Stack * stack, void * data)
 	       "foreach*()" : "point function");
       exit (1);
     }
-    
-    Ast * statement = ast_last_child (n);
-    if (statement->child[0]->sym == sym_compound_statement)
-      ast_after (statement, " end_", ast_left_terminal(n)->start, "();");
-    else {
-      ast_before (statement, "{");
-      ast_after (statement, "} end_", ast_left_terminal(n)->start, "();");
-    }
-    break;
-  }
 
+    if (!strcmp (ast_terminal (n->child[0])->start, "foreach_face")) {
+      free (ast_terminal (n->child[0])->start);
+      ast_terminal (n->child[0])->start = strdup ("foreach_face_generic");
+      if (n->child[4])
+	ast_remove (n->child[2], ast_left_terminal (n->child[3]));
+    }
+
+    // fall through
+  }
+  
   /**
   ## Foreach inner statements */
     
   case sym_foreach_inner_statement: {
     Ast * statement = ast_last_child (n);
     if (statement->child[0]->sym == sym_compound_statement)
-      ast_after (statement, " end_", ast_left_terminal(n)->start, "();");
+      ast_after (statement, " end_", ast_left_terminal(n)->start, "()");
     else {
       ast_before (statement, "{");
-      ast_after (statement, "} end_", ast_left_terminal(n)->start, "();");
+      ast_after (statement, "} end_", ast_left_terminal(n)->start, "()");
     }
     break;
   }
-
+    
   /**
   ## forin_declaration_statement */
 
@@ -1511,7 +1511,7 @@ static void macros (Ast * n, Stack * stack, void * data)
       if (type > 0) {
 	foreach_item (list, 2, expr) {
 	  AstTerminal * t = ast_right_terminal (expr);
-	  const char * typename = type_typedef (expression_type (expr, stack));
+	  const char * typename = typedef_name (expression_type (expr, stack));
 	  if ((type == 1 && !strcmp (typename, "vector")) ||
 	      (type == 2 && !strcmp (typename, "tensor"))) {
 	    TranslateData * d = data;
