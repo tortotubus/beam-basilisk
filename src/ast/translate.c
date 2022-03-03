@@ -413,6 +413,11 @@ static void complete_arguments (Ast * function_call, int n)
 
 static Ast * rotate_arguments (Ast * list, int dimension)
 {
+  for (int i = 0; i < 3 - dimension; i++) {
+    assert (list->child[1]);
+    list = list->child[0];
+  }
+  assert (list->child[1]);
   Ast * next = list->child[0], * item = list->child[2];
   for (int i = 1; i < dimension && next; i++) {
     if (next->child[1]) {
