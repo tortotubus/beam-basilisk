@@ -1637,6 +1637,30 @@ static void macros (Ast * n, Stack * stack, void * data)
     }
     break;
   }
+
+  /**
+  ## Macro statements */
+
+  case sym_macro_statement: {
+    Ast * identifier = ast_schema (n, sym_macro_statement,
+				   0, sym_function_call,
+				   0, sym_postfix_expression,
+				   0, sym_primary_expression,
+				   0, sym_IDENTIFIER);
+    if (identifier) {
+      AstTerminal * t = ast_terminal (identifier);
+      char * name = NULL;
+      str_append (name, "begin_", t->start);
+      Ast * type = ast_identifier_declaration (stack, name);
+      free (name);
+      if (type &&
+	  declaration_from_type (type)->sym == sym_function_declaration) {
+	ast_before (identifier, "{begin_");
+	ast_after (n, "end_", t->start, "();}");
+      }
+    }
+    break;
+  }
     
   /**
   ## Function profiling with `trace` */
