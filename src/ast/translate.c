@@ -56,14 +56,12 @@ Appends `item` to (block) `list`. The list item symbol is `item_sym`. */
 
 Ast * ast_block_list_append (Ast * list, int item_sym, Ast * item)
 {
-  Ast ** c, * parent = list->parent;
-  for (c = parent->child; *c && *c != list; c++);
-  assert (*c == list);
-  Ast * l = ast_new_children (ast_new (list->parent, list->sym),
+  Ast * parent = list->parent;
+  int index = ast_child_index (list);
+  Ast * l = ast_new_children (ast_new (parent, list->sym),
 			      list, 
 			      ast_attach (ast_new (list, item_sym), item));
-  *c = l;
-  l->parent = parent;
+  ast_set_child (parent, index, l);
   return l;
 }
 
@@ -73,15 +71,14 @@ Appends `item` to (comma-separated) `list`. The list item symbol is
 
 Ast * ast_list_append (Ast * list, int item_sym, Ast * item)
 {
-  Ast ** c;
-  for (c = list->parent->child; *c && *c != list; c++);
-  assert (*c == list);
-  Ast * l =  ast_new_children (ast_new (list->parent, list->sym),
+  Ast * parent = list->parent;
+  int index = ast_child_index (list);
+  Ast * l =  ast_new_children (ast_new (parent, list->sym),
 			       list, 
 			       ast_terminal_new_char (item, ","),
 			       ast_new (item, item_sym));
   ast_attach (l->child[2], item);
-  *c = l;
+  ast_set_child (parent, index, l);
   return l;
 }
 
