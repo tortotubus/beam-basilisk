@@ -442,7 +442,7 @@ static Ast * rotate_arguments (Ast * list, int dimension)
 }
 
 typedef struct {
-  Ast * identifier, * initializer;
+  Ast * identifier;
   int type, index, dimension;
 } Field;
 
@@ -462,16 +462,9 @@ static char * field_value (Field * c, const char * prefix)
   return src;
 }
 
-static Field * field_append (Field ** fields, Ast * identifier,
-			     const char * typename, int dimension)
+static void field_init (Field * c, const char * typename,
+			int dimension, int * index)
 {
-  int len = 0;
-  for (Field * c = *fields; c->identifier; c++, len++);
-  *fields = realloc (*fields, (len + 2)*sizeof (Field));
-  (*fields)[len + 1] = (Field){0};
-  Field * c = &(*fields)[len];
-  c->identifier = identifier;
-  c->initializer = NULL;
   if (!strcmp (typename, "scalar") ||
       !strcmp (typename, "vertex scalar"))
     c->type = 1, c->dimension = 1;
@@ -480,14 +473,28 @@ static Field * field_append (Field ** fields, Ast * identifier,
     c->type = 2, c->dimension = dimension;
   else // tensor
     c->type = 3, c->dimension = dimension*dimension;
+  c->index = *index;
+  *index += c->dimension;
+}
+
+static Field * field_append (Field ** fields, Ast * identifier,
+			     const char * typename, int dimension, int * index)
+{
+  int len = 0;
+  for (Field * c = *fields; c->identifier; c++, len++);
+  *fields = realloc (*fields, (len + 2)*sizeof (Field));
+  (*fields)[len + 1] = (Field){0};
+  Field * c = &(*fields)[len];
+  c->identifier = identifier;
+  field_init (c, typename, dimension, index);
   return c;
 }
-  
 
 typedef struct {
   int dimension;
-  Field * constants, * fields;
+  Field * constants;
   int constants_index, fields_index;
+  Ast * init_solver;
 } TranslateData;
 
 static void rotate (Ast * n, Stack * stack, void * data)
@@ -754,6 +761,23 @@ static bool is_field (const char * typename)
 		      !strcmp (typename, "vector") ||
 		      !strcmp (typename, "face vector") ||
 		      !strcmp (typename, "tensor"));
+}
+
+static Ast * get_init_solver (Ast * n, TranslateData * d)
+{
+  if (!d->init_solver) {
+    AstRoot *  parent = ast_get_root (n);
+    Ast * decl =
+      ast_parse_external_declaration ("static void _init_solver(void) {\n}",
+				      parent);
+    ast_set_file_line (decl, ast_right_terminal ((Ast *)parent));
+    d->init_solver = decl->child[0];
+    ast_block_list_append (ast_schema ((Ast *) parent, sym_root,
+				       0, sym_translation_unit),
+			   sym_external_declaration,
+			   d->init_solver);
+  }
+  return d->init_solver;
 }
 
 static void translate (Ast * n, Stack * stack, void * data)
@@ -1075,7 +1099,7 @@ static void translate (Ast * n, Stack * stack, void * data)
   }
 
   /**
-  ## Field declarations */
+  ## (Constant) field declarations */
 
   case sym_init_declarator: {
     Ast * declarator;
@@ -1088,6 +1112,14 @@ static void translate (Ast * n, Stack * stack, void * data)
       Ast * declaration = declaration_from_type (declarator);
       const char * typename = typedef_name_from_declaration (declaration);
       if (is_field (typename)) {
+
+	char * func = strdup (typename);
+	for (char * s = func; *s != '\0'; s++)
+	  if (*s == ' ')
+	    *s = '_';
+	const char * name = ast_terminal (declarator->child[0])->start;
+	if (strchr (typename, ' '))
+	  typename = strchr (typename, ' ') + 1;
 	
 	/**
 	### Constant fields initialization */
@@ -1096,6 +1128,10 @@ static void translate (Ast * n, Stack * stack, void * data)
 			0, sym_declaration_specifiers,
 			0, sym_type_qualifier,
 			0, sym_CONST)) {
+	  const char * const_func = strchr (func, '_');
+	  const_func = const_func ? const_func + 1 : func;
+	  TranslateData * d = data;
+	  
 	  if (!n->child[1]) {
 	    AstTerminal * t = ast_left_terminal (n);
 	    fprintf (stderr,
@@ -1103,24 +1139,33 @@ static void translate (Ast * n, Stack * stack, void * data)
 		     t->file, t->line);
 	    exit (1);
 	  }
-	  TranslateData * d = data;
+
 	  if (declaration->parent->sym == sym_external_declaration) {
 
 	    /**
 	    #### Global constant field declaration */
 
 	    Field * c = field_append (&d->constants, declarator->child[0],
-				      typename, d->dimension);
-	    c->index = d->constants_index;
-	    d->constants_index += c->dimension;
-
+				      typename, d->dimension,
+				      &d->constants_index);
 	    char * src = field_value (c, "_NVARMAX+");
+	    char * initializer = ast_str_append (n->child[2], NULL);
+	    ast_before (ast_schema (get_init_solver (n, d),
+				    sym_function_definition,
+				    1, sym_compound_statement,
+				    1, token_symbol ('}')),
+			"  init_const_", const_func, "((", typename, ")",
+			src, ",\"", name, "\",",
+			!strcmp (typename, "vector") ? "(double[])" : "",
+			initializer, ");\n");
+	    free (initializer);
+	    
 	    str_prepend (src, typename, " s=");
 	    str_append (src, ";");
 	    Ast * expr = ast_parse_expression (src, ast_get_root (n));
 	    free (src);
-	    c->initializer = n->child[2];
 	    ast_set_file_line (expr, ast_left_terminal (n->child[2]));
+	    ast_destroy (n->child[2]);
 	    ast_set_child (n, 2, ast_find (expr, sym_initializer));
 	    ast_destroy (expr);
 	  }
@@ -1129,17 +1174,13 @@ static void translate (Ast * n, Stack * stack, void * data)
 	    /**
 	    #### Local constant field declaration */
 
-	    char * src = NULL, * s = strchr (typename, ' ');
-	    if (s)
-	      typename = s + 1;
-	    char ind[10];
+	    char * src = NULL, ind[10];
 	    snprintf (ind, 9, "%d", d->constants_index);
 	    d->constants_index +=
 	      !strcmp (typename, "scalar") ? 1 : d->dimension;
-	    str_append (src, "double a = new_const_", typename,"(\"",
-			ast_terminal (declarator->child[0])->start,
-			"\",", ind, ",",
-			!strcmp (typename, "vector") ?
+	    str_append (src, "double a = new_const_",
+			const_func, "(\"", name, "\",",
+			ind, ",", !strcmp (typename, "vector") ?
 			"(double[]){initializer});" : "initializer);");
 	    Ast * expr = ast_parse_expression (src, ast_get_root (n));
 	    free (src);
@@ -1166,36 +1207,32 @@ static void translate (Ast * n, Stack * stack, void * data)
 	  /**
 	  #### Global field declarations */
 
-	  Ast * expr;
+	  char * src = NULL;
 	  if (declaration->parent->sym == sym_external_declaration) {
 	    TranslateData * d = data;
-	    Field * c = field_append (&d->fields, declarator->child[0],
-				      typename, d->dimension);
-	    c->index = d->fields_index;
-	    d->fields_index += c->dimension;
-
-	    char * src = field_value (c, "");
+	    Field c;
+	    field_init (&c, typename, d->dimension, &d->fields_index);
+	    src = field_value (&c, "");
+	    ast_before (ast_schema (get_init_solver (n, d),
+				    sym_function_definition,
+				    1, sym_compound_statement,
+				    1, token_symbol ('}')),
+			"  init_", func, "((", typename, ")", src, ",\"",
+			name, "\");\n");
 	    str_prepend (src, typename, " _field_=");
 	    str_append (src, ";");
-	    expr = ast_parse_expression (src, ast_get_root (n));
-	    free (src);
 	  }
 	  
 	  /**
 	  #### Local field declarations */
 	  
 	  else {
-	    char * src = NULL;
-	    char * name = ast_terminal (declarator->child[0])->start;
-	    str_append (src, "_field_=new_", typename, "(\"", name, "\");");
-	    for (char * s = src; *s != '\0'; s++)
-	      if (*s == ' ')
-		*s = '_';
+	    str_append (src, "_field_=new_", func, "(\"", name, "\");");
 	    str_prepend (src, typename, " ");
-	    expr = ast_parse_expression (src, ast_get_root (n));
-	    free (src);
 	  }
-	  
+
+	  Ast * expr = ast_parse_expression (src, ast_get_root (n));
+	  free (src);
 	  ast_set_file_line (expr, ast_right_terminal (n->child[0]));
 	  declarator = ast_find (expr, sym_init_declarator);
 	  ast_destroy (declarator->child[0]);
@@ -1212,7 +1249,8 @@ static void translate (Ast * n, Stack * stack, void * data)
 	declarator = n->child[0];
 	Ast * direct = declarator->child[0];
 	ast_set_child (declarator, 0, direct->child[0]);
-	ast_destroy (direct);	  
+	ast_destroy (direct);
+	free (func);
       }
     }
     else if (n->child[1] && declaration_from_type (n)->parent->sym
@@ -2047,23 +2085,20 @@ void endfor (FILE * fin, FILE * fout, int dimension)
   //  ast_stack_print (root->stack, stderr);
 
   TranslateData data = {
-    .dimension = dimension, .constants_index = 0, .fields_index = 0
+    .dimension = dimension,
+    .constants_index = 0, .fields_index = 0,
+    .init_solver = NULL
   };
   data.constants = calloc (1, sizeof (Field));
-  data.fields = calloc (1, sizeof (Field));
   ast_traverse ((Ast *) root, root->stack, translate, &data);
   ast_traverse ((Ast *) root, root->stack, macros, &data);
   for (Field * c = data.constants; c->identifier; c++) {
 #if 0  
     ast_print (c->identifier, stderr, 0);
-    ast_print (c->initializer, stderr, 0);
     fprintf (stderr, "\nindex: %d\n", c->index);
 #endif
-    if (c->initializer)
-      ast_destroy (c->initializer);
   }
   free (data.constants);
-  free (data.fields);
     
   //  ast_stack_print (root->stack, stderr);
 

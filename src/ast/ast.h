@@ -30,6 +30,7 @@ typedef struct {
 
 AstRoot * ast_parse            (const char * code, AstRoot * parent);
 Ast *     ast_parse_expression (const char * expr, AstRoot * parent);
+Ast *     ast_parse_external_declaration (const char * decl, AstRoot * parent);
 void      ast_destroy          (Ast * n);
 AstRoot * ast_parse_file       (FILE * fp, AstRoot * parent);
 void      ast_print            (Ast * n, FILE * fp, bool kind);

@@ -224,7 +224,7 @@ static void ast_print_internal (Ast * n, FILE * fp, bool sym, File * file)
       fputc ('|', fp);
       fputs (symbol_name (n->sym), fp);
       fputc ('|', fp);
-    }    
+    }
     fputs (t->start, fp);
     file->line += count_lines (t->start);
     if (sym)
@@ -556,6 +556,25 @@ Ast * ast_parse_expression (const char * expr, AstRoot * parent)
     ast_destroy (n);
     n = c;
   }
+  return n;
+}
+
+Ast * ast_parse_external_declaration (const char * decl, AstRoot * parent)
+{
+  stack_push (parent->stack, &parent);
+  Ast * def = (Ast *) ast_parse (decl, parent);
+  ast_pop_scope (parent->stack, (Ast *) parent);
+  Ast * n = ast_find (def, sym_external_declaration);
+  if (!n) {
+    ast_destroy (def);
+    return NULL;
+  }
+  cancel_file_line (n);
+  Ast ** i;
+  for (i = n->parent->child; *i && *i != n; i++);
+  assert (*i == n);
+  *i = ast_placeholder;
+  ast_destroy (def);
   return n;
 }
 
