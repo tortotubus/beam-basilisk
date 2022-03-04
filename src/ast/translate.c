@@ -505,6 +505,18 @@ static void rotate (Ast * n, Stack * stack, void * data)
       TranslateData * d = data;  
       t->start[len - 1] = 'x' + (t->start[len - 1] + 1 - 'x') % d->dimension;
     }
+    else if (!strcmp (t->start, "right"))
+      free (t->start), t->start = strdup ("top");
+    else if (!strcmp (t->start, "left"))
+      free (t->start), t->start = strdup ("bottom");
+    else if (!strcmp (t->start, "top"))
+      free (t->start), t->start = strdup ("front");
+    else if (!strcmp (t->start, "bottom"))
+      free (t->start), t->start = strdup ("back");
+    else if (!strcmp (t->start, "front"))
+      free (t->start), t->start = strdup ("right");
+    else if (!strcmp (t->start, "back"))
+      free (t->start), t->start = strdup ("left");
     break;
   }
 
