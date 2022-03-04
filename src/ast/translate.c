@@ -1033,6 +1033,27 @@ static void translate (Ast * n, Stack * stack, void * data)
   }
 
   /**
+  ## Breaks within foreach_inner loops */
+
+  case sym_BREAK: {
+    Ast * loop = n->parent;
+    while (loop &&
+	   loop->sym != sym_foreach_inner_statement &&
+	   loop->sym != sym_foreach_statement &&
+	   loop->sym != sym_forin_declaration_statement &&
+	   loop->sym != sym_forin_statement &&
+	   loop->sym != sym_iteration_statement &&
+	   (loop->sym != sym_selection_statement ||
+	    loop->child[0]->sym != sym_SWITCH))
+      loop = loop->parent;
+    if (loop && loop->sym == sym_foreach_inner_statement) {
+      ast_before (n, ast_terminal (loop->child[0])->start, "_");
+      ast_after (n, "()");
+    }
+    break;
+  }
+
+  /**
   ## Function calls */
 
   case sym_function_call: {
