@@ -805,20 +805,18 @@ static void translate (Ast * n, Stack * stack, void * data)
       }
 
       /**
-      Here we add the `if (is_face_x())` condition to the loop
+      Here we add the `is_face_x()` condition to the loop
       statement. */
 
       AstTerminal * right = ast_right_terminal (n);
-      Ast * expr = ast_parse_expression ("{if (is_face_x()){;}}",
+      Ast * expr = ast_parse_expression ("is_face_x(){;}",
 					 ast_get_root (n));
-      Ast * conditional = ast_find (expr, sym_statement);
-      Ast * cond = ast_find (conditional, sym_IDENTIFIER);
+      Ast * cond = ast_find (expr, sym_IDENTIFIER);
       ast_terminal (cond)->start[strlen(ast_terminal (cond)->start) - 1] =
 	order[0];
-      ast_replace (conditional, ";", ast_last_child (n), true);
-      ast_set_file_line (conditional, right);
-      ast_set_child (n, n->child[4] ? 4 : 3, conditional);
-      ast_destroy (expr);
+      ast_replace (expr, ";", ast_last_child (n), true);
+      ast_set_file_line (expr, right);
+      ast_set_child (n, n->child[4] ? 4 : 3, expr);
 
       /**
       Finally, we "dimension-rotate" the statement. */
@@ -1829,6 +1827,10 @@ static void macros (Ast * n, Stack * stack, void * data)
 	ast_before (identifier, "{begin_");
 	ast_after (n, "end_", t->start, "();}");
       }
+      else if (!strcmp (t->start, "is_face_x") ||
+	       !strcmp (t->start, "is_face_y") ||
+	       !strcmp (t->start, "is_face_z"))
+	ast_after (n, "end_", t->start, "()");
     }
     break;
   }
