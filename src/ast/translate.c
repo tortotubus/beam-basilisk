@@ -302,9 +302,15 @@ static Ast * expression_type (Ast * expr, Stack * stack)
 				 0, sym_IDENTIFIER);
 	Ast * declaration = ast_find (declaration_from_type (str), sym_types);
 	assert (declaration);
-	AstTerminal * typename =
-	  (AstTerminal *) ast_schema (declaration, sym_types,
-				      0, sym_TYPEDEF_NAME);
+	AstTerminal * typename = (AstTerminal *)
+	  ast_schema (declaration, sym_types,
+		      0, sym_TYPEDEF_NAME);
+	if (!typename)
+	  typename = (AstTerminal *)
+	    ast_schema (declaration, sym_types,
+			0, sym_struct_or_union_specifier,
+			1, sym_generic_identifier,
+			0, sym_IDENTIFIER);
 	if (typename) {
 	  Ast * type = ast_identifier_declaration (stack, typename->start);
 	  if (!type) {
@@ -732,6 +738,15 @@ static int field_list_type (Ast * list, Stack * stack, bool mustbe)
   return type > 3 ? -1 : type;
 }
 
+static bool is_field (const char * typename)
+{
+  return typename && (!strcmp (typename, "scalar") ||
+		      !strcmp (typename, "vertex scalar") ||
+		      !strcmp (typename, "vector") ||
+		      !strcmp (typename, "face vector") ||
+		      !strcmp (typename, "tensor"));
+}
+
 static void translate (Ast * n, Stack * stack, void * data)
 {
   typedef struct {
@@ -1053,113 +1068,6 @@ static void translate (Ast * n, Stack * stack, void * data)
   }
 
   /**
-  ## Function calls */
-
-  case sym_function_call: {
-    Ast * identifier = ast_schema (n, sym_function_call,
-				   0, sym_postfix_expression,
-				   0, sym_primary_expression,
-				   0, sym_IDENTIFIER);
-    if (identifier) {
-      AstTerminal * t = ast_terminal (identifier);
-
-      /**
-      ### Memory allocation tracing */
-
-      static Replacement replacements[] = {
-	{ "malloc",  "pmalloc" },
-	{ "calloc",  "pcalloc" },
-	{ "realloc", "prealloc" },
-	{ "free",    "pfree" },
-	{ "strdup",  "pstrdup" },
-	{ NULL, NULL }
-      };
-      Replacement * i = replacements;
-      while (i->target) {
-	if (!strcmp (t->start, i->target)) {
-	  free (t->start);
-	  t->start = strdup (i->replacement);
-	  assert (n->child[3]);
-	  ast_before (n->child[3], ",__func__,__FILE__,__LINE__");
-	}
-	i++;
-      }
-
-      /**
-      ### Stencil functions */
-
-      if (inforeach (n) || point_declaration (stack)) {
-	if (!strcmp (t->start, "val") || !strcmp (t->start, "fine") ||
-	    !strcmp (t->start, "coarse"))
-	  complete_arguments (n, 4);
-	else if (!strcmp (t->start, "allocated") ||
-		 !strcmp (t->start, "allocated_child") ||
-		 !strcmp (t->start, "neighbor") ||
-		 !strcmp (t->start, "neighborp") ||
-		 !strcmp (t->start, "aparent"))
-	  complete_arguments (n, 3);
-      }
-
-      /**
-      ### Functions with optional arguments */
-
-      Ast * type = ast_identifier_declaration (stack, t->start);
-      if (type) {
-	while (type->sym != sym_declaration &&
-	       type->sym != sym_function_definition)
-	  type = type->parent;
-	assert (type);
-	Ast * parameters = ast_find (type, sym_parameter_list);
-	if (parameters && !parameters->child[1]) {
-	  Ast * struct_name =
-	    ast_get_struct_name (ast_schema (parameters, sym_parameter_list,
-					     0, sym_parameter_declaration,
-					     0, sym_declaration_specifiers));
-	  if (struct_name &&
-	      ast_schema (parameters, sym_parameter_list,
-			  0, sym_parameter_declaration,
-			  1, sym_declarator,
-			  0, sym_direct_declarator,
-			  0, sym_generic_identifier,
-			  0, sym_IDENTIFIER)) {
-	    Ast * arguments = ast_find (n, sym_argument_expression_list);
-	    Ast * struct_arg = arguments->child[1] ? NULL :
-	      ast_is_identifier_expression (arguments->child[0]->child[0]);
-	    if (struct_arg) {
-	      Ast * type =
-		ast_identifier_declaration (stack,
-					    ast_terminal (struct_arg)->start);
-	      while (type->sym != sym_declaration)
-		type = type->parent;
-	      Ast * struct_namep =
-		ast_get_struct_name (ast_schema (type, sym_declaration,
-						 0, sym_declaration_specifiers));
-	      if (!struct_namep ||
-		  strcmp (ast_terminal (struct_namep)->start,
-			  ast_terminal (struct_name)->start))
-		struct_arg = NULL;
-	    }
-	    if (!struct_arg) {
-	      Ast * expr = ast_parse_expression ("func((struct Name){a});",
-						 ast_get_root (n));
-	      Ast * list = ast_find (expr, sym_argument_expression_list);
-	      AstTerminal * t = ast_terminal (ast_find (list, sym_IDENTIFIER));
-	      free (t->start);
-	      t->start = strdup (ast_terminal (struct_name)->start);
-	      ast_replace (list, "a", ast_initializer_list (arguments), false);
-	      ast_set_file_line (list, ast_right_terminal (n));
-	      ast_set_child (n, 2, list);
-	      ast_destroy (expr);
-	    }
-	  }
-	}
-      }
-      
-    }
-    break;
-  }
-
-  /**
   ## Field declarations */
 
   case sym_init_declarator: {
@@ -1172,11 +1080,7 @@ static void translate (Ast * n, Stack * stack, void * data)
 	sym_generic_identifier) {
       Ast * declaration = declaration_from_type (declarator);
       const char * typename = typedef_name_from_declaration (declaration);
-      if (typename && (!strcmp (typename, "scalar") ||
-		       !strcmp (typename, "vertex scalar") ||
-		       !strcmp (typename, "vector") ||
-		       !strcmp (typename, "face vector") ||
-		       !strcmp (typename, "tensor"))) {
+      if (is_field (typename)) {
 	
 	/**
 	### Constant fields initialization */
@@ -1334,7 +1238,123 @@ static void translate (Ast * n, Stack * stack, void * data)
   }
 
   /**
-  ## New Field */
+  ## Function calls */
+
+  case sym_function_call: {
+    Ast * identifier = ast_schema (n, sym_function_call,
+				   0, sym_postfix_expression,
+				   0, sym_primary_expression,
+				   0, sym_IDENTIFIER);
+    if (identifier) {
+      AstTerminal * t = ast_terminal (identifier);
+
+      /**
+      ### Memory allocation tracing */
+
+      static Replacement replacements[] = {
+	{ "malloc",  "pmalloc" },
+	{ "calloc",  "pcalloc" },
+	{ "realloc", "prealloc" },
+	{ "free",    "pfree" },
+	{ "strdup",  "pstrdup" },
+	{ NULL, NULL }
+      };
+      Replacement * i = replacements;
+      while (i->target) {
+	if (!strcmp (t->start, i->target)) {
+	  free (t->start);
+	  t->start = strdup (i->replacement);
+	  assert (n->child[3]);
+	  ast_before (n->child[3], ",__func__,__FILE__,__LINE__");
+	}
+	i++;
+      }
+
+      /**
+      ### Stencil functions */
+
+      if (inforeach (n) || point_declaration (stack)) {
+	if (!strcmp (t->start, "val") || !strcmp (t->start, "fine") ||
+	    !strcmp (t->start, "coarse"))
+	  complete_arguments (n, 4);
+	else if (!strcmp (t->start, "allocated") ||
+		 !strcmp (t->start, "allocated_child") ||
+		 !strcmp (t->start, "neighbor") ||
+		 !strcmp (t->start, "neighborp") ||
+		 !strcmp (t->start, "aparent"))
+	  complete_arguments (n, 3);
+      }
+
+      /**
+      ### Functions with optional arguments */
+
+      Ast * type = ast_identifier_declaration (stack, t->start);
+      if (type) {
+	while (type->sym != sym_declaration &&
+	       type->sym != sym_function_definition)
+	  type = type->parent;
+	assert (type);
+	Ast * parameters = ast_find (type, sym_parameter_list);
+	if (parameters && !parameters->child[1]) {
+	  Ast * struct_name =
+	    ast_get_struct_name (ast_schema (parameters, sym_parameter_list,
+					     0, sym_parameter_declaration,
+					     0, sym_declaration_specifiers));
+	  if (struct_name &&
+	      ast_schema (parameters, sym_parameter_list,
+			  0, sym_parameter_declaration,
+			  1, sym_declarator,
+			  0, sym_direct_declarator,
+			  0, sym_generic_identifier,
+			  0, sym_IDENTIFIER)) {
+	    Ast * arguments = ast_find (n, sym_argument_expression_list);
+	    Ast * struct_arg = arguments->child[1] ? NULL :
+	      ast_is_identifier_expression (arguments->child[0]->child[0]);
+	    if (struct_arg) {
+	      Ast * type =
+		ast_identifier_declaration (stack,
+					    ast_terminal (struct_arg)->start);
+	      while (type->sym != sym_declaration)
+		type = type->parent;
+	      Ast * struct_namep =
+		ast_get_struct_name (ast_schema (type, sym_declaration,
+						 0, sym_declaration_specifiers));
+	      if (!struct_namep ||
+		  strcmp (ast_terminal (struct_namep)->start,
+			  ast_terminal (struct_name)->start))
+		struct_arg = NULL;
+	    }
+	    if (!struct_arg) {
+	      Ast * expr = ast_parse_expression ("func((struct Name){a});",
+						 ast_get_root (n));
+	      Ast * list = ast_find (expr, sym_argument_expression_list);
+	      AstTerminal * t = ast_terminal (ast_find (list, sym_IDENTIFIER));
+	      free (t->start);
+	      t->start = strdup (ast_terminal (struct_name)->start);
+	      ast_replace (list, "a", ast_initializer_list (arguments), false);
+	      ast_set_file_line (list, ast_right_terminal (n));
+	      ast_set_child (n, 2, list);
+	      ast_destroy (expr);
+	    }
+	  }
+	}
+      }      
+    }
+    
+    if (!identifier || strcmp (ast_terminal (identifier)->start, "automatic"))
+      break;
+    else {
+
+      /**
+      This is a call to automatic() which will be treated with
+      sym_NEW_FIELD below. */
+
+      n = identifier;
+    }
+  }
+
+  /**
+  ## `New' and `automatic' fields */
 
   case sym_NEW_FIELD: {
     Ast * parent = n;
@@ -1345,8 +1365,8 @@ static void translate (Ast * n, Stack * stack, void * data)
     if (!parent) {
       AstTerminal * t = ast_terminal (n);
       fprintf (stderr,
-	       "%s:%d: error: 'new' must be used within a declarator "
-	       "or an assignment expression\n", t->file, t->line);
+	       "%s:%d: error: '%s' must be used within a declarator "
+	       "or an assignment expression\n", t->file, t->line, t->start);
       exit (1);
     }
     Ast * identifier = NULL, * declaration = NULL;
@@ -1374,46 +1394,88 @@ static void translate (Ast * n, Stack * stack, void * data)
     else {
       AstTerminal * t = ast_terminal (n);
       fprintf (stderr,
-	       "%s:%d: error: 'new' must be used to initialize a named field\n",
-	       t->file, t->line);
+	       "%s:%d: error: '%s' must be used to initialize a named field\n",
+	       t->file, t->line, t->start);
       exit (1);
     }
     const char * typename = typedef_name_from_declaration (declaration);
-    if (typename && (!strcmp (typename, "scalar") ||
-		     !strcmp (typename, "vertex scalar") ||
-		     !strcmp (typename, "vector") ||
-		     !strcmp (typename, "face vector") ||
-		     !strcmp (typename, "tensor"))) {
-      if (!strstr (ast_terminal (n)->start, typename)) {
-	AstTerminal * t = ast_terminal (n);
-	fprintf (stderr,
-		 "%s:%d: error: type mismatch for `new', "
-		 "expected '%s' got '%s'\n",
-		 t->file, t->line, typename, t->start);
-	exit (1);	
-      }
+    if (is_field (typename)) {
       char * src = NULL;
-      str_append (src, "a=new_", typename, "(\"",
-		  ast_terminal (identifier)->start, "\");");
-      for (char * s = src; *s; s++)
+
+      if (n->sym == sym_NEW_FIELD) {
+	if (!strstr (ast_terminal (n)->start, typename)) {
+	  AstTerminal * t = ast_terminal (n);
+	  fprintf (stderr,
+		   "%s:%d: error: type mismatch for `new', "
+		   "expected '%s' got '%s'\n",
+		   t->file, t->line, typename, t->start);
+	  exit (1);	
+	}
+      }
+      else { // automatic()
+	Ast * call = n;
+	while (call->sym != sym_function_call)
+	  call = call->parent;
+	Ast * arg = ast_find (call, sym_assignment_expression);
+	const char * typenamearg = typedef_name (expression_type (arg, stack));
+	if (!is_field (typenamearg)) {
+	  AstTerminal * t = ast_terminal (n);
+	  fprintf (stderr,
+		   "%s:%d: error: argument of 'automatic()' must be a field, "
+		   "got '%s'\n",
+		   t->file, t->line, typenamearg);
+	  exit (1);
+	}
+	if (!strstr (typenamearg, typename)) {
+	  AstTerminal * t = ast_terminal (n);
+	  fprintf (stderr,
+		   "%s:%d: error: type mismatch for `automatic', "
+		   "expected '%s' got '%s'\n",
+		   t->file, t->line, typename, typenamearg);
+	  exit (1);	
+	}
+	str_append (src, "("); src = ast_str_append (arg, src); 
+	str_append (src, ")",
+		    !strcmp (typename, "scalar") ||
+		    !strcmp (typename, "vertex scalar") ? ".i" :
+		    !strcmp (typename, "vector") ||
+		    !strcmp (typename, "face vector") ? ".x.i" : ".x.x.i",
+		    "?(");
+	src = ast_str_append (arg, src); 
+	str_append (src, "):");
+      }
+
+      char * func = strdup (typename);
+      for (char * s = func; *s; s++)
 	if (*s == ' ')
 	  *s = '_';
+      str_append (src, "new_", func, "(\"",
+		  ast_terminal (identifier)->start, "\");");
+      free (func);
       Ast * expr = ast_parse_expression (src, ast_get_root (n));
       free (src);
       ast_set_file_line (expr, ast_terminal (n));
-      parent = ast_find (parent, sym_cast_expression);
-      n = parent->child[0];
-      Ast * r = ast_find (expr, sym_cast_expression)->child[0];
-      ast_set_child (parent, 0, r);
+
+      Ast * r = ast_find (expr, sym_assignment_expression);
       ast_remove (n, ast_left_terminal (r));
+      if (parent->sym == sym_init_declarator) {
+	parent = ast_schema (parent, sym_init_declarator,
+			     2, sym_initializer);
+	ast_destroy (parent->child[0]);
+	ast_set_child (parent, 0, r);
+      }
+      else {
+	ast_destroy (parent->child[2]);
+	ast_set_child (parent, 2, r);
+      }
       ast_destroy (expr);
     }
     else {
       AstTerminal * t = ast_terminal (n);
       fprintf (stderr,
-	       "%s:%d: error: 'new' must be used to initialize a "
+	       "%s:%d: error: '%s' must be used to initialize a "
 	       "scalar, vector or tensor field\n",
-	       t->file, t->line);
+	       t->file, t->line, t->start);
       exit (1);      
     }
     break;
@@ -1838,6 +1900,11 @@ void ast_push_declaration (Stack * stack, Ast * n)
   if (!identifier)
     identifier = ast_schema (n, sym_enumeration_constant,
 			     0, sym_generic_identifier,
+			     0, sym_IDENTIFIER);
+  if (!identifier && n->sym == sym_struct_or_union_specifier &&
+      n->child[2])
+    identifier = ast_schema (n, sym_struct_or_union_specifier,
+			     1, sym_generic_identifier,
 			     0, sym_IDENTIFIER);
   if (identifier)
     stack_push (stack, &identifier);
