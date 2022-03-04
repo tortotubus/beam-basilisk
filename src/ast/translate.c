@@ -560,8 +560,7 @@ static void rotate_list_item (Ast * item, Ast * n,
     list = ast_block_list_append (list, item->sym, copy);
   }
   ast_set_child (item, 0, body);
-  AstTerminal * t = ast_left_terminal (body);
-  ast_remove (n, t);
+  ast_remove (n, ast_left_terminal (body));
 
   d->dimension = dimension;
 }
@@ -1330,7 +1329,93 @@ static void translate (Ast * n, Stack * stack, void * data)
 	  }
       }
     }
-    
+        
+    break;
+  }
+
+  /**
+  ## New Field */
+
+  case sym_NEW_FIELD: {
+    Ast * parent = n;
+    while (parent &&
+	   parent->sym != sym_init_declarator &&
+	   (parent->sym != sym_assignment_expression || !parent->child[1]))
+      parent = parent->parent;
+    if (!parent) {
+      AstTerminal * t = ast_terminal (n);
+      fprintf (stderr,
+	       "%s:%d: error: 'new' must be used within a declarator "
+	       "or an assignment expression\n", t->file, t->line);
+      exit (1);
+    }
+    Ast * identifier = NULL, * declaration = NULL;
+    if ((identifier = ast_schema (parent, sym_init_declarator,
+				  0, sym_declarator,
+				  0, sym_direct_declarator,
+				  0, sym_generic_identifier,
+				  0, sym_IDENTIFIER)))
+      declaration = declaration_from_type (identifier);
+    else if ((identifier = ast_schema (parent, sym_assignment_expression,
+				       0, sym_unary_expression,
+				       0, sym_postfix_expression,
+				       0, sym_primary_expression,
+				       0, sym_IDENTIFIER))) {
+      AstTerminal * t = ast_terminal (identifier);
+      declaration = ast_identifier_declaration (stack, t->start);
+      if (!declaration) {
+	fprintf (stderr,
+		 "%s:%d: error: undeclared variable '%s'\n",
+		 t->file, t->line, t->start);
+	exit (1);
+      }
+      declaration = declaration_from_type (declaration);
+    }
+    else {
+      AstTerminal * t = ast_terminal (n);
+      fprintf (stderr,
+	       "%s:%d: error: 'new' must be used to initialize a named field\n",
+	       t->file, t->line);
+      exit (1);
+    }
+    const char * typename = typedef_name_from_declaration (declaration);
+    if (typename && (!strcmp (typename, "scalar") ||
+		     !strcmp (typename, "vertex scalar") ||
+		     !strcmp (typename, "vector") ||
+		     !strcmp (typename, "face vector") ||
+		     !strcmp (typename, "tensor"))) {
+      if (!strstr (ast_terminal (n)->start, typename)) {
+	AstTerminal * t = ast_terminal (n);
+	fprintf (stderr,
+		 "%s:%d: error: type mismatch for `new', "
+		 "expected '%s' got '%s'\n",
+		 t->file, t->line, typename, t->start);
+	exit (1);	
+      }
+      char * src = NULL;
+      str_append (src, "a=new_", typename, "(\"",
+		  ast_terminal (identifier)->start, "\");");
+      for (char * s = src; *s; s++)
+	if (*s == ' ')
+	  *s = '_';
+      Ast * expr = ast_parse_expression (src, ast_get_root (n));
+      free (src);
+      ast_set_file_line (expr, ast_terminal (n));
+      parent = ast_find (parent, sym_cast_expression);
+      n = parent->child[0];
+      Ast * r = ast_find (expr, sym_cast_expression)->child[0];
+      ast_set_child (parent, 0, r);
+      ast_remove (n, ast_left_terminal (r));
+      ast_destroy (expr);
+    }
+    else {
+      AstTerminal * t = ast_terminal (n);
+      fprintf (stderr,
+	       "%s:%d: error: 'new' must be used to initialize a "
+	       "scalar, vector or tensor field\n",
+	       t->file, t->line);
+      exit (1);      
+    }
     break;
   }
 
