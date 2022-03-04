@@ -722,10 +722,10 @@ static void ast_remove_internal (Ast * n, AstTerminal * before)
     AstTerminal * t = ast_terminal (n);
     if (t->before) {
       str_prepend (before->before, t->before);
-      free (t->before);
+      free (t->before), t->before = NULL;
     }
-    free (t->start);
-    free (t->after);
+    free (t->start), t->start = NULL;
+    free (t->after), t->after = NULL;
   }
 }
 
