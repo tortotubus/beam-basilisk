@@ -77,12 +77,12 @@ Ast * ast_attach_internal (Ast * parent, ...)
   return parent;
 }
 
-void ast_destroy (Ast * n)
+static void ast_destroy_internal (Ast * n)
 {
   if (n->child) {
     for (Ast ** c = n->child; *c; c++)
       if (*c != ast_placeholder)
-	ast_destroy (*c);
+	ast_destroy_internal (*c);
   }
   else {
     AstTerminal * t = ast_terminal (n);
@@ -102,6 +102,19 @@ void ast_destroy (Ast * n)
     if (r->alloc)
       free_allocator (r->alloc);
   }
+}
+
+void ast_destroy (Ast * n)
+{
+  if (n == ast_placeholder)
+    return;
+  if (n->parent && n->parent->child) {
+    Ast ** c;
+    for (c = n->parent->child; *c && *c != n; c++);
+    if (*c == n)
+      *c = ast_placeholder;
+  }
+  ast_destroy_internal (n);
 }
 
 char * ast_line (AstTerminal * t)
@@ -130,45 +143,96 @@ static int count_lines (const char * s)
   return line;
 }
 
-Ast * ast_replace (Ast * n, const char * terminal,
-		   Ast * with, bool before)
+void ast_set_child (Ast * parent, int index, Ast * child)
 {
-  AstTerminal * t = ast_terminal (n);
-  if (t && !t->file) {
-    AstTerminal * left = ast_left_terminal (with);
-    t->file = left->file, t->line = left->line;
-    if (left->before) {
-      if (before)
-	t->line -= count_lines (left->before);
-      else {
-	assert (!t->before);
-	t->before = left->before;
-	left->before = NULL;
-      }
+  if (child->parent && child->parent != parent) {
+    Ast * oldparent = child->parent;
+    if (oldparent->child) {
+      Ast ** c;
+      for (c = oldparent->child; *c && *c != child; c++);
+      if (*c == child)
+	*c = ast_placeholder;
     }
   }
+  parent->child[index] = child;
+  child->parent = parent;
+}
+
+static AstTerminal * ast_left_line (Ast * n)
+{
+  AstTerminal * t = ast_terminal (n);
+  if (t)
+    return t->file ? t : NULL;
+  else
+    for (Ast ** c = n->child; *c; c++) {
+      t = ast_left_line (*c);
+      if (t)
+	return t;
+    }
+  return NULL;
+}
+
+void ast_replace_child (Ast * parent, int index, Ast * child)
+{
+  Ast * oldchild = parent->child[index];
+  ast_set_child (parent, index, child);
+  AstTerminal * left = ast_left_terminal (child);
+  if (oldchild != ast_placeholder) {
+    AstTerminal * oldleft = ast_left_terminal (oldchild);
+    if (oldleft && left) {
+      if (!left->file) {
+	if (left->before)
+	  free (left->before), left->before = NULL;
+	assert (!left->before);
+	left->file = oldleft->file;
+	left->line = oldleft->line;
+	ast_set_line (child, left);
+      }
+      if (left->before)
+	str_append (left->before, oldleft->before);
+      else
+	left->before = oldleft->before, oldleft->before = NULL;
+    }
+    ast_destroy (oldchild);
+  }
+  if (left && !left->file) {
+    AstTerminal * line = ast_left_line (child);
+    if (line) {
+      if (left->before)
+	str_append (left->before, line->before);
+      else
+	left->before = line->before, line->before = NULL;      
+      left->file = line->file;
+      left->line = line->line;
+      ast_set_line (child, left);
+    }      
+  }
+}
+
+AstTerminal * ast_replace (Ast * n, const char * terminal, Ast * with)
+{
+  AstTerminal * t = ast_terminal (n);
   if (t && !strcmp (t->start, terminal)) {
     while (n && n->sym != with->sym)
       n = n->parent;
     if (n) {
-      if (!before) {
-	AstTerminal * left = ast_left_terminal (with);
-	str_append (left->before, t->before);
-	if (t->file) {
-	  left->file = t->file;
-	  left->line = t->line;
-	}
-      }
       ast_set_child (n->parent, ast_child_index (n), with);
       ast_destroy (n);
+      return ast_right_terminal (with);
     }
-    return n;
+    return NULL;
   }
   if (n->child)
     for (Ast ** c = n->child; *c; c++) {
-      Ast * r = ast_replace (*c, terminal, with, before);
-      if (r)
-	return r;
+      AstTerminal * right = ast_replace (*c, terminal, with);
+      if (right) {
+	int after = count_lines (right->start);
+	right->line += after;
+	for (c++; *c; c++)
+	  ast_set_line (*c, right);
+	right->line -= after;
+	return right;
+      }
     }
   return NULL;
 }
@@ -782,7 +846,7 @@ void ast_check (Ast * n)
   }
 }
 
-void ast_set_file_line (Ast * n, AstTerminal * l)
+void ast_set_line (Ast * n, AstTerminal * l)
 {
   AstTerminal * t = ast_terminal (n);
   if (t && !t->file) {
@@ -791,7 +855,7 @@ void ast_set_file_line (Ast * n, AstTerminal * l)
   }
   if (n->child)
     for (Ast ** c = n->child; *c; c++)
-      ast_set_file_line (*c, l);
+      ast_set_line (*c, l);
 }
 
 Ast * ast_flatten (Ast * n, AstTerminal * t)

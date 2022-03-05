@@ -50,18 +50,20 @@ static inline Ast * ast_last_child (Ast * n)
   return *c;
 }
 
+extern Ast * const ast_placeholder;
+
 static inline AstTerminal * ast_left_terminal (Ast * n)
 {
-  while (n->child)
+  while (n && n != ast_placeholder && n->child)
     n = n->child[0];
-  return (AstTerminal *) n;
+  return (AstTerminal *) (n != ast_placeholder ? n : NULL);
 }
 
 static inline AstTerminal * ast_right_terminal (Ast * n)
 {
-  while (n->child)
+  while (n && n != ast_placeholder && n->child)
     n = ast_last_child (n);
-  return (AstTerminal *) n;
+  return (AstTerminal *) (n != ast_placeholder ? n : NULL);
 }
 
 AstTerminal * ast_terminal_new (Ast * parent, int symbol, const char * start);
@@ -82,22 +84,8 @@ Ast * ast_new_children_internal (Ast * parent, ...);
 #define ast_new_children(p,...) \
   ast_new_children_internal (p, __VA_ARGS__, NULL)
 
-extern Ast * const ast_placeholder;
-
-static inline void ast_set_child (Ast * parent, int index, Ast * child)
-{
-  if (child->parent && child->parent != parent) {
-    Ast * oldparent = child->parent;
-    if (oldparent->child) {
-      Ast ** c;
-      for (c = oldparent->child; *c && *c != child; c++);
-      if (*c == child)
-	*c = ast_placeholder;
-    }
-  }  
-  parent->child[index] = child;
-  child->parent = parent;
-}
+void ast_set_child (Ast * parent, int index, Ast * child);
+void ast_replace_child (Ast * parent, int index, Ast * child);
 
 static inline int ast_child_index (Ast * n)
 {
@@ -129,11 +117,11 @@ static inline void ast_hide (AstTerminal * n)
 }
 
 char * ast_line (AstTerminal * t);
-#define ast_file_line(n) "\"", ast_terminal(n)->file, \
-    "\", ", ast_line(ast_terminal(n))
-void ast_set_file_line (Ast * n, AstTerminal * l);
+#define ast_file_line(n) "\"", ast_terminal((Ast *)n)->file,	\
+    "\", ", ast_line(ast_terminal((Ast *)n))
+void ast_set_line (Ast * n, AstTerminal * l);
 Ast * ast_flatten (Ast * n, AstTerminal * t);
-Ast * ast_replace (Ast * n, const char * terminal, Ast * with, bool before);
+AstTerminal * ast_replace (Ast * n, const char * terminal, Ast * with);
 
 /**
 # Grammar-specific functions */
