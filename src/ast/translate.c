@@ -56,6 +56,7 @@ Appends `item` to (block) `list`. The list item symbol is `item_sym`. */
 
 Ast * ast_block_list_append (Ast * list, int item_sym, Ast * item)
 {
+  ast_set_line (item, ast_right_terminal (list));
   Ast * parent = list->parent;
   int index = ast_child_index (list);
   Ast * l = ast_new_children (ast_new (parent, list->sym),
@@ -71,6 +72,7 @@ Appends `item` to (comma-separated) `list`. The list item symbol is
 
 Ast * ast_list_append (Ast * list, int item_sym, Ast * item)
 {
+  ast_set_line (item, ast_right_terminal (list));
   Ast * parent = list->parent;
   int index = ast_child_index (list);
   Ast * l =  ast_new_children (ast_new (parent, list->sym),
@@ -612,7 +614,7 @@ static Ast * get_block_list_item (Ast * statement)
     Ast * compound =
       ast_new_children (ast_new (parent, sym_compound_statement),
 			left, list, right);
-    ast_set_child (parent, index, compound);
+    ast_replace_child (parent, index, compound);
   }
   
   return item;
@@ -691,16 +693,12 @@ void append_const (Ast * n, Ast * type, void * data)
 Replaces child at `index` of `parent` with `replacement` or with a
 parent of `replacement` of the same symbol as the child. */
 
-void ast_replace_child (Ast * parent, int index, Ast * replacement)
+void ast_replace_child_same_symbol (Ast * parent, int index, Ast * replacement)
 {
   while (replacement && replacement->sym != parent->child[index]->sym)
     replacement = replacement->parent;
   assert (replacement);
-  Ast * child = parent->child[index];
-  AstTerminal * left = ast_left_terminal (child);
-  ast_left_terminal (replacement)->before = left->before, left->before = NULL;
-  ast_set_child (parent, index, replacement);
-  ast_destroy (child);
+  ast_replace_child (parent, index, replacement);
 }
 
 typedef struct {
@@ -725,7 +723,7 @@ void replace_const (Ast * n, Ast * type, void * data)
     while (unary->sym != sym_unary_expression)
       unary = unary->parent;
     unary = unary->parent;
-    ast_replace_child (unary, 0, n);
+    ast_replace_child_same_symbol (unary, 0, n);
   }
 }
 
@@ -770,7 +768,6 @@ static Ast * get_init_solver (Ast * n, TranslateData * d)
     Ast * decl =
       ast_parse_external_declaration ("static void _init_solver(void) {\n}",
 				      parent);
-    ast_set_file_line (decl, ast_right_terminal ((Ast *)parent));
     d->init_solver = decl->child[0];
     ast_block_list_append (ast_schema ((Ast *) parent, sym_root,
 				       0, sym_translation_unit),
@@ -841,16 +838,14 @@ static void translate (Ast * n, Stack * stack, void * data)
       Here we add the `is_face_x()` condition to the loop
       statement. */
 
-      AstTerminal * right = ast_right_terminal (n);
-      Ast * expr = ast_parse_expression ("is_face_x(){;}",
-					 ast_get_root (n));
+      Ast * expr = ast_parse_expression ("is_face_x(){;}", ast_get_root (n));
       Ast * cond = ast_find (expr, sym_IDENTIFIER);
       ast_terminal (cond)->start[strlen(ast_terminal (cond)->start) - 1] =
 	order[0];
-      ast_replace (expr, ";", ast_last_child (n), true);
-      ast_set_file_line (expr, right);
-      ast_set_child (n, n->child[4] ? 4 : 3, expr);
-
+      ast_replace (expr, ";", ast_last_child (n));
+      ast_set_line (expr, ast_left_terminal (n));
+      ast_replace_child (n, n->child[4] ? 4 : 3, expr);
+      
       /**
       Finally, we "dimension-rotate" the statement. */
       
@@ -938,12 +933,11 @@ static void translate (Ast * n, Stack * stack, void * data)
 	Ast * conditional = ast_parse_expression (condition,
 						  ast_get_root (copy));
 	free (condition);
-	ast_replace (conditional, ";", copy, true);
-	ast_set_file_line (conditional, ast_right_terminal (copy));
+	ast_replace (conditional, ";", copy);
 	if (bits)
 	  list = ast_block_list_append (list, item->sym, conditional);
 	else
-	  ast_set_child (item, 0, conditional);
+	  ast_replace_child (item, 0, conditional);
       }
       free (consts);
     }
@@ -1003,12 +997,10 @@ static void translate (Ast * n, Stack * stack, void * data)
 	assert (type);
 	if (!find_struct_member (ast_find (type, sym_struct_declaration_list),
 				 member)) {
-	  Ast * scalar = n->child[0];
 	  Ast * expr =
-	    ast_parse_expression ("_attribute[s.i];", ast_get_root (n));
-	  ast_replace (expr, "s", scalar, false);
-	  ast_set_file_line (expr, ast_right_terminal (scalar));
-	  ast_set_child (n, 0, ast_find (expr, sym_postfix_expression));
+	    ast_parse_expression ("_attribute[_field_.i];", ast_get_root (n));
+	  ast_replace (expr, "_field_", n->child[0]);
+	  ast_replace_child (n, 0, ast_find (expr, sym_postfix_expression));
 	  ast_destroy (expr);
 	}
       }
@@ -1164,9 +1156,7 @@ static void translate (Ast * n, Stack * stack, void * data)
 	    str_append (src, ";");
 	    Ast * expr = ast_parse_expression (src, ast_get_root (n));
 	    free (src);
-	    ast_set_file_line (expr, ast_left_terminal (n->child[2]));
-	    ast_destroy (n->child[2]);
-	    ast_set_child (n, 2, ast_find (expr, sym_initializer));
+	    ast_replace_child (n, 2, ast_find (expr, sym_initializer));
 	    ast_destroy (expr);
 	  }
 	  else {
@@ -1184,17 +1174,13 @@ static void translate (Ast * n, Stack * stack, void * data)
 			"(double[]){initializer});" : "initializer);");
 	    Ast * expr = ast_parse_expression (src, ast_get_root (n));
 	    free (src);
-	    AstTerminal * right = ast_right_terminal (n->child[2]);
 	    if (!strcmp (typename, "vector"))
-	      assert (ast_replace (expr, "initializer",
-				   ast_find (n->child[2], sym_initializer_list),
-				   true));
+	      assert
+		(ast_replace (expr, "initializer",
+			      ast_find (n->child[2], sym_initializer_list)));
 	    else
-	      assert (ast_replace (expr, "initializer", n->child[2]->child[0],
-				   true));
-	    ast_destroy (n->child[2]);
-	    ast_set_file_line (expr, right);
-	    ast_set_child (n, 2, ast_find (expr, sym_initializer));
+	      assert (ast_replace (expr, "initializer", n->child[2]->child[0]));
+	    ast_replace_child (n, 2, ast_find (expr, sym_initializer));	    
 	    ast_destroy (expr);
 	  }
 	}
@@ -1233,12 +1219,10 @@ static void translate (Ast * n, Stack * stack, void * data)
 
 	  Ast * expr = ast_parse_expression (src, ast_get_root (n));
 	  free (src);
-	  ast_set_file_line (expr, ast_right_terminal (n->child[0]));
+	  ast_set_line (expr, ast_right_terminal (n->child[0]));
 	  declarator = ast_find (expr, sym_init_declarator);
-	  ast_destroy (declarator->child[0]);
-	  ast_set_child (declarator, 0, n->child[0]);
-	  ast_set_child (n->parent, ast_child_index (n), declarator);
-	  ast_destroy (n);
+	  ast_replace_child (declarator, 0, n->child[0]);
+	  ast_replace_child (n->parent, ast_child_index (n), declarator);
 	  n = declarator;
 	  ast_destroy (expr);
 	}
@@ -1248,8 +1232,7 @@ static void translate (Ast * n, Stack * stack, void * data)
 	
 	declarator = n->child[0];
 	Ast * direct = declarator->child[0];
-	ast_set_child (declarator, 0, direct->child[0]);
-	ast_destroy (direct);
+	ast_replace_child (declarator, 0, direct->child[0]);
 	free (func);
       }
     }
@@ -1270,9 +1253,7 @@ static void translate (Ast * n, Stack * stack, void * data)
 	    str_append (src, ";");
 	    Ast * expr = ast_parse_expression (src, ast_get_root (n));
 	    free (src);
-	    ast_set_file_line (expr, ast_left_terminal (n->child[2]));
-	    ast_destroy (n->child[2]);
-	    ast_set_child (n, 2, ast_find (expr, sym_initializer));
+	    ast_replace_child (n, 2, ast_find (expr, sym_initializer));
 	    ast_destroy (expr);
 	    break;
 	  }
@@ -1376,14 +1357,13 @@ static void translate (Ast * n, Stack * stack, void * data)
 	      AstTerminal * t = ast_terminal (ast_find (list, sym_IDENTIFIER));
 	      free (t->start);
 	      t->start = strdup (ast_terminal (struct_name)->start);
-	      ast_replace (list, "a", ast_initializer_list (arguments), false);
-	      ast_set_file_line (list, ast_right_terminal (n));
-	      ast_set_child (n, 2, list);
+	      ast_replace (list, "a", ast_initializer_list (arguments));
+	      ast_replace_child (n, 2, list);
 	      ast_destroy (expr);
 	    }
 	  }
 	}
-      }      
+      }
     }
     
     if (!identifier || strcmp (ast_terminal (identifier)->start, "automatic"))
@@ -1499,20 +1479,17 @@ static void translate (Ast * n, Stack * stack, void * data)
       free (func);
       Ast * expr = ast_parse_expression (src, ast_get_root (n));
       free (src);
-      ast_set_file_line (expr, ast_terminal (n));
+      ast_set_line (expr, ast_terminal (n));
 
       Ast * r = ast_find (expr, sym_assignment_expression);
       ast_remove (n, ast_left_terminal (r));
       if (parent->sym == sym_init_declarator) {
 	parent = ast_schema (parent, sym_init_declarator,
 			     2, sym_initializer);
-	ast_destroy (parent->child[0]);
-	ast_set_child (parent, 0, r);
+	ast_replace_child (parent, 0, r);
       }
-      else {
-	ast_destroy (parent->child[2]);
-	ast_set_child (parent, 2, r);
-      }
+      else
+	ast_replace_child (parent, 2, r);
       ast_destroy (expr);
     }
     else {
@@ -1545,8 +1522,7 @@ static void trace_return (Ast * n, Stack * stack, void * data)
       Ast * compound =
 	ast_parse_expression ("{ void _ret = val; return _ret; }",
 			      ast_get_root (n));
-      ast_replace (compound, "val", ast_find (n, sym_assignment_expression),
-		   false);
+      ast_replace (compound, "val", ast_find (n, sym_assignment_expression));
 
       Ast * declarator =
 	ast_flatten (ast_copy (ast_find (function_definition, sym_declarator),
@@ -1554,22 +1530,18 @@ static void trace_return (Ast * n, Stack * stack, void * data)
 		     ast_left_terminal (n));
       AstTerminal * t = ast_terminal (ast_find (declarator, sym_IDENTIFIER));
       free (t->start); t->start = strdup ("_ret");
-      ast_replace (compound, "_ret", declarator, false);
+      ast_replace (compound, "_ret", declarator);
       
       Ast * type_specifier =
 	ast_flatten (ast_copy (ast_find (function_definition,
 					 sym_declaration_specifiers,
 					 0, sym_type_specifier)),
 		     ast_left_terminal (n));
-      ast_replace (compound, "void", type_specifier, false);
-      ast_set_file_line (compound, ast_right_terminal (n));
+      ast_replace (compound, "void", type_specifier);
       ast_before (ast_find (compound, sym_RETURN),
 		  "end_tracing (\"", function_identifier->start, "\", ",
 		  ast_file_line (ret), "); ");
-      ast_set_child (n->parent, 0, compound);
-      str_prepend (ast_left_terminal (compound)->before,
-		   ast_left_terminal (n)->before);
-      ast_destroy (n);
+      ast_replace_child (n->parent, 0, compound);
     }
   }
 }
@@ -1667,17 +1639,11 @@ static void macros (Ast * n, Stack * stack, void * data)
 		">=0;", name, "=*++_i){_statement_;}}");
     Ast * expr = ast_parse_expression (src, ast_get_root (n));
     free (src);
-    AstTerminal * right = ast_right_terminal (n);
-    Ast * parent = n->parent;
+    Ast * parent = n->parent; // fixme: simplify
     Ast * initializer = ast_find (expr, sym_initializer);
-    ast_destroy (initializer->child[0]);
-    ast_set_child (initializer, 0, n->child[5]->child[0]);
-    assert (ast_replace (expr, "_statement_", ast_last_child (n), true));
-    ast_left_terminal (expr)->before = ast_left_terminal (n)->before,
-      ast_left_terminal (n)->before = NULL;
-    ast_set_file_line (expr, right);
-    ast_set_child (parent->parent, ast_child_index (parent), expr);
-    ast_destroy (parent);
+    ast_replace_child (initializer, 0, n->child[5]->child[0]);
+    assert (ast_replace (expr, "_statement_", ast_last_child (n)));
+    ast_replace_child (parent->parent, ast_child_index (parent), expr);
     break;
   }
 
@@ -1733,14 +1699,8 @@ static void macros (Ast * n, Stack * stack, void * data)
     str_append (decl, fors, ";", fore, "){_statement_;}}");
     Ast * expr = ast_parse_expression (decl, ast_get_root (n));
     free (decl); free (fors); free (fore);
-    AstTerminal * right = ast_right_terminal (n);
-    Ast * parent = n->parent;
-    assert (ast_replace (expr, "_statement_", ast_last_child (n), true));
-    ast_left_terminal (expr)->before = ast_left_terminal (n)->before,
-      ast_left_terminal (n)->before = NULL;
-    ast_set_file_line (expr, right);
-    ast_set_child (parent->parent, ast_child_index (parent), expr);
-    ast_destroy (parent);
+    assert (ast_replace (expr, "_statement_", ast_last_child (n)));
+    ast_replace_child (n->parent->parent, ast_child_index (n->parent), expr);
     break;
   }
 
@@ -1881,7 +1841,7 @@ static void macros (Ast * n, Stack * stack, void * data)
     }
     break;
   }
-    
+
   /**
   ## Function profiling with `trace` */
 
@@ -1901,7 +1861,7 @@ static void macros (Ast * n, Stack * stack, void * data)
 		 " tracing (\"", ast_terminal (identifier)->start, "\", ",
 		 ast_file_line (identifier), "); ");
       Ast * end = ast_last_child (compound_statement);
-       ast_before (end,
+      ast_before (end,
 		  " end_tracing (\"", ast_terminal (identifier)->start, "\", ",
 		  ast_file_line (end), "); ");
       if (compound_statement->child[1]->sym == sym_block_item_list) {
