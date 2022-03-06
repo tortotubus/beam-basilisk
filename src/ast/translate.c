@@ -1806,9 +1806,10 @@ static void macros (Ast * n, Stack * stack, void * data)
 	    ast_before (n->child[2], "}");
 	  }
 	  ast_before (n->child[2], "}");
-	}    
-	ast_before (n, (type == 1 ? "(scalar[])" :
-			type == 2 ? "(vector[])" : "(tensor[])"));
+	}
+	ast_before (n, (type == 1 ? "((scalar[])" :
+			type == 2 ? "((vector[])" : "((tensor[])"));
+	ast_after (n->child[2], ")");
       }
     }
     break;
