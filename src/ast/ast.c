@@ -57,9 +57,9 @@ static Ast * ast_attach_single (Ast * parent, Ast * n)
   while (parent->child)
     parent = parent->child[0];
   parent->child = allocate (root->alloc, 2*sizeof (Ast *));
-  parent->child[0] = n;
+  parent->child[0] = NULL;
   parent->child[1] = NULL;
-  n->parent = parent;
+  ast_set_child (parent, 0, n);
   return parent;
 }
 
@@ -609,9 +609,7 @@ Ast * ast_parse_expression (const char * expr, AstRoot * parent)
 
 Ast * ast_parse_external_declaration (const char * decl, AstRoot * parent)
 {
-  stack_push (parent->stack, &parent);
   Ast * def = (Ast *) ast_parse (decl, parent);
-  ast_pop_scope (parent->stack, (Ast *) parent);
   Ast * n = ast_find (def, sym_external_declaration);
   if (!n) {
     ast_destroy (def);

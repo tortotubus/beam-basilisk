@@ -125,8 +125,8 @@ static inline void ast_hide (AstTerminal * n)
 }
 
 char * ast_line (AstTerminal * t);
-#define ast_file_line(n) "\"", ast_terminal((Ast *)n)->file,	\
-    "\", ", ast_line(ast_terminal((Ast *)n))
+#define ast_file_line(n)						\
+  "\"", ast_terminal((Ast *)n)->file, "\",", ast_line(ast_terminal((Ast *)n))
 void ast_set_line (Ast * n, AstTerminal * l);
 Ast * ast_flatten (Ast * n, AstTerminal * t);
 AstTerminal * ast_replace (Ast * n, const char * terminal, Ast * with);

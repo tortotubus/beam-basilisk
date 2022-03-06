@@ -747,8 +747,9 @@ event_parameters
         ;
 
 event_parameter
-        : assignment_expression
-	| generic_identifier '=' initializer
+        : conditional_expression
+        | unary_expression assignment_operator conditional_expression
+        | unary_expression assignment_operator postfix_initializer
         ;
 
 boundary_definition
