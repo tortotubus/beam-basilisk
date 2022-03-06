@@ -55,7 +55,7 @@ static Ast * new_ast (AstRoot * parse,
   AstTerminal * t = ast_terminal (n);
   t->start = start;
   t->after = end;
-  t->file = parse->file[parse->nf - 1];
+  t->file = parse->file;
   while (start != end) {
     if (*start == '\n')
       line--;
@@ -283,11 +283,8 @@ static void file_line (AstRoot * parse, const char * text)
   yylineno = atoi(s) - 1;
   s = strchr (s, '"') + 1;
   char * end = strchr (s, '"');
-  parse->nf++;
-  parse->file = realloc (parse->file, parse->nf*sizeof (char *));
-  char * file = calloc (end - s + 1, sizeof (char));
-  parse->file[parse->nf - 1] = file;
-  strncpy (file, s, end - s);
+  parse->file = allocate (parse->alloc, end - s + 1);
+  strncpy ((char *) parse->file, s, end - s);
   //  fprintf (stderr, "%s: \"%s\" %d\n", text, file, yylineno);
 }
 

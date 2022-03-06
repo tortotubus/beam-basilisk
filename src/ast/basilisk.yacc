@@ -910,11 +910,10 @@ static void stack_externalize (Stack * stack)
 AstRoot * ast_parse (const char * code, AstRoot * parent)
 {
   AstRoot parse;
-  parse.file = malloc (sizeof (char *));
-  parse.nf = 1;
-  parse.file[0] = strdup ("<basilisk>");
   parse.alloc = parent ? parent->alloc : new_allocator();
   parse.stack = parent ? parent->stack : stack_new (sizeof (Ast *));
+  parse.file = allocate (parse.alloc, strlen ("<basilisk>") + 1);
+  strcpy ((char *) parse.file, "<basilisk>");
   stack_internalize (parse.stack);
   parse.type_already_specified = false;
   extern void lexer_setup (char * buffer, size_t len);
@@ -932,8 +931,6 @@ AstRoot * ast_parse (const char * code, AstRoot * parent)
     const char * i = copy_strings (buffer, (Ast *) root, code - buffer);
     const char * end = i; while (*end != '\0') end++;
     root->after = copy_range (i, end, code - buffer);
-    root->file = parse.file;
-    root->nf = parse.nf;    
     root->alloc = parent ? NULL : parse.alloc;
     root->stack = parent ? NULL : parse.stack;
     stack_externalize (parse.stack);

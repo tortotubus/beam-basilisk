@@ -14,15 +14,14 @@ struct _Ast {
 typedef struct {
   Ast ast;
   char * before, * start, * after;
-  char * file;
+  const char * file;
   int line;
 } AstTerminal;
 
 typedef struct {
   Ast ast;
   char * before, * after;
-  char ** file;
-  int nf;
+  const char * file;
   Allocator * alloc;
   Stack * stack;
   bool type_already_specified;
@@ -47,6 +46,15 @@ static inline Ast * ast_last_child (Ast * n)
   if (!c)
     return NULL;
   while (*(c + 1)) c++;
+  return *c;
+}
+
+static inline Ast * ast_child (Ast * n, int sym)
+{
+  Ast ** c = n->child;
+  if (!c)
+    return NULL;
+  while (*c && (*c)->sym != sym) c++;
   return *c;
 }
 

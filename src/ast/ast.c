@@ -96,9 +96,6 @@ static void ast_destroy_internal (Ast * n)
     free (r->after);
     if (r->stack)
       stack_destroy (r->stack);
-    for (int i = 0; i < r->nf; i++)
-      free (r->file[i]);
-    free (r->file);
     if (r->alloc)
       free_allocator (r->alloc);
   }
@@ -518,12 +515,7 @@ static Ast * terminal_copy (const AstTerminal * src,
   dst->start = strdup (src->start);
   dst->after = src->after ? strdup (src->after) : NULL;
   dst->line = src->line;
-  if (dst_root) {
-    int i;
-    for (i = 0; i < src_root->nf && src->file != src_root->file[i]; i++);
-    assert (src->file == src_root->file[i]);
-    dst->file = dst_root->file[i];
-  }
+  dst->file = src->file;
   return (Ast *)dst;
 }
 
@@ -535,14 +527,6 @@ static Ast * root_copy (const AstRoot * src)
   dst->alloc = alloc;
   dst->before = src->before ? strdup (src->before) : NULL;
   dst->after = src->after ? strdup (src->after) : NULL;
-  if (src->nf) {
-    dst->file = malloc (src->nf*sizeof(char *));
-    dst->nf = src->nf;
-    for (int i = 0; i < dst->nf; i++)
-      dst->file[i] = strdup (src->file[i]);
-  }
-  else
-    dst->file = NULL, dst->nf = 0;
   dst->stack = NULL;
   ((Ast *)dst)->parent = NULL;
   return (Ast *)dst;
