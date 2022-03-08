@@ -3,7 +3,6 @@
 #include <string.h>
 #include "ast.h"
 #include "symbols.h"
-#include "stack.h"
 
 Ast * ast_is_typedef (Ast * identifier)
 {
@@ -173,8 +172,10 @@ Ast * ast_new_unary_expression (Ast * parent)
 		  sym_unary_expression);
 }
 
-Ast * ast_is_unary_expression (Ast * n)
+Ast * ast_is_unary_expression (const Ast * n)
 {
+  if (!n)
+    return NULL;
   int sym[] = {
     sym_assignment_expression,
     sym_conditional_expression,
@@ -195,11 +196,11 @@ Ast * ast_is_unary_expression (Ast * n)
   for (i = sym; *i >= 0 && *i != n->sym; i++);
   for (; *i == n->sym && n->child; i++, n = n->child[0])
     if (n->sym == sym_unary_expression)
-      return n;
+      return (Ast *) n;
   return NULL;
 }
 
-Ast * ast_is_identifier_expression (Ast * n)
+Ast * ast_is_identifier_expression (const Ast * n)
 {
   n = ast_is_unary_expression (n);
   if (n)
@@ -207,7 +208,33 @@ Ast * ast_is_identifier_expression (Ast * n)
 		    0, sym_postfix_expression,
 		    0, sym_primary_expression,
 		    0, sym_IDENTIFIER);
-  return n;
+  return (Ast *) n;
+}
+
+Ast * ast_is_simple_expression (const Ast * n)
+{
+  n = ast_schema (ast_is_unary_expression (n), sym_unary_expression,
+		  0, sym_postfix_expression,
+		  0, sym_primary_expression);
+  if (n) {
+    n = n->child[0];
+    if (n->sym == sym_IDENTIFIER ||
+	n->sym == sym_constant ||
+	n->sym == sym_string)
+      return (Ast *) n;
+  }
+  return NULL;
+}
+
+Ast * ast_is_iteration_statement (const Ast * n)
+{
+  if (n && (n->sym == sym_iteration_statement ||
+	    n->sym == sym_foreach_statement ||
+	    n->sym == sym_foreach_inner_statement ||
+	    n->sym == sym_forin_declaration_statement ||
+	    n->sym == sym_forin_statement))
+    return (Ast *) n;
+  return NULL;
 }
 
 Ast * ast_new_constant (Ast * parent, int symbol, const char * value)
@@ -770,6 +797,225 @@ static bool is_field (const char * typename)
 		      !strcmp (typename, "tensor"));
 }
 
+static Ast * declarator_is_allocator (Ast * declarator)
+{
+  Ast * allocator;
+  if ((allocator = ast_schema (declarator, sym_declarator,
+			       0, sym_direct_declarator)) &&
+      allocator->child[0]->sym == sym_direct_declarator &&
+      allocator->child[1]->sym == token_symbol('[') &&
+      !allocator->child[3] &&
+      (allocator = allocator->child[0]->child[0])->sym
+      == sym_generic_identifier)
+    return allocator;
+  return NULL;
+}
+
+static Ast * automatic_argument (const Ast * init_declarator)
+{
+  Ast
+    * initializer = ast_child (init_declarator, sym_initializer),
+    * unary = ast_is_unary_expression (ast_child (initializer,
+						  sym_assignment_expression)),
+    * function_call = ast_schema (unary, sym_unary_expression,
+				  0, sym_postfix_expression,
+				  0, sym_function_call),
+    * function_name = ast_schema (function_call, sym_function_call,
+				  0, sym_postfix_expression,
+				  0, sym_primary_expression,
+				  0, sym_IDENTIFIER),
+    * argument = ast_schema (function_call, sym_function_call,
+			     2, sym_argument_expression_list,
+			     0, sym_argument_expression_list_item,
+			     0, sym_assignment_expression);
+  if (function_name && argument &&
+      !strcmp (ast_terminal (function_name)->start, "automatic"))
+    return argument;
+  return NULL;
+}
+
+static Ast * declarator_is_automatic (const Ast * declarator)
+{
+  Ast * allocator = ast_schema (declarator, sym_declarator,
+				0, sym_direct_declarator,
+				0, sym_generic_identifier);
+  if (!allocator)
+    return NULL;
+  if (automatic_argument (declarator->parent))
+    return allocator;
+  return NULL;
+}
+
+static
+void foreach_field_allocator (Stack * stack, TranslateData * t, Ast * scope,
+			      void func (Stack *, TranslateData *,
+					 const char *,
+					 Ast *, Ast *, Ast *, void *),
+			      void * data)
+{
+  Ast ** d;
+  for (int i = 0; (d = stack_index (stack, i)) && *d != scope; i++)
+    if (*d && (*d)->sym == sym_IDENTIFIER) {
+      Ast * declarator, * init_declarator, * allocator;
+      if (((declarator = ast_ancestor (*d, 4)) &&
+	   (init_declarator = declarator->parent)->sym == sym_init_declarator &&
+	   (allocator = declarator_is_allocator (declarator))) ||
+	  ((declarator = ast_ancestor (*d, 3)) &&
+	   (init_declarator = declarator->parent)->sym == sym_init_declarator &&
+	   (allocator = declarator_is_automatic (declarator)))) {
+	Ast * declaration = declaration_from_type (allocator);
+	const char * typename = typedef_name_from_declaration (declaration);
+	if (is_field (typename))
+	  func (stack, t, typename, init_declarator, declarator, allocator,
+		data);
+      }
+    }
+}
+
+static void
+field_deallocation (Stack * stack, TranslateData * d,
+		    const char * typename,
+		    Ast * init_declarator, Ast * declarator, Ast * allocator,
+		    void * data)
+{
+  char ** delete = data;
+  Ast * argument = automatic_argument (init_declarator);
+  if (argument) {
+    char * arg = ast_str_append (argument, NULL);
+    if (strchr (typename, ' '))
+      typename = strchr (typename, ' ') + 1;
+    str_append (delete[1], "if(!(", arg, ")",
+		!strcmp (typename, "scalar") ? ".i" :
+		!strcmp (typename, "vector") ? ".x.i" : ".x.x.i",
+		")delete((scalar*){",
+		ast_terminal (allocator->child[0])->start,
+		"});");
+    free (arg);
+  }
+  else
+    str_append (delete[0], ast_terminal (allocator->child[0])->start, ",");
+}
+
+static char * delete_fields (char ** delete)
+{
+  char * fields = delete[0], * automatics = delete[1];
+  if (fields || automatics) {
+    if (fields) {
+      str_prepend (fields, "delete((scalar*){");
+      fields[strlen (fields) - 1] = '\0';
+      str_append (fields, "});");
+    }
+    if (automatics)
+      str_append (fields, automatics);
+    delete[0] = fields;
+    return fields;
+  }
+  return NULL;
+}
+
+static void
+field_allocation (Stack * stack, TranslateData * d,
+		  const char * typename,
+		  Ast * init_declarator, Ast * declarator, Ast * allocator,
+		  void * data)
+{
+  field_deallocation (stack, d, typename,
+		      init_declarator, declarator, allocator, data);
+  
+  char * src = strdup (typename);
+  for (char * s = src; *s != '\0'; s++)
+    if (*s == ' ')
+      *s = '_';
+  const char * name = ast_terminal (allocator->child[0])->start;
+  if (strchr (typename, ' '))
+    typename = strchr (typename, ' ') + 1;
+
+  Ast * argument = automatic_argument (init_declarator);
+  if (argument) {
+    char * arg = ast_str_append (argument, NULL);
+    str_prepend (src, typename, " _field_=(", arg, ")",
+		 !strcmp (typename, "scalar") ? ".i" :
+		 !strcmp (typename, "vector") ? ".x.i" : ".x.x.i",
+		 "?(", arg, "):new_");
+    free (arg);
+  }
+  else
+    str_prepend (src, typename, " _field_=new_");
+  str_append (src, "(\"", name, "\");");
+	    
+  Ast * expr = ast_parse_expression (src, ast_get_root (init_declarator));
+  free (src);  
+  ast_set_line (expr, ast_right_terminal (declarator));
+  declarator = ast_find (expr, sym_init_declarator);
+  ast_replace_child (declarator, 0, init_declarator->child[0]);
+  ast_replace_child (init_declarator->parent,
+		     ast_child_index (init_declarator), declarator);
+  ast_destroy (expr);
+
+  /**
+  Remove '[]' from declarator if necessary. */
+
+  declarator = declarator->child[0];
+  Ast * direct = ast_schema (declarator, sym_declarator,
+			     0, sym_direct_declarator,
+			     0, sym_direct_declarator);
+  if (direct)
+    ast_replace_child (declarator, 0, direct);
+}
+
+static Ast * compound_jump (Ast * return_statement, Ast * function_definition,
+			    const char * expression)
+{
+  assert (return_statement->sym == sym_jump_statement);
+  Ast * ret = ast_child (return_statement, sym_RETURN);  
+  if (ret && return_statement->child[2] &&
+      !ast_is_simple_expression (return_statement->child[1]->child[0])) {
+    // return sthg (complicated);
+    char * src = NULL;
+    str_append (src, "{int _ret=val;", expression, "return _ret;}");
+    Ast * compound =
+      ast_parse_expression (src, ast_get_root (function_definition));
+    free (src);
+    ast_replace (compound, "val", ast_find (return_statement,
+					    sym_assignment_expression));
+
+    if (function_definition->sym == sym_function_definition) {
+      Ast * declarator =
+	ast_flatten (ast_copy (ast_find (function_definition, sym_declarator),
+			       sym_IDENTIFIER),
+		     ast_left_terminal (return_statement));
+      AstTerminal * t = ast_terminal (ast_find (declarator, sym_IDENTIFIER));
+      free (t->start); t->start = strdup ("_ret");
+      ast_replace (compound, "_ret", declarator);
+      
+      Ast * type_specifier =
+	ast_flatten (ast_copy (ast_find (function_definition,
+					 sym_declaration_specifiers,
+					 0, sym_type_specifier)),
+		     ast_left_terminal (return_statement));
+      ast_replace (compound, "int", type_specifier);
+    }
+    else
+      assert (function_definition->sym == sym_event_definition);
+    
+    ast_replace_child (return_statement->parent, 0, compound);
+    return compound;
+  }
+  else {
+    // return;
+    char * src = NULL;
+    str_append (src, "{", expression, "return _ret;}");
+    Ast * compound =
+      ast_parse_expression (src, ast_get_root (function_definition));
+    free (src);
+    Ast * parent = return_statement->parent;
+    ast_replace (compound, "_ret", return_statement);
+    ast_replace_child (parent, 0, compound);
+    return compound;
+  }
+  return NULL;
+}
+
 static void translate (Ast * n, Stack * stack, void * data)
 {
   typedef struct {
@@ -1085,20 +1331,14 @@ static void translate (Ast * n, Stack * stack, void * data)
   }
 
   /**
-  ## (Constant) field declarations */
+  ## Constant field and global field allocations */
 
   case sym_init_declarator: {
-    Ast * declarator;
-    if ((declarator = ast_schema (n->child[0], sym_declarator,
-				  0, sym_direct_declarator)) &&
-	declarator->child[0]->sym == sym_direct_declarator &&
-	!declarator->child[3] &&
-	(declarator = declarator->child[0]->child[0])->sym ==
-	sym_generic_identifier) {
+    Ast * declarator = declarator_is_allocator (n->child[0]);
+    if (declarator) {
       Ast * declaration = declaration_from_type (declarator);
       const char * typename = typedef_name_from_declaration (declaration);
       if (is_field (typename)) {
-
 	char * func = strdup (typename);
 	for (char * s = func; *s != '\0'; s++)
 	  if (*s == ' ')
@@ -1177,34 +1417,19 @@ static void translate (Ast * n, Stack * stack, void * data)
 	}
 
 	/**
-	### Field declarations */
+	### Global field allocation */
 	
-	else {
+	else if (declaration->parent->sym == sym_external_declaration) {
+	  TranslateData * d = data;
+	  Field c;
+	  field_init (&c, typename, d->dimension, &d->fields_index);
+	  char * src = field_value (&c, "");
+	  ast_before (ast_child (d->init_solver, token_symbol ('}')),
+		      "  init_", func, "((", typename, ")", src, ",\"",
+		      name, "\");\n");
+	  str_prepend (src, typename, " _field_=");
+	  str_append (src, ";");
 	  
-	  /**
-	  #### Global field declarations */
-
-	  char * src = NULL;
-	  if (declaration->parent->sym == sym_external_declaration) {
-	    TranslateData * d = data;
-	    Field c;
-	    field_init (&c, typename, d->dimension, &d->fields_index);
-	    src = field_value (&c, "");
-	    ast_before (ast_child (d->init_solver, token_symbol ('}')),
-			"  init_", func, "((", typename, ")", src, ",\"",
-			name, "\");\n");
-	    str_prepend (src, typename, " _field_=");
-	    str_append (src, ";");
-	  }
-	  
-	  /**
-	  #### Local field declarations */
-	  
-	  else {
-	    str_append (src, "_field_=new_", func, "(\"", name, "\");");
-	    str_prepend (src, typename, " ");
-	  }
-
 	  Ast * expr = ast_parse_expression (src, ast_get_root (n));
 	  free (src);
 	  ast_set_line (expr, ast_right_terminal (n->child[0]));
@@ -1213,6 +1438,17 @@ static void translate (Ast * n, Stack * stack, void * data)
 	  ast_replace_child (n->parent, ast_child_index (n), declarator);
 	  n = declarator;
 	  ast_destroy (expr);
+	}
+
+	/**
+	This is a an automatic (local) field allocations, which is
+	treated [at the end of the
+	scope](#automatic-field-allocation-and-deallocation) (together
+	with deallocation). */
+	
+	else {
+	  free (func);
+	  break;
 	}
 	
 	/**
@@ -1353,6 +1589,8 @@ static void translate (Ast * n, Stack * stack, void * data)
 	}
       }
     }
+
+    break;
     
     if (!identifier || strcmp (ast_terminal (identifier)->start, "automatic"))
       break;
@@ -1413,58 +1651,21 @@ static void translate (Ast * n, Stack * stack, void * data)
     }
     const char * typename = typedef_name_from_declaration (declaration);
     if (is_field (typename)) {
-      char * src = NULL;
-
-      if (n->sym == sym_NEW_FIELD) {
-	if (!strstr (ast_terminal (n)->start, typename)) {
-	  AstTerminal * t = ast_terminal (n);
-	  fprintf (stderr,
-		   "%s:%d: error: type mismatch for `new', "
-		   "expected '%s' got '%s'\n",
-		   t->file, t->line, typename, t->start);
-	  exit (1);	
-	}
-      }
-      else { // automatic()
-	Ast * call = n;
-	while (call->sym != sym_function_call)
-	  call = call->parent;
-	Ast * arg = ast_find (call, sym_assignment_expression);
-	const char * typenamearg = typedef_name (expression_type (arg, stack));
-	if (!is_field (typenamearg)) {
-	  AstTerminal * t = ast_terminal (n);
-	  fprintf (stderr,
-		   "%s:%d: error: argument of 'automatic()' must be a field, "
-		   "got '%s'\n",
-		   t->file, t->line, typenamearg);
-	  exit (1);
-	}
-	if (!strstr (typenamearg, typename)) {
-	  AstTerminal * t = ast_terminal (n);
-	  fprintf (stderr,
-		   "%s:%d: error: type mismatch for `automatic', "
-		   "expected '%s' got '%s'\n",
-		   t->file, t->line, typename, typenamearg);
-	  exit (1);	
-	}
-	str_append (src, "("); src = ast_str_append (arg, src); 
-	str_append (src, ")",
-		    !strcmp (typename, "scalar") ||
-		    !strcmp (typename, "vertex scalar") ? ".i" :
-		    !strcmp (typename, "vector") ||
-		    !strcmp (typename, "face vector") ? ".x.i" : ".x.x.i",
-		    "?(");
-	src = ast_str_append (arg, src); 
-	str_append (src, "):");
+      if (!strstr (ast_terminal (n)->start, typename)) {
+	AstTerminal * t = ast_terminal (n);
+	fprintf (stderr,
+		 "%s:%d: error: type mismatch for `new', "
+		 "expected '%s' got '%s'\n",
+		 t->file, t->line, typename, t->start);
+	exit (1);	
       }
 
-      char * func = strdup (typename);
-      for (char * s = func; *s; s++)
+      char * src = strdup (typename);
+      for (char * s = src; *s; s++)
 	if (*s == ' ')
 	  *s = '_';
-      str_append (src, "new_", func, "(\"",
-		  ast_terminal (identifier)->start, "\");");
-      free (func);
+      str_prepend (src, "new_");
+      str_append (src, "(\"", ast_terminal (identifier)->start, "\");");
       Ast * expr = ast_parse_expression (src, ast_get_root (n));
       free (src);
       ast_set_line (expr, ast_terminal (n));
@@ -1621,7 +1822,66 @@ static void translate (Ast * n, Stack * stack, void * data)
     }
     break;
   }
+    
+  /**
+  ## Automatic field deallocation before jump statements */
 
+  case sym_jump_statement: {
+    if (n->child[0]->sym == sym_GOTO) {
+      AstTerminal * t = ast_terminal (n->child[0]);
+      fprintf (stderr, "%s:%d: warning: goto statements are unsafe in Basilisk "
+	       "(and are bad programming style)\n",
+	       t->file, t->line);
+      break;
+    }
+
+    int jump_sym = n->child[0]->sym;
+    Ast * parent = n;
+    while (parent &&
+	   ((jump_sym == sym_BREAK &&
+	     parent->child[0]->sym != sym_SWITCH &&
+	     !ast_is_iteration_statement (parent)) ||
+	    (jump_sym == sym_CONTINUE &&
+	     !ast_is_iteration_statement (parent)) ||
+	    (jump_sym == sym_RETURN &&
+	     parent->sym != sym_function_definition &&
+	     parent->sym != sym_event_definition)))
+      parent = parent->parent;
+    Ast * scope = ast_find (parent, sym_compound_statement);
+    if (scope) {
+      char * delete[2] = {NULL};
+      foreach_field_allocator (stack, data, scope, field_deallocation, delete);
+      char * fields = delete_fields (delete);
+      if (fields)
+	compound_jump (n, parent, fields);
+      free (delete[0]);
+      free (delete[1]);
+    }
+    break;
+  }
+    
+  }
+
+  /**
+  ## Automatic field allocation and deallocation */
+
+  if (n->sym == token_symbol('}') && n->parent->sym == sym_compound_statement) {
+    char * delete[2] = {NULL};
+    foreach_field_allocator (stack, data, n->parent, field_allocation, delete);
+    
+    /**
+    ### Field deallocation */
+
+    char * fields = delete_fields (delete);
+    if (fields) {
+      Ast * expr = ast_parse_expression (fields, ast_get_root (n));
+      ast_block_list_append (ast_child (n->parent, sym_block_item_list),
+			     sym_block_item,
+			     ast_new_children (ast_new (n, sym_statement),
+					       expr));
+    }
+    free (delete[0]);
+    free (delete[1]);
   }
 }
 
@@ -1630,38 +1890,12 @@ static void trace_return (Ast * n, Stack * stack, void * data)
   Ast * function_definition = ((void **)data)[0];
   AstTerminal * function_identifier = ((void **)data)[1];
   if (ast_schema (n, sym_jump_statement, 0, sym_RETURN)) {
-    Ast * ret = n->child[0];
-    if (!n->child[2]) { // return ;
-      ast_before (ret,
-		  "{ end_tracing (\"", function_identifier->start, "\", ",
-		  ast_file_line (ret), "); ");
-      ast_after (n->child[1], " }");
-    }
-    else { // return sthg;
-      Ast * compound =
-	ast_parse_expression ("{ void _ret = val; return _ret; }",
-			      ast_get_root (n));
-      ast_replace (compound, "val", ast_find (n, sym_assignment_expression));
-
-      Ast * declarator =
-	ast_flatten (ast_copy (ast_find (function_definition, sym_declarator),
-			       sym_IDENTIFIER),
-		     ast_left_terminal (n));
-      AstTerminal * t = ast_terminal (ast_find (declarator, sym_IDENTIFIER));
-      free (t->start); t->start = strdup ("_ret");
-      ast_replace (compound, "_ret", declarator);
-      
-      Ast * type_specifier =
-	ast_flatten (ast_copy (ast_find (function_definition,
-					 sym_declaration_specifiers,
-					 0, sym_type_specifier)),
-		     ast_left_terminal (n));
-      ast_replace (compound, "void", type_specifier);
-      ast_before (ast_find (compound, sym_RETURN),
-		  "end_tracing (\"", function_identifier->start, "\", ",
-		  ast_file_line (ret), "); ");
-      ast_replace_child (n->parent, 0, compound);
-    }
+    char * end_tracing = NULL;
+    str_append (end_tracing,
+		"end_tracing(\"", function_identifier->start, "\",",
+		ast_file_line (n->child[0]), ");");
+    compound_jump (n, function_definition, end_tracing);
+    free (end_tracing);
   }
 }
 
@@ -1720,13 +1954,8 @@ static void macros (Ast * n, Stack * stack, void * data)
   ## Foreach inner statements */
     
   case sym_foreach_inner_statement: {
-    Ast * statement = ast_last_child (n);
-    if (statement->child[0]->sym == sym_compound_statement)
-      ast_after (statement, " end_", ast_left_terminal(n)->start, "()");
-    else {
-      ast_before (statement, "{");
-      ast_after (statement, "} end_", ast_left_terminal(n)->start, "()");
-    }
+    ast_before (n, "{");
+    ast_after (n, "end_", ast_left_terminal(n)->start, "()}");
     break;
   }
     
@@ -1979,12 +2208,12 @@ static void macros (Ast * n, Stack * stack, void * data)
 				   0, sym_IDENTIFIER);
       Ast * compound_statement = ast_last_child (n);
       ast_after (compound_statement->child[0],
-		 " tracing (\"", ast_terminal (identifier)->start, "\", ",
-		 ast_file_line (identifier), "); ");
+		 "tracing(\"", ast_terminal (identifier)->start, "\",",
+		 ast_file_line (identifier), ");");
       Ast * end = ast_last_child (compound_statement);
       ast_before (end,
-		  " end_tracing (\"", ast_terminal (identifier)->start, "\", ",
-		  ast_file_line (end), "); ");
+		  "end_tracing(\"", ast_terminal (identifier)->start, "\",",
+		  ast_file_line (end), ");");
       if (compound_statement->child[1]->sym == sym_block_item_list) {
 	void * data[] = { n, identifier };
 	ast_traverse (compound_statement, stack, trace_return, data);

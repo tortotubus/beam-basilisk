@@ -36,12 +36,14 @@ void      ast_print            (Ast * n, FILE * fp, bool kind);
 void      ast_print_tree       (Ast * n, FILE * fp, const char * indent,
 				bool compress);
 void      ast_print_file_line  (Ast * n, FILE * fp);
-AstRoot * ast_get_root         (Ast * n);
+AstRoot * ast_get_root         (const Ast * n);
 void      ast_identifier_print (Ast * identifier, FILE * fp);
 void      ast_stack_print      (Stack * stack, FILE * fp);
 
-static inline Ast * ast_last_child (Ast * n)
+static inline Ast * ast_last_child (const Ast * n)
 {
+  if (!n)
+    return NULL;
   Ast ** c = n->child;
   if (!c)
     return NULL;
@@ -49,8 +51,10 @@ static inline Ast * ast_last_child (Ast * n)
   return *c;
 }
 
-static inline Ast * ast_child (Ast * n, int sym)
+static inline Ast * ast_child (const Ast * n, int sym)
 {
+  if (!n)
+    return NULL;
   Ast ** c = n->child;
   if (!c)
     return NULL;
@@ -60,14 +64,14 @@ static inline Ast * ast_child (Ast * n, int sym)
 
 extern Ast * const ast_placeholder;
 
-static inline AstTerminal * ast_left_terminal (Ast * n)
+static inline AstTerminal * ast_left_terminal (const Ast * n)
 {
   while (n && n != ast_placeholder && n->child)
     n = n->child[0];
   return (AstTerminal *) (n != ast_placeholder ? n : NULL);
 }
 
-static inline AstTerminal * ast_right_terminal (Ast * n)
+static inline AstTerminal * ast_right_terminal (const Ast * n)
 {
   while (n && n != ast_placeholder && n->child)
     n = ast_last_child (n);
@@ -80,11 +84,11 @@ AstTerminal * ast_terminal_new (Ast * parent, int symbol, const char * start);
 
 Ast * ast_new_internal (Ast * parent, ...);
 #define ast_new(parent,...) ast_new_internal (parent, __VA_ARGS__, -1)
-Ast * ast_schema_internal (Ast * n, ...);
+Ast * ast_schema_internal (const Ast * n, ...);
 #define ast_schema(n,...) ast_schema_internal (n, __VA_ARGS__, -1)
-Ast * ast_find_internal (Ast * n, ...);
+Ast * ast_find_internal (const Ast * n, ...);
 #define ast_find(n,...) ast_find_internal (n, __VA_ARGS__, -1)
-Ast * ast_copy_internal (Ast * n, ...);
+Ast * ast_copy_internal (const Ast * n, ...);
 #define ast_copy(n,...) ast_copy_internal (n, __VA_ARGS__ + 0, -1)
 Ast * ast_attach_internal (Ast * parent, ...);
 #define ast_attach(p,...) ast_attach_internal (p, __VA_ARGS__, NULL)
@@ -103,6 +107,13 @@ static inline int ast_child_index (Ast * n)
   for (c = n->parent->child; *c && *c != n; c++, index++);
   assert (*c == n);
   return index;
+}
+
+static inline Ast * ast_ancestor (Ast * n, int i)
+{
+  while (n && i)
+    n = n->parent, i--;
+  return n;
 }
 
 char * str_append_realloc (char * dst, ...);
@@ -167,6 +178,7 @@ Ast * ast_new_unary_expression (Ast * parent);
 Ast * ast_new_constant (Ast * parent, int symbol, const char * value);
 Ast * ast_new_identifier (Ast * parent, const char * name);
 Ast * ast_new_member_identifier (Ast * parent, const char * name);
-Ast * ast_is_unary_expression (Ast * n);
-Ast * ast_is_identifier_expression (Ast * n);
+Ast * ast_is_unary_expression (const Ast * n);
+Ast * ast_is_identifier_expression (const Ast * n);
+Ast * ast_is_simple_expression (const Ast * n);
 Ast * ast_get_struct_name (Ast * declaration_specifiers);
