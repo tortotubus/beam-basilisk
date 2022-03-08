@@ -121,9 +121,9 @@ char * ast_line (AstTerminal * t)
   return s;
 }
 
-AstRoot * ast_get_root (Ast * n)
+AstRoot * ast_get_root (const Ast * n)
 {
-  Ast * root = n;
+  const Ast * root = n;
   while (root->parent)
     root = root->parent;
   return ast_root (root);
@@ -376,7 +376,7 @@ void ast_print_tree (Ast * n, FILE * fp, const char * indent, bool compress)
     return;
   }
   if (compress)
-    while (n->child && !n->child[1])
+    while (n->child && !n->child[1] && n->child[0] != ast_placeholder)
       n = n->child[0];
   fprintf (fp, "%s", symbol_name (n->sym));
   AstTerminal * t = ast_terminal (n);
@@ -438,7 +438,7 @@ Ast * ast_new_internal (Ast * parent, ...)
   return n;
 }
 
-static Ast * vast_schema_internal (Ast * n, va_list ap)
+static Ast * vast_schema_internal (const Ast * n, va_list ap)
 {
   int sym = va_arg(ap, int);
   if (n->sym != sym)
@@ -457,10 +457,10 @@ static Ast * vast_schema_internal (Ast * n, va_list ap)
       return NULL;
     c = va_arg(ap, int);
   }
-  return n;
+  return (Ast *) n;
 }
 
-Ast * ast_schema_internal (Ast * n, ...)
+Ast * ast_schema_internal (const Ast * n, ...)
 {
   if (!n)
     return NULL;
@@ -468,10 +468,10 @@ Ast * ast_schema_internal (Ast * n, ...)
   va_start (ap, n);
   n = vast_schema_internal (n, ap);
   va_end (ap);
-  return n;
+  return (Ast *) n;
 }
 
-static Ast * vast_find_internal (Ast * n, va_list ap)
+static Ast * vast_find_internal (const Ast * n, va_list ap)
 {
   va_list bp;
   va_copy (bp, ap);
@@ -486,7 +486,7 @@ static Ast * vast_find_internal (Ast * n, va_list ap)
   return NULL;
 }
 
-Ast * ast_find_internal (Ast * n, ...)
+Ast * ast_find_internal (const Ast * n, ...)
 {
   if (!n)
     return NULL;
@@ -494,7 +494,7 @@ Ast * ast_find_internal (Ast * n, ...)
   va_start (ap, n);
   n = vast_find_internal (n, ap);
   va_end (ap);
-  return n;
+  return (Ast *) n;
 }
 
 static Ast * copy_ast (Ast * dst, const Ast * src)
@@ -532,7 +532,7 @@ static Ast * root_copy (const AstRoot * src)
   return (Ast *)dst;
 }
 
-static Ast * vast_copy_internal (Ast * n, va_list ap, bool * found,
+static Ast * vast_copy_internal (const Ast * n, va_list ap, bool * found,
 				 AstRoot * dst_root, const AstRoot * src_root)
 {
   Ast * c = NULL;
@@ -569,14 +569,14 @@ static Ast * vast_copy_internal (Ast * n, va_list ap, bool * found,
   return c;
 }
 
-Ast * ast_copy_internal (Ast * n, ...)
+Ast * ast_copy_internal (const Ast * n, ...)
 {
   va_list ap;
   va_start (ap, n);
   bool found = false;
   AstRoot * src_root = ast_get_root (n);
   Ast * c = vast_copy_internal (n, ap, &found, src_root, src_root);
-  c->parent = n;
+  c->parent = (Ast *) n;
   va_end (ap);
   return c;
 }
@@ -588,10 +588,7 @@ Ast * ast_parse_expression (const char * expr, AstRoot * parent)
   Ast * n = (Ast *) ast_parse (s, parent);
   free (s);
   if (n) {
-    Ast * identifier = ast_find (n, sym_direct_declarator,
-				 0, sym_generic_identifier,
-				 0, sym_IDENTIFIER);
-    ast_pop_scope (parent->stack, identifier);
+    ast_pop_scope (parent->stack, n);
     Ast * c = ast_find (n, sym_statement);
     if (c)
       c = c->child[0];
@@ -767,8 +764,14 @@ void ast_stack_print (Stack * stack, FILE * fp)
 {
   Ast ** n;
   for (int i = 0; (n = stack_index (stack, i)); i++)
-    if (*n && (*n)->sym == sym_IDENTIFIER)
-      ast_identifier_print (*n, fp);
+    if (*n) {
+      if (ast_terminal (*n))
+	ast_identifier_print (*n, fp);
+      else if (*n == ast_placeholder)
+	fprintf (fp, "_placeholder_\n");
+      else
+	fprintf (fp, "%s %p\n", symbol_name ((*n)->sym), *n);
+    }
 }
 
 void ast_set_char (Ast * n, int c)
