@@ -99,6 +99,30 @@ Ast * ast_list_prepend (Ast * list, int item_sym, Ast * item)
 }
 
 /**
+Removes `item` from the (comma-separated) `list` and returns the new
+list or NULL if the list contains only *item*. */
+
+Ast * ast_list_remove (Ast * list, Ast * item)
+{
+  Ast * grand_parent = item->parent->parent;
+  if (ast_child_index (item) == 0) {
+    if (grand_parent->sym == list->sym) {
+      ast_replace_child (grand_parent, 0, grand_parent->child[2]);
+      ast_destroy (grand_parent->child[1]);
+      grand_parent->child[1] = NULL;
+    }
+    else
+      return NULL;
+  }
+  else {
+    Ast * parent = item->parent;
+    list = parent->child[0];
+    ast_replace_child (grand_parent, ast_child_index (parent), list);
+  }
+  return list;
+}
+
+/**
 Transforms a list of expressions into a list of arguments. */
 
 void ast_argument_list (Ast * expression)
@@ -440,6 +464,7 @@ static void complete_arguments (Ast * function_call, int n)
 		      function_call->child[2]);
     args = ast_child (function_call, sym_argument_expression_list);
   }
+  
   int i = 0;
   foreach_item (args, 2, item)
     i++;
@@ -1939,6 +1964,20 @@ static void macros (Ast * n, Stack * stack, void * data)
 	       "foreach*()" : "point function");
       exit (1);
     }
+    
+    Ast * parameters = ast_child (n, sym_foreach_parameters);
+    bool serial = false;
+    if (parameters)
+      foreach_item (parameters, 2, param) {
+	Ast * identifier = ast_is_identifier_expression (param->child[0]);
+	if (identifier && !strcmp (ast_terminal (identifier)->start,
+				   "serial")) {
+	  serial = true;
+	  _list = ast_list_remove (parameters, param);
+	  if (!_list)
+	    ast_remove (n->child[2], ast_left_terminal (n->child[3]));
+	}
+      }
 
     if (!strcmp (ast_terminal (n->child[0])->start, "foreach_face")) {
       free (ast_terminal (n->child[0])->start);
@@ -1947,7 +1986,21 @@ static void macros (Ast * n, Stack * stack, void * data)
 	ast_remove (n->child[2], ast_left_terminal (n->child[3]));
     }
 
-    // fall through
+    if (serial)
+      ast_before (n, "\n"
+		  "#if _OPENMP\n"
+		  "  #undef OMP\n"
+		  "  #define OMP(x)\n"
+		  "#endif\n");
+    ast_before (n, "{");
+    ast_after (n, "end_", ast_left_terminal(n)->start, "()}");
+    if (serial)
+      ast_after (n, "\n"
+		 "#if _OPENMP\n"
+		 "  #undef OMP\n"
+		 "  #define OMP(x) _Pragma(#x)\n"
+		 "#endif\n");      
+    break;
   }
   
   /**
