@@ -557,7 +557,7 @@ typedef struct {
   int dimension;
   Field * constants;
   int constants_index, fields_index;
-  Ast * init_solver;
+  Ast * init_solver, * init_events, * init_fields;
 } TranslateData;
 
 static void rotate (Ast * n, Stack * stack, void * data)
@@ -1401,7 +1401,7 @@ static void translate (Ast * n, Stack * stack, void * data)
 				      &d->constants_index);
 	    char * src = field_value (c, "_NVARMAX+");
 	    char * initializer = ast_str_append (n->child[2], NULL);
-	    ast_before (ast_child (d->init_solver, token_symbol ('}')),
+	    ast_before (ast_child (d->init_fields, token_symbol ('}')),
 			"  init_const_", const_func, "((", typename, ")",
 			src, ",\"", name, "\",",
 			!strcmp (typename, "vector") ? "(double[])" : "",
@@ -1449,7 +1449,7 @@ static void translate (Ast * n, Stack * stack, void * data)
 	  Field c;
 	  field_init (&c, typename, d->dimension, &d->fields_index);
 	  char * src = field_value (&c, "");
-	  ast_before (ast_child (d->init_solver, token_symbol ('}')),
+	  ast_before (ast_child (d->init_fields, token_symbol ('}')),
 		      "  init_", func, "((", typename, ")", src, ",\"",
 		      name, "\");\n");
 	  str_prepend (src, typename, " _field_=");
@@ -1811,9 +1811,9 @@ static void translate (Ast * n, Stack * stack, void * data)
 		  ast_file_line (t), ",\"", t->start, "\"});\n");
       TranslateData * d = data;
       if (last)
-	ast_before (ast_child (d->init_solver, token_symbol ('}')), reg);
+	ast_before (ast_child (d->init_events, token_symbol ('}')), reg);
       else
-	ast_after (ast_child (d->init_solver, token_symbol ('{')), reg);
+	ast_after (ast_child (d->init_events, token_symbol ('{')), reg);
       free (reg);
       free (iarray);
       free (tarray);
@@ -2245,10 +2245,11 @@ static void macros (Ast * n, Stack * stack, void * data)
     break;
   }
 
-  /**
-  ## Function profiling with `trace` */
-
   case sym_function_definition: {
+    
+    /**
+    ## Function profiling with `trace` */
+    
     Ast * trace = ast_schema (n, sym_function_definition,
 			      0, sym_function_declaration,
 			      0, sym_declaration_specifiers,
@@ -2259,11 +2260,11 @@ static void macros (Ast * n, Stack * stack, void * data)
       Ast * identifier = ast_find (n, sym_direct_declarator,
 				   0, sym_generic_identifier,
 				   0, sym_IDENTIFIER);
-      Ast * compound_statement = ast_last_child (n);
+      Ast * compound_statement = ast_child (n, sym_compound_statement);
       ast_after (compound_statement->child[0],
 		 "tracing(\"", ast_terminal (identifier)->start, "\",",
 		 ast_file_line (identifier), ");");
-      Ast * end = ast_last_child (compound_statement);
+      Ast * end = ast_child (compound_statement, token_symbol ('}'));
       ast_before (end,
 		  "end_tracing(\"", ast_terminal (identifier)->start, "\",",
 		  ast_file_line (end), ");");
@@ -2272,6 +2273,25 @@ static void macros (Ast * n, Stack * stack, void * data)
 	ast_traverse (compound_statement, stack, trace_return, data);
       }
     }
+
+    /**
+    ## Solver initialization and termination. */
+
+    Ast * identifier = ast_schema (n, sym_function_definition,
+				   0, sym_function_declaration,
+				   1, sym_declarator,
+				   0, sym_direct_declarator,
+				   0, sym_direct_declarator,
+				   0, sym_generic_identifier,
+				   0, sym_IDENTIFIER);
+    if (identifier && !strcmp (ast_terminal (identifier)->start, "main")) {
+      Ast * compound_statement = ast_child (n, sym_compound_statement);
+      ast_after (compound_statement->child[0],
+		 "_init_solver();");
+      Ast * end = ast_child (compound_statement, token_symbol ('}'));
+      ast_before (end, "free_solver();");
+    }
+    
     break;
   }
 
@@ -2448,7 +2468,8 @@ void endfor (FILE * fin, FILE * fout, int dimension)
   TranslateData data = {
     .dimension = dimension,
     .constants_index = 0, .fields_index = 0,
-    .init_solver = NULL
+    // fixme: splitting of events and fields is not used yet
+    .init_solver = NULL, .init_events = NULL, .init_fields = NULL
   };
   data.constants = calloc (1, sizeof (Field));
 
@@ -2459,7 +2480,7 @@ void endfor (FILE * fin, FILE * fout, int dimension)
   str_prepend (ast_left_terminal (data.init_solver)->before, "\n");  
   ast_block_list_append (ast_find ((Ast *)root, sym_translation_unit),
 			 sym_external_declaration, data.init_solver);
-  data.init_solver =
+  data.init_events = data.init_fields =
     ast_find (ast_find (data.init_solver, sym_compound_statement)->child[1],
 	      sym_compound_statement);
   ast_destroy ((Ast *) init);
@@ -2468,6 +2489,14 @@ void endfor (FILE * fin, FILE * fout, int dimension)
 
   ast_traverse ((Ast *) root, root->stack, translate, &data);
   ast_traverse ((Ast *) root, root->stack, macros, &data);
+
+  if (data.fields_index) {
+    Ast * call_init_solver = ast_find (data.init_solver, sym_function_call);
+    char n[10];
+    snprintf (n, 9, "%d", data.fields_index);
+    ast_before (call_init_solver, "datasize=", n, "*sizeof(double);");
+  }
+  
   for (Field * c = data.constants; c->identifier; c++) {
 #if 0  
     ast_print (c->identifier, stderr, 0);
