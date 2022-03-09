@@ -155,10 +155,9 @@ void  ast_traverse (Ast * n, Stack * stack,
 #define foreach_item(list, index, item)					\
   for (Ast * _list = list, * item = _list ?				\
 	 (_list->child[1] ? _list->child[index] : _list->child[0]) : NULL; \
-       item;								\
-       _list = _list->child[1] ? _list->child[0] : NULL,		\
-	 item = _list ? (_list->child[1] ? _list->child[index] :	\
-			 _list->child[0]) : NULL			\
+       (_list = _list && _list->child[1] ? _list->child[0] : NULL), item; \
+       item = _list ? (_list->child[1] ? _list->child[index] :		\
+		       _list->child[0]) : NULL				\
        )
 
 Ast * ast_is_typedef              (Ast * identifier);
@@ -173,6 +172,7 @@ Ast * ast_list_append_list (Ast * list, Ast * list1);
 Ast * ast_block_list_append (Ast * list, int item_sym, Ast * item);
 Ast * ast_list_append (Ast * list, int item_sym, Ast * item);
 Ast * ast_list_prepend (Ast * list, int item_sym, Ast * item);
+Ast * ast_list_remove (Ast * list, Ast * item);
 void  ast_argument_list (Ast * expression);
 Ast * ast_new_unary_expression (Ast * parent);
 Ast * ast_new_constant (Ast * parent, int symbol, const char * value);

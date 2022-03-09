@@ -142,7 +142,7 @@ static int count_lines (const char * s)
 
 void ast_set_child (Ast * parent, int index, Ast * child)
 {
-  if (child->parent && child->parent != parent) {
+  if (child->parent) {
     Ast * oldparent = child->parent;
     if (oldparent->child) {
       Ast ** c;
@@ -248,9 +248,17 @@ static void update_file_line (const char * preproc, File * file)
       while (u != preproc && !strchr ("\n\r", *u) && strchr (" \t", *u))
 	u--;
       if (u == preproc || strchr ("\n\r", *u)) {
-	file->line = atoi (s + 1) - 1;
-	file->name = strchr (s, '"');
-	assert (file->name); file->name++;
+	s++;
+	while (*s && strchr (" \t", *s)) s++;
+	if (strchr ("0123456789", *s)) {
+	  int line = atoi (s) - 1;
+	  while (*s && !strchr (" \t", *s)) s++;
+	  while (*s && strchr (" \t", *s)) s++;
+	  if (*s == '"') {
+	    file->line = line;
+	    file->name = s + 1;
+	  }
+	}
       }
     }
     else if (*s == '\n')
