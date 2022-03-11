@@ -285,8 +285,15 @@ static void ast_print_internal (Ast * n, FILE * fp, bool sym, File * file)
 	file->name = t->file;      
       }
       else if (t->line != file->line) {
-	fprintf (fp, "\n#line %d\n", t->line);
-	file->line = t->line;
+	if (file->line > t->line || t->line - file->line > 10) {
+	  fprintf (fp, "\n#line %d\n", t->line);
+	  file->line = t->line;
+	}
+	else
+	  while (file->line < t->line) {
+	    fputc ('\n', fp);
+	    file->line++;
+	  }
       }
     }
     if (sym) {
