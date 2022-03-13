@@ -2141,7 +2141,7 @@ static void macros (Ast * n, Stack * stack, void * data)
     const char * typename =
       get_field_type (n->child[2], ast_terminal(identifier));
     char * src = NULL, * name = ast_terminal(identifier)->start;
-    str_append (src, "{", typename, "*_i=list;if(_i)"
+    str_append (src, "{", typename, "*_i=(", typename, "*)list;if(_i)"
 		"for(", typename, " ", name, "=*_i;(&",
 		name,
 		!strcmp (typename, "scalar") ? ")->i" :
@@ -2150,9 +2150,11 @@ static void macros (Ast * n, Stack * stack, void * data)
 		">=0;", name, "=*++_i){_statement_;}}");
     Ast * expr = ast_parse_expression (src, ast_get_root (n));
     free (src);
-    Ast * parent = n->parent; // fixme: simplify
-    Ast * initializer = ast_find (expr, sym_initializer);
-    ast_replace_child (initializer, 0, n->child[5]->child[0]);
+    Ast * parent = n->parent;
+    Ast * initializer = ast_find (expr, sym_cast_expression,
+				  3, sym_cast_expression);
+    ast_replace_child (initializer, 0,
+		       ast_child (n, sym_forin_arguments)->child[0]);
     assert (ast_replace (expr, "_statement_", ast_last_child (n)));
     ast_replace_child (parent->parent, ast_child_index (parent), expr);
     break;
