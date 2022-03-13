@@ -4,9 +4,9 @@
 #include "ast.h"
 #include "symbols.h"
 
-Ast * ast_is_typedef (Ast * identifier)
+Ast * ast_is_typedef (const Ast * identifier)
 {
-  Ast * declaration = identifier;
+  const Ast * declaration = identifier;
   while (declaration && declaration->sym != sym_declaration)
     declaration = declaration->parent;
   if (declaration)
@@ -318,7 +318,7 @@ static Ast * find_struct_member (Ast * n, Ast * member)
   return NULL;
 }
 
-static Ast * declaration_from_type (Ast * type)
+static Ast * declaration_from_type (const Ast * type)
 {
   while (type->sym != sym_declaration &&
 	 type->sym != sym_function_declaration &&
@@ -327,7 +327,7 @@ static Ast * declaration_from_type (Ast * type)
 	 type->sym != sym_forin_declaration_statement)
     type = type->parent;
   assert (type);
-  return type;
+  return (Ast *) type;
 }
 
 static Ast * expression_type (Ast * expr, Stack * stack)
@@ -707,6 +707,62 @@ void maybeconstfield (Ast * n, Stack * stack,
       maybeconstfield (*c, stack, func, data);  
 }
 
+static Ast * is_point_point (const Ast * identifier)
+{
+  if (identifier->parent->parent->sym == sym_direct_declarator &&
+      !strcmp (ast_terminal (identifier)->start, "point")) {    
+    const Ast * decl = identifier;
+    while (decl->sym != sym_declaration &&
+	   decl->sym != sym_parameter_declaration)
+      decl = decl->parent;
+    Ast * type = ast_schema (decl->child[0],
+			     sym_declaration_specifiers,
+			     0, sym_type_specifier,
+			     0, sym_types,
+			     0, sym_TYPEDEF_NAME);
+    if (type && !strcmp (ast_terminal (type)->start, "Point")) {
+      if (decl->sym == sym_declaration)
+	return (Ast *) decl;
+      else if (decl->sym == sym_parameter_declaration) {
+	while (decl->sym != sym_parameter_type_list)
+	  decl = decl->parent;
+	if ((decl = decl->parent)->sym != sym_direct_declarator ||
+	    (decl = decl->parent)->sym != sym_declarator ||
+	    (decl = decl->parent)->sym != sym_function_declaration ||
+	    (decl = decl->parent)->sym != sym_function_definition)
+	  return NULL;
+	return ast_last_child (decl)->child[0];
+      }
+    }
+  }
+  return NULL;
+}
+
+static Ast * is_point_function (const Ast * declarator)
+{
+  Ast * parameters = ast_find (declarator, sym_parameter_type_list);
+  if (parameters)
+    foreach_item (parameters, 2, param) {
+      Ast * identifier = ast_find (param, sym_IDENTIFIER);
+      if (identifier &&
+	  identifier->parent->parent->sym == sym_direct_declarator &&
+	  !strcmp (ast_terminal (identifier)->start, "point")) {
+	const Ast * decl = identifier;
+	while (decl->sym != sym_declaration &&
+	       decl->sym != sym_parameter_declaration)
+	  decl = decl->parent;
+	Ast * type = ast_schema (decl->child[0],
+				 sym_declaration_specifiers,
+				 0, sym_type_specifier,
+				 0, sym_types,
+				 0, sym_TYPEDEF_NAME);
+	if (type && !strcmp (ast_terminal (type)->start, "Point"))
+	  return identifier;
+      }
+    }
+  return NULL;
+}
+
 static
 void maybeconst (Ast * n, Stack * stack,
 		 void func (Ast * n, Ast * type, void * data),
@@ -785,6 +841,82 @@ void replace_const (Ast * n, Ast * type, void * data)
       unary = unary->parent;
     unary = unary->parent;
     ast_replace_child_same_symbol (unary, 0, n);
+  }
+}
+
+/**
+### (const) fields combinations */
+
+static
+char * combination_constants (TranslateData * d, Ast ** consts, int bits,
+			      char * constants)
+{
+  int nmaybeconst = 0;
+  for (Ast ** c = consts; *c; c++, nmaybeconst++);
+  for (int i = 0; i < nmaybeconst; i++)
+    if (bits & (1 << i)) {
+      const char * name = ast_terminal (consts[i])->start;
+      const char * typename = typedef_name (consts[i]);
+      if (!strcmp (typename, "vector") ||
+	  !strcmp (typename, "face vector")) {
+	str_append (constants, "const struct{double x");
+	for (int j = 1; j < d->dimension; j++) {
+	  char s[] = ",y"; s[1] = 'x' + j;
+	  str_append (constants, s);
+	}
+	str_append (constants, ";}_const_", name, "={_constant[",
+		    name,  ".x.i-_NVARMAX]");
+	for (int j = 1; j < d->dimension; j++) {
+	  char s[] = ".x.i-_NVARMAX]"; s[1] = 'x' + j;
+	  str_append (constants, ",_constant[", name, s);
+	}
+	str_append (constants, "};");
+      }
+      else
+	str_append (constants,
+		    "const double _const_", name, "=_constant[",
+		    name, ".i-_NVARMAX];");
+    }
+  return constants;
+}
+
+static void combinations (Ast * n, Stack * stack, TranslateData * d,
+			  Ast ** consts,
+			  Ast * list, Ast * item, const char * key)
+{
+  int nmaybeconst = 0;
+  for (Ast ** c = consts; *c; c++, nmaybeconst++);
+  int n2 = 1 << nmaybeconst;
+  for (int bits = 0; bits < n2; bits++) {
+    char * condition = strdup ("if (");
+    for (int i = 0; i < nmaybeconst; i++) {
+      const char * name = ast_terminal (consts[i])->start;
+      const char * typename = typedef_name (consts[i]);
+      str_append (condition,
+		  (bits & (1 << i)) ? "" : "!",
+		  "is_constant(", name,
+		  !strcmp (typename, "vector") ||
+		  !strcmp (typename, "face vector") ? ".x" : "",
+		  ")");
+      if (i < nmaybeconst - 1)
+	str_append (condition, " && ");
+    }
+    str_append (condition, "){");
+    condition = combination_constants (d, consts, bits, condition);
+    str_append (condition, key, "{_statement_;}}");
+    Ast * copy = bits ? ast_copy (n) : n;
+    if (bits)
+      maybeconst (copy, stack, replace_const, &(ReplaceConst){consts, bits});
+    Ast * conditional = ast_parse_expression (condition,
+					      ast_get_root (copy));
+    free (condition);
+    assert (ast_replace (conditional, "_statement_", copy));
+    conditional = ast_new_children (ast_new (list, sym_statement),
+				    conditional);
+    if (bits)
+      list = ast_block_list_append (list, item->sym, conditional);
+    else
+      ast_replace_child (item, 0, conditional);
   }
 }
 
@@ -1146,66 +1278,40 @@ static void translate (Ast * n, Stack * stack, void * data)
     if (consts) {
       Ast * item = get_block_list_item (n->parent->parent);
       Ast * list = item->parent;
-      int nmaybeconst = 0;
-      for (Ast ** c = consts; *c; c++, nmaybeconst++);
-      int n2 = 1 << nmaybeconst;
-      for (int bits = 0; bits < n2; bits++) {
-	char * condition = strdup ("if (");
-	for (int i = 0; i < nmaybeconst; i++) {
-	  const char * name = ast_terminal (consts[i])->start;
-	  const char * typename = typedef_name (consts[i]);
-	  str_append (condition,
-		      (bits & (1 << i)) ? "" : "!",
-		      "is_constant(", name,
-		      !strcmp (typename, "vector") ||
-		      !strcmp (typename, "face vector") ? ".x" : "",
-		      ")");
-	  if (i < nmaybeconst - 1)
-	    str_append (condition, " && ");
-	}
-	str_append (condition, "){");
-	for (int i = 0; i < nmaybeconst; i++)
-	  if (bits & (1 << i)) {
-	    const char * name = ast_terminal (consts[i])->start;
-	    const char * typename = typedef_name (consts[i]);
-	    if (!strcmp (typename, "vector") ||
-		!strcmp (typename, "face vector")) {
-	      str_append (condition,
-			  "const struct { double x");
-	      TranslateData * d = data;
-	      for (int j = 1; j < d->dimension; j++) {
-		char s[] = ", y"; s[2] = 'x' + j;
-		str_append (condition, s);
-	      }
-	      str_append (condition, "; } _const_", name, " = {_constant[",
-			  name,  ".x.i - _NVARMAX]");
-	      for (int j = 1; j < d->dimension; j++) {
-		char s[] = ".x.i - _NVARMAX]"; s[1] = 'x' + j;
-		str_append (condition, ", _constant[", name, s);
-	      }
-	      str_append (condition, "};");
-	    }
-	    else
-	      str_append (condition,
-			  " const double _const_", name, " = _constant[",
-			  name, ".i - _NVARMAX];");
-	  }
-	str_append (condition, "foreach();}");
-	Ast * copy = bits ? ast_copy (n) : n;
-	if (bits)
-	  maybeconst (copy, stack, replace_const, &(ReplaceConst){consts, bits});
-	Ast * conditional = ast_parse_expression (condition,
-						  ast_get_root (copy));
-	free (condition);
-	ast_replace (conditional, ";", copy);
-	if (bits)
-	  list = ast_block_list_append (list, item->sym, conditional);
-	else
-	  ast_replace_child (item, 0, conditional);
-      }
+      combinations (n, stack, data, consts, list, item, "foreach()");
       free (consts);
     }
     
+    break;
+  }
+
+  /**
+  ## (const) fields combinations for Point functions */
+
+  case sym_function_definition: {
+    if (is_point_function (ast_schema (n, sym_function_definition,
+				       0, sym_function_declaration,
+				       1, sym_declarator))) {
+      Ast ** consts = NULL;
+      maybeconst (n, stack, append_const, &consts);
+      if (consts) {
+	Ast * compoundi = ast_schema (n, sym_function_definition,
+				      1, sym_compound_statement);
+	Ast * compound = ast_copy (compoundi);
+	Ast * list = ast_child (compoundi, sym_block_item_list);
+	Ast * item = list->child[0];
+	ast_destroy (list->child[1]);
+	list->child[1] = NULL;
+	item->sym = sym_block_item;
+	ast_destroy (item->child[0]);
+	if (item->child[1]) {
+	  ast_destroy (item->child[1]);
+	  item->child[1] = NULL;
+	}
+	combinations (compound, stack, data, consts, list, item, "");
+	free (consts);
+      }
+    }
     break;
   }
 
@@ -1311,9 +1417,9 @@ static void translate (Ast * n, Stack * stack, void * data)
     }
     break;
   }
-  
+
   /**
-  ## Identifiers */
+  ## Replacement of some identifiers */
   
   case sym_IDENTIFIER: {
     if (n->parent->sym == sym_primary_expression) {
@@ -2109,32 +2215,14 @@ static void macros (Ast * n, Stack * stack, void * data)
   ## Point point */
   
   case sym_IDENTIFIER: {
-    if (n->parent->parent->sym == sym_direct_declarator &&
-	!strcmp (ast_terminal (n)->start, "point")) {
-      Ast * decl = declaration_from_type (n);
-      if (decl->sym == sym_declaration)
-	;
-      else if (decl->sym == sym_parameter_declaration) {
-	while (decl->sym != sym_parameter_type_list)
-	  decl = decl->parent;
-	if ((decl = decl->parent)->sym != sym_direct_declarator ||
-	    (decl = decl->parent)->sym != sym_declarator ||
-	    (decl = decl->parent)->sym != sym_function_declaration ||
-	    (decl = decl->parent)->sym != sym_function_definition)	    
-	  decl = NULL;
-	else
-	  decl = ast_last_child (decl)->child[0];
-      }
-      else
-	decl = NULL;
-      if (decl) {
-	TranslateData * d = data;
-	static const char * name[3] = {"ig", "jg", "kg"};
-	for (int i = 0; i < d->dimension; i++)
-	  ast_after (decl, "int ", name[i], "=0;"
-		     "NOT_UNUSED(", name[i], ");");
-	ast_after (decl, "POINT_VARIABLES;");	
-      }
+    Ast * decl = is_point_point (n);
+    if (decl) {
+      TranslateData * d = data;
+      static const char * name[3] = {"ig", "jg", "kg"};
+      for (int i = 0; i < d->dimension; i++)
+	ast_after (decl, "int ", name[i], "=0;"
+		   "NOT_UNUSED(", name[i], ");");
+      ast_after (decl, "POINT_VARIABLES;");	
     }
     break;
   }
