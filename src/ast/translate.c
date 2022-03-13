@@ -555,6 +555,7 @@ static Field * field_append (Field ** fields, Ast * identifier,
 
 typedef struct {
   int dimension;
+  bool nolineno;
   Field * constants;
   int constants_index, fields_index;
   Ast * init_solver, * init_events, * init_fields;
@@ -1628,6 +1629,7 @@ static void translate (Ast * n, Stack * stack, void * data)
 				   0, sym_IDENTIFIER);
     if (identifier) {
       AstTerminal * t = ast_terminal (identifier);
+      TranslateData * d = data;
 
       /**
       ### Memory allocation tracing */
@@ -1646,7 +1648,8 @@ static void translate (Ast * n, Stack * stack, void * data)
 	  free (t->start);
 	  t->start = strdup (i->replacement);
 	  assert (n->child[3]);
-	  ast_before (n->child[3], ",__func__,__FILE__,__LINE__");
+	  ast_before (n->child[3], ",__func__,__FILE__,",
+		      d->nolineno ? "0" : "__LINE__");
 	}
 	i++;
       }
@@ -1909,13 +1912,13 @@ static void translate (Ast * n, Stack * stack, void * data)
 	snprintf (anexpr, 9, "%d", i);
 	str_append (reg, name, "_expr", anexpr, i < nexpr - 1 ? "," : "");
       }
+      TranslateData * d = data;
       str_append (reg, "},",
 		  iarray ? iarray : "((int *)0)",
 		  ",",
 		  tarray ? tarray : "((double *)0)",
 		  ",",
-		  ast_file_line (t), ",\"", t->start, "\"});\n");
-      TranslateData * d = data;
+		  ast_file_line (t, d->nolineno), ",\"", t->start, "\"});\n");
       if (last)
 	ast_before (ast_child (d->init_events, token_symbol ('}')), reg);
       else
@@ -2022,9 +2025,10 @@ static void trace_return (Ast * n, Stack * stack, void * data)
   AstTerminal * function_identifier = ((void **)data)[1];
   if (ast_schema (n, sym_jump_statement, 0, sym_RETURN)) {
     char * end_tracing = NULL;
+    TranslateData * d = ((void **)data)[2];
     str_append (end_tracing,
 		"end_tracing(\"", function_identifier->start, "\",",
-		ast_file_line (n->child[0]), ");");
+		ast_file_line (n->child[0], d->nolineno), ");");
     compound_jump (n, function_definition, end_tracing);
     free (end_tracing);
   }
@@ -2344,21 +2348,22 @@ static void macros (Ast * n, Stack * stack, void * data)
 			      0, sym_storage_class_specifier,
 			      0, sym_TRACE);
     if (trace) {
-      ast_hide (ast_terminal (trace));
+      TranslateData * d = data;
+      ast_hide (ast_terminal (trace));      
       Ast * identifier = ast_find (n, sym_direct_declarator,
 				   0, sym_generic_identifier,
 				   0, sym_IDENTIFIER);
       Ast * compound_statement = ast_child (n, sym_compound_statement);
       ast_after (compound_statement->child[0],
 		 "tracing(\"", ast_terminal (identifier)->start, "\",",
-		 ast_file_line (identifier), ");");
+		 ast_file_line (identifier, d->nolineno), ");");
       Ast * end = ast_child (compound_statement, token_symbol ('}'));
       ast_before (end,
 		  "end_tracing(\"", ast_terminal (identifier)->start, "\",",
-		  ast_file_line (end), ");");
+		  ast_file_line (end, d->nolineno), ");");
       if (compound_statement->child[1]->sym == sym_block_item_list) {
-	void * data[] = { n, identifier };
-	ast_traverse (compound_statement, stack, trace_return, data);
+	void * adata[] = { n, identifier, data };
+	ast_traverse (compound_statement, stack, trace_return, adata);
       }
     }
 
@@ -2519,7 +2524,7 @@ void ast_traverse (Ast * n, Stack * stack,
   func (n, stack, data);
 }
 
-void endfor (FILE * fin, FILE * fout, int dimension)
+void endfor (FILE * fin, FILE * fout, int dimension, bool nolineno)
 {
   char * buffer = NULL;
   size_t len = 0, maxlen = 0;
@@ -2554,7 +2559,7 @@ void endfor (FILE * fin, FILE * fout, int dimension)
   root->alloc = d->alloc; d->alloc = NULL;
 
   TranslateData data = {
-    .dimension = dimension,
+    .dimension = dimension, .nolineno = nolineno,
     .constants_index = 0, .fields_index = 0,
     // fixme: splitting of events and fields is not used yet
     .init_solver = NULL, .init_events = NULL, .init_fields = NULL
