@@ -1836,17 +1836,17 @@ static void translate (Ast * n, Stack * stack, void * data)
       Make the name unique. */
       
       AstTerminal * t = ast_left_terminal (n->child[1]);
-      char * name = malloc (strlen (t->start) + 10),
+      char * name = malloc (strlen (t->start) + 20),
 	* suffix = name + strlen(t->start);
       strcpy (name, t->start);
       int i = 0;
       while (ast_identifier_declaration (stack, name))
-	snprintf (suffix, 9, "_%d", i++);
+	snprintf (suffix, 19, "_%d", i++);
 
       /**
       Define the event expressions. */
 
-      char * expr = NULL, * iarray = NULL, * tarray = NULL, anexpr[10];
+      char * expr = NULL, * iarray = NULL, * tarray = NULL, anexpr[20];
       int last = 0, nexpr = 0;
       foreach_item (n->child[3], 2, event_parameter) {
 	Ast * initializer = ast_child (event_parameter, sym_postfix_initializer);
@@ -1861,7 +1861,7 @@ static void translate (Ast * n, Stack * stack, void * data)
 		     "to set 't' or 'i'\n", t->file, t->line);
 	    exit (1);
 	  }
-	  snprintf (anexpr, 9, "%d", nexpr++);
+	  snprintf (anexpr, 19, "%d", nexpr++);
 	  str_append (expr, "static int ", name, "_expr", anexpr,
 		      "(int *ip,double *tp,Event *_ev)"
 		      "{int i=*ip;double t=*tp;"
@@ -1884,7 +1884,7 @@ static void translate (Ast * n, Stack * stack, void * data)
 	      !strcmp (ast_terminal (identifier)->start, "last"))
 	    last = 1;
 	  else {
-	    snprintf (anexpr, 9, "%d", nexpr++);
+	    snprintf (anexpr, 19, "%d", nexpr++);
 	    str_append (expr, "static int ", name, "_expr", anexpr,
 			"(int *ip,double *tp,Event *_ev)"
 			"{int i=*ip;double t=*tp;"
@@ -1906,10 +1906,10 @@ static void translate (Ast * n, Stack * stack, void * data)
       Register the event. */
 
       char * reg = NULL;
-      snprintf (anexpr, 9, "%d", nexpr);
+      snprintf (anexpr, 19, "%d", nexpr);
       str_append (reg, "  event_register((Event){0,", anexpr, ",", name, ",{");
       for (int i = 0; i < nexpr; i++) {
-	snprintf (anexpr, 9, "%d", i);
+	snprintf (anexpr, 19, "%d", i);
 	str_append (reg, name, "_expr", anexpr, i < nexpr - 1 ? "," : "");
       }
       TranslateData * d = data;
