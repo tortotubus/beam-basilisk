@@ -160,13 +160,12 @@ void  ast_traverse (Ast * n, Stack * stack,
 		       _list->child[0]) : NULL				\
        )
 
-Ast * ast_is_typedef              (Ast * identifier);
 Ast * ast_identifier_declaration (Stack * stack, const char * identifier);
 
 void ast_set_char (Ast * n, int c);
 void ast_remove (Ast * n, AstTerminal * before);
 void ast_check (Ast * n);
-Ast * ast_is_typedef (Ast * identifier);
+Ast * ast_is_typedef (const Ast * identifier);
 Ast * ast_find_function (Ast * n, const char * name);
 Ast * ast_list_append_list (Ast * list, Ast * list1);
 Ast * ast_block_list_append (Ast * list, int item_sym, Ast * item);
