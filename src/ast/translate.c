@@ -2580,18 +2580,7 @@ void ast_push_declaration (Stack * stack, Ast * n)
 void ast_pop_scope (Stack * stack, Ast * scope)
 {
   Ast * n;
-  while ((n = *((Ast **)stack_pop (stack))) != scope) {
-#if 0
-    if (n->sym == sym_IDENTIFIER) {
-      fputs ("  pop: ", stderr);
-      ast_identifier_print (n, stderr);
-    }
-#endif
-  }
-#if 0
-  fputs ("scope: ", stderr);
-  ast_print_file_line (n, stderr);
-#endif
+  while ((n = *((Ast **)stack_pop (stack))) != scope);
 }
 
 Ast * ast_push_function_definition (Stack * stack, Ast * declarator)
@@ -2663,7 +2652,8 @@ void ast_traverse (Ast * n, Stack * stack,
   func (n, stack, data);
 }
 
-void endfor (FILE * fin, FILE * fout, int dimension, bool nolineno)
+void endfor (FILE * fin, FILE * fout,
+	     const char * grid, int dimension, bool nolineno)
 {
   char * buffer = NULL;
   size_t len = 0, maxlen = 0;
@@ -2681,13 +2671,7 @@ void endfor (FILE * fin, FILE * fout, int dimension, bool nolineno)
   }
   buffer[len++] = '\0';
 
-#if 1
-  FILE * fp = fopen (".endfor", "w");
-  fputs (buffer, fp);
-  fclose (fp);
-#endif
-
-  fp = fopen (BASILISK "/ast/defaults.h", "r");
+  FILE * fp = fopen (BASILISK "/ast/defaults.h", "r");
   assert (fp);
   AstRoot * d = ast_parse_file (fp, NULL);
   fclose (fp);
@@ -2717,8 +2701,6 @@ void endfor (FILE * fin, FILE * fout, int dimension, bool nolineno)
 	      sym_compound_statement);
   ast_destroy ((Ast *) init);
   
-  //  ast_stack_print (root->stack, stderr);
-
   ast_traverse ((Ast *) root, root->stack, translate, &data);
   ast_traverse ((Ast *) root, root->stack, macros, &data);
 
@@ -2728,32 +2710,12 @@ void endfor (FILE * fin, FILE * fout, int dimension, bool nolineno)
     snprintf (n, 9, "%d", data.fields_index);
     ast_before (call_init_solver, "datasize=", n, "*sizeof(double);");
   }
+
+  ast_before (data.init_events, grid, "_methods();");
   
-  for (Field * c = data.constants; c->identifier; c++) {
-#if 0  
-    ast_print (c->identifier, stderr, 0);
-    fprintf (stderr, "\nindex: %d\n", c->index);
-#endif
-  }
   free (data.constants);
     
-  //  ast_stack_print (root->stack, stderr);
-
   ast_print ((Ast *) root, fout, false);
-#if 1
-  fp = fopen (".endfor.out", "w");
-  ast_print ((Ast *) root, fp, false);
-  fclose (fp);
-#endif
-
-#if 0
-  Ast * main = ast_find_function ((Ast *) root, "main");
-  if (main) {
-    fp = fopen (".endfor.main", "w");
-    ast_print_tree (main, fp, 0);
-    fclose (fp);
-  }
-#endif
   
   ast_destroy ((Ast *) d);
   ast_destroy ((Ast *) root);
