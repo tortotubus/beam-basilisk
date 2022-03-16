@@ -2561,11 +2561,16 @@ static void macros (Ast * n, Stack * stack, void * data)
     break;
   }
 
-#if 1    
+  /**
+  ## Warnings for Basilisk C parse errors */
+    
   case sym_YYerror: {
-    fprintf (stderr, "ERROR");
-    ast_print (n, stderr, 0);
-    fputc ('\n', stderr);
+    AstTerminal * t = ast_left_terminal (n);
+    char * s = NULL;
+    s = ast_str_append (n, s);
+    fprintf (stderr, "%s:%d: warning: Basilisk C parse error near `%s'\n",
+	     t->file, t->line, s);
+    free (s);
     break;
   }
     
