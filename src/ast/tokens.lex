@@ -143,6 +143,8 @@ static Ast * new_ast (AstRoot * parse,
 "trace"			                { SAST(TRACE); }
 "reduction"			        { SAST(REDUCTION); }
 
+"foreach_blockf" |
+"foreach_block" |
 "foreach_child" |
 "foreach_neighbor"                      { SAST(FOREACH_INNER); }
 
