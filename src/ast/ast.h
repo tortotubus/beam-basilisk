@@ -16,6 +16,7 @@ typedef struct {
   char * before, * start, * after;
   const char * file;
   int line;
+  void * value;
 } AstTerminal;
 
 typedef struct {
