@@ -509,16 +509,36 @@ typedef struct {
   int type, index, dimension;
 } Field;
 
-static char * field_value (Field * c, const char * prefix)
+static char * field_value (Field * c, const char * prefix, int type)
 {
   char * src = NULL;
-  for (int i = 0; i < c->dimension; i++) {
-    char s[10];
-    snprintf (s, 9, "%d", c->index + i);
-    str_append (src, "{", prefix, s, "}",
-		i < c->dimension - 1 ? "," : "");	      
+  if (c->type == 3) { // tensor
+    int index = c->index;
+    for (int j = 0; j < c->dimension; j++) {
+      if (type > 1)
+	str_append (src, "{");
+      for (int i = 0; i < c->dimension; i++) {
+	char s[10];
+	snprintf (s, 9, "%d", index++);
+	str_append (src, "{", prefix, s, "}",
+		    i < c->dimension - 1 ? "," : "");
+      }
+      str_append (src, type > 1 ? "}" : "", j < c->dimension - 1 ? "," : "");
+    }
   }
-  if (c->dimension > 1) {
+  else if (c->type == 2) // vector
+    for (int i = 0; i < c->dimension; i++) {
+      char s[10];
+      snprintf (s, 9, "%d", c->index + i);
+      str_append (src, "{", prefix, s, "}",
+		  i < c->dimension - 1 ? "," : "");
+    }
+  else if (c->type == 1) { // scalar
+    char s[10];
+    snprintf (s, 9, "%d", c->index);
+    str_append (src, prefix, s);
+  }
+  if (type >= c->type) {
     str_prepend (src, "{");
     str_append (src, "}");
   }
@@ -528,16 +548,15 @@ static char * field_value (Field * c, const char * prefix)
 static void field_init (Field * c, const char * typename,
 			int dimension, int * index)
 {
+  c->index = *index;
   if (!strcmp (typename, "scalar") ||
       !strcmp (typename, "vertex scalar"))
-    c->type = 1, c->dimension = 1;
+    c->type = 1, c->dimension = 1, *index += 1;
   else if (!strcmp (typename, "vector") ||
 	   !strcmp (typename, "face vector"))
-    c->type = 2, c->dimension = dimension;
+    c->type = 2, c->dimension = dimension, *index += dimension;
   else // tensor
-    c->type = 3, c->dimension = dimension*dimension;
-  c->index = *index;
-  *index += c->dimension;
+    c->type = 3, c->dimension = dimension, *index += dimension*dimension;
 }
 
 static Field * field_append (Field ** fields, Ast * identifier,
@@ -1475,7 +1494,8 @@ static void translate (Ast * n, Stack * stack, void * data)
 	for (char * s = func; *s != '\0'; s++)
 	  if (*s == ' ')
 	    *s = '_';
-	const char * name = ast_terminal (declarator->child[0])->start;
+	AstTerminal * field = ast_terminal (declarator->child[0]);
+	const char * name = field->start;
 	if (strchr (typename, ' '))
 	  typename = strchr (typename, ' ') + 1;
 	
@@ -1506,7 +1526,7 @@ static void translate (Ast * n, Stack * stack, void * data)
 	    Field * c = field_append (&d->constants, declarator->child[0],
 				      typename, d->dimension,
 				      &d->constants_index);
-	    char * src = field_value (c, "_NVARMAX+");
+	    char * src = field_value (c, "_NVARMAX+", c->type);
 	    char * initializer = ast_str_append (n->child[2], NULL);
 	    ast_before (ast_child (d->init_fields, token_symbol ('}')),
 			"  init_const_", const_func, "((", typename, ")",
@@ -1555,7 +1575,8 @@ static void translate (Ast * n, Stack * stack, void * data)
 	  TranslateData * d = data;
 	  Field c;
 	  field_init (&c, typename, d->dimension, &d->fields_index);
-	  char * src = field_value (&c, "");
+	  field->value = (void *)(long) c.index + 1;
+	  char * src = field_value (&c, "", c.type);
 	  ast_before (ast_child (d->init_fields, token_symbol ('}')),
 		      "  init_", func, "((", typename, ")", src, ",\"",
 		      name, "\");\n");
@@ -1604,7 +1625,7 @@ static void translate (Ast * n, Stack * stack, void * data)
 	for (Field * c = d->constants; c->identifier; c++)
 	  if (!strcmp (ast_terminal (c->identifier)->start,
 		       ast_terminal (identifier)->start)) {
-	    char * src = field_value (c, "_NVARMAX+");
+	    char * src = field_value (c, "_NVARMAX+", c->type);
 	    str_prepend (src, "double s=");
 	    str_append (src, ";");
 	    Ast * expr = ast_parse_expression (src, ast_get_root (n));
@@ -1698,7 +1719,7 @@ static void translate (Ast * n, Stack * stack, void * data)
 	      Ast * type =
 		ast_identifier_declaration (stack,
 					    ast_terminal (struct_arg)->start);
-	      while (type->sym != sym_declaration)
+	      while (type && type->sym != sym_declaration)
 		type = type->parent;
 	      Ast * struct_namep =
 		ast_get_struct_name (ast_schema (type, sym_declaration,
@@ -2234,7 +2255,7 @@ static void macros (Ast * n, Stack * stack, void * data)
   }
 
   /**
-  Field lists */
+  ## Field lists */
 
   case sym_postfix_initializer: {
       
@@ -2258,32 +2279,148 @@ static void macros (Ast * n, Stack * stack, void * data)
       Ast * list = n->child[1];
       int type = field_list_type (list, stack, n->sym == sym_field_list);
       if (type > 0) {
-	foreach_item (list, 2, expr) {
-	  AstTerminal * t = ast_right_terminal (expr);
-	  const char * typename = typedef_name (expression_type (expr, stack));
-	  if ((type == 1 && !strcmp (typename, "vector")) ||
-	      (type == 2 && !strcmp (typename, "tensor"))) {
-	    TranslateData * d = data;
-	    ast_after ((Ast *) t, ".x");
-	    for (int i = 1; i < d->dimension; i++) {
-	      char s[] = ".x"; s[1] = 'x' + i;
-	      ast_after ((Ast *) t, ",", t->start, s);
+
+	/**
+	### External/global lists */
+	
+	bool external = true;
+	Ast * scope = n->parent;
+	while (external && scope) {
+	  if (scope->sym == sym_compound_statement)
+	    external = false;
+	  scope = scope->parent;
+	}
+	if (external) {
+	  foreach_item (list, 2, expr) {
+	    const char * typename = typedef_name (expression_type (expr, stack));
+	    assert (typename);
+	    Ast * unary = ast_is_unary_expression (expr->child[0]);
+	    if (!unary) {
+	      AstTerminal * t = ast_terminal (expr);
+	      fprintf (stderr,
+		       "%s:%d: error: global lists can only be initialized "
+		       "with simple expressions\n", t->file, t->line);
+	      exit (1);
 	    }
-	  }
-	  else if (type == 1 && !strcmp (typename, "tensor")) {
-	    TranslateData * d = data;
-	    for (int i = 0; i < d->dimension; i++) {
-	      char a[] = ".x"; a[1] = 'x' + i;
-	      for (int j = 0; j < d->dimension; j++) {
-		char b[] = ".x"; b[1] = 'x' + j;
-		if (i > 0 || j > 0)
-		  ast_after ((Ast *) t, ",", t->start, a, b);
-		else
-		  ast_after ((Ast *) t, a, b);
+	    int stype = 1; // identifier
+	    Ast * identifier = ast_schema (unary, sym_unary_expression,
+					   0, sym_postfix_expression,
+					   0, sym_primary_expression,
+					   0, sym_IDENTIFIER);
+	    if (!identifier) {
+	      stype = 2;  // identifier.x
+	      identifier = ast_schema (unary, sym_unary_expression,
+				       0, sym_postfix_expression,
+				       0, sym_postfix_expression,
+				       0, sym_primary_expression,
+				       0, sym_IDENTIFIER);
+	    }
+	    if (!identifier) {
+	      stype = 3;  // identifier.x.x
+	      identifier = ast_schema (unary, sym_unary_expression,
+				       0, sym_postfix_expression,
+				       0, sym_postfix_expression,
+				       0, sym_postfix_expression,
+				       0, sym_primary_expression,
+				       0, sym_IDENTIFIER);
+	    }
+	    if (identifier) {
+	      AstTerminal * t = ast_terminal (identifier);
+	      Ast * declaration = ast_identifier_declaration (stack, t->start);
+	      const char * typename1 = get_field_type (declaration, t);
+	      if (!ast_terminal (declaration)->value) {
+		fprintf (stderr,
+			 "%s:%d: error: variable `%s' is not initialized\n",
+			 t->file, t->line, t->start);
+		exit (1);			
 	      }
+	      Field c = {
+		.identifier = NULL,
+		.type = (!strcmp (typename1, "scalar") ? 1 :
+			 !strcmp (typename1, "vector") ? 2 : 3),
+		.index = ((long) ast_terminal (declaration)->value) - 1,
+		.dimension = ((TranslateData *)data)->dimension
+	      };
+	      if (stype > 1) { // .x or .x.x
+		Ast * member = ast_schema (unary, sym_unary_expression,
+					   0, sym_postfix_expression,
+					   2, sym_member_identifier,
+					   0, sym_generic_identifier,
+					   0, sym_IDENTIFIER);
+		if (member) {
+		  if (stype == 2) { // .x
+		    c.index += (ast_terminal(member)->start[0] - 'x')*
+		      (c.type == 3 ? c.dimension : 1);
+		    if (type == 1 && c.type == 3)
+		      c.type = 2;
+		    else
+		      c.type = type;
+		  }
+		  else if (stype == 3) { // .x.x
+		    Ast * member1 = ast_schema (unary, sym_unary_expression,
+						0, sym_postfix_expression,
+						0, sym_postfix_expression,
+						2, sym_member_identifier,
+						0, sym_generic_identifier,
+						0, sym_IDENTIFIER);
+		    if (member1) {
+		      c.index += (ast_terminal(member)->start[0] - 'x') +
+			(ast_terminal(member1)->start[0] - 'x')*c.dimension;
+		      c.type = 1;
+		      ast_terminal(member1)->start[0] = '\0';
+		      Ast * dot = ast_schema (unary, sym_unary_expression,
+					      0, sym_postfix_expression,
+					      0, sym_postfix_expression,
+					      1, token_symbol ('.'));
+		      ast_terminal(dot)->start[0] = '\0';
+		    }
+		  }
+		  ast_terminal(member)->start[0] = '\0';
+		  Ast * dot = ast_schema (unary, sym_unary_expression,
+					  0, sym_postfix_expression,
+					  1, token_symbol ('.'));
+		  ast_terminal(dot)->start[0] = '\0';
+		}
+	      }
+	      free (t->start), t->start = field_value (&c, "", type);
 	    }
 	  }
 	}
+
+	/**
+	### Local lists */
+
+	else
+	  foreach_item (list, 2, expr) {
+	    AstTerminal * t = ast_right_terminal (expr);
+	    const char * typename = typedef_name (expression_type (expr, stack));
+	    if ((type == 1 && !strcmp (typename, "vector")) ||
+		(type == 2 && !strcmp (typename, "tensor"))) {
+	      TranslateData * d = data;
+	      ast_after ((Ast *) t, ".x");
+	      for (int i = 1; i < d->dimension; i++) {
+		char s[] = ".x"; s[1] = 'x' + i;
+		ast_after ((Ast *) t, ",", t->start, s);
+	      }
+	    }
+	    else if (type == 1 && !strcmp (typename, "tensor")) {
+	      TranslateData * d = data;
+	      for (int i = 0; i < d->dimension; i++) {
+		char a[] = ".x"; a[1] = 'x' + i;
+		for (int j = 0; j < d->dimension; j++) {
+		  char b[] = ".x"; b[1] = 'x' + j;
+		  if (i > 0 || j > 0)
+		    ast_after ((Ast *) t, ",", t->start, a, b);
+		  else
+		    ast_after ((Ast *) t, a, b);
+		}
+	      }
+	    }
+	  }
+
+	/**
+	Finalize both global and local lists */
+	
 	if (type == 1) // scalar
 	  ast_before (n->child[2], ",{-1}");
 	else if (type == 2) { // vector
