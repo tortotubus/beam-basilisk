@@ -1716,32 +1716,49 @@ static void translate (Ast * n, Stack * stack, void * data)
 			  0, sym_generic_identifier,
 			  0, sym_IDENTIFIER)) {
 	    Ast * arguments = ast_find (n, sym_argument_expression_list);
-	    Ast * struct_arg = arguments->child[1] ? NULL :
-	      ast_is_identifier_expression (arguments->child[0]->child[0]);
-	    if (struct_arg) {
-	      Ast * type =
-		ast_identifier_declaration (stack,
-					    ast_terminal (struct_arg)->start);
-	      while (type && type->sym != sym_declaration)
-		type = type->parent;
-	      Ast * struct_namep =
-		ast_get_struct_name (ast_schema (type, sym_declaration,
-						 0, sym_declaration_specifiers));
-	      if (!struct_namep ||
-		  strcmp (ast_terminal (struct_namep)->start,
-			  ast_terminal (struct_name)->start))
-		struct_arg = NULL;
-	    }
-	    if (!struct_arg) {
-	      Ast * expr = ast_parse_expression ("func((struct Name){a});",
-						 ast_get_root (n));
+	    if (!arguments) {
+	      Ast * expr = ast_parse_expression ("func((struct Name){0});",
+						   ast_get_root (n));
 	      Ast * list = ast_find (expr, sym_argument_expression_list);
 	      AstTerminal * t = ast_terminal (ast_find (list, sym_IDENTIFIER));
 	      free (t->start);
 	      t->start = strdup (ast_terminal (struct_name)->start);
-	      ast_replace (list, "a", ast_initializer_list (arguments));
+	      ast_set_line (list, ast_terminal (n->child[1]));
+	      ast_new_children (n, n->child[0], n->child[1],
+				ast_placeholder,
+				n->child[2]);
 	      ast_replace_child (n, 2, list);
 	      ast_destroy (expr);
+	    }
+	    else {
+	      Ast * struct_arg = arguments->child[1] ? NULL :
+		ast_is_identifier_expression (arguments->child[0]->child[0]);
+	      if (struct_arg) {
+		Ast * type =
+		  ast_identifier_declaration (stack,
+					      ast_terminal (struct_arg)->start);
+		while (type && type->sym != sym_declaration)
+		  type = type->parent;
+		Ast * struct_namep =
+		  ast_get_struct_name (ast_schema (type, sym_declaration,
+						   0,
+						   sym_declaration_specifiers));
+		if (!struct_namep ||
+		    strcmp (ast_terminal (struct_namep)->start,
+			    ast_terminal (struct_name)->start))
+		  struct_arg = NULL;
+	      }
+	      if (!struct_arg) {
+		Ast * expr = ast_parse_expression ("func((struct Name){a});",
+						   ast_get_root (n));
+		Ast * list = ast_find (expr, sym_argument_expression_list);
+		AstTerminal * t = ast_terminal (ast_find (list, sym_IDENTIFIER));
+		free (t->start);
+		t->start = strdup (ast_terminal (struct_name)->start);
+		ast_replace (list, "a", ast_initializer_list (arguments));
+		ast_replace_child (n, 2, list);
+		ast_destroy (expr);
+	      }
 	    }
 	  }
 	}
@@ -2551,7 +2568,6 @@ static void macros (Ast * n, Stack * stack, void * data)
     fputc ('\n', stderr);
     break;
   }
-#endif
     
   }
 }
