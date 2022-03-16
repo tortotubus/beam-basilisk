@@ -713,10 +713,13 @@ void maybeconstfield (Ast * n, Stack * stack,
 					     ast_terminal (identifier)->start);
     if (type) {
       Ast * declaration = type;
-      while (declaration->sym != sym_declaration &&
-	     declaration->sym != sym_parameter_declaration)
+      while (declaration &&
+	     declaration->sym != sym_declaration &&
+	     declaration->sym != sym_parameter_declaration &&
+	     declaration->sym != sym_forin_declaration_statement)
 	declaration = declaration->parent;
-      if (ast_schema (declaration->child[0], sym_declaration_specifiers,
+      if (ast_schema (ast_child (declaration, sym_declaration_specifiers),
+		      sym_declaration_specifiers,
 		      0, sym_type_qualifier,
 		      0, sym_MAYBECONST))
 	func (n, type, data);
