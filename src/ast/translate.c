@@ -2295,7 +2295,7 @@ static void macros (Ast * n, Stack * stack, void * data)
   }
   case sym_field_list:
   case sym_initializer: {
-    if (n->child[2]) {
+    if (n->child[1] && n->child[2]) {
       Ast * list = n->child[1];
       int type = field_list_type (list, stack, n->sym == sym_field_list);
       if (type > 0) {
@@ -2639,7 +2639,8 @@ void ast_traverse (Ast * n, Stack * stack,
     Ast * declarator = ast_find (n, sym_direct_declarator);
     ast_push_function_definition (stack, declarator);
     for (Ast ** c = n->child; *c; c++)
-      ast_traverse (*c, stack, func, data);
+      ast_traverse (*c, stack, func, data);  
+    func (n, stack, data);
     ast_pop_scope (stack, declarator);
     break;
   }
@@ -2648,7 +2649,8 @@ void ast_traverse (Ast * n, Stack * stack,
   case sym_for_declaration_statement: {
     stack_push (stack, &n);
     for (Ast ** c = n->child; *c; c++)
-      ast_traverse (*c, stack, func, data);
+      ast_traverse (*c, stack, func, data);      
+    func (n, stack, data);
     ast_pop_scope (stack, n);
     break;
   }
@@ -2657,7 +2659,8 @@ void ast_traverse (Ast * n, Stack * stack,
     stack_push (stack, &n);
     ast_push_declaration (stack, n->child[3]);
     for (Ast ** c = n->child; *c; c++)
-      ast_traverse (*c, stack, func, data);
+      ast_traverse (*c, stack, func, data);  
+    func (n, stack, data);
     ast_pop_scope (stack, n);
     break;
   }
@@ -2670,10 +2673,9 @@ void ast_traverse (Ast * n, Stack * stack,
     if (n->child)
       for (Ast ** c = n->child; *c; c++)
 	ast_traverse (*c, stack, func, data);
+    func (n, stack, data);
     break;
   }
-  
-  func (n, stack, data);
 }
 
 void endfor (FILE * fin, FILE * fout,
