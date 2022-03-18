@@ -1370,6 +1370,32 @@ static void translate (Ast * n, Stack * stack, void * data)
       ast_set_child (n, 0, func);
       ast_left_terminal (n)->before = before;
     }
+
+    /**
+    Check whether we are trying to access (undeclared) 'y' or 'z'
+    members of a vector field (i.e. higher dimension members). */
+    
+    else if ((member = ast_schema (n->child[0], sym_postfix_expression,
+				   2, sym_member_identifier,
+				   0, sym_generic_identifier,
+				   0, sym_IDENTIFIER)) &&
+	     ((d->dimension < 2 &&
+	       (!strcmp (ast_terminal (member)->start, "y") ||
+		!strcmp (ast_terminal (member)->start, "t"))) ||
+	      (d->dimension < 3 &&
+	       (!strcmp (ast_terminal (member)->start, "z") ||
+		!strcmp (ast_terminal (member)->start, "r")))) &&
+	     (typename = typedef_name (expression_type (n->child[0]->child[0],
+							stack))) &&
+	     (!strcmp (typename, "vector") ||
+	      !strcmp (typename, "face vector")) &&
+	     (inforeach (n) || point_declaration (stack))) {
+      // fixme: does not work with tensor components such as t.z.x
+      Ast * expr = ast_attach (ast_new (n, sym_primary_expression),
+			       ast_terminal_new (n, sym_IDENTIFIER,
+						 "_val_higher_dimension"));
+      ast_replace_child (n->parent, 0, expr);
+    }
     break;
   }
 
