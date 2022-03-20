@@ -576,7 +576,7 @@ typedef struct {
   int dimension;
   bool nolineno;
   Field * constants;
-  int constants_index, fields_index;
+  int constants_index, fields_index, nboundary;
   Ast * init_solver, * init_events, * init_fields;
 } TranslateData;
 
@@ -1196,6 +1196,269 @@ static Ast * compound_jump (Ast * return_statement, Ast * function_definition,
   return NULL;
 }
 
+/**
+## Boundary conditions 
+
+This function replaces neumann/dirichlet(...) with
+neumann/dirichlet(0) and returns the number of replacements. */
+
+static int homogeneize (Ast * n)
+{
+  int nh = 0;
+  if (n->sym == sym_function_call) {
+    Ast * identifier = ast_schema (n, sym_function_call,
+				   0, sym_postfix_expression,
+				   0, sym_primary_expression,
+				   0, sym_IDENTIFIER);
+    if (identifier &&
+	(!strcmp (ast_terminal (identifier)->start, "neumann") ||
+	 !strcmp (ast_terminal (identifier)->start, "dirichlet"))) {
+      Ast * item = ast_schema (n, sym_function_call,
+			       2, sym_argument_expression_list,
+			       0, sym_argument_expression_list_item);
+      Ast * simple = ast_is_simple_expression (item->child[0]);
+      if (!simple || simple->sym != sym_constant ||
+	  (strcmp (ast_terminal (simple->child[0])->start, "0") &&
+	   strcmp (ast_terminal (simple->child[0])->start, "0."))) {
+	ast_replace_child (item, 0, ast_new_constant (n, sym_I_CONSTANT, "0"));
+	nh = 1;
+      }
+    }
+  }
+  if (n->child)
+    for (Ast ** c = n->child; *c; c++)
+      nh += homogeneize (*c);
+  return nh;
+}
+
+static char * boundaryrep (char * name, const char * boundarydir, int dimension)
+{
+  if (!strcmp (boundarydir, "left") || !strcmp (boundarydir, "right")) {
+    char * s;
+    if ((s = strstr (name, ".n")))
+      strcpy (s, ".x");
+    else if ((s = strstr (name, ".t")))
+      strcpy (s, ".y");
+    else if ((s = strstr (name, ".r")))
+      strcpy (s, ".z");
+  }
+  else if (!strcmp (boundarydir, "top") || !strcmp (boundarydir, "bottom")) {
+    char * s;
+    if ((s = strstr (name, ".n")))
+      strcpy (s, ".y");
+    else if ((s = strstr (name, ".t")))
+      strcpy (s, dimension > 2 ? ".z" : ".x");
+    else if ((s = strstr (name, ".r")))
+      strcpy (s, ".x");
+  }
+  else if (!strcmp (boundarydir, "front") || !strcmp (boundarydir, "back")) {
+    char * s;
+    if ((s = strstr (name, ".n")))
+      strcpy (s, ".z");
+    else if ((s = strstr (name, ".t")))
+      strcpy (s, ".x");
+    else if ((s = strstr (name, ".r")))
+      strcpy (s, ".y");
+  }
+  return name;
+}
+
+static Ast * boundary_function (Ast * expr, TranslateData * d,
+				char * before, char * ind)
+{
+  char * src = NULL;
+  snprintf (ind, 19, "%d", d->nboundary++);
+  str_append (src,
+	      "static double _boundary", ind,
+	      "(Point point,Point neighbor,scalar _s,void *data){{");
+      
+  char * index[] = {"i","j","k"}, * dir[] = {"x","y","z"};
+  for (int i = 0; i < d->dimension; i++)
+    str_append (src, "int ",
+		index[i], "g=neighbor.", index[i], "-point.", index[i], ";"
+		"if(", index[i], "g==0)", index[i], "g=_attribute[_s.i].d.",
+		dir[i], ";",
+		"NOT_UNUSED(", index[i], "g);");
+  assert (before);
+  str_append (src, "POINT_VARIABLES;return ", before, "_expr_;}}");
+  free (before);
+  Ast * boundary =
+    ast_child (ast_parse_external_declaration (src, ast_get_root (expr)),
+	       sym_function_definition);
+  free (src);
+  assert (expr->sym == sym_assignment_expression);
+  ast_replace (boundary, "_expr_", expr);
+  return boundary;
+}
+
+static char * set_boundary (Ast * array, char * ind)
+{
+  assert (array->sym == sym_array_access);
+  Ast * member = ast_schema (array->child[0], sym_postfix_expression,
+			     2, sym_member_identifier,
+			     0, sym_generic_identifier,
+			     0, sym_IDENTIFIER);
+  if (member) {
+    if (!strcmp (ast_terminal(member)->start, "n"))
+      ast_terminal(member)->start[0] = 'x';
+    else if (!strcmp (ast_terminal(member)->start, "t"))
+      ast_terminal(member)->start[0] = 'y';
+    else if (!strcmp (ast_terminal(member)->start, "r"))
+      ast_terminal(member)->start[0] = 'z';
+  }
+  char * scalar = ast_str_append (array->child[0], NULL);
+  char * bc = ast_str_append (array->child[2], NULL);
+  char * set = NULL;
+  str_append (set,
+	      "_attribute[", scalar, ".i].boundary[", bc,
+	      "]=_boundary", ind, ",",
+	      "_attribute[", scalar, ".i].boundary_homogeneous[", bc,
+	      "]=_boundary", ind);
+  free (scalar);
+  free (bc);
+  return set;
+}
+
+static Ast * function_scope (Ast * n, Stack * stack)
+{
+  if (point_declaration (stack))
+    return NULL;
+  while (n) {
+    if (n->sym == sym_foreach_statement)
+      return NULL;
+    if (n->sym == sym_function_definition)
+      return n;
+    n = n->parent;
+  }
+  return NULL;
+}
+
+/**
+Inserts `item` after `insert` in the (block) list containing `insert`. */
+
+Ast * ast_block_list_insert_after (Ast * insert, Ast * item)
+{
+  Ast * list_item = insert->parent, * list = list_item->parent,
+    * parent = list->parent;
+  int item_sym = list_item->sym;
+  assert (parent->sym == list->sym);	
+  ast_set_child (parent, 0,
+		 ast_new_children (ast_new (list, list->sym),
+				   list,
+				   ast_new_children (ast_new (list, item_sym),
+						     item)));
+  return list;
+}
+
+/**
+Inserts `item` before `insert` in the (block) list containing `insert`. */
+
+Ast * ast_block_list_insert_before (Ast * insert, Ast * item)
+{
+  return ast_block_list_insert_after
+    (insert->parent->parent->child[0]->child[1]->child[0], item);
+}
+  
+static void global_boundaries (Ast * n, Stack * stack, void * data)
+{
+  switch (n->sym) {
+
+  /**
+  ### Local boundary conditions */
+    
+  case sym_array_access: {
+    Ast * assign = ast_ancestor (n, 3), * scope;
+    if (assign->sym == sym_assignment_expression &&
+	(scope = function_scope (n, stack))) {
+      const char * typename =
+	typedef_name (expression_type (n->child[0], stack));
+      Ast * member = NULL;
+      if ((typename &&
+	   (!strcmp (typename, "scalar") ||
+	    !strcmp (typename, "vertex scalar"))) ||
+	  ((member = ast_schema (n->child[0], sym_postfix_expression,
+				 2, sym_member_identifier,
+				 0, sym_generic_identifier,
+				 0, sym_IDENTIFIER)) &&
+	   (!strcmp (ast_terminal (member)->start, "n") ||
+	    !strcmp (ast_terminal (member)->start, "t") ||
+	    !strcmp (ast_terminal (member)->start, "r")) &&
+	   (typename = typedef_name (expression_type (n->child[0]->child[0],
+						      stack))) &&
+	   (!strcmp (typename, "vector") ||
+	    !strcmp (typename, "face vector")))) {
+	AstTerminal * t = ast_left_terminal (assign);
+	char * before = t->before;
+	t->before = NULL;
+	char ind[20];
+	Ast * boundary =
+	  boundary_function (ast_child (assign, sym_assignment_expression),
+			     data, before, ind);
+	char * set = set_boundary (n, ind);
+	ast_block_list_insert_before (scope, boundary);
+	
+	Ast * homogeneous = ast_copy (boundary);
+	if (!homogeneize (homogeneous)) {
+	  ast_destroy (homogeneous);
+	  str_append (set, ";\n");
+	}
+	else {
+	  Ast * func = ast_find (homogeneous, sym_IDENTIFIER);
+	  str_append (ast_terminal (func)->start, "_homogeneous");
+	  str_append (set, "_homogeneous;\n");
+	  ast_block_list_insert_before (scope, homogeneous);
+	}
+	Ast * expr = ast_child (ast_parse_expression (set, ast_get_root (n)),
+				sym_expression);	
+	free (set);
+	Ast * parent = ast_ancestor (assign, 2);
+	assert (parent->sym == sym_expression_statement);
+	ast_replace_child (parent, 0, expr);
+      }
+    }
+    break;
+  }
+
+  /**
+  ### Global boundary conditions */
+    
+  case sym_boundary_definition: {
+    Ast * expr = ast_schema (n, sym_boundary_definition,
+			     0, sym_assignment_expression,
+			     2, sym_assignment_expression);
+    Ast * array = ast_find (n, sym_array_access);
+    if (expr && array) {
+      AstTerminal * t = ast_left_terminal (n);
+      char * before = t->before;
+      t->before = NULL;	
+      char ind[20];
+      Ast * boundary = boundary_function (expr, data, before, ind);
+
+      char * set = set_boundary (array, ind);
+      TranslateData * d = data;
+      ast_after (ast_child (d->init_fields, token_symbol ('}')), "  ", set);
+      free (set);
+
+      ast_replace_child (n->parent, 0, boundary);
+      
+      Ast * homogeneous = ast_copy (boundary);
+      if (!homogeneize (homogeneous)) {
+	ast_destroy (homogeneous);
+	ast_after (ast_child (d->init_fields, token_symbol ('}')), ";\n");
+      }
+      else {
+	Ast * func = ast_find (homogeneous, sym_IDENTIFIER);
+	str_append (ast_terminal (func)->start, "_homogeneous");
+	ast_block_list_insert_after (n, homogeneous);
+	ast_after (ast_child (d->init_fields, token_symbol ('}')),
+		   "_homogeneous;\n");
+      }
+    }
+    break;
+  }
+  }
+}
+
 static void translate (Ast * n, Stack * stack, void * data)
 {
   typedef struct {
@@ -1346,6 +1609,8 @@ static void translate (Ast * n, Stack * stack, void * data)
 
   case sym_array_access: {
     const char * typename = typedef_name (expression_type (n->child[0], stack));
+    TranslateData * d = data;
+    Ast * member;
     if (typename &&
 	(!strcmp (typename, "scalar") ||
 	 !strcmp (typename, "vertex scalar")) &&
@@ -1412,9 +1677,9 @@ static void translate (Ast * n, Stack * stack, void * data)
 				 0, sym_generic_identifier,
 				 0, sym_IDENTIFIER);
 	Ast * type = ast_identifier_declaration (stack, "scalar");
+	assert (type);
 	while (type->sym != sym_declaration)
 	  type = type->parent;
-	assert (type);
 	if (!find_struct_member (ast_find (type, sym_struct_declaration_list),
 				 member)) {
 	  Ast * expr =
@@ -2702,7 +2967,8 @@ void ast_traverse (Ast * n, Stack * stack,
   default:
     if (n->child)
       for (Ast ** c = n->child; *c; c++)
-	ast_traverse (*c, stack, func, data);
+	if (*c != ast_placeholder)
+	  ast_traverse (*c, stack, func, data);
     func (n, stack, data);
     break;
   }
@@ -2739,7 +3005,7 @@ void endfor (FILE * fin, FILE * fout,
 
   TranslateData data = {
     .dimension = dimension, .nolineno = nolineno,
-    .constants_index = 0, .fields_index = 0,
+    .constants_index = 0, .fields_index = 0, .nboundary = 0,
     // fixme: splitting of events and fields is not used yet
     .init_solver = NULL, .init_events = NULL, .init_fields = NULL
   };
@@ -2757,6 +3023,7 @@ void endfor (FILE * fin, FILE * fout,
 	      sym_compound_statement);
   ast_destroy ((Ast *) init);
   
+  ast_traverse ((Ast *) root, root->stack, global_boundaries, &data);
   ast_traverse ((Ast *) root, root->stack, translate, &data);
   ast_traverse ((Ast *) root, root->stack, macros, &data);
 

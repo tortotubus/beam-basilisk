@@ -171,6 +171,8 @@ Ast * ast_is_typedef (const Ast * identifier);
 Ast * ast_find_function (Ast * n, const char * name);
 Ast * ast_list_append_list (Ast * list, Ast * list1);
 Ast * ast_block_list_append (Ast * list, int item_sym, Ast * item);
+Ast * ast_block_list_insert_after (Ast * insert, Ast * item);
+Ast * ast_block_list_insert_before (Ast * insert, Ast * item);
 Ast * ast_list_append (Ast * list, int item_sym, Ast * item);
 Ast * ast_list_prepend (Ast * list, int item_sym, Ast * item);
 Ast * ast_list_remove (Ast * list, Ast * item);
