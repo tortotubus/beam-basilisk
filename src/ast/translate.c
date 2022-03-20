@@ -1715,7 +1715,8 @@ static void translate (Ast * n, Stack * stack, void * data)
 		 !strcmp (t->start, "allocated_child") ||
 		 !strcmp (t->start, "neighbor") ||
 		 !strcmp (t->start, "neighborp") ||
-		 !strcmp (t->start, "aparent"))
+		 !strcmp (t->start, "aparent") ||
+		 !strcmp (t->start, "child"))
 	  complete_arguments (n, 3);
       }
 
