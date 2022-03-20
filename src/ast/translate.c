@@ -1935,13 +1935,16 @@ static void translate (Ast * n, Stack * stack, void * data)
 		      "{int i=*ip;double t=*tp;"
 		      "int ret=(1);*ip=i;*tp=t;return ret;}");
 	  if (!strcmp (ast_terminal (identifier)->start, "t")) {
-	    tarray = strdup ("(double[])");
-	    tarray = ast_str_append (initializer, tarray);
+	    str_append (tarray, name, "_array");
+	    str_append (expr, "static double ", tarray, "[]=");
 	  }
 	  else {
-	    iarray = strdup ("(int[])");
-	    iarray = ast_str_append (initializer, iarray);
+	    str_append (iarray, name, "_array");
+	    str_append (expr, "static int ", iarray, "[]=");
 	  }
+	  ast_before (ast_last_child(initializer), ",-1");
+	  expr = ast_str_append (initializer, expr);
+	  str_append (expr, ";");
 	  break;
 	}
 	else {
