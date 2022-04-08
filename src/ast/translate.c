@@ -2219,6 +2219,10 @@ static void translate (Ast * n, Stack * stack, void * data)
       char * name = malloc (strlen (t->start) + 20),
 	* suffix = name + strlen(t->start);
       strcpy (name, t->start);
+      long last = 0;
+      Ast * parent = ast_identifier_declaration (stack, name);
+      if (parent)
+	last = (long) ast_terminal (parent)->value;
       int i = 0;
       while (ast_identifier_declaration (stack, name))
 	snprintf (suffix, 19, "_%d", i++);
@@ -2227,7 +2231,7 @@ static void translate (Ast * n, Stack * stack, void * data)
       Define the event expressions. */
 
       char * expr = NULL, * iarray = NULL, * tarray = NULL, anexpr[20];
-      int last = 0, nexpr = 0;
+      int nexpr = 0;
       foreach_item (n->child[3], 2, event_parameter) {
 	Ast * initializer = ast_child (event_parameter, sym_postfix_initializer);
 	if (initializer) {
@@ -2327,8 +2331,17 @@ static void translate (Ast * n, Stack * stack, void * data)
 		  "(const int i,const double t,Event *_ev)"
 		  "{_statement_;return 0;}");
       Ast * def = ast_parse_external_declaration (src, ast_get_root (n));
+      Ast * identifier = ast_schema (def, sym_external_declaration,
+				     0, sym_function_definition,
+				     0, sym_function_declaration,
+				     1, sym_declarator,
+				     0, sym_direct_declarator,
+				     0, sym_direct_declarator,
+				     0, sym_generic_identifier,
+				     0, sym_IDENTIFIER);
+      ast_terminal (identifier)->value = (void *) last;
       free (src);
-      Ast * parent = n->parent;
+      parent = n->parent;
       ast_replace (def, "_statement_", statement);
       ast_replace_child (parent, 0, def->child[0]);
       ast_before (parent->child[0], expr);
