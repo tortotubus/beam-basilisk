@@ -1772,6 +1772,9 @@ static void translate (Ast * n, Stack * stack, void * data)
     if (n->parent->sym == sym_primary_expression) {
       static Replacement replacements[] = {
 	{ "stderr", "ferr" },
+	{ "stdout", "fout" },
+	{ "qerr", "qstderr()" },
+	{ "qout", "qstdout()" },
 	{ NULL, NULL }
       };
       Replacement * i = replacements;
