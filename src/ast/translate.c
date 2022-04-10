@@ -2558,8 +2558,11 @@ static void macros (Ast * n, Stack * stack, void * data)
   ## Foreach inner statements */
     
   case sym_foreach_inner_statement: {
+    AstTerminal * t = ast_left_terminal(n);
+    if (!strcmp (t->start, "foreach_block") && inforeach (n))
+      str_append (t->start, "_inner");
     ast_before (n, "{");
-    ast_after (n, "end_", ast_left_terminal(n)->start, "()}");
+    ast_after (n, "end_", t->start, "()}");
     break;
   }
     
