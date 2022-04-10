@@ -483,6 +483,8 @@ static Ast * rotate_arguments (Ast * list, int dimension)
     assert (list->child[1]);
     list = list->child[0];
   }
+  if (!list->child[1])
+    ast_print (list, stderr, 0);
   assert (list->child[1]);
   Ast * next = list->child[0], * item = list->child[2];
   for (int i = 1; i < dimension && next; i++) {
@@ -578,6 +580,7 @@ typedef struct {
   Field * constants;
   int constants_index, fields_index, nboundary;
   Ast * init_solver, * init_events, * init_fields;
+  Ast * dir;
 } TranslateData;
 
 static void rotate (Ast * n, Stack * stack, void * data)
@@ -619,24 +622,25 @@ static void rotate (Ast * n, Stack * stack, void * data)
   }
 
   case sym_function_call: {
-    Ast * identifier = ast_schema (n, sym_function_call,
-				   0, sym_postfix_expression,
-				   0, sym_primary_expression,
-				   0, sym_IDENTIFIER);
-    if (identifier) {
-      const char * name = ast_terminal (identifier)->start;
-      if ((!strcmp (name, "val") ||
-	   !strcmp (name, "fine") ||
-	   !strcmp (name, "coarse") ||
-	   !strcmp (name, "allocated") ||
-	   !strcmp (name, "allocated_child") ||
-	   !strcmp (name, "neighbor") ||
-	   !strcmp (name, "neighborp") ||
-	   !strcmp (name, "aparent"))
-	  &&
-	  (inforeach (n) || point_declaration (stack))) {
-	TranslateData * d = data;  
-	rotate_arguments (n->child[2], d->dimension);
+    TranslateData * d = data;
+    if (d->dimension > 1) {
+      Ast * identifier = ast_schema (n, sym_function_call,
+				     0, sym_postfix_expression,
+				     0, sym_primary_expression,
+				     0, sym_IDENTIFIER);
+      if (identifier) {
+	const char * name = ast_terminal (identifier)->start;
+	if ((!strcmp (name, "val") ||
+	     !strcmp (name, "fine") ||
+	     !strcmp (name, "coarse") ||
+	     !strcmp (name, "allocated") ||
+	     !strcmp (name, "allocated_child") ||
+	     !strcmp (name, "neighbor") ||
+	     !strcmp (name, "neighborp") ||
+	     !strcmp (name, "aparent"))
+	    &&
+	    (inforeach (n) || point_declaration (stack)))
+	  rotate_arguments (n->child[2], d->dimension);
       }
     }
     break;
@@ -657,13 +661,19 @@ static void rotate_list_item (Ast * item, Ast * n,
   
   Ast * list = item->parent;
   Ast * body = ast_last_child (n), * copy = body;
-  for (int i = 1; i < d->dimension; i++) {
-    copy = ast_copy (copy);
+  if (d->dimension == 1) {
     stack_push (stack, &copy);
     ast_traverse (copy, stack, rotate, d);
-    ast_pop_scope (stack, copy);
-    list = ast_block_list_append (list, item->sym, copy);
+    ast_pop_scope (stack, copy);    
   }
+  else
+    for (int i = 1; i < d->dimension; i++) {
+      copy = ast_copy (copy);
+      stack_push (stack, &copy);
+      ast_traverse (copy, stack, rotate, d);
+      ast_pop_scope (stack, copy);
+      list = ast_block_list_append (list, item->sym, copy);
+    }
   ast_set_child (item, 0, body);
   ast_remove (n, ast_left_terminal (body));
 
