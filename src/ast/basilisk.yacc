@@ -176,7 +176,8 @@ unary_expression
 	| SIZEOF unary_expression
 	| SIZEOF '(' type_name ')'
 	| ALIGNOF '(' type_name ')'
-	| NEW_FIELD /* Basilisk C extension */
+	| NEW_FIELD /* Basilisk C extension */	
+	| NEW_FIELD '[' postfix_expression ']' /* Basilisk C extension */	
 	;
 
 unary_operator
