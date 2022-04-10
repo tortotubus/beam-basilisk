@@ -2131,8 +2131,19 @@ static void translate (Ast * n, Stack * stack, void * data)
       for (char * s = src; *s; s++)
 	if (*s == ' ')
 	  *s = '_';
-      str_prepend (src, "new_");
-      str_append (src, "(\"", ast_terminal (identifier)->start, "\");");
+      Ast * layers = ast_schema (n->parent, sym_unary_expression,
+				 2, sym_postfix_expression);
+      if (layers) {
+	str_append (src, "(\"", ast_terminal (identifier)->start,
+		    !strcmp (src, "scalar") ? "\",\"\"," : "\",");
+	ast_str_append (layers, src);
+	str_append (src, ");");
+	str_prepend (src, "new_block_");
+      }
+      else {
+	str_prepend (src, "new_");
+	str_append (src, "(\"", ast_terminal (identifier)->start, "\");");
+      }
       Ast * expr = ast_parse_expression (src, ast_get_root (n));
       free (src);
       ast_set_line (expr, ast_terminal (n));
