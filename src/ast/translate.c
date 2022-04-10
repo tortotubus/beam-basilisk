@@ -2062,12 +2062,13 @@ static void translate (Ast * n, Stack * stack, void * data)
 		Ast * type =
 		  ast_identifier_declaration (stack,
 					      ast_terminal (struct_arg)->start);
-		while (type && type->sym != sym_declaration)
+		while (type &&
+		       type->sym != sym_declaration &&
+		       type->sym != sym_parameter_declaration)
 		  type = type->parent;
-		Ast * struct_namep =
-		  ast_get_struct_name (ast_schema (type, sym_declaration,
-						   0,
-						   sym_declaration_specifiers));
+		Ast * struct_namep = 
+		  ast_get_struct_name (ast_child (type,
+						  sym_declaration_specifiers));
 		if (!struct_namep ||
 		    strcmp (ast_terminal (struct_namep)->start,
 			    ast_terminal (struct_name)->start))
