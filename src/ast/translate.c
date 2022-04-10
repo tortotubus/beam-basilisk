@@ -1459,6 +1459,26 @@ static void global_boundaries (Ast * n, Stack * stack, void * data)
   }
 }
 
+static void diagonalize (Ast * n, Stack * stack, void * field)
+{
+  if (n->sym == sym_function_call) {
+    Ast * identifier = ast_schema (n, sym_function_call,
+				   0, sym_postfix_expression,
+				   0, sym_primary_expression,
+				   0, sym_IDENTIFIER);
+    if (identifier) {
+      Ast * arg;
+      if (!strcmp (ast_terminal (identifier)->start, "val") &&
+	  (inforeach (n) || point_declaration (stack)) &&
+	  (arg = ast_is_identifier_expression
+	   (ast_find (n, sym_assignment_expression))) &&
+	  !strcmp (ast_terminal (arg)->start,
+		   ast_terminal ((Ast *)field)->start))
+	str_append (ast_terminal (identifier)->start, "_diagonal");
+    }
+  }
+}
+
 static void translate (Ast * n, Stack * stack, void * data)
 {
   typedef struct {
@@ -1482,6 +1502,30 @@ static void translate (Ast * n, Stack * stack, void * data)
   case sym_external_foreach_dimension: {
     rotate_list_item (n->parent, n, stack, data);
     break;
+  }
+    
+  /**
+  ## Diagonalize */
+
+  case sym_macro_statement: {
+    Ast * identifier = ast_schema (n, sym_macro_statement,
+				   0, sym_function_call,
+				   0, sym_postfix_expression,
+				   0, sym_primary_expression,
+				   0, sym_IDENTIFIER);
+    if (!strcmp (ast_terminal (identifier)->start, "diagonalize")) {
+      Ast * field = ast_schema (n, sym_macro_statement,
+				0, sym_function_call,
+				2, sym_argument_expression_list,
+				0, sym_argument_expression_list_item,
+				0, sym_assignment_expression);
+      if (field && (field = ast_is_identifier_expression (field))) {
+	stack_push (stack, &n);
+	ast_traverse (n, stack, diagonalize, field);
+	ast_pop_scope (stack, n);
+      }
+    }
+    break; 
   }
     
   /**
