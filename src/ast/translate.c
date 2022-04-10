@@ -1682,7 +1682,7 @@ static void translate (Ast * n, Stack * stack, void * data)
 
     /**
     Check whether we are trying to access (undeclared) 'y' or 'z'
-    members of a vector field (i.e. higher dimension members). */
+    members of a vector or tensor field (i.e. higher dimension members). */
     
     else if ((member = ast_schema (n->child[0], sym_postfix_expression,
 				   2, sym_member_identifier,
@@ -1699,40 +1699,29 @@ static void translate (Ast * n, Stack * stack, void * data)
 	     (!strcmp (typename, "vector") ||
 	      !strcmp (typename, "face vector")) &&
 	     (inforeach (n) || point_declaration (stack))) {
-      // fixme: does not work with tensor components such as t.z.x
       Ast * expr = ast_attach (ast_new (n, sym_primary_expression),
 			       ast_terminal_new (n, sym_IDENTIFIER,
 						 "_val_higher_dimension"));
       ast_replace_child (n->parent, 0, expr);
     }
-    break;
-  }
-
-  /**
-  ## Attribute access */
-
-  case sym_postfix_expression: {
-    if (n->child[1] && n->child[1]->sym == token_symbol('.')) {
-      const char * typename =
-	typedef_name (expression_type (n->child[0], stack));
-      if (typename && (!strcmp (typename, "scalar") ||
-		       !strcmp (typename, "vertex scalar"))) {
-	Ast * member = ast_find (n->child[2], sym_member_identifier,
-				 0, sym_generic_identifier,
-				 0, sym_IDENTIFIER);
-	Ast * type = ast_identifier_declaration (stack, "scalar");
-	assert (type);
-	while (type->sym != sym_declaration)
-	  type = type->parent;
-	if (!find_struct_member (ast_find (type, sym_struct_declaration_list),
-				 member)) {
-	  Ast * expr =
-	    ast_parse_expression ("_attribute[_field_.i];", ast_get_root (n));
-	  ast_replace (expr, "_field_", n->child[0]);
-	  ast_replace_child (n, 0, ast_find (expr, sym_postfix_expression));
-	  ast_destroy (expr);
-	}
-      }
+    else if ((member = ast_schema (n->child[0], sym_postfix_expression,
+				   0, sym_postfix_expression,
+				   2, sym_member_identifier,
+				   0, sym_generic_identifier,
+				   0, sym_IDENTIFIER)) &&
+	     ((d->dimension < 2 &&
+	       !strcmp (ast_terminal (member)->start, "y")) ||
+	      (d->dimension < 3 &&
+	       !strcmp (ast_terminal (member)->start, "z"))) &&
+	     (typename =
+	      typedef_name (expression_type (n->child[0]->child[0]->child[0],
+					     stack))) &&
+	     !strcmp (typename, "tensor") &&
+	     (inforeach (n) || point_declaration (stack))) {
+      Ast * expr = ast_attach (ast_new (n, sym_primary_expression),
+			       ast_terminal_new (n, sym_IDENTIFIER,
+						 "_val_higher_dimension"));
+      ast_replace_child (n->parent, 0, expr);      
     }
     break;
   }
