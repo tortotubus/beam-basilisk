@@ -513,15 +513,19 @@ typedef struct {
 
 static char * field_value (Field * c, const char * prefix, int type)
 {
+  bool constant = false;
+  int cindex = c->index;
+  if (cindex >= 65535)
+    cindex -= 65535, constant = true;
   char * src = NULL;
   if (c->type == 3) { // tensor
-    int index = c->index;
+    int index = cindex;
     for (int j = 0; j < c->dimension; j++) {
       if (type > 1)
 	str_append (src, "{");
       for (int i = 0; i < c->dimension; i++) {
-	char s[10];
-	snprintf (s, 9, "%d", index++);
+	char s[20];
+	snprintf (s, 19, "%s%d", constant ? "_NVARMAX+" : "", index++);
 	str_append (src, "{", prefix, s, "}",
 		    i < c->dimension - 1 ? "," : "");
       }
@@ -530,14 +534,14 @@ static char * field_value (Field * c, const char * prefix, int type)
   }
   else if (c->type == 2) // vector
     for (int i = 0; i < c->dimension; i++) {
-      char s[10];
-      snprintf (s, 9, "%d", c->index + i);
+      char s[20];
+      snprintf (s, 19, "%s%d", constant ? "_NVARMAX+" : "", cindex + i);
       str_append (src, "{", prefix, s, "}",
 		  i < c->dimension - 1 ? "," : "");
     }
   else if (c->type == 1) { // scalar
-    char s[10];
-    snprintf (s, 9, "%d", c->index);
+    char s[20];
+    snprintf (s, 19, "%s%d", constant ? "_NVARMAX+" : "", cindex);
     str_append (src, prefix, s);
   }
   if (type >= c->type) {
@@ -1960,6 +1964,7 @@ static void translate (Ast * n, Stack * stack, void * data)
 	    Field * c = field_append (&d->constants, declarator->child[0],
 				      typename, d->dimension,
 				      &d->constants_index);
+	    field->value = (void *)(long) c->index + 65536;
 	    char * src = field_value (c, "_NVARMAX+", c->type);
 	    char * initializer = ast_str_append (n->child[2], NULL);
 	    ast_before (ast_child (d->init_fields, token_symbol ('}')),
