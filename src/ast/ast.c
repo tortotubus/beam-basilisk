@@ -882,3 +882,25 @@ Ast * ast_flatten (Ast * n, AstTerminal * t)
       ast_flatten (*c, t);
   return n;
 }
+
+bool ast_are_identical (const Ast * a, const Ast * b)
+{
+  if (a->sym != b->sym)
+    return false;
+  AstTerminal * ta = ast_terminal (a), * tb = ast_terminal (b);
+  if (ta) {
+    if (!tb || strcmp (ta->start, tb->start))
+      return false;
+  }
+  else if (tb)
+    return false;
+  else {
+    Ast ** c, ** d;
+    for (c = a->child, d = b->child; *c && *d; c++, d++)
+      if (!ast_are_identical (*c, *d))
+	return false;
+    if (*c || *d)
+      return false;
+  }
+  return true;
+}
