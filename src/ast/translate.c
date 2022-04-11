@@ -2439,8 +2439,13 @@ static void translate (Ast * n, Stack * stack, void * data)
 	  if (!ast_child (event_parameter, sym_assignment_operator) &&
 	      (identifier = ast_is_identifier_expression
 	       (ast_child (event_parameter, sym_conditional_expression))) &&
-	      !strcmp (ast_terminal (identifier)->start, "last"))
-	    last = 1;
+	      (!strcmp (ast_terminal (identifier)->start, "last") ||
+	       !strcmp (ast_terminal (identifier)->start, "first"))) {
+	    if (!strcmp (ast_terminal (identifier)->start, "last"))
+	      last = 1;
+	    else
+	      last = 0;
+	  }
 	  else {
 	    snprintf (anexpr, 19, "%d", nexpr++);
 	    str_append (expr, "static int ", name, "_expr", anexpr,
