@@ -924,37 +924,44 @@ static void combinations (Ast * n, Stack * stack, TranslateData * d,
   int nmaybeconst = 0;
   for (Ast ** c = consts; *c; c++, nmaybeconst++);
   int n2 = 1 << nmaybeconst;
+  char * condition = NULL;
   for (int bits = 0; bits < n2; bits++) {
-    char * condition = strdup ("if (");
-    for (int i = 0; i < nmaybeconst; i++) {
-      const char * name = ast_terminal (consts[i])->start;
-      const char * typename = typedef_name (consts[i]);
-      str_append (condition,
-		  (bits & (1 << i)) ? "" : "!",
-		  "is_constant(", name,
-		  !strcmp (typename, "vector") ||
-		  !strcmp (typename, "face vector") ? ".x" : "",
-		  ")");
-      if (i < nmaybeconst - 1)
-	str_append (condition, " && ");
+    if (bits > 0)
+      str_append (condition, "else ");
+    if (bits == n2 - 1)
+      str_append (condition, "{");
+    else {
+      str_append (condition, "if(");
+      for (int i = 0; i < nmaybeconst; i++) {
+	const char * name = ast_terminal (consts[i])->start;
+	const char * typename = typedef_name (consts[i]);
+	str_append (condition,
+		    (bits & (1 << i)) ? "" : "!",
+		    "is_constant(", name,
+		    !strcmp (typename, "vector") ||
+		    !strcmp (typename, "face vector") ? ".x" : "",
+		    ")");
+	if (i < nmaybeconst - 1)
+	  str_append (condition, " && ");
+      }
+      str_append (condition, "){");
     }
-    str_append (condition, "){");
     condition = combination_constants (d, consts, bits, condition);
-    str_append (condition, key, "{_statement_;}}");
-    Ast * copy = bits ? ast_copy (n) : n;
-    if (bits)
-      maybeconst (copy, stack, replace_const, &(ReplaceConst){consts, bits});
-    Ast * conditional = ast_parse_expression (condition,
-					      ast_get_root (copy));
-    free (condition);
-    assert (ast_replace (conditional, "_statement_", copy));
-    conditional = ast_new_children (ast_new (list, sym_statement),
-				    conditional);
-    if (bits)
-      list = ast_block_list_append (list, item->sym, conditional);
-    else
-      ast_replace_child (item, 0, conditional);
+    char index[20];
+    snprintf (index, 19, "%d", bits);
+    str_append (condition, key, "{_statement", index, "_;}}");
   }
+  Ast * conditional = ast_parse_expression (condition, ast_get_root (n));
+  free (condition);
+  for (int bits = 1; bits < n2; bits++) {
+    Ast * copy = ast_copy (n);
+    maybeconst (copy, stack, replace_const, &(ReplaceConst){consts, bits});
+    char statement[100];
+    snprintf (statement, 99, "_statement%d_", bits);
+    assert (ast_replace (conditional, statement, copy));
+  }
+  assert (ast_replace (conditional, "_statement0_", n));
+  ast_replace_child (item, 0, conditional);
 }
 
 static int field_list_type (Ast * list, Stack * stack, bool mustbe)
