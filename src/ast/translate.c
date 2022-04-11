@@ -2126,6 +2126,25 @@ static void translate (Ast * n, Stack * stack, void * data)
       }
 
       /**
+      ### Macro statement */
+
+      if (n->parent->sym == sym_macro_statement) {
+	char * name = NULL;
+	str_append (name, "begin_", t->start);
+	Ast * type = ast_identifier_declaration (stack, name);
+	if (type &&
+	    declaration_from_type (type)->sym == sym_function_declaration) {
+	  ast_before (identifier, "{");
+	  ast_after (n, ";");
+	  ast_after (n->parent, "end_", t->start, "();}");
+	  free (t->start);
+	  t->start = name;
+	}
+	else // fixme: should this be an error?
+	  free (name);
+      }
+      
+      /**
       ### Functions with optional arguments */
 
       Ast * type = ast_identifier_declaration (stack, t->start);
@@ -3036,7 +3055,7 @@ static void macros (Ast * n, Stack * stack, void * data)
   }
 
   /**
-  ## Macro statements */
+  ## is_face_... statements */
 
   case sym_macro_statement: {
     Ast * identifier = ast_schema (n, sym_macro_statement,
@@ -3046,19 +3065,9 @@ static void macros (Ast * n, Stack * stack, void * data)
 				   0, sym_IDENTIFIER);
     if (identifier) {
       AstTerminal * t = ast_terminal (identifier);
-      char * name = NULL;
-      str_append (name, "begin_", t->start);
-      Ast * type = ast_identifier_declaration (stack, name);
-      free (name);
-      if (type &&
-	  declaration_from_type (type)->sym == sym_function_declaration) {
-	ast_before (identifier, "{begin_");
-	ast_after (ast_child (n, sym_function_call), ";");
-	ast_after (n, "end_", t->start, "();}");
-      }
-      else if (!strcmp (t->start, "is_face_x") ||
-	       !strcmp (t->start, "is_face_y") ||
-	       !strcmp (t->start, "is_face_z"))
+      if (!strcmp (t->start, "is_face_x") ||
+	  !strcmp (t->start, "is_face_y") ||
+	  !strcmp (t->start, "is_face_z"))
 	ast_after (n, "end_", t->start, "()");
     }
     break;
