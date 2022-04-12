@@ -160,6 +160,7 @@ member_identifier
 argument_expression_list
 	: argument_expression_list_item
 	| argument_expression_list ',' argument_expression_list_item
+	| argument_expression_list ',' /* Basilisk C extension */
 	;
 
 argument_expression_list_item
@@ -323,7 +324,7 @@ storage_class_specifier
 	| THREAD_LOCAL
 	| AUTO
 	| REGISTER
-	| TRACE
+	| TRACE /* Basilisk C extension */
 	;
 
 type_specifier
