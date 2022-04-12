@@ -135,9 +135,10 @@ static Ast * new_ast (AstRoot * parse,
 
 "new"{WS}+("vertex"{WS}+)?"scalar"      { SAST(NEW_FIELD); }
 "new"{WS}+("face"{WS}+)?"vector"        { SAST(NEW_FIELD); }
-"new"{WS}+"tensor"                      { SAST(NEW_FIELD); }
-"face"{WS}+"vector"                     { SAST(TYPEDEF_NAME); }
+"new"{WS}+("symmetric"{WS}+)?"tensor"   { SAST(NEW_FIELD); }
 "vertex"{WS}+"scalar"                   { SAST(TYPEDEF_NAME); }
+"face"{WS}+"vector"                     { SAST(TYPEDEF_NAME); }
+"symmetric"{WS}+"tensor"                { SAST(TYPEDEF_NAME); }
 "(const)"                               { SAST(MAYBECONST); }
 "in"			                { SAST(IN); }
 "trace"			                { SAST(TRACE); }
