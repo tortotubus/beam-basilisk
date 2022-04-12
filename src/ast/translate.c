@@ -147,30 +147,32 @@ Ast * ast_initializer_list (Ast * list)
   while (list->sym == sym_argument_expression_list) {
     list->sym = sym_initializer_list;
     Ast * initializer = list->child[1] ? list->child[2] : list->child[0];
-    initializer->sym = sym_initializer;
-    if (initializer->child[1]) {
-      Ast * designator = ast_new (initializer, sym_designator);
-      Ast * identifier = ast_new (initializer, sym_generic_identifier);
-      Ast * dot = ast_terminal_new_char (initializer, ".");
-      ast_new_children (designator, dot, identifier);
-      ast_new_children (identifier, initializer->child[0]);
-      AstTerminal * left = ast_left_terminal (identifier);
-      ast_terminal (dot)->line = left->line;
-      ast_terminal (dot)->before = left->before; left->before = NULL;      
-      Ast * designator_list =
-	ast_new_children (ast_new (initializer, sym_designator_list),
-			  designator);
-      Ast * designation =
-	ast_new_children (ast_new (initializer, sym_designation),
-			  designator_list,
-			  initializer->child[1]);
-      if (list->child[1])
-	ast_new_children (list,
-			  list->child[0], list->child[1],
-			  designation, initializer->child[2]);
-      else
-	ast_new_children (list,
-			  designation, initializer->child[2]);
+    if (initializer) {
+      initializer->sym = sym_initializer;
+      if (initializer->child[1]) {
+	Ast * designator = ast_new (initializer, sym_designator);
+	Ast * identifier = ast_new (initializer, sym_generic_identifier);
+	Ast * dot = ast_terminal_new_char (initializer, ".");
+	ast_new_children (designator, dot, identifier);
+	ast_new_children (identifier, initializer->child[0]);
+	AstTerminal * left = ast_left_terminal (identifier);
+	ast_terminal (dot)->line = left->line;
+	ast_terminal (dot)->before = left->before; left->before = NULL;      
+	Ast * designator_list =
+	  ast_new_children (ast_new (initializer, sym_designator_list),
+			    designator);
+	Ast * designation =
+	  ast_new_children (ast_new (initializer, sym_designation),
+			    designator_list,
+			    initializer->child[1]);
+	if (list->child[1])
+	  ast_new_children (list,
+			    list->child[0], list->child[1],
+			    designation, initializer->child[2]);
+	else
+	  ast_new_children (list,
+			    designation, initializer->child[2]);
+      }
     }
     list = list->child[0];    
   }
