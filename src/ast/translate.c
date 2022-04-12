@@ -508,7 +508,7 @@ static Ast * rotate_arguments (Ast * list, int dimension)
 
 typedef struct {
   Ast * identifier;
-  int type, index, dimension;
+  int type, index, dimension, symmetric;
 } Field;
 
 static char * field_value (Field * c, const char * prefix, int type)
@@ -519,13 +519,18 @@ static char * field_value (Field * c, const char * prefix, int type)
     cindex -= 65535, constant = true;
   char * src = NULL;
   if (c->type == 3) { // tensor
-    int index = cindex;
+    int index = cindex, m[c->dimension][c->dimension];    
     for (int j = 0; j < c->dimension; j++) {
       if (type > 1)
 	str_append (src, "{");
       for (int i = 0; i < c->dimension; i++) {
 	char s[20];
-	snprintf (s, 19, "%s%d", constant ? "_NVARMAX+" : "", index++);
+	if (c->symmetric) {
+	  m[i][j] = i >= j ? index++ : m[j][i];
+	  snprintf (s, 19, "%s%d", constant ? "_NVARMAX+" : "", m[i][j]);
+	}
+	else
+	  snprintf (s, 19, "%s%d", constant ? "_NVARMAX+" : "", index++);
 	str_append (src, "{", prefix, s, "}",
 		    i < c->dimension - 1 ? "," : "");
       }
@@ -561,8 +566,16 @@ static void field_init (Field * c, const char * typename,
   else if (!strcmp (typename, "vector") ||
 	   !strcmp (typename, "face vector"))
     c->type = 2, c->dimension = dimension, *index += dimension;
-  else // tensor
-    c->type = 3, c->dimension = dimension, *index += dimension*dimension;
+  else if (!strcmp (typename, "tensor")) {
+    c->type = 3, c->dimension = dimension;
+    if (c->symmetric)
+      *index += dimension*(dimension + 1)/2;
+    else
+      *index += dimension*dimension;
+  }
+  else if (!strcmp (typename, "symmetric tensor"))
+    c->type = 3, c->dimension = dimension, c->symmetric = 1,
+      *index += dimension*(dimension + 1)/2;
 }
 
 static Field * field_append (Field ** fields, Ast * identifier,
@@ -574,6 +587,7 @@ static Field * field_append (Field ** fields, Ast * identifier,
   (*fields)[len + 1] = (Field){0};
   Field * c = &(*fields)[len];
   c->identifier = identifier;
+  c->symmetric = 0;
   field_init (c, typename, dimension, index);
   return c;
 }
@@ -995,7 +1009,8 @@ static bool is_field (const char * typename)
 		      !strcmp (typename, "vertex scalar") ||
 		      !strcmp (typename, "vector") ||
 		      !strcmp (typename, "face vector") ||
-		      !strcmp (typename, "tensor"));
+		      !strcmp (typename, "tensor") ||
+		      !strcmp (typename, "symmetric tensor"));
 }
 
 static Ast * declarator_is_allocator (Ast * declarator)
@@ -2020,6 +2035,7 @@ static void translate (Ast * n, Stack * stack, void * data)
 	else if (declaration->parent->sym == sym_external_declaration) {
 	  TranslateData * d = data;
 	  Field c;
+	  c.symmetric = !strcmp (func, "symmetric_tensor");
 	  field_init (&c, typename, d->dimension, &d->fields_index);
 	  field->value = (void *)(long) c.index + 1;
 	  char * src = field_value (&c, "", c.type);
@@ -3148,7 +3164,8 @@ static void macros (Ast * n, Stack * stack, void * data)
   case sym_TYPEDEF_NAME: {
     AstTerminal * t = ast_terminal (n);
     if (!strcmp (t->start, "face vector") ||
-	!strcmp (t->start, "vertex scalar")) {
+	!strcmp (t->start, "vertex scalar") ||
+	!strcmp (t->start, "symmetric tensor")) {
       char * s = strchr (t->start, ' ') + 1;
       memmove (t->start, s, strlen (s) + 1);
     }
