@@ -641,6 +641,7 @@ jump_statement
 external_declaration
 	: function_definition
 	| declaration
+	| macro_statement /* Basilisk C extension */
 	| event_definition /* Basilisk C extension */
 	| boundary_definition /* Basilisk C extension */
 	| external_foreach_dimension /* Basilisk C extension */

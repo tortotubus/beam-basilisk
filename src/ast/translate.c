@@ -123,6 +123,29 @@ Ast * ast_list_remove (Ast * list, Ast * item)
 }
 
 /**
+Removes `item` from the (block) `list` and returns the new
+list or NULL if the list contains only *item*. */
+
+Ast * ast_block_list_remove (Ast * list, Ast * item)
+{
+  Ast * grand_parent = item->parent->parent;
+  if (ast_child_index (item) == 0) {
+    if (grand_parent->sym == list->sym) {
+      ast_replace_child (grand_parent, 0, grand_parent->child[1]);
+      grand_parent->child[1] = NULL;
+    }
+    else
+      return NULL;
+  }
+  else {
+    Ast * parent = item->parent;
+    list = parent->child[0];
+    ast_replace_child (grand_parent, ast_child_index (parent), list);
+  }
+  return list;
+}
+
+/**
 Transforms a list of expressions into a list of arguments. */
 
 void ast_argument_list (Ast * expression)
@@ -912,7 +935,7 @@ char * combination_constants (TranslateData * d, Ast ** consts, int bits,
       const char * typename = typedef_name (consts[i]);
       if (!strcmp (typename, "vector") ||
 	  !strcmp (typename, "face vector")) {
-	str_append (constants, "const struct{double x");
+	str_append (constants, "struct{double x");
 	for (int j = 1; j < d->dimension; j++) {
 	  char s[] = ",y"; s[1] = 'x' + j;
 	  str_append (constants, s);
@@ -927,7 +950,7 @@ char * combination_constants (TranslateData * d, Ast ** consts, int bits,
       }
       else
 	str_append (constants,
-		    "const double _const_", name, "=_constant[",
+		    "double _const_", name, "=_constant[",
 		    name, ".i-_NVARMAX];");
     }
   return constants;
@@ -1381,6 +1404,26 @@ static void boundary_expr (Ast * n, Stack * stack, void * data)
   }
 }
 
+static char * str_append_maps (char * s, Stack * stack)
+{
+  Ast ** n;
+  for (int i = 0; (n = stack_index (stack, i)); i++)
+    if (*n && (*n)->sym == sym_macro_statement &&
+	(*n)->child[1]->child[2]) {
+      Ast * block_list = (*n)->child[1]->child[1];
+      AstTerminal * t = ast_left_terminal (block_list);
+      str_append (s, "\n#line ", ast_line (t), " \"", t->file, "\"");
+      s = ast_str_append (block_list, s);
+    }
+  return s;
+}
+
+static char * str_append_point_variables (char * s, Stack * stack)
+{
+  str_append (s, "POINT_VARIABLES;");
+  return str_append_maps (s, stack);
+}
+
 static Ast * boundary_function (Ast * expr, Stack * stack, TranslateData * d,
 				char * before, char * ind)
 {
@@ -1398,7 +1441,8 @@ static Ast * boundary_function (Ast * expr, Stack * stack, TranslateData * d,
 		dir[i], ";",
 		"NOT_UNUSED(", index[i], "g);");
   assert (before);
-  str_append (src, "POINT_VARIABLES;return ", before, "_expr_;}}");
+  src = str_append_point_variables (src, stack);
+  str_append (src, "return ", before, "_expr_;}}");
   free (before);
   Ast * boundary =
     ast_child (ast_parse_external_declaration (src, ast_get_root (expr)),
@@ -2726,6 +2770,15 @@ static void macros (Ast * n, Stack * stack, void * data)
       if (n->child[4])
 	ast_remove (n->child[2], ast_left_terminal (n->child[3]));
     }
+    else { // maps for !foreach_face() loops
+      char * maps = str_append_maps (NULL, stack);
+      if (maps) {
+	Ast * statement = ast_child (n, sym_statement);
+	ast_before (statement, "{", maps);
+	ast_after (statement, "}");
+	free (maps);
+      }
+    }
 
     if (serial)
       ast_before (n, "\n"
@@ -2891,7 +2944,8 @@ static void macros (Ast * n, Stack * stack, void * data)
       for (int i = 0; i < d->dimension; i++)
 	ast_after (decl, "int ", name[i], "=0;"
 		   "NOT_UNUSED(", name[i], ");");
-      ast_after (decl, "POINT_VARIABLES;");	
+      ast_right_terminal (decl)->after =
+	str_append_point_variables (ast_right_terminal (decl)->after, stack);
     }
     break;
   }
@@ -3089,9 +3143,6 @@ static void macros (Ast * n, Stack * stack, void * data)
     break;
   }
 
-  /**
-  ## is_face_... statements */
-
   case sym_macro_statement: {
     Ast * identifier = ast_schema (n, sym_macro_statement,
 				   0, sym_function_call,
@@ -3100,10 +3151,33 @@ static void macros (Ast * n, Stack * stack, void * data)
 				   0, sym_IDENTIFIER);
     if (identifier) {
       AstTerminal * t = ast_terminal (identifier);
+
+      /**
+      ## is_face_... statements */
+
       if (!strcmp (t->start, "is_face_x") ||
 	  !strcmp (t->start, "is_face_y") ||
-	  !strcmp (t->start, "is_face_z"))
+	  !strcmp (t->start, "is_face_z")) {
+	char * maps = str_append_maps (NULL, stack);
+	if (maps) {
+	  ast_after (ast_child (n, sym_compound_statement)->child[0], maps);
+	  free (maps);
+	}
 	ast_after (n, "end_", t->start, "()");
+      }
+
+      /**
+      ## Map */
+
+      else if (!strcmp (ast_terminal (identifier)->start, "map")) {
+	Ast * item = n->parent;
+	if (item->sym == sym_external_declaration) {
+	  assert (ast_child_index (item) == 1);
+	  Ast * parent = item->parent, * grand_parent = parent->parent;
+	  ast_set_child (grand_parent, ast_child_index (parent),
+			 parent->child[0]);
+	}
+      }
     }
     break;
   }
@@ -3278,6 +3352,20 @@ void ast_traverse (Ast * n, Stack * stack,
     break;
   }
 
+  case sym_macro_statement: {
+    Ast * identifier = ast_schema (n, sym_macro_statement,
+				   0, sym_function_call,
+				   0, sym_postfix_expression,
+				   0, sym_primary_expression,
+				   0, sym_IDENTIFIER);
+    if (!strcmp (ast_terminal (identifier)->start, "map"))
+      stack_push (stack, &n);
+    for (Ast ** c = n->child; *c; c++)
+      ast_traverse (*c, stack, func, data);
+    func (n, stack, data);
+    break; 
+  }
+
   case sym_declaration:
     ast_push_declaration (stack, n);
     // fall through
@@ -3340,10 +3428,16 @@ void endfor (FILE * fin, FILE * fout,
     ast_find (ast_find (data.init_solver, sym_compound_statement)->child[1],
 	      sym_compound_statement);
   ast_destroy ((Ast *) init);
-  
+
+#if 0
+  ast_traverse ((Ast *) root, root->stack, translate, &data);
+  ast_traverse ((Ast *) root, root->stack, macros, &data);
+  ast_traverse ((Ast *) root, root->stack, global_boundaries, &data);
+#else
   ast_traverse ((Ast *) root, root->stack, global_boundaries, &data);
   ast_traverse ((Ast *) root, root->stack, translate, &data);
   ast_traverse ((Ast *) root, root->stack, macros, &data);
+#endif
 
   if (data.fields_index) {
     Ast * call_init_solver = ast_find (data.init_solver, sym_function_call);
@@ -3355,7 +3449,11 @@ void endfor (FILE * fin, FILE * fout,
   ast_before (data.init_events, grid, "_methods();");
   
   free (data.constants);
-    
+  Ast ** n;
+  while ((n = ((Ast **)stack_pop (root->stack))))
+    if ((*n)->sym == sym_macro_statement)
+      ast_destroy (*n);
+
   ast_print ((Ast *) root, fout, false);
   
   ast_destroy ((Ast *) d);
