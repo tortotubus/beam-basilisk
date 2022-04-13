@@ -628,28 +628,29 @@ typedef struct {
 
 static void rotate (Ast * n, Stack * stack, void * data)
 {
+  TranslateData * d = data;
   switch (n->sym) {
 
   case sym_IDENTIFIER: {
     AstTerminal * t = ast_terminal (n);
     int len = strlen (t->start);
     if (len >= 2 && t->start[len - 2] == '_' &&
-	strchr ("xyz", t->start[len - 1])) {
-      TranslateData * d = data;  
+	strchr ("xyz", t->start[len - 1]))
       t->start[len - 1] = 'x' + (t->start[len - 1] + 1 - 'x') % d->dimension;
+    else if (d->dimension > 1) {
+      if (!strcmp (t->start, "right"))
+	free (t->start), t->start = strdup ("top");
+      else if (!strcmp (t->start, "left"))
+	free (t->start), t->start = strdup ("bottom");
+      else if (!strcmp (t->start, "top"))
+	free (t->start), t->start = strdup ("front");
+      else if (!strcmp (t->start, "bottom"))
+	free (t->start), t->start = strdup ("back");
+      else if (!strcmp (t->start, "front"))
+	free (t->start), t->start = strdup ("right");
+      else if (!strcmp (t->start, "back"))
+	free (t->start), t->start = strdup ("left");
     }
-    else if (!strcmp (t->start, "right"))
-      free (t->start), t->start = strdup ("top");
-    else if (!strcmp (t->start, "left"))
-      free (t->start), t->start = strdup ("bottom");
-    else if (!strcmp (t->start, "top"))
-      free (t->start), t->start = strdup ("front");
-    else if (!strcmp (t->start, "bottom"))
-      free (t->start), t->start = strdup ("back");
-    else if (!strcmp (t->start, "front"))
-      free (t->start), t->start = strdup ("right");
-    else if (!strcmp (t->start, "back"))
-      free (t->start), t->start = strdup ("left");
     break;
   }
 
@@ -657,15 +658,12 @@ static void rotate (Ast * n, Stack * stack, void * data)
     AstTerminal * t = ast_terminal (ast_schema (n, sym_member_identifier,
 						0, sym_generic_identifier,
 						0, sym_IDENTIFIER));
-    if (t->start[1] == '\0' && strchr ("xyz", *t->start)) {
-      TranslateData * d = data;
+    if (t->start[1] == '\0' && strchr ("xyz", *t->start))
       *t->start = 'x' + (*t->start + 1 - 'x') % d->dimension;
-    }
     break;
   }
 
   case sym_function_call: {
-    TranslateData * d = data;
     if (d->dimension > 1) {
       Ast * identifier = ast_schema (n, sym_function_call,
 				     0, sym_postfix_expression,
@@ -2922,8 +2920,8 @@ static void macros (Ast * n, Stack * stack, void * data)
 	  type = type->parent;
 	if (!find_struct_member (ast_find (type, sym_struct_declaration_list),
 				 member)) {
-	  Ast * expr =
-	    ast_parse_expression ("_attribute[_field_.i];", ast_get_root (n));
+	  Ast * expr = ast_parse_expression ("_attribute[_field_.i];",
+					     ast_get_root (n));
 	  ast_replace (expr, "_field_", n->child[0]);
 	  ast_replace_child (n, 0, ast_find (expr, sym_postfix_expression));
 	  ast_destroy (expr);
@@ -2973,7 +2971,7 @@ static void macros (Ast * n, Stack * stack, void * data)
   case sym_initializer: {
     if (n->child[1] && n->child[2]) {
       Ast * list = n->child[1];
-      int type = field_list_type (list, stack, n->sym == sym_field_list);
+      int type = field_list_type (list, stack, false);
       if (type > 0) {
 
 	/**
@@ -3381,7 +3379,8 @@ void ast_traverse (Ast * n, Stack * stack,
 }
 
 void endfor (FILE * fin, FILE * fout,
-	     const char * grid, int dimension, bool nolineno)
+	     const char * grid, int dimension,
+	     bool nolineno, bool progress)
 {
   char * buffer = NULL;
   size_t len = 0, maxlen = 0;
@@ -3447,6 +3446,8 @@ void endfor (FILE * fin, FILE * fout,
   }
 
   ast_before (data.init_events, grid, "_methods();");
+  if (progress)
+    ast_after (data.init_events, "last_events();");
   
   free (data.constants);
   Ast ** n;
