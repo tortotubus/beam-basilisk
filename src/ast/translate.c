@@ -1843,7 +1843,36 @@ static void translate (Ast * n, Stack * stack, void * data)
       list = ast_child (n, sym_argument_expression_list);
       char * before = ast_left_terminal (n)->before;
       ast_left_terminal (n)->before = NULL;
-      Ast * func = ast_new_identifier (n, "val");
+      Ast * func = NULL,
+	* identifier = ast_schema (n->child[0], sym_postfix_expression,
+				   0, sym_primary_expression,
+				   0, sym_IDENTIFIER);
+      if (identifier) {
+	Ast * type =
+	  ast_identifier_declaration (stack, ast_terminal (identifier)->start);
+	Ast * assign, * unary, * identifier;
+	if ((assign = ast_schema (ast_ancestor (type, 4), sym_init_declarator,
+				  2, sym_initializer,
+				  0, sym_assignment_expression)) &&
+	    (unary = ast_is_unary_expression (assign)) &&
+	    (identifier = ast_schema (unary, sym_unary_expression,
+				      0, sym_postfix_expression,
+				      0, sym_function_call,
+				      0, sym_postfix_expression,
+				      0, sym_primary_expression,
+				      0, sym_IDENTIFIER)) &&
+	    (!strcmp (ast_terminal (identifier)->start, "new_const_scalar"))) {
+	  while (type && type->sym != sym_declaration)
+	    type = type->parent;
+	  if (type &&
+	      ast_schema (type->child[0], sym_declaration_specifiers,
+			  0, sym_type_qualifier,
+			  0, sym_CONST))
+	    func = ast_new_identifier (n, "_val_constant");
+	}
+      }
+      if (!func)
+	func = ast_new_identifier (n, "val");
       ast_set_child (n, 2,
 		     ast_list_prepend (list,
 				       sym_argument_expression_list_item,
