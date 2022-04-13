@@ -263,6 +263,7 @@ conditional_expression
 assignment_expression
 	: conditional_expression
 	| unary_expression assignment_operator assignment_expression
+	| unary_expression assignment_operator postfix_initializer /* Basilisk C extension */
 	;
 
 assignment_operator

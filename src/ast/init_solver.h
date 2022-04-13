@@ -11,4 +11,5 @@ static void _init_solver (void)
     empty. */
 
   }
+  set_fpe();
 }

@@ -15,11 +15,13 @@ for f in `cat /tmp/list`; do man 3 $f | grep -m1 "$f.*;"; done
 ## Type definitions */
 
 typedef void QFILE, FILE, extrae_type_t, extrae_value_t;
-typedef void MPI_Datatype, MPI_Request, MPI_Comm, MPI_Op, Node;
+typedef void MPI_Datatype, MPI_Request, MPI_Comm, MPI_Op, MPI_Aint, Node;
 typedef int bool, MPI_Status;
 typedef long size_t, clock_t, int64_t;
-typedef float GLfloat;
-typedef void framebuffer, Frustum;
+typedef void GLfloat, GLubyte;
+typedef void framebuffer, fbdepth_t, Frustum;
+typedef void Kdt, KdtRect, KdtSum, KdtCheck;
+typedef void va_list;
 
 /**
 ## From standard C libraries */
