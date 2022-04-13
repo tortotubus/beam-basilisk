@@ -14,6 +14,6 @@ int main (int argc, char * argv[])
     fprintf (stderr, "%s: error: could not parse code\n", argv[0]);
     return 1;
   }
-  ast_print_tree (n, stderr, 0, false);
+  ast_print_tree (n, stderr, 0, false, -1);
   ast_destroy (n);
 }

@@ -366,8 +366,11 @@ void ast_print_file_line (Ast * n, FILE * fp)
 }
 
 static void print_child_tree (Ast * n, FILE * fp,
-			      const char * indent, bool isLast, bool compress)
+			      const char * indent, bool isLast,
+			      bool compress, int maxdepth)
 {
+  if (!maxdepth)
+    return;
   char * ind;
   if (indent) {
     fputs (indent, fp);
@@ -384,11 +387,12 @@ static void print_child_tree (Ast * n, FILE * fp,
     fputs ("├─", fp);
     str_append (ind, "│ ");
   }
-  ast_print_tree (n, fp, ind, compress);
+  ast_print_tree (n, fp, ind, compress, maxdepth);
   free (ind);
 }
 
-void ast_print_tree (Ast * n, FILE * fp, const char * indent, bool compress)
+void ast_print_tree (Ast * n, FILE * fp, const char * indent,
+		     bool compress, int maxdepth)
 {
   if (n == ast_placeholder) {
     fputs ("_placeholder_\n", fp);
@@ -404,7 +408,8 @@ void ast_print_tree (Ast * n, FILE * fp, const char * indent, bool compress)
   else {
     fputc ('\n', fp);
     for (Ast **c = n->child; *c; c++)
-      print_child_tree (*c, fp, indent, *(c + 1) == NULL, compress);
+      print_child_tree (*c, fp, indent, *(c + 1) == NULL,
+			compress, maxdepth - 1);
   }
 }
 
