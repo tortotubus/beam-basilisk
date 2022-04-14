@@ -630,8 +630,8 @@ static void rotate (Ast * n, Stack * stack, void * data)
 {
   TranslateData * d = data;
   switch (n->sym) {
-
-  case sym_IDENTIFIER: {
+    
+  case sym_IDENTIFIER: case sym_FOREACH: {
     AstTerminal * t = ast_terminal (n);
     int len = strlen (t->start);
     if (len >= 2 && t->start[len - 2] == '_' &&
@@ -1725,11 +1725,16 @@ static void translate (Ast * n, Stack * stack, void * data)
 					 0, sym_primary_expression,
 					 0, sym_IDENTIFIER);
 	    if (identifier && ast_terminal (identifier)->start[1] == '\0' &&
-		strchr ("xyz", ast_terminal (identifier)->start[0]))
+		strchr ("xyz", ast_terminal (identifier)->start[0])) {
 	      *s-- = ast_terminal (identifier)->start[0];
+	      parameters = ast_list_remove (parameters, param);
+	    }
 	  }
 	if (s != order + 2)
 	  memmove (order, s + 1, strlen(s));
+	if (parameters == NULL)
+	  n->child[2] = n->child[3], n->child[3] = n->child[4],
+	    n->child[4] = NULL;
       }
 
       /**
@@ -2757,11 +2762,12 @@ static const char * get_field_type (Ast * declaration, AstTerminal * t)
 static void macros (Ast * n, Stack * stack, void * data)
 {
   switch (n->sym) {
-    
-  /**
-  ## Foreach statements */
-
+        
   case sym_foreach_statement: {
+
+    /**
+    ## Foreach statements */
+
     Ast * foreach = inforeach (n);
     if (foreach) {
       AstTerminal * t = ast_terminal (n->child[0]);
@@ -2777,25 +2783,9 @@ static void macros (Ast * n, Stack * stack, void * data)
       exit (1);
     }
     
-    Ast * parameters = ast_child (n, sym_foreach_parameters);
-    bool serial = false;
-    if (parameters)
-      foreach_item (parameters, 2, param) {
-	Ast * identifier = ast_is_identifier_expression (param->child[0]);
-	if (identifier && !strcmp (ast_terminal (identifier)->start,
-				   "serial")) {
-	  serial = true;
-	  _list = ast_list_remove (parameters, param);
-	  if (!_list)
-	    ast_remove (n->child[2], ast_left_terminal (n->child[3]));
-	}
-      }
-
     if (!strcmp (ast_terminal (n->child[0])->start, "foreach_face")) {
       free (ast_terminal (n->child[0])->start);
       ast_terminal (n->child[0])->start = strdup ("foreach_face_generic");
-      if (n->child[4])
-	ast_remove (n->child[2], ast_left_terminal (n->child[3]));
     }
     else { // maps for !foreach_face() loops
       char * maps = str_append_maps (NULL, stack);
@@ -2806,15 +2796,83 @@ static void macros (Ast * n, Stack * stack, void * data)
 	free (maps);
       }
     }
+    
+    ast_after (n, "end_", ast_left_terminal(n)->start, "();");
 
+    /**
+    ### Reductions */
+
+    Ast * parameters = ast_child (n, sym_foreach_parameters);
+    bool serial = false;
+    char * sreductions = NULL;
+    if (parameters) {
+      foreach_item (parameters, 2, item) {
+	Ast * identifier = ast_is_identifier_expression (item->child[0]);
+	if (identifier && !strcmp (ast_terminal (identifier)->start,
+				   "serial")) {
+	  serial = true;
+	  parameters = ast_list_remove (parameters, item);
+	}
+	else if (item->child[0]->sym == sym_reduction_list) {
+	  Ast * reductions = item->child[0];
+	  foreach_item (reductions, 1, reduction) {
+	    Ast * identifier = ast_schema (reduction, sym_reduction,
+					   4, sym_reduction_array,
+					   0, sym_generic_identifier,
+					   0, sym_IDENTIFIER);
+	    Ast * array = ast_schema (reduction, sym_reduction,
+				      4, sym_reduction_array,
+				      3, sym_expression);
+	    char * operator = ast_left_terminal (reduction->child[2])->start;
+	    if (array) {
+	      ast_after (n, "mpi_all_reduce_double(",
+			 ast_terminal (identifier)->start,
+			 ",",
+			 !strcmp(operator, "min") ? "MPI_MIN" : 
+			 !strcmp(operator, "max") ? "MPI_MAX" : 
+			 "MPI_SUM,");
+	      ast_right_terminal (n)->after =
+		ast_str_append (array, ast_right_terminal (n)->after);
+	      ast_after (n, ");");
+	    }
+	    else
+	      ast_after (n, "mpi_all_reduce_double(&",
+			 ast_terminal (identifier)->start,
+			 ",",
+			 !strcmp(operator, "min") ? "MPI_MIN" : 
+			 !strcmp(operator, "max") ? "MPI_MAX" : 
+			 "MPI_SUM",
+			 ",1);");
+	    sreductions = ast_str_append (reduction, sreductions);
+	  }
+	  parameters = ast_list_remove (parameters, item);
+	}
+      }
+      if (parameters == NULL)
+	n->child[2] = n->child[3], n->child[3] = n->child[4], n->child[4] = NULL;
+    }
+    
     if (serial)
       ast_before (n, "\n"
 		  "#if _OPENMP\n"
 		  "  #undef OMP\n"
 		  "  #define OMP(x)\n"
 		  "#endif\n");
-    ast_before (n, "{");
-    ast_after (n, "end_", ast_left_terminal(n)->start, "()}");
+    if (sreductions) {
+      ast_before (n, "\n"
+		  "#undef OMP_PARALLEL\n"
+		  "#define OMP_PARALLEL()\n"
+		  "OMP(omp parallel ", sreductions, "){");
+      ast_after (n,
+		 "\n"
+		 "#undef OMP_PARALLEL\n"
+		 "#define OMP_PARALLEL() OMP(omp parallel)\n}");
+      free (sreductions);
+    }
+    else {
+      ast_before (n, "{");
+      ast_after (n, "}");
+    }
     if (serial)
       ast_after (n, "\n"
 		 "#if _OPENMP\n"
