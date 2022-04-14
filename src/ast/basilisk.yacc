@@ -703,12 +703,17 @@ reduction_list
 	;
 
 reduction
-        : REDUCTION '(' reduction_operator  ':' generic_identifier ')'
+        : REDUCTION '(' reduction_operator  ':' reduction_array ')'
 	;
 
 reduction_operator
         : generic_identifier
 	| '+'
+	;
+
+reduction_array
+        : generic_identifier
+	| generic_identifier '[' ':' expression ']'
 	;
 
 foreach_inner_statement
