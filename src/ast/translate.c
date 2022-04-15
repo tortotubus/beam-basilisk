@@ -1454,10 +1454,9 @@ static Ast * boundary_function (Ast * expr, Stack * stack, TranslateData * d,
   return boundary;
 }
 
-static void set_member (Ast * array)
+static void set_boundary_component (Ast * member_identifier)
 {
-  Ast * member = ast_schema (array->child[0], sym_postfix_expression,
-			     2, sym_member_identifier,
+  Ast * member = ast_schema (member_identifier, sym_member_identifier,
 			     0, sym_generic_identifier,
 			     0, sym_IDENTIFIER);
   if (member) {
@@ -1558,7 +1557,6 @@ static void global_boundaries (Ast * n, Stack * stack, void * data)
 	AstTerminal * t = ast_left_terminal (assign);
 	char * before = t->before;
 	t->before = NULL;
-	set_member (n);
 	char ind[20];
 	TranslateData * d = data;
 	d->boundary = n;
@@ -1602,7 +1600,9 @@ static void global_boundaries (Ast * n, Stack * stack, void * data)
       AstTerminal * t = ast_left_terminal (n);
       char * before = t->before;
       t->before = NULL;
-      set_member (array);
+      set_boundary_component (ast_schema (array->child[0],
+					  sym_postfix_expression,
+					  2, sym_member_identifier));
       char ind[20];
       TranslateData * d = data;
       d->boundary = array;      
@@ -2694,8 +2694,8 @@ static void translate (Ast * n, Stack * stack, void * data)
 					0, sym_generic_identifier,
 					0, sym_IDENTIFIER))) {
 	    TranslateData * d = data;
-	    ast_after (d->init_fields,
-		       ast_terminal (identifier)->start, "=new_bid();");
+	    ast_before (d->init_fields,
+			ast_terminal (identifier)->start, "=new_bid();");
 	  }
     }
     break;
@@ -3014,6 +3014,13 @@ static void macros (Ast * n, Stack * stack, void * data)
 	  ast_destroy (expr);
 	}
       }
+
+      /**
+      ## Boundary vector component access */
+      
+      else if (typename && (!strcmp (typename, "vector") ||
+			    !strcmp (typename, "face vector")))
+	set_boundary_component (ast_find (n->child[2], sym_member_identifier));
     }
     break;
   }
@@ -3515,15 +3522,9 @@ void endfor (FILE * fin, FILE * fout,
 	      sym_compound_statement);
   ast_destroy ((Ast *) init);
 
-#if 0
-  ast_traverse ((Ast *) root, root->stack, translate, &data);
-  ast_traverse ((Ast *) root, root->stack, macros, &data);
-  ast_traverse ((Ast *) root, root->stack, global_boundaries, &data);
-#else
   ast_traverse ((Ast *) root, root->stack, global_boundaries, &data);
   ast_traverse ((Ast *) root, root->stack, translate, &data);
   ast_traverse ((Ast *) root, root->stack, macros, &data);
-#endif
 
   if (data.fields_index) {
     Ast * call_init_solver = ast_find (data.init_solver, sym_function_call);
