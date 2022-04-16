@@ -172,29 +172,44 @@ Ast * ast_initializer_list (Ast * list)
     Ast * initializer = list->child[1] ? list->child[2] : list->child[0];
     if (initializer) {
       initializer->sym = sym_initializer;
-      if (initializer->child[1]) {
-	Ast * designator = ast_new (initializer, sym_designator);
-	Ast * identifier = ast_new (initializer, sym_generic_identifier);
-	Ast * dot = ast_terminal_new_char (initializer, ".");
-	ast_new_children (designator, dot, identifier);
-	ast_new_children (identifier, initializer->child[0]);
-	AstTerminal * left = ast_left_terminal (identifier);
-	ast_terminal (dot)->line = left->line;
-	ast_terminal (dot)->before = left->before; left->before = NULL;      
-	Ast * designator_list =
-	  ast_new_children (ast_new (initializer, sym_designator_list),
-			    designator);
-	Ast * designation =
-	  ast_new_children (ast_new (initializer, sym_designation),
-			    designator_list,
-			    initializer->child[1]);
-	if (list->child[1])
-	  ast_new_children (list,
-			    list->child[0], list->child[1],
-			    designation, initializer->child[2]);
-	else
-	  ast_new_children (list,
-			    designation, initializer->child[2]);
+      Ast * equals = ast_schema (initializer, sym_initializer,
+				 0, sym_assignment_expression,
+				 1, sym_assignment_operator,
+				 0, token_symbol('='));
+      if (equals) {
+	Ast * name = ast_schema (initializer, sym_initializer,
+				 0, sym_assignment_expression,
+				 0, sym_unary_expression,
+				 0, sym_postfix_expression,
+				 0, sym_primary_expression,
+				 0, sym_IDENTIFIER);
+	if (!name)
+	  name = ast_schema (initializer, sym_initializer,
+			     0, sym_assignment_expression,
+			     0, sym_TYPEDEF_NAME);
+	if (name) {
+	  Ast * designator = ast_new (initializer, sym_designator);
+	  Ast * identifier = ast_new (initializer, sym_generic_identifier);
+	  Ast * dot = ast_terminal_new_char (initializer, ".");
+	  ast_new_children (designator, dot, identifier);
+	  ast_new_children (identifier, name);
+	  AstTerminal * left = ast_left_terminal (identifier);
+	  ast_terminal (dot)->line = left->line;
+	  ast_terminal (dot)->before = left->before; left->before = NULL;      
+	  Ast * designator_list =
+	    ast_new_children (ast_new (initializer, sym_designator_list),
+			      designator);
+	  Ast * designation =
+	    ast_new_children (ast_new (initializer, sym_designation),
+			      designator_list, equals);
+	  ast_set_child (initializer, 0, initializer->child[0]->child[2]);
+	  if (list->child[1])
+	    ast_new_children (list,
+			      list->child[0], list->child[1], designation,
+			      initializer);
+	  else
+	    ast_new_children (list, designation, initializer);
+	}
       }
     }
     list = list->child[0];    

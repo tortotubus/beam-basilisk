@@ -71,7 +71,8 @@ static int yyparse (AstRoot * parse, Ast * root);
 /**
 ## Grammar
 
-Note that 4 shift/reduce conflicts are expected. */
+Note that 9 shift/reduce conflicts and 5 reduce/reduce conflicts are
+expected. */
 
 %start root
 
@@ -165,7 +166,6 @@ argument_expression_list
 
 argument_expression_list_item
         : assignment_expression
-	| IDENTIFIER '=' initializer  /* Basilisk C extension */
 	| field_list /* Basilisk C extension */
 	;
 
@@ -264,6 +264,8 @@ assignment_expression
 	: conditional_expression
 	| unary_expression assignment_operator assignment_expression
 	| unary_expression assignment_operator postfix_initializer /* Basilisk C extension */
+	| TYPEDEF_NAME assignment_operator assignment_expression /* Basilisk C extension */
+	| TYPEDEF_NAME assignment_operator postfix_initializer /* Basilisk C extension */
 	;
 
 assignment_operator
