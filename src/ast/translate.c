@@ -1577,13 +1577,13 @@ static void global_boundaries (Ast * n, Stack * stack, void * data)
 	  str_append (ast_terminal (func)->start, "_homogeneous");
 	  str_append (set, "_homogeneous;\n");
 	  ast_block_list_insert_before (scope, homogeneous);
-	}
-	Ast * expr = ast_child (ast_parse_expression (set, ast_get_root (n)),
-				sym_expression);	
+	}	
+	Ast * expr = ast_parse_expression (set, ast_get_root (n));
 	free (set);
 	Ast * parent = ast_ancestor (assign, 2);
 	assert (parent->sym == sym_expression_statement);
-	ast_replace_child (parent, 0, expr);
+	ast_replace_child (parent, 0, ast_child (expr, sym_expression));
+	ast_destroy (expr);
       }
     }
     break;
@@ -1733,9 +1733,11 @@ static void translate (Ast * n, Stack * stack, void * data)
 	  }
 	if (s != order + 2)
 	  memmove (order, s + 1, strlen(s));
-	if (parameters == NULL)
+	if (parameters == NULL) {
+	  ast_destroy (n->child[2]);
 	  n->child[2] = n->child[3], n->child[3] = n->child[4],
 	    n->child[4] = NULL;
+	}
       }
 
       /**
@@ -2847,8 +2849,10 @@ static void macros (Ast * n, Stack * stack, void * data)
 	  parameters = ast_list_remove (parameters, item);
 	}
       }
-      if (parameters == NULL)
+      if (parameters == NULL) {
+	ast_destroy (n->child[2]);
 	n->child[2] = n->child[3], n->child[3] = n->child[4], n->child[4] = NULL;
+      }
     }
     
     if (serial)
