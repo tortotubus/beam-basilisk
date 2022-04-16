@@ -950,6 +950,7 @@ char * combination_constants (TranslateData * d, Ast ** consts, int bits,
 	str_append (constants,
 		    "double _const_", name, "=_constant[",
 		    name, ".i-_NVARMAX];");
+      str_append (constants, "NOT_UNUSED(_const_", name, ");");
     }
   return constants;
 }
