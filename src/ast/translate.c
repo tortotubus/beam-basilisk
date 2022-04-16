@@ -436,7 +436,7 @@ static char * typedef_name (Ast * type)
   if (!type)
     return NULL;
   Ast * declarator = type;
-  while (declarator->sym != sym_declarator)
+  while (declarator && declarator->sym != sym_declarator)
     declarator = declarator->parent;
   
   if (!ast_schema (declarator, sym_declarator,
@@ -624,6 +624,7 @@ typedef struct {
   int constants_index, fields_index, nboundary;
   Ast * init_solver, * init_events, * init_fields;
   Ast * boundary;
+  char * swigname, * swigdecl, * swiginit;
 } TranslateData;
 
 static void rotate (Ast * n, Stack * stack, void * data)
@@ -2123,7 +2124,7 @@ static void translate (Ast * n, Stack * stack, void * data)
 		      name, "\");\n");
 	  str_prepend (src, typename, " _field_=");
 	  str_append (src, ";");
-	  
+
 	  Ast * expr = ast_parse_expression (src, ast_get_root (n));
 	  free (src);
 	  ast_set_line (expr, ast_right_terminal (n->child[0]));
@@ -2132,6 +2133,15 @@ static void translate (Ast * n, Stack * stack, void * data)
 	  ast_replace_child (n->parent, ast_child_index (n), declarator);
 	  n = declarator;
 	  ast_destroy (expr);
+
+	  /**
+	  #### SWIG interface */
+
+	  if (d->swigname) {
+	    str_append (d->swigdecl, "extern ", typename, " ", name, ";\n");
+	    str_append (d->swiginit, name, "=", typename,
+			 "(_", d->swigname, ".cvar.", name, ")\n");
+	  }
 	}
 
 	/**
@@ -3477,7 +3487,8 @@ void ast_traverse (Ast * n, Stack * stack,
 
 void endfor (FILE * fin, FILE * fout,
 	     const char * grid, int dimension,
-	     bool nolineno, bool progress)
+	     bool nolineno, bool progress, bool catch,
+	     FILE * swigfp, char * swigname)
 {
   char * buffer = NULL;
   size_t len = 0, maxlen = 0;
@@ -3509,9 +3520,11 @@ void endfor (FILE * fin, FILE * fout,
     .dimension = dimension, .nolineno = nolineno,
     .constants_index = 0, .fields_index = 0, .nboundary = 0,
     // fixme: splitting of events and fields is not used yet
-    .init_solver = NULL, .init_events = NULL, .init_fields = NULL
+    .init_solver = NULL, .init_events = NULL, .init_fields = NULL,
+    .swigname = NULL, . swigdecl = NULL, .swiginit = NULL
   };
   data.constants = calloc (1, sizeof (Field));
+  data.swigname = swigname;
 
   fp = fopen (BASILISK "/ast/init_solver.h", "r");
   AstRoot * init = ast_parse_file (fp, root);
@@ -3537,8 +3550,35 @@ void endfor (FILE * fin, FILE * fout,
   }
 
   ast_before (data.init_events, grid, "_methods();");
+  if (catch)
+    ast_after (data.init_events, "catch_fpe();");
   if (progress)
     ast_after (data.init_events, "last_events();");
+
+  /* SWIG interface */
+  if (swigfp) {
+    if (data.swigdecl) {
+      fprintf (swigfp,
+	       "\n%%{\n"
+	       "%s"
+	       "%%}\n"
+	       "\n"
+	       "%s",
+	       data.swigdecl,
+	       data.swigdecl);
+      free (data.swigdecl);
+    }
+    if (data.swiginit) {
+      fprintf (swigfp,
+	       "\n"
+	       "%%pythoncode %%{\n"
+	       "%s"
+	       "%%}\n",
+	       data.swiginit);
+      free (data.swiginit);
+    }
+    fclose (swigfp);
+  }
   
   free (data.constants);
   Ast ** n;
