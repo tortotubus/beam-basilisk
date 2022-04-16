@@ -24,6 +24,11 @@ typedef void Kdt, KdtRect, KdtSum, KdtCheck;
 typedef void va_list;
 
 /**
+For Python/SWIG */
+
+typedef void PyObject;
+
+/**
 ## From standard C libraries */
 
 void abort(void);
