@@ -3536,7 +3536,7 @@ void endfor (FILE * fin, FILE * fout,
     .constants_index = 0, .fields_index = 0, .nboundary = 0,
     // fixme: splitting of events and fields is not used yet
     .init_solver = NULL, .init_events = NULL, .init_fields = NULL,
-    .swigname = NULL, . swigdecl = NULL, .swiginit = NULL
+    .swigname = NULL, .swigdecl = NULL, .swiginit = NULL
   };
   data.constants = calloc (1, sizeof (Field));
   data.swigname = swigname;
