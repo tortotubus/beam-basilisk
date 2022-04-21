@@ -14,6 +14,12 @@ symbols.h: basilisk.c Makefile
 	@awk '/^enum yysymbol_kind_t/{a=1}{if(a)print $$0;}/};/{a=0}' \
 		basilisk.c | sed 's/YYSYMBOL_/sym_/g' >> symbols.h
 
+grammar.h: basilisk.yacc grammar
+	./grammar < basilisk.yacc  > grammar.h
+
+grammar: grammar.c
+	cc -Wall grammar.c -o grammar
+
 tokens.c: tokens.lex
 	flex -o tokens.c tokens.lex
 
@@ -28,6 +34,8 @@ tokens.o: ast.h basilisk.c
 translate.o: ast.h symbols.h
 
 allocator.o: allocator.h
+
+check.o: ast.h symbols.h grammar.h
 
 clean:
 	rm -f *.o *.a
