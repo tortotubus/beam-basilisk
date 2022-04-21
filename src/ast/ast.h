@@ -186,3 +186,5 @@ Ast * ast_is_identifier_expression (const Ast * n);
 Ast * ast_is_simple_expression (const Ast * n);
 Ast * ast_get_struct_name (Ast * declaration_specifiers);
 bool  ast_are_identical (const Ast * a, const Ast * b);
+
+Ast * ast_check_grammar (Ast * n);
