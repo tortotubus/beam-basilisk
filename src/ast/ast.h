@@ -89,6 +89,8 @@ Ast * ast_schema_internal (const Ast * n, ...);
 #define ast_schema(n,...) ast_schema_internal (n, __VA_ARGS__, -1)
 Ast * ast_find_internal (const Ast * n, ...);
 #define ast_find(n,...) ast_find_internal (n, __VA_ARGS__, -1)
+Ast * ast_copy_single (const Ast * n,
+		       AstRoot ** dst_root, AstRoot ** src_root);
 Ast * ast_copy_internal (const Ast * n, ...);
 #define ast_copy(n,...) ast_copy_internal (n, __VA_ARGS__ + 0, -1)
 Ast * ast_attach_internal (Ast * parent, ...);
@@ -186,5 +188,8 @@ Ast * ast_is_identifier_expression (const Ast * n);
 Ast * ast_is_simple_expression (const Ast * n);
 Ast * ast_get_struct_name (Ast * declaration_specifiers);
 bool  ast_are_identical (const Ast * a, const Ast * b);
+Ast * ast_expression_type (Ast * expr, Stack * stack, bool higher_dimension);
+char * ast_typedef_name (Ast * type);
 
 Ast * ast_check_grammar (Ast * n);
+Ast * ast_stencil (Ast * foreach, Stack * stack);

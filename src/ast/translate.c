@@ -337,7 +337,7 @@ Ast * ast_get_struct_name (Ast * declaration_specifiers)
 		     0, sym_IDENTIFIER);
 }
 
-static Ast * find_struct_member (Ast * n, Ast * member)
+static Ast * find_struct_member (Ast * n, const char * member)
 {
   if (!n)
     return NULL;
@@ -346,8 +346,7 @@ static Ast * find_struct_member (Ast * n, Ast * member)
 				 0, sym_direct_declarator,
 				 0, sym_generic_identifier,
 				 0, sym_IDENTIFIER);
-  if (identifier && !strcmp (ast_terminal (identifier)->start,
-			     ast_terminal (member)->start))
+  if (identifier && !strcmp (ast_terminal (identifier)->start, member))
     return identifier;
   if (n->child)
     for (Ast ** c = n->child; *c; c++) {
@@ -370,7 +369,7 @@ static Ast * declaration_from_type (const Ast * type)
   return (Ast *) type;
 }
 
-static Ast * expression_type (Ast * expr, Stack * stack)
+Ast * ast_expression_type (Ast * expr, Stack * stack, bool higher_dimension)
 {
   switch (expr->sym) {
 
@@ -379,7 +378,7 @@ static Ast * expression_type (Ast * expr, Stack * stack)
     while (expr->child && expr->sym != sym_postfix_expression)
       expr = expr->child[0];
     return expr->sym == sym_postfix_expression ?
-      expression_type (expr, stack) : NULL;
+      ast_expression_type (expr, stack, higher_dimension) : NULL;
     
   case sym_primary_expression:
     if (expr->child[0]->sym == sym_IDENTIFIER)
@@ -390,10 +389,10 @@ static Ast * expression_type (Ast * expr, Stack * stack)
   case sym_postfix_expression:
     assert (expr->child && expr->child[0]);
     if (expr->child[1] == NULL || expr->child[2] == NULL)
-      return expression_type (expr->child[0], stack);
+      return ast_expression_type (expr->child[0], stack, higher_dimension);
     if (expr->child[1]->sym == token_symbol('.')) {
       // struct member access
-      Ast * str = expression_type (expr->child[0], stack);
+      Ast * str = ast_expression_type (expr->child[0], stack, higher_dimension);
       if (str) {
 	Ast * member = ast_find (expr->child[2], sym_member_identifier,
 				 0, sym_generic_identifier,
@@ -416,16 +415,29 @@ static Ast * expression_type (Ast * expr, Stack * stack)
 		     typename->file, typename->line, typename->start);
 	    return NULL;
 	  }
+
+	  /**
+	  Special treatment of vector and tensor fields, to deal with
+	  possibly undefined components in lower dimensions. */
+
+	  const char * mname = 
+	    (higher_dimension &&
+	     ast_terminal (member)->start[1] == '\0' &&
+	     strchr ("xyz", ast_terminal (member)->start[0]) &&
+	     (!strcmp (ast_terminal (type)->start, "vector") ||
+	      !strcmp (ast_terminal (type)->start, "tensor"))) ? "x" :
+	    ast_terminal (member)->start;
+	    
 	  while (type->sym != sym_declaration)
 	    type = type->parent;
 	  return
 	    find_struct_member (ast_find (type, sym_struct_declaration_list),
-				member);
+				mname);
 	}
 	else if ((str = ast_schema (declaration, sym_types,
 				    0, sym_struct_or_union_specifier,
 				    2, sym_struct_declaration_list)))
-	  return find_struct_member (str, member);
+	  return find_struct_member (str, ast_terminal (member)->start);
       }
     }
     else if (expr->child[1]->sym == sym_PTR_OP) {
@@ -446,7 +458,7 @@ static char * typedef_name_from_declaration (Ast * declaration)
   return NULL;
 }
 
-static char * typedef_name (Ast * type)
+char * ast_typedef_name (Ast * type)
 {
   if (!type)
     return NULL;
@@ -481,7 +493,7 @@ static Ast * inforeach (Ast * n)
 static bool point_declaration (Stack * stack)
 {
   const char * typename =
-    typedef_name (ast_identifier_declaration (stack, "point"));
+    ast_typedef_name (ast_identifier_declaration (stack, "point"));
   return typename && !strcmp (typename, "Point");
 }
 
@@ -585,8 +597,8 @@ static char * field_value (Field * c, const char * prefix, int type)
 		  i < c->dimension - 1 ? "," : "");
     }
   else if (c->type == 1) { // scalar
-    char s[20];
-    snprintf (s, 19, "%s%d", constant ? "_NVARMAX+" : "", cindex);
+    char s[30];
+    snprintf (s, 29, "%s%d", constant ? "_NVARMAX+" : "", cindex);
     str_append (src, prefix, s);
   }
   if (type >= c->type) {
@@ -946,7 +958,7 @@ char * combination_constants (TranslateData * d, Ast ** consts, int bits,
   for (int i = 0; i < nmaybeconst; i++)
     if (bits & (1 << i)) {
       const char * name = ast_terminal (consts[i])->start;
-      const char * typename = typedef_name (consts[i]);
+      const char * typename = ast_typedef_name (consts[i]);
       if (!strcmp (typename, "vector") ||
 	  !strcmp (typename, "face vector")) {
 	str_append (constants, "struct{double x");
@@ -988,7 +1000,7 @@ static void combinations (Ast * n, Stack * stack, TranslateData * d,
       str_append (condition, "if(");
       for (int i = 0; i < nmaybeconst; i++) {
 	const char * name = ast_terminal (consts[i])->start;
-	const char * typename = typedef_name (consts[i]);
+	const char * typename = ast_typedef_name (consts[i]);
 	str_append (condition,
 		    (bits & (1 << i)) ? "" : "!",
 		    "is_constant(", name,
@@ -1022,7 +1034,8 @@ static int field_list_type (Ast * list, Stack * stack, bool mustbe)
 {
   int type = 4; // tensor
   foreach_item (list, 2, expr) {
-    const char * typename = typedef_name (expression_type (expr, stack));
+    const char * typename =
+      ast_typedef_name (ast_expression_type (expr, stack, false));
     if (!typename ||
 	(strcmp (typename, "scalar") &&
 	 strcmp (typename, "vector") &&
@@ -1318,7 +1331,7 @@ static void boundary_expr (Ast * n, Stack * stack, void * data)
     
     if (n->child[1] && n->child[1]->sym == token_symbol('.')) {
       const char * typename =
-	typedef_name (expression_type (n->child[0], stack));
+	ast_typedef_name (ast_expression_type (n->child[0], stack, false));
       if (typename && (!strcmp (typename, "vector") ||
 		       !strcmp (typename, "face vector"))) {
 	Ast * member = ast_find (n->child[2], sym_member_identifier,
@@ -1407,8 +1420,9 @@ static void boundary_expr (Ast * n, Stack * stack, void * data)
       if (identifier &&
 	  !strcmp (ast_terminal (identifier)->start, "dirichlet")) {
 	const char * typename =
-	  typedef_name (expression_type (d->boundary->child[0]->child[0],
-					 stack));
+	  ast_typedef_name (ast_expression_type
+			    (d->boundary->child[0]->child[0],
+			     stack, false));
 	if (!strcmp (typename, "face vector"))
 	  str_append (ast_terminal (identifier)->start, "_face");
       }
@@ -1555,7 +1569,7 @@ static void global_boundaries (Ast * n, Stack * stack, void * data)
     if (assign->sym == sym_assignment_expression &&
 	(scope = function_scope (n, stack))) {
       const char * typename =
-	typedef_name (expression_type (n->child[0], stack));
+	ast_typedef_name (ast_expression_type (n->child[0], stack, false));
       Ast * member = NULL;
       if ((typename &&
 	   (!strcmp (typename, "scalar") ||
@@ -1567,8 +1581,9 @@ static void global_boundaries (Ast * n, Stack * stack, void * data)
 	   (!strcmp (ast_terminal (member)->start, "n") ||
 	    !strcmp (ast_terminal (member)->start, "t") ||
 	    !strcmp (ast_terminal (member)->start, "r")) &&
-	   (typename = typedef_name (expression_type (n->child[0]->child[0],
-						      stack))) &&
+	   (typename =
+	    ast_typedef_name (ast_expression_type (n->child[0]->child[0],
+						   stack, false))) &&
 	   (!strcmp (typename, "vector") ||
 	    !strcmp (typename, "face vector")))) {
 	AstTerminal * t = ast_left_terminal (assign);
@@ -1850,7 +1865,8 @@ static void translate (Ast * n, Stack * stack, void * data)
   function call `val(s,i,j,0)`. */
 
   case sym_array_access: {
-    const char * typename = typedef_name (expression_type (n->child[0], stack));
+    const char * typename =
+      ast_typedef_name (ast_expression_type (n->child[0], stack, false));
     TranslateData * d = data;
     Ast * member;
     if (typename &&
@@ -1919,8 +1935,9 @@ static void translate (Ast * n, Stack * stack, void * data)
 	      (d->dimension < 3 &&
 	       (!strcmp (ast_terminal (member)->start, "z") ||
 		!strcmp (ast_terminal (member)->start, "r")))) &&
-	     (typename = typedef_name (expression_type (n->child[0]->child[0],
-							stack))) &&
+	     (typename =
+	      ast_typedef_name (ast_expression_type (n->child[0]->child[0],
+						     stack, false))) &&
 	     (!strcmp (typename, "vector") ||
 	      !strcmp (typename, "face vector")) &&
 	     (inforeach (n) || point_declaration (stack))) {
@@ -1939,8 +1956,9 @@ static void translate (Ast * n, Stack * stack, void * data)
 	      (d->dimension < 3 &&
 	       !strcmp (ast_terminal (member)->start, "z"))) &&
 	     (typename =
-	      typedef_name (expression_type (n->child[0]->child[0]->child[0],
-					     stack))) &&
+	      ast_typedef_name (ast_expression_type
+				(n->child[0]->child[0]->child[0],
+				 stack, false))) &&
 	     !strcmp (typename, "tensor") &&
 	     (inforeach (n) || point_declaration (stack))) {
       Ast * expr = ast_attach (ast_new (n, sym_primary_expression),
@@ -3023,7 +3041,7 @@ static void macros (Ast * n, Stack * stack, void * data)
   case sym_postfix_expression: {
     if (n->child[1] && n->child[1]->sym == token_symbol('.')) {
       const char * typename =
-	typedef_name (expression_type (n->child[0], stack));
+	ast_typedef_name (ast_expression_type (n->child[0], stack, false));
       if (typename && (!strcmp (typename, "scalar") ||
 		       !strcmp (typename, "vertex scalar"))) {
 	Ast * member = ast_find (n->child[2], sym_member_identifier,
@@ -3034,7 +3052,7 @@ static void macros (Ast * n, Stack * stack, void * data)
 	while (type->sym != sym_declaration)
 	  type = type->parent;
 	if (!find_struct_member (ast_find (type, sym_struct_declaration_list),
-				 member)) {
+				 ast_terminal (member)->start)) {
 	  Ast * expr = ast_parse_expression ("_attribute[_field_.i];",
 					     ast_get_root (n));
 	  ast_replace (expr, "_field_", n->child[0]);
@@ -3108,7 +3126,8 @@ static void macros (Ast * n, Stack * stack, void * data)
 	}
 	if (external) {
 	  foreach_item (list, 2, expr) {
-	    const char * typename = typedef_name (expression_type (expr, stack));
+	    const char * typename =
+	      ast_typedef_name (ast_expression_type (expr, stack, false));
 	    assert (typename);
 	    Ast * unary = ast_is_unary_expression (expr->child[0]);
 	    if (!unary) {
@@ -3209,7 +3228,8 @@ static void macros (Ast * n, Stack * stack, void * data)
 	else
 	  foreach_item (list, 2, expr) {
 	    AstTerminal * t = ast_right_terminal (expr);
-	    const char * typename = typedef_name (expression_type (expr, stack));
+	    const char * typename =
+	      ast_typedef_name (ast_expression_type (expr, stack, false));
 	    if ((type == 1 && !strcmp (typename, "vector")) ||
 		(type == 2 && !strcmp (typename, "tensor"))) {
 	      TranslateData * d = data;
@@ -3539,7 +3559,7 @@ void endfor (FILE * fin, FILE * fout,
     .swigname = NULL, .swigdecl = NULL, .swiginit = NULL
   };
   data.constants = calloc (1, sizeof (Field));
-  data.swigname = swigname;
+  data.swigname = swigfp ? swigname : NULL;
 
   fp = fopen (BASILISK "/ast/init_solver.h", "r");
   AstRoot * init = ast_parse_file (fp, root);
@@ -3571,7 +3591,7 @@ void endfor (FILE * fin, FILE * fout,
     ast_after (data.init_events, "last_events();");
 
   /* SWIG interface */
-  if (swigfp) {
+  if (data.swigname) {
     if (data.swigdecl) {
       fprintf (swigfp,
 	       "\n%%{\n"

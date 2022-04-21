@@ -321,7 +321,8 @@ static void ast_print_internal (Ast * n, FILE * fp, bool sym, File * file)
       update_file_line (r->before, file);
     }
     for (Ast ** c = n->child; *c; c++)
-      ast_print_internal (*c, fp, sym, file);
+      if (*c != ast_placeholder)
+	ast_print_internal (*c, fp, sym, file);
     if (r && r->after) {
       fputs (r->after, fp);
       file->line += count_lines (r->after);
@@ -556,37 +557,49 @@ static Ast * root_copy (const AstRoot * src)
   return (Ast *)dst;
 }
 
-static Ast * vast_copy_internal (const Ast * n, va_list ap, bool * found,
-				 AstRoot * dst_root, const AstRoot * src_root)
+Ast * ast_copy_single (const Ast * n,
+		       AstRoot ** dst_root, AstRoot ** src_root)
 {
   Ast * c = NULL;
   AstRoot * r = ast_root (n);
   if (r) {
     c = root_copy (r);
-    src_root = r;
-    dst_root = ast_root (c);
+    *src_root = r;
+    *dst_root = ast_root (c);
   }
   AstTerminal * t = ast_terminal (n);
   if (t)
-    c = terminal_copy (t, dst_root, src_root);
+    c = terminal_copy (t, *dst_root, *src_root);
   else if (!c)
-    c = copy_ast (allocate (dst_root->alloc, sizeof (Ast)), n);
+    c = copy_ast (allocate ((*dst_root)->alloc, sizeof (Ast)), n);
+  if (!t) {
+    int len = 0;
+    for (Ast ** i = n->child; *i; i++, len++);
+    c->child = allocate ((*dst_root)->alloc, (len + 1)*sizeof (Ast *));
+  }
+  return c;
+}
 
+static Ast * vast_copy_internal (const Ast * n, va_list ap, bool * found,
+				 AstRoot * dst_root, AstRoot * src_root)
+{
+  Ast * c = ast_copy_single (n, &dst_root, &src_root);
   va_list cp;
   va_copy (cp, ap);
   if (vast_schema_internal (n, cp))
     *found = true;
   va_end (cp);
 
-  if (!t) {
+  if (!ast_terminal (n)) {
     int len = 0;
-    for (Ast ** i = n->child; *i; i++, len++);
-    c->child = allocate (dst_root->alloc, (len + 1)*sizeof (Ast *));
-    len = 0;
     for (Ast ** i = n->child, ** j = c->child;
 	 *i && !(*found); i++, j++, len++) {
-      *j = vast_copy_internal (*i, ap, found, dst_root, src_root);
-      (*j)->parent = c;
+      if (*i == ast_placeholder)
+	*j = ast_placeholder;
+      else {
+	*j = vast_copy_internal (*i, ap, found, dst_root, src_root);
+	(*j)->parent = c;
+      }
     }
     c->child[len] = NULL;
   }
