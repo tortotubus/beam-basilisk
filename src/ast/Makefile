@@ -1,6 +1,7 @@
 CFLAGS += -Wall -g -I$(BASILISK) -DBASILISK=\"$(BASILISK)\"
 
-libast.a: ast.o tokens.o basilisk.o translate.o allocator.o stack.o
+libast.a: ast.o tokens.o basilisk.o translate.o allocator.o \
+	stack.o stencil.o check.o
 	ar cr $@ $^
 
 basilisk.c: basilisk.yacc
