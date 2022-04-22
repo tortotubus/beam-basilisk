@@ -191,5 +191,6 @@ bool  ast_are_identical (const Ast * a, const Ast * b);
 Ast * ast_expression_type (Ast * expr, Stack * stack, bool higher_dimension);
 char * ast_typedef_name (Ast * type);
 
-Ast * ast_check_grammar (Ast * n);
+Ast * ast_check_grammar (Ast * n, bool recursive);
+
 Ast * ast_stencil (Ast * foreach, Stack * stack);

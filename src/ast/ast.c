@@ -370,8 +370,6 @@ static void print_child_tree (Ast * n, FILE * fp,
 			      const char * indent, bool isLast,
 			      bool compress, int maxdepth)
 {
-  if (!maxdepth)
-    return;
   char * ind;
   if (indent) {
     fputs (indent, fp);
@@ -397,6 +395,10 @@ void ast_print_tree (Ast * n, FILE * fp, const char * indent,
 {
   if (n == ast_placeholder) {
     fputs ("_placeholder_\n", fp);
+    return;
+  }
+  if (!maxdepth) {
+    fputs ("...\n", fp);
     return;
   }
   if (compress)

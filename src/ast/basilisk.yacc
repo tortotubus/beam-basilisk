@@ -166,7 +166,7 @@ argument_expression_list
 
 argument_expression_list_item
         : assignment_expression
-	| field_list /* Basilisk C extension */
+	| postfix_initializer /* Basilisk C extension */
 	;
 
 unary_expression
@@ -740,12 +740,8 @@ forin_statement
 
 forin_arguments
         : expression
-	| field_list
+	| postfix_initializer
 	;
-
-field_list
-        : '{' expression '}'
-        ;
 
 event_definition
         : generic_identifier generic_identifier '(' event_parameters ')' statement

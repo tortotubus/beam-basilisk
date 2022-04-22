@@ -10,7 +10,7 @@ static bool check (Ast * n)
   return false;
 }
 
-Ast * ast_check_grammar (Ast * n)
+Ast * ast_check_grammar (Ast * n, bool recursive)
 {
   if (n && n->child) {    
     if (!check (n)) {
@@ -18,10 +18,11 @@ Ast * ast_check_grammar (Ast * n)
       ast_print_tree (n, stderr, 0, 0, 10);
       abort ();
     }
-    for (Ast ** c = n->child; *c; c++) {
-      assert ((*c)->parent == n);
-      ast_check_grammar (*c);
-    }
+    if (recursive)
+      for (Ast ** c = n->child; *c; c++) {
+	assert ((*c)->parent == n);
+	ast_check_grammar (*c, true);
+      }
   }
   return n;
 }
