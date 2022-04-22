@@ -4,6 +4,8 @@
 #include "ast.h"
 #include "symbols.h"
 
+#define CHECK(x, recursive) ast_check_grammar(x, recursive)
+
 Ast * ast_is_typedef (const Ast * identifier)
 {
   const Ast * declaration = identifier;
@@ -202,7 +204,14 @@ Ast * ast_initializer_list (Ast * list)
 	  Ast * designation =
 	    ast_new_children (ast_new (initializer, sym_designation),
 			      designator_list, equals);
-	  ast_set_child (initializer, 0, initializer->child[0]->child[2]);
+	  if (initializer->child[0]->child[2]->sym == sym_assignment_expression)
+	    ast_set_child (initializer, 0, initializer->child[0]->child[2]);
+	  else {
+	    assert (initializer->child[0]->child[2]->sym ==
+		    sym_postfix_initializer);
+	    initializer = initializer->child[0]->child[2];
+	    initializer->sym = sym_initializer;
+	  }
 	  if (list->child[1])
 	    ast_new_children (list,
 			      list->child[0], list->child[1], designation,
@@ -210,6 +219,12 @@ Ast * ast_initializer_list (Ast * list)
 	  else
 	    ast_new_children (list, designation, initializer);
 	}
+      }
+      else if (ast_schema (initializer, sym_initializer,
+			   0, sym_postfix_initializer)) {	
+	initializer = initializer->child[0];
+	initializer->sym = sym_initializer;
+	ast_set_child (list, list->child[1] ? 2 : 0, initializer);
       }
     }
     list = list->child[0];    
@@ -541,20 +556,20 @@ static Ast * rotate_arguments (Ast * list, int dimension)
   Ast * next = list->child[0], * item = list->child[2];
   for (int i = 1; i < dimension && next; i++) {
     if (next->child[1]) {
-      list->child[2] = next->child[2];
+      ast_set_child (list, 2, next->child[2]);
       list = next;
       next = list->child[0];
     }
     else {
-      list->child[2] = next->child[0];
+      ast_set_child (list, 2, next->child[0]);
       list = next;
       next = NULL;
     }	    
   }
   if (list->child[1])
-    list->child[2] = item;
+    ast_set_child (list, 2, item);
   else
-    list->child[0] = item;
+    ast_set_child (list, 0, item);
   return list;
 }
 
@@ -772,8 +787,10 @@ static Ast * get_block_list_item (Ast * statement)
     Ast * list = ast_new_children (ast_new (parent, sym_block_item_list),
 				   item);
     Ast * compound =
-      ast_new_children (ast_new (parent, sym_compound_statement),
-			left, list, right);
+      ast_new_children (ast_new (parent, sym_statement),
+			ast_new_children (ast_new (parent,
+						   sym_compound_statement),
+					  left, list, right));
     ast_replace_child (parent, index, compound);
   }
   
@@ -1027,7 +1044,8 @@ static void combinations (Ast * n, Stack * stack, TranslateData * d,
     assert (ast_replace (conditional, statement, copy));
   }
   assert (ast_replace (conditional, "_statement0_", n));
-  ast_replace_child (item, 0, conditional);
+  ast_replace_child (item, 0, ast_new_children (ast_new (list, sym_statement),
+						conditional));
 }
 
 static int field_list_type (Ast * list, Stack * stack, bool mustbe)
@@ -1247,12 +1265,12 @@ static Ast * compound_jump (Ast * return_statement, Ast * function_definition,
     free (src);
     ast_replace (compound, "val", ast_find (return_statement,
 					    sym_assignment_expression));
-
     if (function_definition->sym == sym_function_definition) {
-      Ast * declarator =
-	ast_flatten (ast_copy (ast_find (function_definition, sym_declarator),
-			       sym_IDENTIFIER),
-		     ast_left_terminal (return_statement));
+      Ast * func = ast_find (function_definition, sym_direct_declarator);
+      while (func->child[0]->sym == sym_direct_declarator)
+	func = func->child[0];
+      Ast * declarator = ast_flatten (ast_copy (func, sym_IDENTIFIER),
+				      ast_left_terminal (return_statement));
       AstTerminal * t = ast_terminal (ast_find (declarator, sym_IDENTIFIER));
       free (t->start); t->start = strdup ("_ret");
       ast_replace (compound, "_ret", declarator);
@@ -1562,6 +1580,19 @@ static void global_boundaries (Ast * n, Stack * stack, void * data)
   switch (n->sym) {
 
   /**
+  ## Warnings for Basilisk C parse errors */
+    
+  case sym_YYerror: {
+    AstTerminal * t = ast_left_terminal (n);
+    char * s = NULL;
+    s = ast_str_append (n, s);
+    fprintf (stderr, "%s:%d: warning: Basilisk C parse error near `%s'\n",
+	     t->file, t->line, s);
+    free (s);
+    break;
+  }
+
+  /**
   ### Local boundary conditions */
     
   case sym_array_access: {
@@ -1683,6 +1714,12 @@ static void diagonalize (Ast * n, Stack * stack, void * field)
   }
 }
 
+/**
+   TODO:
+   
+   try to parse system headers
+*/
+
 static void translate (Ast * n, Stack * stack, void * data)
 {
   typedef struct {
@@ -1781,11 +1818,12 @@ static void translate (Ast * n, Stack * stack, void * data)
 	order[0];
       ast_replace (expr, ";", ast_last_child (n));
       ast_set_line (expr, ast_left_terminal (n));
-      ast_replace_child (n, n->child[4] ? 4 : 3, expr);
-      
+      ast_replace_child (n, n->child[4] ? 4 : 3,
+			 ast_new_children (ast_new (n, sym_statement), expr));
+	
       /**
       Finally, we "dimension-rotate" the statement. */
-      
+
       if (strlen (order) > 1) {
 	Ast * statement = ast_last_child (n);
 	Ast * item = get_block_list_item (statement);
@@ -1805,6 +1843,8 @@ static void translate (Ast * n, Stack * stack, void * data)
 	    order[i];
 	  list = ast_block_list_append (list, item->sym, copy);
 	}
+	if (statement->sym != sym_statement)
+	  statement = ast_new_children (ast_new (n, sym_statement), statement);
 	ast_set_child (item, 0, statement);
 
 	d->dimension = dimension;
@@ -2366,7 +2406,6 @@ static void translate (Ast * n, Stack * stack, void * data)
 	}
       }
     }
-
     break;
     
     if (!identifier || strcmp (ast_terminal (identifier)->start, "automatic"))
@@ -2959,7 +2998,7 @@ static void macros (Ast * n, Stack * stack, void * data)
     const char * typename =
       get_field_type (n->child[2], ast_terminal(identifier));
     char * src = NULL, * name = ast_terminal(identifier)->start;
-    str_append (src, "{", typename, "*_i=(", typename, "*)list;if(_i)"
+    str_append (src, "{", typename, "*_i=(", typename, "*)(list);if(_i)"
 		"for(", typename, " ", name, "=*_i;(&",
 		name,
 		!strcmp (typename, "scalar") ? ")->i" :
@@ -2969,10 +3008,27 @@ static void macros (Ast * n, Stack * stack, void * data)
     Ast * expr = ast_parse_expression (src, ast_get_root (n));
     free (src);
     Ast * parent = n->parent;
-    Ast * initializer = ast_find (expr, sym_cast_expression,
-				  3, sym_cast_expression);
-    ast_replace_child (initializer, 0,
-		       ast_child (n, sym_forin_arguments)->child[0]);
+    Ast * arg = ast_child (n, sym_forin_arguments)->child[0];
+    if (arg->sym == sym_expression) {
+      Ast * initializer = ast_find (expr, sym_expression_error);
+      ast_replace_child (initializer, 0, arg);
+    }
+    else {
+      assert (arg->sym == sym_postfix_initializer);
+      Ast * initializer = ast_find (expr, sym_cast_expression);
+      ast_replace_child (initializer, 3, arg);
+      initializer->sym = sym_postfix_expression;
+      Ast * parent = initializer->parent;
+      int index = ast_child_index (initializer);
+      Ast * unary = ast_new_children (ast_new (n, sym_unary_expression),
+				      initializer);
+      Ast * cast = ast_new_children (ast_new (n, sym_cast_expression),
+				     unary);
+      char * before = ast_left_terminal (arg)->before;
+      ast_replace_child (parent, index, cast);
+      ast_left_terminal (arg)->before = before;
+      ast_left_terminal (parent->child[index])->before = NULL;
+    }
     assert (ast_replace (expr, "_statement_", ast_last_child (n)));
     ast_replace_child (parent->parent, ast_child_index (parent), expr);
     break;
@@ -3004,7 +3060,7 @@ static void macros (Ast * n, Stack * stack, void * data)
 	exit (1);
       }
       Ast * l;
-      if (arg->sym == sym_field_list || !arg->child[1]) {
+      if (arg->sym == sym_postfix_initializer || !arg->child[1]) {
 	l = arg;
 	arg = NULL;
       }
@@ -3106,8 +3162,9 @@ static void macros (Ast * n, Stack * stack, void * data)
 		    0, sym_struct_or_union,
 		    0, sym_STRUCT))
       break;
+    // else fall through
   }
-  case sym_field_list:
+
   case sym_initializer: {
     if (n->child[1] && n->child[2]) {
       Ast * list = n->child[1];
@@ -3388,19 +3445,6 @@ static void macros (Ast * n, Stack * stack, void * data)
     break;
   }
 
-  /**
-  ## Warnings for Basilisk C parse errors */
-    
-  case sym_YYerror: {
-    AstTerminal * t = ast_left_terminal (n);
-    char * s = NULL;
-    s = ast_str_append (n, s);
-    fprintf (stderr, "%s:%d: warning: Basilisk C parse error near `%s'\n",
-	     t->file, t->line, s);
-    free (s);
-    break;
-  }
-    
   }
 }
 
@@ -3520,6 +3564,27 @@ void ast_traverse (Ast * n, Stack * stack,
   }
 }
 
+static void autoboundary (Ast * n, Stack * stack, void * data)
+{
+  switch (n->sym) {
+
+  case sym_foreach_statement: {
+    if (!strcmp (ast_terminal (n->child[0])->start, "foreach") ||
+	!strcmp (ast_terminal (n->child[0])->start, "foreach_vertex") ||
+	!strcmp (ast_terminal (n->child[0])->start, "foreach_face")) {
+      ast_check_grammar (n, true);
+      Ast * stencil = ast_stencil (n, stack);
+      if (stencil) {
+	ast_print (stencil, stderr, 0);
+	ast_destroy (stencil);
+      }
+    }
+    break;
+  }
+    
+  }
+}
+
 void endfor (FILE * fin, FILE * fout,
 	     const char * grid, int dimension,
 	     bool nolineno, bool progress, bool catch,
@@ -3573,10 +3638,14 @@ void endfor (FILE * fin, FILE * fout,
 	      sym_compound_statement);
   ast_destroy ((Ast *) init);
 
+  ast_traverse ((Ast *) root, root->stack, autoboundary, &data);
   ast_traverse ((Ast *) root, root->stack, global_boundaries, &data);
+  CHECK ((Ast *) root, true);
   ast_traverse ((Ast *) root, root->stack, translate, &data);
+  CHECK ((Ast *) root, true);
   ast_traverse ((Ast *) root, root->stack, macros, &data);
-
+  CHECK ((Ast *) root, true);
+  
   if (data.fields_index) {
     Ast * call_init_solver = ast_find (data.init_solver, sym_function_call);
     char n[10];

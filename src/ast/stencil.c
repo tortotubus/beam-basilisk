@@ -171,7 +171,7 @@ static Ast * block_list_append (Ast * list, Ast * item)
     ast_new_children (ast_new (item, list->sym), list, item);
 }
 
-#define CHECK(x) ast_check_grammar(x)
+#define CHECK(x) ast_check_grammar(x, true)
 
 static Ast * copy_marked (Ast * n, Ast * scope, AstRoot * root)
 {
@@ -439,7 +439,7 @@ Ast * ast_stencil (Ast * foreach, Stack * stack)
     return NULL;
   
   int index = ast_child_index (statement);
-  foreach->child[index] = ast_placeholder;
+  foreach->child[index] = ast_placeholder; // fixme: use ast_copy properly instead
   Ast * stencil = ast_copy (foreach);
   foreach->child[index] = statement;
   ast_set_child (stencil, index, copy);  
