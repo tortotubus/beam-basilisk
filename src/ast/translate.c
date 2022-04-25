@@ -2397,8 +2397,21 @@ static void translate (Ast * n, Stack * stack, void * data)
 		AstTerminal * t = ast_terminal (ast_find (list, sym_IDENTIFIER));
 		free (t->start);
 		t->start = strdup (ast_terminal (struct_name)->start);
-		ast_replace (list, "a", ast_initializer_list (arguments));
+		Ast * initializer_list = ast_initializer_list (arguments);
+		ast_replace (list, "a", initializer_list);
 		ast_replace_child (n, 2, list);
+		if (initializer_list->child[1] &&
+		    initializer_list->child[1]->sym == token_symbol (',') &&
+		    !initializer_list->child[2]) {
+		  Ast * postfix = initializer_list->parent;
+		  assert (postfix->sym == sym_postfix_initializer &&
+			  postfix->child[2]->sym == token_symbol ('}'));
+		  ast_new_children (postfix,
+				    postfix->child[0],
+				    initializer_list->child[0],
+				    initializer_list->child[1],
+				    postfix->child[2]);
+		}
 		ast_destroy (expr);
 	      }
 	    }
