@@ -1259,7 +1259,14 @@ static Ast * compound_jump (Ast * return_statement, Ast * function_definition,
       !ast_is_simple_expression (return_statement->child[1]->child[0])) {
     // return sthg (complicated);
     char * src = NULL;
-    str_append (src, "{int _ret=val;", expression, "return _ret;}");
+    str_append (src, "{int ");
+    Ast * pointer = ast_schema (function_definition, sym_function_definition,
+				0, sym_function_declaration,
+				1, sym_declarator,
+				0, sym_pointer);
+    if (pointer)
+      ast_str_append (pointer, src);
+    str_append (src, "_ret=val;", expression, "return _ret;}");
     Ast * compound =
       ast_parse_expression (src, ast_get_root (function_definition));
     free (src);
