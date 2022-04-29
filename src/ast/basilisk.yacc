@@ -882,12 +882,13 @@ static Stack * stack_internalize (Stack * stack)
   for (int i = 0; (n = stack_index (stack, i)); i++)
     if ((*n)->sym == YYSYMBOL_IDENTIFIER) {
       AstTerminal * t = ast_terminal (*n);
-      if (t->after != NULL) {
+      char * after = t->start + strlen (t->start) - 1;
+      if (t->after != NULL && t->after != after) {
 	fprintf (stderr, "%s:%d: %s after: %s\n",
 		 t->file, t->line, t->start, t->after);
 	abort();
       }
-      t->after = t->start + strlen (t->start) - 1;
+      t->after = after;
     }
   return stack;
 }

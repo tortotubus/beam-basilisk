@@ -165,6 +165,9 @@ void  ast_traverse (Ast * n, Stack * stack,
        )
 
 Ast * ast_identifier_declaration (Stack * stack, const char * identifier);
+Ast * ast_identifier_declaration_from (Stack * stack, const char * identifier,
+				       Ast * start);
+Ast * ast_function_identifier (const Ast * function_definition);
 
 void ast_set_char (Ast * n, int c);
 void ast_remove (Ast * n, AstTerminal * before);
@@ -193,4 +196,5 @@ char * ast_typedef_name (Ast * type);
 
 Ast * ast_check_grammar (Ast * n, bool recursive);
 
-Ast * ast_stencil (Ast * foreach, Stack * stack);
+bool  ast_is_stencil_function (Ast * n);
+Ast * ast_stencil (Ast * n);

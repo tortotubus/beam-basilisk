@@ -124,8 +124,10 @@ char * ast_line (AstTerminal * t)
 AstRoot * ast_get_root (const Ast * n)
 {
   const Ast * root = n;
-  while (root->parent)
+  while (root->parent) {
+    assert (root != root->parent);
     root = root->parent;
+  }
   return ast_root (root);
 }
 
@@ -578,6 +580,7 @@ Ast * ast_copy_single (const Ast * n,
     int len = 0;
     for (Ast ** i = n->child; *i; i++, len++);
     c->child = allocate ((*dst_root)->alloc, (len + 1)*sizeof (Ast *));
+    c->child[len] = NULL;
   }
   return c;
 }
@@ -682,7 +685,8 @@ AstRoot * ast_parse_file (FILE * fp, AstRoot * parent)
   return root;
 }
 
-Ast * ast_identifier_declaration (Stack * stack, const char * identifier)
+Ast * ast_identifier_declaration_from (Stack * stack, const char * identifier,
+				       Ast * start)
 {
   /**
   This is to ignore "face ", "vertex " and "symmetric " typedef prefixes. */
@@ -695,7 +699,17 @@ Ast * ast_identifier_declaration (Stack * stack, const char * identifier)
     identifier += strlen ("symmetric ");
   
   Ast ** d;
-  for (int i = 0; (d = stack_index (stack, i)); i++)
+  int i = 0;
+  if (start) {
+    for (; (d = stack_index (stack, i)) && *d != start; i++);
+    if (d) {
+      assert (*d == start);
+      i++;
+    }
+    else
+      return NULL;
+  }
+  for (; (d = stack_index (stack, i)); i++)
     if (*d && (*d)->sym == sym_IDENTIFIER) {
 
       /**
@@ -723,7 +737,12 @@ Ast * ast_identifier_declaration (Stack * stack, const char * identifier)
     }
   return NULL;
 }
-    
+
+Ast * ast_identifier_declaration (Stack * stack, const char * identifier)
+{
+  return ast_identifier_declaration_from (stack, identifier, NULL);
+}
+
 char * str_append_realloc (char * src, ...)
 {
   va_list ap;
@@ -907,6 +926,10 @@ Ast * ast_flatten (Ast * n, AstTerminal * t)
 
 bool ast_are_identical (const Ast * a, const Ast * b)
 {
+  if (a == NULL && b == NULL)
+    return true;
+  if (a == NULL || b == NULL)
+    return false;
   if (a->sym != b->sym)
     return false;
   AstTerminal * ta = ast_terminal (a), * tb = ast_terminal (b);
