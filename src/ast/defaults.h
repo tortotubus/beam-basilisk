@@ -29,6 +29,12 @@ For Python/SWIG */
 typedef void PyObject;
 
 /**
+For stencils */
+
+void default_stencil() {}
+void _stencil_default_stencil() {}
+
+/**
 ## From standard C libraries */
 
 void abort(void);

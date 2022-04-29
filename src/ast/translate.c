@@ -35,6 +35,18 @@ Ast * ast_find_function (Ast * n, const char * name)
   return found;
 }
 
+Ast * ast_function_identifier (const Ast * function_definition)
+{
+  return ast_schema (function_definition,
+		     sym_function_definition,
+		     0, sym_function_declaration,
+		     1, sym_declarator,
+		     0, sym_direct_declarator,
+		     0, sym_direct_declarator,
+		     0, sym_generic_identifier,
+		     0, sym_IDENTIFIER);
+}
+
 /**
 Appends (block) list `list1` to (block) list `list`. */
 
@@ -388,6 +400,9 @@ Ast * ast_expression_type (Ast * expr, Stack * stack, bool higher_dimension)
 {
   switch (expr->sym) {
 
+  case sym_argument_expression_list_item:
+    return ast_expression_type (expr->child[0], stack, higher_dimension);
+    
   case sym_initializer:
   case sym_assignment_expression:
     while (expr->child && expr->sym != sym_postfix_expression)
@@ -669,6 +684,17 @@ typedef struct {
   char * swigname, * swigdecl, * swiginit;
 } TranslateData;
 
+static Ast * in_stencil_point_function (Ast * n)
+{
+  while (n && n->sym != sym_function_definition)
+    n = n->parent;
+  if (!n)
+    return NULL;
+  if (ast_is_stencil_function (n))
+    return n;
+  return NULL;
+}
+
 static void rotate (Ast * n, Stack * stack, void * data)
 {
   TranslateData * d = data;
@@ -717,13 +743,17 @@ static void rotate (Ast * n, Stack * stack, void * data)
 	if ((!strcmp (name, "val") ||
 	     !strcmp (name, "fine") ||
 	     !strcmp (name, "coarse") ||
+	     !strcmp (name, "_stencil_val") ||
+	     !strcmp (name, "_stencil_fine") ||
+	     !strcmp (name, "_stencil_coarse") ||
 	     !strcmp (name, "allocated") ||
 	     !strcmp (name, "allocated_child") ||
 	     !strcmp (name, "neighbor") ||
 	     !strcmp (name, "neighborp") ||
 	     !strcmp (name, "aparent"))
 	    &&
-	    (inforeach (n) || point_declaration (stack)))
+	    (inforeach (n) || point_declaration (stack) ||
+	     in_stencil_point_function (n)))
 	  rotate_arguments (n->child[2], d->dimension);
       }
     }
@@ -1582,7 +1612,10 @@ Ast * ast_block_list_insert_before (Ast * insert, Ast * item)
     (insert->parent->parent->child[0]->child[1]->child[0], item);
 }
 
-static void global_boundaries (Ast * n, Stack * stack, void * data)
+/**
+# Global boundaries and stencils */
+
+static void global_boundaries_and_stencils (Ast * n, Stack * stack, void * data)
 {
   switch (n->sym) {
 
@@ -1600,7 +1633,7 @@ static void global_boundaries (Ast * n, Stack * stack, void * data)
   }
 
   /**
-  ### Local boundary conditions */
+  ## Local boundary conditions */
     
   case sym_array_access: {
     Ast * assign = ast_ancestor (n, 3), * scope;
@@ -1659,7 +1692,7 @@ static void global_boundaries (Ast * n, Stack * stack, void * data)
   }
 
   /**
-  ### Global boundary conditions */
+  ## Global boundary conditions */
     
   case sym_boundary_definition: {
     Ast * expr = ast_schema (n, sym_boundary_definition,
@@ -1698,6 +1731,34 @@ static void global_boundaries (Ast * n, Stack * stack, void * data)
     }
     break;
   }
+
+  /**
+  ## Stencils */
+
+  case sym_foreach_statement: {
+    if (!strcmp (ast_terminal (n->child[0])->start, "foreach") ||
+	!strcmp (ast_terminal (n->child[0])->start, "foreach_vertex") ||
+	!strcmp (ast_terminal (n->child[0])->start, "foreach_face")) {
+      Ast * stencil = ast_stencil (n);
+      if (stencil) {
+	str_append (ast_terminal (ast_child (stencil, sym_FOREACH))->start,
+		    "_stencil");
+	Ast * statement = n->parent->parent;
+	assert (statement->sym == sym_statement);
+	Ast * item = get_block_list_item (statement), * list = item->parent;
+	list = ast_block_list_append
+	  (list, item->sym,
+	   ast_new_children (ast_new (n, sym_statement),
+			     ast_new_children (ast_new (n,
+							sym_basilisk_statements),
+					       stencil)));
+	ast_set_child (item, 0, list->child[1]->child[0]);
+	ast_set_child (list->child[1], 0, statement);
+      }
+    }
+    break;
+  }
+
   }
 }
 
@@ -1727,6 +1788,24 @@ static void diagonalize (Ast * n, Stack * stack, void * field)
    try to parse system headers
 */
 
+static bool is_foreach_stencil (Ast * n)
+{
+  Ast * foreach = ast_schema (n, sym_foreach_statement,
+			      0, sym_FOREACH);
+  if (!foreach)
+    return false;
+  int len = strlen (ast_terminal (foreach)->start) - 8;
+  return len > 0 && !strcmp (ast_terminal (foreach)->start + len, "_stencil");
+}
+
+static Ast * higher_dimension (Ast * n)
+{
+  char * s = is_foreach_stencil (inforeach (n)) || in_stencil_point_function (n)
+    ? "_stencil_val_higher_dimension" : "_val_higher_dimension";
+  return ast_attach (ast_new (n, sym_primary_expression),
+		     ast_terminal_new (n, sym_IDENTIFIER, s));
+}
+				     
 static void translate (Ast * n, Stack * stack, void * data)
 {
   typedef struct {
@@ -1783,8 +1862,11 @@ static void translate (Ast * n, Stack * stack, void * data)
 
     /**
     ### foreach_face() statements */
-    
-    if (!strcmp (ast_terminal (n->child[0])->start, "foreach_face")) {
+
+    bool is_face_stencil = !strcmp (ast_terminal (n->child[0])->start,
+				    "foreach_face_stencil");
+    if (is_face_stencil ||
+	!strcmp (ast_terminal (n->child[0])->start, "foreach_face")) {
       char order[] = "xyz";
 
       /**
@@ -1816,17 +1898,19 @@ static void translate (Ast * n, Stack * stack, void * data)
       }
 
       /**
-      Here we add the `is_face_x()` condition to the loop
-      statement. */
+      Here we add the `is_face_x()` condition to the loop statement
+      (except for stencils). */
 
-      Ast * expr = ast_parse_expression ("is_face_x(){;}", ast_get_root (n));
-      Ast * cond = ast_find (expr, sym_IDENTIFIER);
-      ast_terminal (cond)->start[strlen(ast_terminal (cond)->start) - 1] =
-	order[0];
-      ast_replace (expr, ";", ast_last_child (n));
-      ast_set_line (expr, ast_left_terminal (n));
-      ast_replace_child (n, n->child[4] ? 4 : 3,
-			 ast_new_children (ast_new (n, sym_statement), expr));
+      if (!is_face_stencil) {
+	Ast * expr = ast_parse_expression ("is_face_x(){;}", ast_get_root (n));
+	Ast * cond = ast_find (expr, sym_IDENTIFIER);
+	ast_terminal (cond)->start[strlen(ast_terminal (cond)->start) - 1] =
+	  order[0];
+	ast_replace (expr, ";", ast_last_child (n));
+	ast_set_line (expr, ast_left_terminal (n));
+	ast_replace_child (n, n->child[4] ? 4 : 3,
+			   ast_new_children (ast_new (n, sym_statement), expr));
+      }
 	
       /**
       Finally, we "dimension-rotate" the statement. */
@@ -1845,9 +1929,11 @@ static void translate (Ast * n, Stack * stack, void * data)
 	  stack_push (stack, &copy);
 	  ast_traverse (copy, stack, rotate, d);
 	  ast_pop_scope (stack, copy);
-	  Ast * cond = ast_find (copy, sym_IDENTIFIER);
-	  ast_terminal (cond)->start[strlen(ast_terminal (cond)->start) - 1] =
-	    order[i];
+	  if (!is_face_stencil) {
+	    Ast * cond = ast_find (copy, sym_IDENTIFIER);
+	    ast_terminal (cond)->start[strlen(ast_terminal (cond)->start) - 1] =
+	      order[i];
+	  }
 	  list = ast_block_list_append (list, item->sym, copy);
 	}
 	if (statement->sym != sym_statement)
@@ -1859,15 +1945,17 @@ static void translate (Ast * n, Stack * stack, void * data)
     }
 
     /**
-    ### (const) fields combinations */
+    ### (const) fields combinations (except for stencils) */
 
-    Ast ** consts = NULL;
-    maybeconst (n, stack, append_const, &consts);
-    if (consts) {
-      Ast * item = get_block_list_item (n->parent->parent);
-      Ast * list = item->parent;
-      combinations (n, stack, data, consts, list, item, "foreach()");
-      free (consts);
+    if (!is_foreach_stencil (n)) {
+      Ast ** consts = NULL;
+      maybeconst (n, stack, append_const, &consts);
+      if (consts) {
+	Ast * item = get_block_list_item (n->parent->parent);
+	Ast * list = item->parent;
+	combinations (n, stack, data, consts, list, item, "foreach()");
+	free (consts);
+      }
     }
     
     break;
@@ -1915,11 +2003,12 @@ static void translate (Ast * n, Stack * stack, void * data)
     const char * typename =
       ast_typedef_name (ast_expression_type (n->child[0], stack, false));
     TranslateData * d = data;
-    Ast * member;
+    Ast * member, * foreach = NULL, * stencil_function = NULL;
     if (typename &&
 	(!strcmp (typename, "scalar") ||
 	 !strcmp (typename, "vertex scalar")) &&
-	(inforeach (n) || point_declaration (stack))) {
+	((foreach = inforeach (n)) || point_declaration (stack) ||
+	 (stencil_function = in_stencil_point_function (n)))) {
       n->sym = sym_function_call;
       ast_set_char (ast_child (n, token_symbol('[')), '(');
 
@@ -1958,6 +2047,9 @@ static void translate (Ast * n, Stack * stack, void * data)
       }
       if (!func)
 	func = ast_new_identifier (n, "val");
+      if (is_foreach_stencil (foreach) || stencil_function)
+	str_prepend (ast_terminal (ast_find (func, sym_IDENTIFIER))->start,
+		     "_stencil_");
       ast_set_child (n, 2,
 		     ast_list_prepend (list,
 				       sym_argument_expression_list_item,
@@ -1987,12 +2079,8 @@ static void translate (Ast * n, Stack * stack, void * data)
 						     stack, false))) &&
 	     (!strcmp (typename, "vector") ||
 	      !strcmp (typename, "face vector")) &&
-	     (inforeach (n) || point_declaration (stack))) {
-      Ast * expr = ast_attach (ast_new (n, sym_primary_expression),
-			       ast_terminal_new (n, sym_IDENTIFIER,
-						 "_val_higher_dimension"));
-      ast_replace_child (n->parent, 0, expr);
-    }
+	     ((foreach = inforeach (n)) || point_declaration (stack)))
+      ast_replace_child (n->parent, 0, higher_dimension (n));
     else if ((member = ast_schema (n->child[0], sym_postfix_expression,
 				   0, sym_postfix_expression,
 				   2, sym_member_identifier,
@@ -2007,12 +2095,8 @@ static void translate (Ast * n, Stack * stack, void * data)
 				(n->child[0]->child[0]->child[0],
 				 stack, false))) &&
 	     !strcmp (typename, "tensor") &&
-	     (inforeach (n) || point_declaration (stack))) {
-      Ast * expr = ast_attach (ast_new (n, sym_primary_expression),
-			       ast_terminal_new (n, sym_IDENTIFIER,
-						 "_val_higher_dimension"));
-      ast_replace_child (n->parent, 0, expr);      
-    }
+	     (inforeach (n) || point_declaration (stack)))
+      ast_replace_child (n->parent, 0, higher_dimension (n));
     break;
   }
 
@@ -2309,17 +2393,25 @@ static void translate (Ast * n, Stack * stack, void * data)
       /**
       ### Stencil functions */
 
-      if (inforeach (n) || point_declaration (stack)) {
+      Ast * foreach = NULL, * stencil_function = NULL;
+      if ((foreach = inforeach (n)) || point_declaration (stack) ||
+	  (stencil_function = in_stencil_point_function (n))) {
 	if (!strcmp (t->start, "val") || !strcmp (t->start, "fine") ||
-	    !strcmp (t->start, "coarse"))
+	    !strcmp (t->start, "coarse")) {
 	  complete_arguments (n, 4);
+	  if (is_foreach_stencil (foreach) || stencil_function)
+	    str_prepend (t->start, "_stencil_");
+	}
 	else if (!strcmp (t->start, "allocated") ||
 		 !strcmp (t->start, "allocated_child") ||
 		 !strcmp (t->start, "neighbor") ||
 		 !strcmp (t->start, "neighborp") ||
 		 !strcmp (t->start, "aparent") ||
-		 !strcmp (t->start, "child"))
+		 !strcmp (t->start, "child")) {
 	  complete_arguments (n, 3);
+	  if (is_foreach_stencil (foreach) || stencil_function)
+	    str_prepend (t->start, "_stencil_");
+	}
       }
 
       /**
@@ -2890,7 +2982,7 @@ static void macros (Ast * n, Stack * stack, void * data)
       free (ast_terminal (n->child[0])->start);
       ast_terminal (n->child[0])->start = strdup ("foreach_face_generic");
     }
-    else { // maps for !foreach_face() loops
+    else if (!is_foreach_stencil (n)) { // maps for !foreach_face() loops
       char * maps = str_append_maps (NULL, stack);
       if (maps) {
 	Ast * statement = ast_child (n, sym_statement);
@@ -2917,36 +3009,38 @@ static void macros (Ast * n, Stack * stack, void * data)
 	  parameters = ast_list_remove (parameters, item);
 	}
 	else if (item->child[0]->sym == sym_reduction_list) {
-	  Ast * reductions = item->child[0];
-	  foreach_item (reductions, 1, reduction) {
-	    Ast * identifier = ast_schema (reduction, sym_reduction,
-					   4, sym_reduction_array,
-					   0, sym_generic_identifier,
-					   0, sym_IDENTIFIER);
-	    Ast * array = ast_schema (reduction, sym_reduction,
-				      4, sym_reduction_array,
-				      3, sym_expression);
-	    char * operator = ast_left_terminal (reduction->child[2])->start;
-	    if (array) {
-	      ast_after (n, "mpi_all_reduce_double(",
-			 ast_terminal (identifier)->start,
-			 ",",
-			 !strcmp(operator, "min") ? "MPI_MIN" : 
-			 !strcmp(operator, "max") ? "MPI_MAX" : 
-			 "MPI_SUM,");
-	      ast_right_terminal (n)->after =
-		ast_str_append (array, ast_right_terminal (n)->after);
-	      ast_after (n, ");");
+	  if (!is_foreach_stencil (n)) {
+	    Ast * reductions = item->child[0];
+	    foreach_item (reductions, 1, reduction) {
+	      Ast * identifier = ast_schema (reduction, sym_reduction,
+					     4, sym_reduction_array,
+					     0, sym_generic_identifier,
+					     0, sym_IDENTIFIER);
+	      Ast * array = ast_schema (reduction, sym_reduction,
+					4, sym_reduction_array,
+					3, sym_expression);
+	      char * operator = ast_left_terminal (reduction->child[2])->start;
+	      if (array) {
+		ast_after (n, "mpi_all_reduce_double(",
+			   ast_terminal (identifier)->start,
+			   ",",
+			   !strcmp(operator, "min") ? "MPI_MIN" : 
+			   !strcmp(operator, "max") ? "MPI_MAX" : 
+			   "MPI_SUM,");
+		ast_right_terminal (n)->after =
+		  ast_str_append (array, ast_right_terminal (n)->after);
+		ast_after (n, ");");
+	      }
+	      else
+		ast_after (n, "mpi_all_reduce_double(&",
+			   ast_terminal (identifier)->start,
+			   ",",
+			   !strcmp(operator, "min") ? "MPI_MIN" : 
+			   !strcmp(operator, "max") ? "MPI_MAX" : 
+			   "MPI_SUM",
+			   ",1);");
+	      sreductions = ast_str_append (reduction, sreductions);
 	    }
-	    else
-	      ast_after (n, "mpi_all_reduce_double(&",
-			 ast_terminal (identifier)->start,
-			 ",",
-			 !strcmp(operator, "min") ? "MPI_MIN" : 
-			 !strcmp(operator, "max") ? "MPI_MAX" : 
-			 "MPI_SUM",
-			 ",1);");
-	    sreductions = ast_str_append (reduction, sreductions);
 	  }
 	  parameters = ast_list_remove (parameters, item);
 	}
@@ -2956,34 +3050,37 @@ static void macros (Ast * n, Stack * stack, void * data)
 	n->child[2] = n->child[3], n->child[3] = n->child[4], n->child[4] = NULL;
       }
     }
+
+    if (!is_foreach_stencil (n)) {
+      if (serial)
+	ast_before (n, "\n"
+		    "#if _OPENMP\n"
+		    "  #undef OMP\n"
+		    "  #define OMP(x)\n"
+		    "#endif\n");
+      if (sreductions) {
+	ast_before (n, "\n"
+		    "#undef OMP_PARALLEL\n"
+		    "#define OMP_PARALLEL()\n"
+		    "OMP(omp parallel ", sreductions, "){");
+	ast_after (n,
+		   "\n"
+		   "#undef OMP_PARALLEL\n"
+		   "#define OMP_PARALLEL() OMP(omp parallel)\n}");
+	free (sreductions);
+      }
+      else {
+	ast_before (n, "{");
+	ast_after (n, "}");
+      }
+      if (serial)
+	ast_after (n, "\n"
+		   "#if _OPENMP\n"
+		   "  #undef OMP\n"
+		   "  #define OMP(x) _Pragma(#x)\n"
+		   "#endif\n");
+    }
     
-    if (serial)
-      ast_before (n, "\n"
-		  "#if _OPENMP\n"
-		  "  #undef OMP\n"
-		  "  #define OMP(x)\n"
-		  "#endif\n");
-    if (sreductions) {
-      ast_before (n, "\n"
-		  "#undef OMP_PARALLEL\n"
-		  "#define OMP_PARALLEL()\n"
-		  "OMP(omp parallel ", sreductions, "){");
-      ast_after (n,
-		 "\n"
-		 "#undef OMP_PARALLEL\n"
-		 "#define OMP_PARALLEL() OMP(omp parallel)\n}");
-      free (sreductions);
-    }
-    else {
-      ast_before (n, "{");
-      ast_after (n, "}");
-    }
-    if (serial)
-      ast_after (n, "\n"
-		 "#if _OPENMP\n"
-		 "  #undef OMP\n"
-		 "  #define OMP(x) _Pragma(#x)\n"
-		 "#endif\n");      
     break;
   }
   
@@ -2992,8 +3089,13 @@ static void macros (Ast * n, Stack * stack, void * data)
     
   case sym_foreach_inner_statement: {
     AstTerminal * t = ast_left_terminal(n);
-    if (!strcmp (t->start, "foreach_block") && inforeach (n))
-      str_append (t->start, "_inner");
+    Ast * foreach = inforeach (n);
+    if (foreach) {
+      if (!strcmp (t->start, "foreach_block"))
+	str_append (t->start, "_inner");
+    }
+    if (is_foreach_stencil (foreach) || in_stencil_point_function (n))
+      str_prepend (t->start, "_stencil_");
     ast_before (n, "{");
     ast_after (n, "end_", t->start, "()}");
     break;
@@ -3515,11 +3617,6 @@ void ast_traverse (Ast * n, Stack * stack,
 		   void func (Ast *, Stack *, void *),
 		   void * data)
 {
-  if (ast_root (n)) {
-    ast_pop_scope (stack, n);
-    stack_push (stack, &n);
-  }
-  
   switch (n->sym) {
 
   /**
@@ -3584,27 +3681,6 @@ void ast_traverse (Ast * n, Stack * stack,
   }
 }
 
-static void autoboundary (Ast * n, Stack * stack, void * data)
-{
-  switch (n->sym) {
-
-  case sym_foreach_statement: {
-    if (!strcmp (ast_terminal (n->child[0])->start, "foreach") ||
-	!strcmp (ast_terminal (n->child[0])->start, "foreach_vertex") ||
-	!strcmp (ast_terminal (n->child[0])->start, "foreach_face")) {
-      ast_check_grammar (n, true);
-      Ast * stencil = ast_stencil (n, stack);
-      if (stencil) {
-	ast_print (stencil, stderr, 0);
-	ast_destroy (stencil);
-      }
-    }
-    break;
-  }
-    
-  }
-}
-
 void endfor (FILE * fin, FILE * fout,
 	     const char * grid, int dimension,
 	     bool nolineno, bool progress, bool catch,
@@ -3658,12 +3734,18 @@ void endfor (FILE * fin, FILE * fout,
 	      sym_compound_statement);
   ast_destroy ((Ast *) init);
 
-  ast_traverse ((Ast *) root, root->stack, autoboundary, &data);
-  ast_traverse ((Ast *) root, root->stack, global_boundaries, &data);
+  stack_push (root->stack, &root);
+  ast_traverse ((Ast *) root, root->stack,
+		global_boundaries_and_stencils, &data);
+  ast_pop_scope (root->stack, (Ast *) root);
   CHECK ((Ast *) root, true);
+  stack_push (root->stack, &root);
   ast_traverse ((Ast *) root, root->stack, translate, &data);
+  ast_pop_scope (root->stack, (Ast *) root);
   CHECK ((Ast *) root, true);
+  stack_push (root->stack, &root);
   ast_traverse ((Ast *) root, root->stack, macros, &data);
+  ast_pop_scope (root->stack, (Ast *) root);
   CHECK ((Ast *) root, true);
   
   if (data.fields_index) {
