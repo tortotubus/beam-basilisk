@@ -285,7 +285,7 @@ Ast * ast_is_unary_expression (const Ast * n)
     -1
   }, * i;
   for (i = sym; *i >= 0 && *i != n->sym; i++);
-  for (; *i == n->sym && n->child; i++, n = n->child[0])
+  for (; n != ast_placeholder && *i == n->sym && n->child; i++, n = n->child[0])
     if (n->sym == sym_unary_expression)
       return (Ast *) n;
   return NULL;
@@ -398,8 +398,18 @@ static Ast * declaration_from_type (const Ast * type)
 
 Ast * ast_expression_type (Ast * expr, Stack * stack, bool higher_dimension)
 {
+  if (expr == ast_placeholder)
+    return NULL;
   switch (expr->sym) {
 
+  case sym_IDENTIFIER:
+    if (ast_ancestor (expr, 2)->sym == sym_member_identifier)
+      return ast_expression_type (ast_ancestor (expr, 3), stack,
+				  higher_dimension);
+    else
+      return ast_identifier_declaration (stack, ast_terminal (expr)->start);
+    
+  case sym_primary_expression:
   case sym_argument_expression_list_item:
     return ast_expression_type (expr->child[0], stack, higher_dimension);
     
@@ -409,12 +419,6 @@ Ast * ast_expression_type (Ast * expr, Stack * stack, bool higher_dimension)
       expr = expr->child[0];
     return expr->sym == sym_postfix_expression ?
       ast_expression_type (expr, stack, higher_dimension) : NULL;
-    
-  case sym_primary_expression:
-    if (expr->child[0]->sym == sym_IDENTIFIER)
-      return ast_identifier_declaration (stack,
-					 ast_terminal (expr->child[0])->start);
-    break;
     
   case sym_postfix_expression:
     assert (expr->child && expr->child[0]);
@@ -797,8 +801,10 @@ static void rotate_list_item (Ast * item, Ast * n,
 /**
 This function returns a block_item containing *statement*. */
 
-static Ast * get_block_list_item (Ast * statement)
+Ast * ast_block_list_get_item (Ast * statement)
 {
+  assert (statement->sym == sym_statement ||
+	  statement->sym == sym_declaration);
   Ast * item = statement->parent;
 
   /**
@@ -1612,6 +1618,16 @@ Ast * ast_block_list_insert_before (Ast * insert, Ast * item)
     (insert->parent->parent->child[0]->child[1]->child[0], item);
 }
 
+Ast * ast_block_list_insert_before2 (Ast * insert, Ast * item)
+{
+  // fixme: merge with above
+  Ast * parent = insert->child[0];
+  Ast * list = ast_block_list_append (insert->parent, insert->sym, item);
+  ast_set_child (insert, 0, list->child[1]->child[0]);
+  ast_set_child (list->child[1], 0, parent);
+  return list;
+}
+
 /**
 # Global boundaries and stencils */
 
@@ -1735,17 +1751,17 @@ static void global_boundaries_and_stencils (Ast * n, Stack * stack, void * data)
   /**
   ## Stencils */
 
+#if 1    
   case sym_foreach_statement: {
     if (!strcmp (ast_terminal (n->child[0])->start, "foreach") ||
 	!strcmp (ast_terminal (n->child[0])->start, "foreach_vertex") ||
 	!strcmp (ast_terminal (n->child[0])->start, "foreach_face")) {
-      Ast * stencil = ast_stencil (n);
-      if (stencil) {
+      Ast * stencil = ast_copy (n);
+      if (ast_stencil (stencil)) {
 	str_append (ast_terminal (ast_child (stencil, sym_FOREACH))->start,
 		    "_stencil");
 	Ast * statement = n->parent->parent;
-	assert (statement->sym == sym_statement);
-	Ast * item = get_block_list_item (statement), * list = item->parent;
+	Ast * item = ast_block_list_get_item (statement), * list = item->parent;
 	list = ast_block_list_append
 	  (list, item->sym,
 	   ast_new_children (ast_new (n, sym_statement),
@@ -1755,9 +1771,12 @@ static void global_boundaries_and_stencils (Ast * n, Stack * stack, void * data)
 	ast_set_child (item, 0, list->child[1]->child[0]);
 	ast_set_child (list->child[1], 0, statement);
       }
+      else
+	ast_destroy (stencil);
     }
     break;
   }
+#endif
 
   }
 }
@@ -1818,7 +1837,7 @@ static void translate (Ast * n, Stack * stack, void * data)
   ## foreach_dimension() */
 
   case sym_foreach_dimension_statement: {
-    Ast * item = get_block_list_item (n->parent->parent);
+    Ast * item = ast_block_list_get_item (n->parent->parent);
     rotate_list_item (item, n, stack, data);
     break;
   }
@@ -1917,7 +1936,7 @@ static void translate (Ast * n, Stack * stack, void * data)
 
       if (strlen (order) > 1) {
 	Ast * statement = ast_last_child (n);
-	Ast * item = get_block_list_item (statement);
+	Ast * item = ast_block_list_get_item (statement);
 	TranslateData * d = data;
 	int dimension = d->dimension;
 	d->dimension = strlen (order);
@@ -1951,7 +1970,7 @@ static void translate (Ast * n, Stack * stack, void * data)
       Ast ** consts = NULL;
       maybeconst (n, stack, append_const, &consts);
       if (consts) {
-	Ast * item = get_block_list_item (n->parent->parent);
+	Ast * item = ast_block_list_get_item (n->parent->parent);
 	Ast * list = item->parent;
 	combinations (n, stack, data, consts, list, item, "foreach()");
 	free (consts);
@@ -3572,6 +3591,8 @@ static void macros (Ast * n, Stack * stack, void * data)
 
 void ast_push_declaration (Stack * stack, Ast * n)
 {
+  if (n == ast_placeholder)
+    return;
   if (n->sym == sym_parameter_type_list ||
       n->sym == sym_struct_declaration_list)
     return; // skip function arguments and struct members
@@ -3580,7 +3601,6 @@ void ast_push_declaration (Stack * stack, Ast * n)
 				 0, sym_IDENTIFIER);
   if (!identifier)
     identifier = ast_schema (n, sym_enumeration_constant,
-			     0, sym_generic_identifier,
 			     0, sym_IDENTIFIER);
   if (!identifier && n->sym == sym_struct_or_union_specifier &&
       n->child[2])
@@ -3617,6 +3637,8 @@ void ast_traverse (Ast * n, Stack * stack,
 		   void func (Ast *, Stack *, void *),
 		   void * data)
 {
+  if (!n || n == ast_placeholder)
+    return;
   switch (n->sym) {
 
   /**
@@ -3674,8 +3696,7 @@ void ast_traverse (Ast * n, Stack * stack,
   default:
     if (n->child)
       for (Ast ** c = n->child; *c; c++)
-	if (*c != ast_placeholder)
-	  ast_traverse (*c, stack, func, data);
+	ast_traverse (*c, stack, func, data);
     func (n, stack, data);
     break;
   }
@@ -3792,7 +3813,7 @@ void endfor (FILE * fin, FILE * fout,
     if ((*n)->sym == sym_macro_statement)
       ast_destroy (*n);
 
-  ast_print ((Ast *) root, fout, false);
+  ast_print ((Ast *) root, fout, 0);
   
   ast_destroy ((Ast *) d);
   ast_destroy ((Ast *) root);

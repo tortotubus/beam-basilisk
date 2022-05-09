@@ -273,8 +273,12 @@ static void update_file_line (const char * preproc, File * file)
   }  
 }
 
-static void ast_print_internal (Ast * n, FILE * fp, bool sym, File * file)
+static void ast_print_internal (Ast * n, FILE * fp, int sym, File * file)
 {
+  if (n == ast_placeholder) {
+    fputc ('$', fp);
+    return;
+  }
   //  ast_print_file_line (n, stderr);
   AstTerminal * t = ast_terminal (n);
   if (t) {
@@ -286,13 +290,19 @@ static void ast_print_internal (Ast * n, FILE * fp, bool sym, File * file)
       int len = strlen (t->file);
       if (!file->name || strncmp (t->file, file->name, len) ||
 	  (file->name[len] != '"' && file->name[len] != '\0')) {
-	fprintf (fp, "\n#line %d \"%s\"\n", t->line, t->file);
+	if (sym == 3)
+	  fprintf (fp, "\n%s:%d: ", t->file, t->line);
+	else
+	  fprintf (fp, "\n#line %d \"%s\"\n", t->line, t->file);
 	file->line = t->line;
 	file->name = t->file;      
       }
       else if (t->line != file->line) {
 	if (file->line > t->line || t->line - file->line > 10) {
-	  fprintf (fp, "\n#line %d\n", t->line);
+	  if (sym == 3)
+	    fprintf (fp, "\n%s:%d: ", t->file, t->line);
+	  else
+	    fprintf (fp, "\n#line %d\n", t->line);
 	  file->line = t->line;
 	}
 	else
@@ -302,14 +312,18 @@ static void ast_print_internal (Ast * n, FILE * fp, bool sym, File * file)
 	  }
       }
     }
-    if (sym) {
+    if (sym == 1) {
       fputc ('|', fp);
       fputs (symbol_name (n->sym), fp);
       fputc ('|', fp);
     }
+    else if (sym == 2) {
+      if (t->value)
+	fputc ('^', fp);
+    }
     fputs (t->start, fp);
     file->line += count_lines (t->start);
-    if (sym)
+    if (sym == 1)
       fputc ('/', fp);
     if (t->after) {
       fputs (t->after, fp);
@@ -323,8 +337,7 @@ static void ast_print_internal (Ast * n, FILE * fp, bool sym, File * file)
       update_file_line (r->before, file);
     }
     for (Ast ** c = n->child; *c; c++)
-      if (*c != ast_placeholder)
-	ast_print_internal (*c, fp, sym, file);
+      ast_print_internal (*c, fp, sym, file);
     if (r && r->after) {
       fputs (r->after, fp);
       file->line += count_lines (r->after);
@@ -332,7 +345,7 @@ static void ast_print_internal (Ast * n, FILE * fp, bool sym, File * file)
   }
 }
 
-void ast_print (Ast * n, FILE * fp, bool sym)
+void ast_print (Ast * n, FILE * fp, int sym)
 {
   ast_print_internal (n, fp, sym, &(File){0});
 }
@@ -470,7 +483,7 @@ Ast * ast_new_internal (Ast * parent, ...)
 static Ast * vast_schema_internal (const Ast * n, va_list ap)
 {
   int sym = va_arg(ap, int);
-  if (n->sym != sym)
+  if (n == ast_placeholder || n->sym != sym)
     return NULL;
   int c = va_arg(ap, int);
   while (c >= 0) {
@@ -482,7 +495,7 @@ static Ast * vast_schema_internal (const Ast * n, va_list ap)
       return NULL;
     n = n->child[c];
     int sym = va_arg(ap, int);
-    if (n->sym != sym)
+    if (n == ast_placeholder || n->sym != sym)
       return NULL;
     c = va_arg(ap, int);
   }
@@ -502,6 +515,8 @@ Ast * ast_schema_internal (const Ast * n, ...)
 
 static Ast * vast_find_internal (const Ast * n, va_list ap)
 {
+  if (n == ast_placeholder)
+    return NULL;
   va_list bp;
   va_copy (bp, ap);
   Ast * found = vast_schema_internal (n, bp);
@@ -685,8 +700,8 @@ AstRoot * ast_parse_file (FILE * fp, AstRoot * parent)
   return root;
 }
 
-Ast * ast_identifier_declaration_from (Stack * stack, const char * identifier,
-				       Ast * start)
+Ast * ast_identifier_declaration_from_to (Stack * stack, const char * identifier,
+					  const Ast * start, const Ast * end)
 {
   /**
   This is to ignore "face ", "vertex " and "symmetric " typedef prefixes. */
@@ -710,7 +725,9 @@ Ast * ast_identifier_declaration_from (Stack * stack, const char * identifier,
       return NULL;
   }
   for (; (d = stack_index (stack, i)); i++)
-    if (*d && (*d)->sym == sym_IDENTIFIER) {
+    if (end && *d == end)
+      break;
+    else if (*d && (*d)->sym == sym_IDENTIFIER) {
 
       /**
       WARNING: this assumes that the "after" string is never modified
@@ -740,7 +757,7 @@ Ast * ast_identifier_declaration_from (Stack * stack, const char * identifier,
 
 Ast * ast_identifier_declaration (Stack * stack, const char * identifier)
 {
-  return ast_identifier_declaration_from (stack, identifier, NULL);
+  return ast_identifier_declaration_from_to (stack, identifier, NULL, NULL);
 }
 
 char * str_append_realloc (char * src, ...)
@@ -893,6 +910,8 @@ void ast_check (Ast * n)
 
 void ast_set_line (Ast * n, AstTerminal * l)
 {
+  if (n == ast_placeholder)
+    return;
   AstTerminal * t = ast_terminal (n);
   if (t && !t->file) {
     t->file = l->file;

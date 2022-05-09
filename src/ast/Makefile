@@ -34,6 +34,8 @@ tokens.o: ast.h basilisk.c
 
 translate.o: ast.h symbols.h
 
+stencil.o: ast.h symbols.h
+
 allocator.o: allocator.h
 
 check.o: ast.h symbols.h grammar.h
