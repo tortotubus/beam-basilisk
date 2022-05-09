@@ -33,7 +33,7 @@ Ast *     ast_parse_expression (const char * expr, AstRoot * parent);
 Ast *     ast_parse_external_declaration (const char * decl, AstRoot * parent);
 void      ast_destroy          (Ast * n);
 AstRoot * ast_parse_file       (FILE * fp, AstRoot * parent);
-void      ast_print            (Ast * n, FILE * fp, bool kind);
+void      ast_print            (Ast * n, FILE * fp, int kind);
 void      ast_print_tree       (Ast * n, FILE * fp, const char * indent,
 				bool compress, int maxdepth);
 void      ast_print_file_line  (Ast * n, FILE * fp);
@@ -52,18 +52,28 @@ static inline Ast * ast_last_child (const Ast * n)
   return *c;
 }
 
+extern Ast * const ast_placeholder;
+
 static inline Ast * ast_child (const Ast * n, int sym)
 {
   if (!n)
     return NULL;
   Ast ** c = n->child;
-  if (!c)
+  if (c == NULL)
     return NULL;
-  while (*c && (*c)->sym != sym) c++;
+  while (*c && (*c == ast_placeholder || (*c)->sym != sym)) c++;
   return *c;
 }
 
-extern Ast * const ast_placeholder;
+static inline Ast * ast_parent (const Ast * n, int sym)
+{
+  if (!n || n == ast_placeholder)
+    return NULL;
+  Ast * parent = n->parent;
+  while (parent && parent->sym != sym)
+    parent = parent->parent;
+  return parent;
+}
 
 static inline AstTerminal * ast_left_terminal (const Ast * n)
 {
@@ -146,6 +156,27 @@ void ast_set_line (Ast * n, AstTerminal * l);
 Ast * ast_flatten (Ast * n, AstTerminal * t);
 AstTerminal * ast_replace (Ast * n, const char * terminal, Ast * with);
 
+#define NN(parent,sym,...) ast_new_children (ast_new (parent, sym), __VA_ARGS__)
+
+static inline AstTerminal * NB (Ast * parent, int sym, const char * name)
+{
+  AstTerminal * t = ast_terminal_new (parent, sym, name);
+  AstTerminal * r = ast_left_terminal (parent);
+  t->before = r->before, r->before = NULL;
+  return t;
+}
+
+static inline AstTerminal * NA (Ast * parent, int sym, const char * name)
+{
+  AstTerminal * t = ast_terminal_new (parent, sym, name);
+  AstTerminal * r = ast_right_terminal (parent);
+  t->line = r->line;
+  return t;
+}
+
+#define NCB(parent,sym) NB(parent, token_symbol((sym)[0]), sym)
+#define NCA(parent,sym) NA(parent, token_symbol((sym)[0]), sym)
+
 /**
 # Grammar-specific functions */
 
@@ -157,16 +188,18 @@ void  ast_traverse (Ast * n, Stack * stack,
 		    void func (Ast *, Stack *, void *),
 		    void * data);
 #define foreach_item(list, index, item)					\
-  for (Ast * _list = list, * item = _list ?				\
+  for (Ast * _list = list, * item = _list && _list != ast_placeholder ?	\
 	 (_list->child[1] ? _list->child[index] : _list->child[0]) : NULL; \
-       (_list = _list && _list->child[1] ? _list->child[0] : NULL), item; \
-       item = _list ? (_list->child[1] ? _list->child[index] :		\
-		       _list->child[0]) : NULL				\
+       (_list = _list && _list != ast_placeholder &&			\
+	_list->child[1] ? _list->child[0] : NULL), item;		\
+       item = _list && _list != ast_placeholder ?			\
+	 (_list->child[1] ? _list->child[index] :			\
+	  _list->child[0]) : NULL					\
        )
 
 Ast * ast_identifier_declaration (Stack * stack, const char * identifier);
-Ast * ast_identifier_declaration_from (Stack * stack, const char * identifier,
-				       Ast * start);
+Ast * ast_identifier_declaration_from_to (Stack * stack, const char * identifier,
+					  const Ast * start, const Ast * end);
 Ast * ast_function_identifier (const Ast * function_definition);
 
 void ast_set_char (Ast * n, int c);
@@ -178,6 +211,8 @@ Ast * ast_list_append_list (Ast * list, Ast * list1);
 Ast * ast_block_list_append (Ast * list, int item_sym, Ast * item);
 Ast * ast_block_list_insert_after (Ast * insert, Ast * item);
 Ast * ast_block_list_insert_before (Ast * insert, Ast * item);
+Ast * ast_block_list_insert_before2 (Ast * insert, Ast * item);
+Ast * ast_block_list_get_item (Ast * statement);
 Ast * ast_list_append (Ast * list, int item_sym, Ast * item);
 Ast * ast_list_prepend (Ast * list, int item_sym, Ast * item);
 Ast * ast_list_remove (Ast * list, Ast * item);

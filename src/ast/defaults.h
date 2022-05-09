@@ -31,12 +31,13 @@ typedef void PyObject;
 /**
 For stencils */
 
-void default_stencil() {}
-void _stencil_default_stencil() {}
+void point;
+int BGHOSTS, o_stencil;
 
 /**
 ## From standard C libraries */
 
+bool true, false;
 void abort(void);
 int abs(int j);
 int atexit(void (*function)(void));
