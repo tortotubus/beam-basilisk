@@ -77,8 +77,11 @@ static inline Ast * ast_parent (const Ast * n, int sym)
 
 static inline AstTerminal * ast_left_terminal (const Ast * n)
 {
-  while (n && n != ast_placeholder && n->child)
-    n = n->child[0];
+  while (n && n != ast_placeholder && n->child) {
+    Ast ** c = n->child;
+    while (*c && *c == ast_placeholder) c++;
+    n = *c;
+  }
   return (AstTerminal *) (n != ast_placeholder ? n : NULL);
 }
 
@@ -88,6 +91,7 @@ static inline AstTerminal * ast_right_terminal (const Ast * n)
     n = ast_last_child (n);
   return (AstTerminal *) (n != ast_placeholder ? n : NULL);
 }
+AstTerminal * ast_next_terminal (const Ast * n);
 
 AstTerminal * ast_terminal_new (Ast * parent, int symbol, const char * start);
 #define ast_terminal_new_char(p,s)			\
@@ -112,14 +116,13 @@ Ast * ast_new_children_internal (Ast * parent, ...);
 void ast_set_child (Ast * parent, int index, Ast * child);
 void ast_replace_child (Ast * parent, int index, Ast * child);
 
-static inline int ast_child_index (Ast * n)
+static inline int ast_child_index (const Ast * n)
 {
   assert (n->parent);
   int index = 0;
   Ast ** c;
   for (c = n->parent->child; *c && *c != n; c++, index++);
-  assert (*c == n);
-  return index;
+  return *c == n ? index : - 1;
 }
 
 static inline Ast * ast_ancestor (Ast * n, int i)
@@ -201,9 +204,12 @@ Ast * ast_identifier_declaration (Stack * stack, const char * identifier);
 Ast * ast_identifier_declaration_from_to (Stack * stack, const char * identifier,
 					  const Ast * start, const Ast * end);
 Ast * ast_function_identifier (const Ast * function_definition);
+Ast * ast_function_call_identifier (const Ast * n);
 
 void ast_set_char (Ast * n, int c);
+void ast_remove_internal (Ast * n, AstTerminal * before);
 void ast_remove (Ast * n, AstTerminal * before);
+void ast_erase (Ast * n);
 void ast_check (Ast * n);
 Ast * ast_is_typedef (const Ast * identifier);
 Ast * ast_find_function (Ast * n, const char * name);

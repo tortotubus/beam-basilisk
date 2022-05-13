@@ -21,14 +21,6 @@ bool ast_is_stencil_function (Ast * n)
   return len > 0 && !strncmp (ast_terminal (identifier)->start, "_stencil_", 9);
 }
 
-static Ast * function_call_identifier (Ast * n)
-{
-  return ast_schema (n, sym_function_call,
-		     0, sym_postfix_expression,
-		     0, sym_primary_expression,
-		     0, sym_IDENTIFIER);
-}
-
 static bool is_scalar (Ast * n, Stack * stack)
 {
   const char * typename =
@@ -63,14 +55,12 @@ static bool is_field_access (Ast * n, Stack * stack)
   }
 
   case sym_function_call: {
-    Ast * identifier = function_call_identifier (n);
+    Ast * identifier = ast_function_call_identifier (n);
     AstTerminal * t;
     if (identifier && (t = ast_terminal (identifier)) &&
 	(!strcmp (t->start, "val") ||
 	 !strcmp (t->start, "fine") ||
 	 !strcmp (t->start, "coarse") ||
-	 !strcmp (t->start, "allocated") ||
-	 !strcmp (t->start, "allocated_child") ||
 	 !strcmp (t->start, "neighbor") ||
 	 !strcmp (t->start, "neighborp") ||
 	 !strcmp (t->start, "aparent") ||
@@ -95,80 +85,6 @@ static Ast * block_list_append (Ast * list, Ast * item)
 }
 
 static
-Ast * move_field_access (Ast * parent, Ast * n, bool after)
-{
-  Ast * assignment = ast_parent (n, sym_assignment_expression);
-  Ast * op = ast_child (assignment, sym_assignment_operator);
-  if (!op && ast_ancestor (assignment, 2)->sym == sym_expression_statement)
-    return NULL; // already on its own in an expression statement
-  Ast * item = ast_block_list_get_item (parent);
-  Ast * postfix = n->parent;
-  if (op) {
-    Ast * assign = ast_attach (ast_new_unary_expression (parent),
-			       postfix);
-    AstTerminal * func = NB(assign, sym_IDENTIFIER,
-			    op->child[0]->sym == token_symbol('=') ?
-			    "_assign" : "r_assign");
-    postfix = NN(parent, sym_postfix_expression,
-		 NN(parent, sym_function_call,
-		    NN(parent, sym_postfix_expression,
-		       NN(parent, sym_primary_expression,
-			  func)),
-		    NCB(assign, "("),
-		    NN(parent, sym_argument_expression_list,
-		       NN(parent, sym_argument_expression_list_item,
-			  assign)),
-		    NCA(assign, ")")));
-  }
-  Ast * assign = ast_attach (ast_new_unary_expression (parent),
-			     postfix);
-  Ast * statement = NN(parent, sym_statement,
-		       NN(parent, sym_expression_statement,
-			  NN(parent, sym_expression,
-			     assign),
-			  NCA(assign, ";")));
-  if (after)
-    return ast_block_list_append (item->parent, item->sym, statement);
-  else
-    return ast_block_list_insert_before2 (item, statement);
-}
-
-/**
-Move field accesses into their own expression statement, before their
-parent statement or declaration. */
-
-void move_field_accesses (Ast * n, Stack * stack, void * scope)
-{
-  if (is_field_access (n, stack)) {
-    Ast * parent = n->parent;
-    while (parent &&
-	   parent->sym != sym_statement &&
-	   parent->sym != sym_declaration)
-      parent = parent->parent;
-    assert (parent);
-    if (parent->sym == sym_statement) {
-      switch (parent->child[0]->sym) {
-
-      case sym_jump_statement:
-      case sym_selection_statement:
-      case sym_expression_statement: {
-	move_field_access (parent, n, false);
-	break;
-      }
-	
-      default:  // fixme: deal with other statements
-	ast_print_tree (parent->child[0], stderr, 0, 0, 1);
-	abort();
-      }
-    }
-    else {
-      assert (parent->sym == sym_declaration);
-      move_field_access (parent, n, true);
-    }    
-  }
-}
-
-static
 Ast * get_local_variable_reference (Ast * n, Stack * stack, Ast * scope)
 {
   Ast * identifier = ast_child (ast_find (n, sym_postfix_expression,
@@ -186,7 +102,7 @@ void set_conditionals (Ast * n, Stack * stack, void * scope)
   switch (n->sym) {
 
   case sym_jump_statement:
-    ast_destroy (n);
+    ast_erase (n);
     break;
 
   case sym_postfix_expression:
@@ -200,7 +116,7 @@ void set_conditionals (Ast * n, Stack * stack, void * scope)
 			 NN (n, sym_unary_expression, n->child[0]),
 			 NN (n, sym_assignment_operator, t),
 			 ast_placeholder);
-      ast_destroy (n->child[1]);
+      ast_erase (n->child[1]);
       ast_set_child (parent, index, assign);
     }
     break;
@@ -208,7 +124,7 @@ void set_conditionals (Ast * n, Stack * stack, void * scope)
   case sym_assignment_expression:
     if (n->child[1] && n->child[2] != ast_placeholder &&
 	!get_local_variable_reference (n, stack, scope))
-      ast_destroy (n->child[2]);
+      ast_erase (n->child[2]);
     break;
     
   }
@@ -262,7 +178,7 @@ bool has_field_arguments (Ast * function_call, Stack * stack)
 /**
 Clean up placeholders. */
 
-void ast_cleanup (Ast * n, Stack * stack, void * scope)
+void ast_cleanup (Ast * n, Stack * stack, Ast * scope, bool init_declarator)
 {
   if (!n->child) // terminals are clean
     return;
@@ -276,7 +192,7 @@ void ast_cleanup (Ast * n, Stack * stack, void * scope)
   if (!nc) {
     // all children are destroyed, destroy parent
     if (n->sym != sym_argument_expression_list)
-      ast_destroy (n);
+      ast_erase (n);
     else {
       Ast * function_call = ast_parent (n, sym_function_call);      
       if (!is_point_function_call (function_call) &&
@@ -289,7 +205,7 @@ void ast_cleanup (Ast * n, Stack * stack, void * scope)
   
   if (!np) { // clean
     ast_shift_children (n);
-
+    
     switch (n->sym) {
     
     /**
@@ -298,7 +214,7 @@ void ast_cleanup (Ast * n, Stack * stack, void * scope)
     case sym_function_call:
       if (n->sym == sym_function_call && !is_point_function_call (n) &&
 	  !is_field_access (n, stack) && !has_field_arguments (n, stack))
-	ast_destroy (n);
+	ast_erase (n);
       break;
 
     /**
@@ -306,11 +222,19 @@ void ast_cleanup (Ast * n, Stack * stack, void * scope)
 
     case sym_jump_statement:
       if (n->child[0]->sym == sym_RETURN && n->child[2] &&
-	  ((Ast *) scope)->sym == sym_function_definition) {
-	ast_destroy (n->child[1]);
+	  scope->sym == sym_function_definition) {
+	ast_erase (n->child[1]);
 	n->child[1] = n->child[2];
 	n->child[2] = NULL;
       }
+      break;
+
+    /**
+    Remove empty expression statements. */
+
+    case sym_expression_statement:
+      if (!n->child[1] && ast_ancestor (n, 2)->sym == sym_block_item)
+	ast_erase (n);
       break;
       
     }
@@ -327,7 +251,7 @@ void ast_cleanup (Ast * n, Stack * stack, void * scope)
     if (n->child[0]->sym == sym_IF) {
       if (n->child[4] == ast_placeholder &&
 	  (!n->child[5] || n->child[6] == ast_placeholder)) {
-	ast_destroy (n);
+	ast_erase (n);
 	return;
       }
       else if (n->child[2] == ast_placeholder) {
@@ -340,17 +264,17 @@ void ast_cleanup (Ast * n, Stack * stack, void * scope)
 	    ns++;
 	  }
 	if (!ns) {
-	  ast_destroy (list);
-	  ast_destroy (n);
+	  ast_erase (list);
+	  ast_erase (n);
 	  return;
 	}
-	ast_destroy (n->child[1]);
-	ast_destroy (n->child[3]);
+	ast_erase (n->child[1]);
+	ast_erase (n->child[3]);
 	if (n->child[5])
-	  ast_destroy (n->child[5]);
+	  ast_erase (n->child[5]);
 	n->sym = sym_statement;
 	if (ns == 1) {
-	  ast_destroy (n->child[0]);
+	  ast_erase (n->child[0]);
 	  ast_set_child (n, 0, ast_schema (list, sym_block_item_list,
 					   0, sym_block_item,
 					   0, sym_statement)->child[0]);
@@ -359,7 +283,7 @@ void ast_cleanup (Ast * n, Stack * stack, void * scope)
 	  Ast * open = ast_terminal_new_char (n, "{");
 	  Ast * close = ast_terminal_new_char (n, "}");
 	  ast_right_terminal(close)->line = ast_right_terminal(list)->line;
-	  ast_destroy (n->child[0]);
+	  ast_erase (n->child[0]);
 	  ast_set_child (n, 0, NN (n, sym_compound_statement,
 				   open, list, close));
 	}
@@ -373,7 +297,7 @@ void ast_cleanup (Ast * n, Stack * stack, void * scope)
 	       n->child[5] &&
 	       n->child[6] == ast_placeholder) {
 	// IF '(' expression_error ')' statement ELSE _placeholder_
-	ast_destroy (n->child[5]);
+	ast_erase (n->child[5]);
 	n->child[5] = NULL;
 	return;
       }
@@ -394,14 +318,14 @@ void ast_cleanup (Ast * n, Stack * stack, void * scope)
   case sym_iteration_statement:
   case sym_for_declaration_statement:
     if (!ast_child (n, sym_statement)) {
-      ast_destroy (n);
+      ast_erase (n);
       return;
     }
     break;
 
   case sym_foreach_inner_statement:
     assert (!ast_child (n, sym_statement));
-    ast_destroy (n);
+    ast_erase (n);
     break;
     
   case sym_argument_expression_list: {
@@ -424,7 +348,7 @@ void ast_cleanup (Ast * n, Stack * stack, void * scope)
 				 o_stencil (n->child[1])));
     }
     else
-      ast_destroy (n);
+      ast_erase (n);
     return;
   }
 
@@ -446,15 +370,20 @@ void ast_cleanup (Ast * n, Stack * stack, void * scope)
 	ast_set_child (n, 2, o_stencil (n->child[1]));
       return;
     }
+    // fall through
+  }
+
+  case sym_init_declarator_list: {
     if (n->child[0] == ast_placeholder) {
       if (!n->child[2] || n->child[2] == ast_placeholder) {
-	ast_destroy (n);
+	ast_erase (n);
 	return;
       }
       n->child[0] = n->child[2];
     }
-    ast_destroy (n->child[1]);
+    ast_erase (n->child[1]);
     n->child[1] = NULL;
+    ast_shift_children (n);
     break;
   }
     
@@ -462,12 +391,12 @@ void ast_cleanup (Ast * n, Stack * stack, void * scope)
     if (n->child[0] == ast_placeholder)
       n->child[0] = n->child[1];
     n->child[1] = NULL;
-    ast_shift_children (n);
+    ast_shift_children (n);    
     break;
 
   case sym_array_access:
     if (!is_field_access (n, stack))
-      ast_destroy (n);
+      ast_erase (n);
     else {
       assert (n->child[2] == ast_placeholder);
       ast_set_child (n, 2, NN (n, sym_expression, o_stencil (n)));
@@ -477,9 +406,12 @@ void ast_cleanup (Ast * n, Stack * stack, void * scope)
   case sym_function_call:
     if (n->child[0] != ast_placeholder)
       assert (!is_field_access (n, stack));
-    ast_destroy (n);    
+    ast_erase (n);
     break;
 
+  case sym_declarator:
+  case sym_direct_declarator:
+  case sym_declaration:
   case sym_labeled_statement:
   case sym_cast_expression:
   case sym_compound_statement:
@@ -503,19 +435,26 @@ void ast_cleanup (Ast * n, Stack * stack, void * scope)
   case sym_shift_expression:
   case sym_multiplicative_expression:
     assert (!is_field_access (n, stack));
-    ast_destroy (n);
+    ast_erase (n);
     return;
 
+  case sym_foreach_statement:
+  case sym_function_definition:
+    // keep incomplete function definitions and foreach statements
+    return;
+    
   /**
   We need to keep incomplete init declarators for the
   undefined_variables() function below. */
     
   case sym_init_declarator:
+    if (init_declarator)
+      ast_erase (n);
     break;
     
   case sym_assignment_expression:
-    if (n->child[0] == ast_placeholder) {
-      ast_destroy (n);
+    if (n->child[0] == ast_placeholder || init_declarator) {
+      ast_erase (n);
       return;
     }
 
@@ -525,12 +464,90 @@ void ast_cleanup (Ast * n, Stack * stack, void * scope)
     break;
     
   default:
-    //    ast_print_tree (n, stderr, 0, 0, 1);
-    //abort();
+#if 1   
+    ast_print_tree (n, stderr, 0, 0, -1);
+    abort();
+#endif
     //    ast_print (n, stderr, 0);
     ;
 
   }
+}
+
+static
+Ast * move_field_access (Ast * parent, Ast * n, bool after)
+{
+  Ast * assignment = ast_parent (n, sym_assignment_expression);
+  Ast * op = ast_child (assignment, sym_assignment_operator);
+  if (!op && ast_ancestor (assignment, 2)->sym == sym_expression_statement)
+    return NULL; // already on its own in an expression statement
+  Ast * item = ast_block_list_get_item (parent);
+  Ast * postfix = n->parent;
+  if (op) {
+    Ast * assign = ast_attach (ast_new_unary_expression (parent),
+			       postfix);
+    AstTerminal * func = NB(assign, sym_IDENTIFIER,
+			    op->child[0]->sym == token_symbol('=') ?
+			    "_assign" : "r_assign");
+    postfix = NN(parent, sym_postfix_expression,
+		 NN(parent, sym_function_call,
+		    NN(parent, sym_postfix_expression,
+		       NN(parent, sym_primary_expression,
+			  func)),
+		    NCB(assign, "("),
+		    NN(parent, sym_argument_expression_list,
+		       NN(parent, sym_argument_expression_list_item,
+			  assign)),
+		    NCA(assign, ")")));
+  }
+  Ast * assign = ast_attach (ast_new_unary_expression (parent),
+			     postfix);
+  Ast * statement = NN(parent, sym_statement,
+		       NN(parent, sym_expression_statement,
+			  NN(parent, sym_expression,
+			     assign),
+			  NCA(assign, ";")));
+  if (after)
+    return ast_block_list_append (item->parent, item->sym, statement);
+  else
+    return ast_block_list_insert_before2 (item, statement);
+}
+
+/**
+Move field accesses into their own expression statement, before their
+parent statement or declaration. */
+
+void move_field_accesses (Ast * n, Stack * stack, void * data)
+{
+  if (is_field_access (n, stack)) {
+    Ast * parent = n->parent;
+    while (parent &&
+	   parent->sym != sym_statement &&
+	   parent->sym != sym_declaration)
+      parent = parent->parent;
+    assert (parent);
+    if (parent->sym == sym_statement) {
+      switch (parent->child[0]->sym) {
+
+      case sym_jump_statement:
+      case sym_selection_statement:
+      case sym_expression_statement: {
+	move_field_access (parent, n, false);
+	break;
+      }
+	
+      default:  // fixme: deal with other statements
+	ast_print_tree (parent->child[0], stderr, 0, 0, 1);
+	abort();
+      }
+    }
+    else {
+      assert (parent->sym == sym_declaration);
+      move_field_access (parent, n, true);
+    }
+  }
+  else
+    ast_cleanup (n, stack, data, false);
 }
 
 typedef struct {
@@ -548,7 +565,7 @@ static inline bool is_undefined (Ast * n, Ast * scope)
   return ast_terminal (n)->value == scope;
 }
 
-static Ast * get_variable_reference (Ast * n, Stack * stack)
+static Ast * get_variable_reference (Ast * n, Stack * stack, Ast * scope)
 {
   Ast * identifier = ast_find (n, sym_postfix_expression,
 			       0, sym_primary_expression);
@@ -559,14 +576,14 @@ static Ast * get_variable_reference (Ast * n, Stack * stack)
 			 0, sym_IDENTIFIER);
   if (!identifier || ast_ancestor (identifier, 3)->sym == sym_function_call)
     return NULL;
-  Ast * ref = ast_identifier_declaration (stack,
-					  ast_terminal (identifier)->start);
+  Ast * ref = ast_identifier_declaration_from_to
+    (stack, ast_terminal (identifier)->start, NULL, scope);
   if (!ref) {
     fprintf (stderr, "%s:%d: error: undeclared identifier '%s'\n",
 	     ast_terminal (identifier)->file,
 	     ast_terminal (identifier)->line,
 	     ast_terminal (identifier)->start);
-    abort();
+    exit (1);
   }
   return ref;
 }
@@ -581,7 +598,7 @@ void undefined_iterators (Ast * n, Stack * stack, void * data)
   case sym_postfix_expression:
     if (n->child[1] && (n->child[1]->sym == sym_INC_OP ||
 			n->child[1]->sym == sym_DEC_OP)) {
-      Ast * ref = get_variable_reference (n, stack);
+      Ast * ref = get_variable_reference (n, stack, NULL);
       if (!ref)
 	return;
       set_undefined (ref, undef->scope);
@@ -590,7 +607,7 @@ void undefined_iterators (Ast * n, Stack * stack, void * data)
 
   case sym_assignment_expression:
     if (n->child[1]) {
-      Ast * ref = get_variable_reference (n, stack);
+      Ast * ref = get_variable_reference (n, stack, NULL);
       if (!ref)
 	return;
       if (n->child[1]->child[0]->sym != token_symbol('='))
@@ -644,7 +661,7 @@ void undefined_variables (Ast * n, Stack * stack, void * data)
 	set_undefined (ref, undef->scope);
       else
 	set_undefined (ref, NULL);
-      return;
+      break;
     }
 
     /**
@@ -653,18 +670,18 @@ void undefined_variables (Ast * n, Stack * stack, void * data)
     
     if (n->parent->sym != sym_primary_expression ||
 	ast_ancestor (n, 3)->sym == sym_function_call)
-      return;
+      break;
 
     /**
     If the variable is undeclared or marked as undefined, we remove it. */
     
     if (!ref || is_undefined (ref, undef->scope)) {
-      ast_destroy (n);
+      ast_erase (n);
       undef->undefined = true;
       return;
     }
     
-    return;
+    break;
   }
     
   case sym_init_declarator: {
@@ -673,10 +690,10 @@ void undefined_variables (Ast * n, Stack * stack, void * data)
 			    0, sym_generic_identifier,
 			    0, sym_IDENTIFIER);
       set_undefined (ref, undef->scope);
-      ast_destroy (n->child[1]);
+      ast_erase (n->child[1]);
       n->child[1] = NULL;
     }
-    return;
+    break;
   }
 
   /**
@@ -684,33 +701,36 @@ void undefined_variables (Ast * n, Stack * stack, void * data)
     
   case sym_postfix_expression: {
     Ast * ref;
-    if (n->child[1] && (n->child[1]->sym == sym_INC_OP ||
-			n->child[1]->sym == sym_DEC_OP) &&
-	(ref = get_variable_reference (n, stack)) &&
+    if (n->child[1] && n->child[0] != ast_placeholder &&
+	(n->child[1]->sym == sym_INC_OP ||
+	 n->child[1]->sym == sym_DEC_OP) &&
+	(ref = get_variable_reference (n, stack, NULL)) &&
 	!is_local_declaration (ref, stack, undef->scope)) {
       set_undefined (ref, undef->scope);
-      ast_destroy (n);
+      ast_erase (n);
       undef->undefined = true;
+      return;
     }
-    return;
+    break;
   }
 
   case sym_assignment_expression:
-    if (n->child[1]) {
-      Ast * ref = get_variable_reference (n, stack);
+    if (n->child[1] && n->child[0] != ast_placeholder) {
+      Ast * ref = get_variable_reference (n, stack, NULL);
       if (!ref)
 	return;
       if (!is_local_declaration (ref, stack, undef->scope) ||
 	  n->child[2] == ast_placeholder) {
 	set_undefined (ref, undef->scope);
-	ast_destroy (n);
+	ast_erase (n);
 	undef->undefined = true;
+	return;
       }
       else if (is_undefined (ref, undef->scope) &&
 	       n->child[1]->child[0]->sym == token_symbol('='))
 	set_undefined (ref, NULL);
     }
-    return;
+    break;
 
   /**
   Point function calls which take the address of a variable as
@@ -726,15 +746,15 @@ void undefined_variables (Ast * n, Stack * stack, void * data)
 	    ast_find (argument, sym_unary_expression,
 		      0, sym_unary_operator,
 		      0, token_symbol ('&'))) {
-	  Ast * ref = get_variable_reference (argument, stack);
+	  Ast * ref = get_variable_reference (argument, stack, NULL);
 	  if (!ref)
-	    return;
+	    break;
 	  set_undefined (ref, undef->scope);
-	  ast_destroy (argument);
+	  ast_erase (argument);
 	  undef->undefined = true;
 	}
     }
-    return;
+    break;
     
     
   /**
@@ -758,18 +778,21 @@ void undefined_variables (Ast * n, Stack * stack, void * data)
       if (*c == ast_placeholder)
 	break;
     if (!*c)
-      return;
+      break;
     Ast * statement = ast_child (n, sym_statement);
     for (c = n->child; *c; c++)
       if (*c != ast_placeholder && *c != statement)
-	ast_destroy (*c);
+	ast_erase (*c);
     if (n->sym == sym_for_declaration_statement)
       n = n->parent;
-    ast_set_child (n->parent, ast_child_index (n), statement->child[0]);
+    if (statement)
+      ast_set_child (n->parent, ast_child_index (n), statement->child[0]);
     break;
   }
     
   }
+
+  ast_cleanup (n, stack, undef->scope, false);
 }
 
 /**
@@ -896,6 +919,7 @@ static void default_stencil (Ast * n, Stack * stack, void * scope)
       else
 	list = ast_list_append (list, sym_initializer, argument->child[0]);	
     }
+  ast_destroy (arguments);
   if (!list->child) { // no field arguments
     list->child = allocate (ast_get_root(n)->alloc, sizeof (Ast *));
     list->child[0] = NULL;
@@ -914,10 +938,12 @@ Ast * null_expression (Ast * n)
 
 static void point_function_calls (Ast * n, Stack * stack, void * scope)
 {
+  ast_cleanup (n, stack, scope, false);
+  
   if (n->sym != sym_function_call || !is_point_function_call (n))
     return;
 
-  Ast * identifier = function_call_identifier (n);
+  Ast * identifier = ast_function_call_identifier (n);
   if (!identifier) {
     fprintf (stderr,
 	     "%s:%d: warning: stencils: "
@@ -955,7 +981,7 @@ static void point_function_calls (Ast * n, Stack * stack, void * scope)
   
   if (function_definition == scope)
     return; // recursive function call
-	
+
   /**
   Look for a previously-defined stencil function, otherwise copy the
   function definition. */
@@ -986,7 +1012,7 @@ static void point_function_calls (Ast * n, Stack * stack, void * scope)
     }
     if (argument == ast_placeholder) {
       if (new_stencil) {
-	
+
 	/**
 	This is a new stencil, we replace the parameter with an
 	undefined type. */
@@ -998,18 +1024,18 @@ static void point_function_calls (Ast * n, Stack * stack, void * scope)
 		  NN (parameter, sym_types,
 		      NA (parameter->child[1], sym_TYPEDEF_NAME,
 			  "_stencil_undefined"))));
-	ast_destroy (parameter->child[0]);
+	ast_erase (parameter->child[0]);
 	ast_set_child (parameter, 0, undefined);
-	ast_set_child (parameter, 1,
-		       NN (parameter, sym_declarator,
-			   NN (parameter, sym_pointer,
-			       pointer),
-			   NN (parameter, sym_direct_declarator,
-			       NN (parameter, sym_generic_identifier,
-				   ast_find (parameter->child[1],
-					     sym_direct_declarator,
-					     0, sym_generic_identifier,
-					     0, sym_IDENTIFIER)))));
+	ast_replace_child (parameter, 1,
+			   NN (parameter, sym_declarator,
+			       NN (parameter, sym_pointer,
+				   pointer),
+			       NN (parameter, sym_direct_declarator,
+				   NN (parameter, sym_generic_identifier,
+				       ast_find (parameter->child[1],
+						 sym_direct_declarator,
+						 0, sym_generic_identifier,
+						 0, sym_IDENTIFIER)))));
       }
       else {
 
@@ -1029,19 +1055,18 @@ static void point_function_calls (Ast * n, Stack * stack, void * scope)
 
       /**
       We replace the undefined argument with a NULL value. */
-      
       int index = arguments->child[1] ? 2 : 0;
-      ast_set_child (arguments, index, NN (n, sym_argument_expression_list_item,
-					   null_expression (n)));
+      ast_replace_child (arguments, index,
+			 NN (n, sym_argument_expression_list_item,
+			     null_expression (n)));
     }
 
     /**
     If the parameter is undefined with replace the argument with a
     NULL value. */
-    
     else if (is_undefined_parameter (parameter))
       ast_replace_child (argument, 0, null_expression (argument));
-      
+
     parameters = parameters && parameters != ast_placeholder &&
       parameters->child[1] ? parameters->child[0] : NULL;
     parameter = parameters ?
@@ -1049,7 +1074,7 @@ static void point_function_calls (Ast * n, Stack * stack, void * scope)
        parameters->child[0]) : NULL;
     arguments = _list;
   }
-  
+
   /**
   We create the new stencil function (if necessary). */  
 
@@ -1058,7 +1083,7 @@ static void point_function_calls (Ast * n, Stack * stack, void * scope)
   stencil = ast_stencil (stencil);
   if (!stencil) {
     ast_destroy (new_stencil);
-    ast_destroy (n);
+    ast_erase (n);
   }
   else {
     Ast * m = function_definition;
@@ -1102,22 +1127,172 @@ static void point_function_calls (Ast * n, Stack * stack, void * scope)
   }
 }
 
+Ast * ast_scope_parent (Ast * n, int sym, int scope)
+{
+  n = n->parent;
+  while (n && n->sym != scope) {
+    if (n->sym == sym)
+      return n;
+    n = n->parent;
+  }
+  return NULL;
+}
+
+static inline void initialize (Ast * n)
+{
+#if 0 
+  fprintf (stderr, "%s:%d: initialize %s\n",
+	   ast_terminal (n)->file,
+	   ast_terminal (n)->line,
+	   ast_terminal (n)->start);
+#endif
+  ast_terminal (n)->value = n;
+}
+
+static inline bool is_initialized (Ast * n)
+{
+  return ast_terminal (n)->value == n;
+}
+  
+static inline void declare (Ast * n, Ast * scope)
+{
+#if 0 
+  fprintf (stderr, "%s:%d: declare %s\n",
+	   ast_terminal (n)->file,
+	   ast_terminal (n)->line,
+	   ast_terminal (n)->start);
+#endif
+  ast_terminal (n)->value = scope;
+}
+
+static inline bool is_declared (Ast * n, Ast * scope)
+{
+  return ast_terminal (n)->value == scope;
+}
+
+static inline void use (Ast * n)
+{
+  ast_terminal (n)->value = NULL;
+}
+
+static
+void mark_unused (Ast * n, Stack * stack, void * scope)
+{
+  switch (n->sym) {
+
+  case sym_IDENTIFIER: {
+    if (ast_ancestor (n, 3)->sym == sym_function_call)
+      return;
+    if (ast_ancestor (n, 2)->sym == sym_direct_declarator) {      
+      if (ast_scope_parent (n, sym_struct_declarator, sym_declaration))
+	return;
+      if (ast_ancestor (n, 4)->sym == sym_forin_declaration_statement ||
+	  ast_scope_parent (n, sym_init_declarator, sym_declaration)->child[1])
+	initialize (n);
+      else
+	declare (n, scope);
+      return;
+    }
+    if (n->parent->sym != sym_primary_expression)
+      return;
+    Ast * ref = ast_identifier_declaration_from_to
+      (stack, ast_terminal (n)->start, NULL, scope);
+    if (ref) {
+      Ast * expr = ast_scope_parent (n, sym_expression, sym_statement);
+      if (expr) {
+	while (expr->parent->sym == sym_expression)
+	  expr = expr->parent;
+	if (expr->parent->sym == sym_forin_statement) {
+	  initialize (ref);
+	  return;
+	}
+      }
+      Ast * assign = ast_parent (n, sym_assignment_expression);
+      if (ast_schema (assign, sym_assignment_expression,
+		      1, sym_assignment_operator,
+		      0, token_symbol ('='))) {
+	if (is_declared (ref, scope))
+	  initialize (ref);
+	return;
+      }
+      if (is_declared (ref, scope))
+	// declared but not initialized
+	ast_erase (n);
+      else {
+#if 0
+	fprintf (stderr, "%s:%d: use %s\n",
+		 ast_terminal (n)->file,
+		 ast_terminal (n)->line,
+		 ast_terminal (n)->start);
+#endif	
+	use (ref);
+      }
+    }
+    break;
+  }
+    
+  }
+}
+
+static
+void remove_undefined (Ast * n, Stack * stack, void * scope)
+{
+  Ast * ref;
+  if (n->sym == sym_IDENTIFIER &&
+      ast_ancestor (n, 3)->sym != sym_function_call &&
+      ast_ancestor (n, 2)->sym != sym_direct_declarator &&
+      n->parent->sym == sym_primary_expression &&
+      (ref = ast_identifier_declaration (stack, ast_terminal (n)->start)) &&
+      (is_declared (ref, scope) || is_initialized (ref))) {
+#if 0
+    fprintf (stderr, "%s:%d: '%s' undefined\n",
+	     ast_terminal (n)->file,
+	     ast_terminal (n)->line,
+	     ast_terminal (n)->start);
+#endif
+    ast_erase (n);
+  }
+  else
+    ast_cleanup (n, stack, scope, true);
+}
+
+static
+void remove_unused (Ast * n, Stack * stack, void * data)
+{
+  Undefined * undef = data;
+  if (n->sym == sym_IDENTIFIER &&
+      (is_declared (n, undef->scope) || is_initialized (n))) {
+    ast_erase (n);
+    undef->undefined = true;
+  }
+  else
+    ast_cleanup (n, stack, undef->scope, true);
+}
+
 Ast * ast_stencil (Ast * n)
 {
   AstRoot * root = ast_get_root (n);
   Stack * stack = root->stack;
   stack_push (stack, &n);
   ast_traverse (n, stack, move_field_accesses, n);
-  Undefined u = {n};
   Ast * m = n->sym == sym_foreach_statement ? ast_child (n, sym_statement) : n;
+  Undefined u = {n};
   do {
-    ast_traverse (m, stack, ast_cleanup, n);
     u.undefined = false;
     ast_traverse (m, stack, undefined_variables, &u);
   } while (u.undefined);
-  ast_traverse (m, stack, ast_cleanup, n);
   ast_traverse (m, stack, point_function_calls, n);
-  ast_traverse (m, stack, ast_cleanup, n);
+
+  Ast * statement =  (n->sym == sym_foreach_statement ?
+		      ast_child (n, sym_statement) :
+		      ast_child (n, sym_compound_statement));
+  do {
+    ast_traverse (statement, stack, mark_unused, n);
+    ast_traverse (statement, stack, remove_undefined, n);
+    u.undefined = false;
+    ast_traverse (statement, stack, remove_unused, &u);
+  } while (u.undefined);
+  
   ast_pop_scope (stack, n);
   if (n->sym == sym_foreach_statement && !ast_child (n, sym_statement))
     return NULL;

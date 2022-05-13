@@ -17,7 +17,7 @@ for f in `cat /tmp/list`; do man 3 $f | grep -m1 "$f.*;"; done
 typedef void QFILE, FILE, extrae_type_t, extrae_value_t;
 typedef void MPI_Datatype, MPI_Request, MPI_Comm, MPI_Op, MPI_Aint, Node;
 typedef int bool, MPI_Status;
-typedef long size_t, clock_t, int64_t, uint32_t, uint16_t;
+typedef long size_t, clock_t, int64_t, uint32_t, uint16_t, uint64_t;
 typedef void GLfloat, GLubyte;
 typedef void framebuffer, fbdepth_t, Frustum;
 typedef void Kdt, KdtRect, KdtSum, KdtCheck;
@@ -33,6 +33,7 @@ For stencils */
 
 void point;
 int BGHOSTS, o_stencil;
+double HUGE;
 
 /**
 ## From standard C libraries */
