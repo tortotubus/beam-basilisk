@@ -101,8 +101,9 @@ Array * neighborhood (scalar newpid, int nextpid, FILE * fp)
     bool root = false;
     if ((!is_local(cell) || NEWPID()->pid - 1 != nextpid) && is_refined(cell)) {
       foreach_child()
-	if (is_local(cell) && NEWPID()->pid - 1 == nextpid)
-	  root = true, break;
+	if (is_local(cell) && NEWPID()->pid - 1 == nextpid) {
+	  root = true; break;
+	}
       if (root && cell.pid != nextpid) {
 	foreach_neighbor()
 	  if (cell.pid != nextpid && is_newpid()) {
@@ -371,8 +372,9 @@ bool balance()
       if (!is_leaf(cell) && !is_local(cell)) {
 	unsigned short flags = cell.flags & ~active;
 	foreach_child()
-	  if (is_active(cell))
-	    flags |= active, break;
+	  if (is_active(cell)) {
+	    flags |= active; break;
+	  }
 	cell.flags = flags;
       }
 #endif

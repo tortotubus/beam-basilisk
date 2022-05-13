@@ -576,8 +576,9 @@ static void refine_layered_elevation (Point point, scalar h)
   
   bool shallow = zb[] > default_sea_level;
   foreach_child()
-    if (zb[] > default_sea_level)
-      shallow = true, break;
+    if (zb[] > default_sea_level) {
+      shallow = true; break;
+    }
 
   /**
   If we do, refined cells are just set to the default sea level. */

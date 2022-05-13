@@ -105,8 +105,10 @@ static void prolongation_elevation (Point point, scalar h)
 {
   bool wet = true;
   foreach_neighbor(1)
-    if (h[] <= dry)
-      wet = false, break;
+    if (h[] <= dry) {
+      wet = false;
+      break;
+    }
   if (wet)
     refine_linear (point, h);
   else {
