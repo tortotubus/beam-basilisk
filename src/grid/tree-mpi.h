@@ -898,14 +898,16 @@ void mpi_boundary_update_buffers()
 	  foreach_neighbor(1)
 	    if ((is_local(cell) &&
 		 (is_refined(cell) || is_local_prolongation (point, p))) ||
-		is_root(point))
-	      locals = true, break;
+		is_root(point)) {
+	      locals = true; break;
+	    }
 	}
       }
       else
 	foreach_neighbor(1)
-	  if (is_local(cell) || is_root(point))
-	    locals = true, break;
+	  if (is_local(cell) || is_root(point)) {
+	    locals = true; break;
+	  }
       if (locals)
 	foreach_child()
 	  if (is_remote(cell))
@@ -934,8 +936,9 @@ void mpi_boundary_update_buffers()
 	else if (is_remote(cell)) {
 	  bool root = false;
 	  foreach_child()
-	    if (is_local(cell))
-	      root = true, break;
+	    if (is_local(cell)) {
+	      root = true; break;
+	    }
 	  if (root) {
 	    int pid = cell.pid;
 	    foreach_neighbor()
@@ -1052,8 +1055,9 @@ void mpi_boundary_refine (scalar * list)
 	  if (is_leaf(cell)) {
 	    bool neighbors = false;
 	    foreach_neighbor()
-	      if (allocated(0) && (is_active(cell) || is_local(aparent(0))))
-		neighbors = true, break;
+	      if (allocated(0) && (is_active(cell) || is_local(aparent(0)))) {
+		neighbors = true; break;
+	      }
 	    // refine the cell only if it has local neighbors
 	    if (neighbors)
 	      refine_cell (point, list, 0, &rerefined);
@@ -1197,13 +1201,15 @@ static void flag_border_cells()
     if (is_active(cell)) {
       short flags = cell.flags & ~border;
       foreach_neighbor() {
-	if (!is_local(cell) || (level > 0 && !is_local(aparent(0))))
-	  flags |= border, break;
+	if (!is_local(cell) || (level > 0 && !is_local(aparent(0)))) {
+	  flags |= border; break;
+	}
 	// root cell
 	if (is_refined_check())
 	  foreach_child()
-	    if (!is_local(cell))
-	      flags |= border, break;
+	    if (!is_local(cell)) {
+	      flags |= border; break;
+	    }
 	if (flags & border)
 	  break;
       }
@@ -1220,8 +1226,9 @@ static void flag_border_cells()
 	if (is_border(cell)) {
 	  bool remote = false;
 	  foreach_neighbor (GHOSTS/2)
-	    if (!is_local(cell))
-	      remote = true, break;
+	    if (!is_local(cell)) {
+	      remote = true; break;
+	    }
 	  if (remote)
 	    foreach_child()
 	      cell.flags |= border;
@@ -1270,8 +1277,9 @@ void mpi_partitioning()
 	cell.pid = child(0).pid;
 	bool inactive = true;
 	foreach_child()
-	  if (is_active(cell))
-	    inactive = false, break;
+	  if (is_active(cell)) {
+	    inactive = false; break;
+	  }
 	if (inactive)
 	  cell.flags &= ~active;
       }
@@ -1357,8 +1365,9 @@ void restore_mpi (FILE * fp, scalar * list1)
     if (!(flags & leaf) && is_leaf(cell)) {
       bool locals = false;
       foreach_neighbor(1)
-	if ((cell.flags & set) && (is_local(cell) || is_root(point)))
-	  locals = true, break;
+	if ((cell.flags & set) && (is_local(cell) || is_root(point))) {
+	  locals = true; break;
+	}
       if (locals)
 	refine_cell (point, listm, 0, NULL);
       else {
@@ -1388,8 +1397,9 @@ void restore_mpi (FILE * fp, scalar * list1)
       else if (!is_local(cell)) {
 	bool inactive = true;
 	foreach_child()
-	  if (is_active(cell))
-	    inactive = false, break;
+	  if (is_active(cell)) {
+	    inactive = false; break;
+	  }
 	if (inactive)
 	  cell.flags &= ~active;
       }
@@ -1461,8 +1471,9 @@ double z_indexing (scalar index, bool leaves)
 	  bool loc = is_local(cell);
 	  if (!loc)
 	    foreach_child()
-	      if (is_local(cell))
-		loc = true, break;
+	      if (is_local(cell)) {
+		loc = true; break;
+	      }
 	  if (loc) {
 	    int i = index[] + !leaves;
 	    foreach_child() {

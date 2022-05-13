@@ -71,12 +71,14 @@ int refine_cell (Point point, scalar * list, int flag, Cache * refined)
     foreach_child() {
       bool bord = false;
       foreach_neighbor() {
-	if (!is_local(cell) || (level > 0 && !is_local(aparent(0))))
-	  bord = true, break;
+	if (!is_local(cell) || (level > 0 && !is_local(aparent(0)))) {
+	  bord = true; break;
+	}
 	if (is_refined_check())
 	  foreach_child()
-	    if (!is_local(cell))
-	      bord = true, break;
+	    if (!is_local(cell)) {
+	      bord = true; break;
+	    }
 	if (bord)
 	  break;
       }
@@ -217,8 +219,9 @@ astats adapt_wavelet (struct Adapt p)
 	bool local = is_local(cell);
 	if (!local)
 	  foreach_child()
-	    if (is_local(cell))
-	      local = true, break;
+	    if (is_local(cell)) {
+	      local = true; break;
+	    }
 	if (local) {
 	  int i = 0;
 	  static const int just_fine = 1 << (user + 3);

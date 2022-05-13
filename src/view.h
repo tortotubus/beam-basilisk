@@ -333,10 +333,10 @@ typedef struct {
 static void compose_image_op (void * pin, void * pout, int * len,
 			      MPI_Datatype * dptr)
 {
-  RGBA * in = pin, * out = pout;
-  for (int i = 0; i < *len; i++,in++,out++)
+  RGBA * rin = pin, * out = pout;
+  for (int i = 0; i < *len; i++,rin++,out++)
     if (out->a[3] == 0)
-      *out = *in;
+      *out = *rin;
 }
 
 trace
@@ -368,10 +368,10 @@ typedef struct {
 static void compose_image_op (void * pin, void * pout, int * len,
 			      MPI_Datatype * dptr)
 {
-  RGBA * in = pin, * out = pout;
-  for (int i = 0; i < *len; i++,in++,out++)
-    if (out->depth > in->depth)
-      *out = *in;
+  RGBA * rin = pin, * out = pout;
+  for (int i = 0; i < *len; i++,rin++,out++)
+    if (out->depth > rin->depth)
+      *out = *rin;
 }
 
 trace
