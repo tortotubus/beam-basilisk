@@ -89,6 +89,7 @@ static void ast_destroy_internal (Ast * n)
     free (t->before);
     free (t->start);
     free (t->after);
+    t->before = t->start = t->after = NULL;
   }
   AstRoot * r = ast_root (n);
   if (r) {
@@ -734,7 +735,8 @@ Ast * ast_identifier_declaration_from_to (Stack * stack, const char * identifier
       for the declaration identifiers stored in the stack. */
 
       if (!ast_terminal(*d)->after) {
-	if (!strcmp (ast_terminal(*d)->start, identifier))
+	if (ast_terminal(*d)->start &&
+	    !strcmp (ast_terminal(*d)->start, identifier))
 	  return *d;
       }
 
@@ -856,7 +858,7 @@ void ast_set_char (Ast * n, int c)
   n->sym = token_symbol(c), ast_terminal (n)->start[0] = c;
 }
 
-static void ast_remove_internal (Ast * n, AstTerminal * before)
+void ast_remove_internal (Ast * n, AstTerminal * before)
 {
   if (n->child) {
     for (Ast ** c = n->child; *c; c++)
@@ -884,6 +886,34 @@ void ast_remove (Ast * n, AstTerminal * before)
 	*c = *(c + 1);
   }
   ast_remove_internal (n, before);
+}
+
+AstTerminal * ast_next_terminal (const Ast * n)
+{
+  if (!n || n == ast_placeholder)
+    return NULL;
+  Ast * parent = n->parent;
+  while (parent) {
+    int index = ast_child_index (n) + 1;
+    if (index <= 0)
+      return NULL;
+    while ((n = parent->child[index])) {
+      if (n != ast_placeholder)
+	return ast_left_terminal (n);
+      index++;
+    }
+    n = parent;
+    parent = n->parent;
+  }
+  return NULL;
+}
+
+void ast_erase (Ast * n)
+{
+  AstTerminal * t = ast_next_terminal (n);
+  if (t)
+    ast_remove_internal (n, t);
+  ast_destroy (n);
 }
 
 static void ast_check_children (Ast * n)

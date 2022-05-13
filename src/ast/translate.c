@@ -4,7 +4,11 @@
 #include "ast.h"
 #include "symbols.h"
 
-#define CHECK(x, recursive) ast_check_grammar(x, recursive)
+#if 0
+# define CHECK(x, recursive) ast_check_grammar(x, recursive)
+#else
+# define CHECK(x, recursive) ((void) x)
+#endif
 
 Ast * ast_is_typedef (const Ast * identifier)
 {
@@ -44,6 +48,14 @@ Ast * ast_function_identifier (const Ast * function_definition)
 		     0, sym_direct_declarator,
 		     0, sym_direct_declarator,
 		     0, sym_generic_identifier,
+		     0, sym_IDENTIFIER);
+}
+
+Ast * ast_function_call_identifier (const Ast * n)
+{
+  return ast_schema (n, sym_function_call,
+		     0, sym_postfix_expression,
+		     0, sym_primary_expression,
 		     0, sym_IDENTIFIER);
 }
 
@@ -738,10 +750,7 @@ static void rotate (Ast * n, Stack * stack, void * data)
 
   case sym_function_call: {
     if (d->dimension > 1) {
-      Ast * identifier = ast_schema (n, sym_function_call,
-				     0, sym_postfix_expression,
-				     0, sym_primary_expression,
-				     0, sym_IDENTIFIER);
+      Ast * identifier = ast_function_call_identifier (n);
       if (identifier) {
 	const char * name = ast_terminal (identifier)->start;
 	if ((!strcmp (name, "val") ||
@@ -927,10 +936,7 @@ void maybeconst (Ast * n, Stack * stack,
     for (Ast ** c = n->child; *c; c++)
       maybeconst (*c, stack, func, data);  
   
-  Ast * identifier = ast_schema (n, sym_function_call,
-				 0, sym_postfix_expression,
-				 0, sym_primary_expression,
-				 0, sym_IDENTIFIER);
+  Ast * identifier = ast_function_call_identifier (n);
   if (identifier) {
     const char * name = ast_terminal (identifier)->start;
     if (!strcmp (name, "val") || !strcmp (name, "fine") ||
@@ -1143,10 +1149,7 @@ static Ast * automatic_argument (const Ast * init_declarator)
     * function_call = ast_schema (unary, sym_unary_expression,
 				  0, sym_postfix_expression,
 				  0, sym_function_call),
-    * function_name = ast_schema (function_call, sym_function_call,
-				  0, sym_postfix_expression,
-				  0, sym_primary_expression,
-				  0, sym_IDENTIFIER),
+    * function_name = ast_function_call_identifier (function_call),
     * argument = ast_schema (function_call, sym_function_call,
 			     2, sym_argument_expression_list,
 			     0, sym_argument_expression_list_item,
@@ -1301,7 +1304,7 @@ static Ast * compound_jump (Ast * return_statement, Ast * function_definition,
 				1, sym_declarator,
 				0, sym_pointer);
     if (pointer)
-      ast_str_append (pointer, src);
+      src = ast_str_append (pointer, src);
     str_append (src, "_ret=val;", expression, "return _ret;}");
     Ast * compound =
       ast_parse_expression (src, ast_get_root (function_definition));
@@ -1356,10 +1359,7 @@ static int homogeneize (Ast * n)
 {
   int nh = 0;
   if (n->sym == sym_function_call) {
-    Ast * identifier = ast_schema (n, sym_function_call,
-				   0, sym_postfix_expression,
-				   0, sym_primary_expression,
-				   0, sym_IDENTIFIER);
+    Ast * identifier = ast_function_call_identifier (n);
     if (identifier &&
 	(!strcmp (ast_terminal (identifier)->start, "neumann") ||
 	 !strcmp (ast_terminal (identifier)->start, "dirichlet") ||
@@ -1474,10 +1474,7 @@ static void boundary_expr (Ast * n, Stack * stack, void * data)
 			       0, sym_generic_identifier,
 			       0, sym_IDENTIFIER);
     if (member && !strcmp (ast_terminal(member)->start, "x")) {
-      Ast * identifier = ast_schema (n, sym_function_call,
-				     0, sym_postfix_expression,
-				     0, sym_primary_expression,
-				     0, sym_IDENTIFIER);
+      Ast * identifier = ast_function_call_identifier (n);
       if (identifier &&
 	  !strcmp (ast_terminal (identifier)->start, "dirichlet")) {
 	const char * typename =
@@ -1751,7 +1748,6 @@ static void global_boundaries_and_stencils (Ast * n, Stack * stack, void * data)
   /**
   ## Stencils */
 
-#if 1    
   case sym_foreach_statement: {
     if (!strcmp (ast_terminal (n->child[0])->start, "foreach") ||
 	!strcmp (ast_terminal (n->child[0])->start, "foreach_vertex") ||
@@ -1776,7 +1772,6 @@ static void global_boundaries_and_stencils (Ast * n, Stack * stack, void * data)
     }
     break;
   }
-#endif
 
   }
 }
@@ -1784,10 +1779,7 @@ static void global_boundaries_and_stencils (Ast * n, Stack * stack, void * data)
 static void diagonalize (Ast * n, Stack * stack, void * field)
 {
   if (n->sym == sym_function_call) {
-    Ast * identifier = ast_schema (n, sym_function_call,
-				   0, sym_postfix_expression,
-				   0, sym_primary_expression,
-				   0, sym_IDENTIFIER);
+    Ast * identifier = ast_function_call_identifier (n);
     if (identifier) {
       Ast * arg;
       if (!strcmp (ast_terminal (identifier)->start, "val") &&
@@ -1907,7 +1899,7 @@ static void translate (Ast * n, Stack * stack, void * data)
 	      parameters = ast_list_remove (parameters, param);
 	    }
 	  }
-	if (s != order + 2)
+	if (s != order + 2 && s >= order)
 	  memmove (order, s + 1, strlen(s));
 	if (parameters == NULL) {
 	  ast_destroy (n->child[2]);
@@ -1986,7 +1978,8 @@ static void translate (Ast * n, Stack * stack, void * data)
   case sym_function_definition: {
     if (is_point_function (ast_schema (n, sym_function_definition,
 				       0, sym_function_declaration,
-				       1, sym_declarator))) {
+				       1, sym_declarator)) &&
+	!ast_is_stencil_function (n)) {
       Ast ** consts = NULL;
       maybeconst (n, stack, append_const, &consts);
       if (consts) {
@@ -2022,12 +2015,11 @@ static void translate (Ast * n, Stack * stack, void * data)
     const char * typename =
       ast_typedef_name (ast_expression_type (n->child[0], stack, false));
     TranslateData * d = data;
-    Ast * member, * foreach = NULL, * stencil_function = NULL;
+    Ast * member, * foreach = NULL;
     if (typename &&
 	(!strcmp (typename, "scalar") ||
 	 !strcmp (typename, "vertex scalar")) &&
-	((foreach = inforeach (n)) || point_declaration (stack) ||
-	 (stencil_function = in_stencil_point_function (n)))) {
+	((foreach = inforeach (n)) || point_declaration (stack))) {
       n->sym = sym_function_call;
       ast_set_char (ast_child (n, token_symbol('[')), '(');
 
@@ -2066,7 +2058,7 @@ static void translate (Ast * n, Stack * stack, void * data)
       }
       if (!func)
 	func = ast_new_identifier (n, "val");
-      if (is_foreach_stencil (foreach) || stencil_function)
+      if (is_foreach_stencil (foreach) || in_stencil_point_function (n))
 	str_prepend (ast_terminal (ast_find (func, sym_IDENTIFIER))->start,
 		     "_stencil_");
       ast_set_child (n, 2,
@@ -2173,7 +2165,7 @@ static void translate (Ast * n, Stack * stack, void * data)
       Replacement * i = replacements;
       AstTerminal * identifier = ast_terminal (n);
       while (i->target) {
-	if (!strcmp (identifier->start, i->target)) {
+	if (identifier->start && !strcmp (identifier->start, i->target)) {
 	  free (identifier->start);
 	  identifier->start = strdup (i->replacement);
 	}
@@ -2378,10 +2370,7 @@ static void translate (Ast * n, Stack * stack, void * data)
   ## Function calls */
 
   case sym_function_call: {
-    Ast * identifier = ast_schema (n, sym_function_call,
-				   0, sym_postfix_expression,
-				   0, sym_primary_expression,
-				   0, sym_IDENTIFIER);
+    Ast * identifier = ast_function_call_identifier (n);
     if (identifier) {
       AstTerminal * t = ast_terminal (identifier);
       TranslateData * d = data;
@@ -2412,9 +2401,9 @@ static void translate (Ast * n, Stack * stack, void * data)
       /**
       ### Stencil functions */
 
-      Ast * foreach = NULL, * stencil_function = NULL;
-      if ((foreach = inforeach (n)) || point_declaration (stack) ||
-	  (stencil_function = in_stencil_point_function (n))) {
+      Ast * foreach = NULL;
+      if ((foreach = inforeach (n)) || point_declaration (stack)) {
+	Ast * stencil_function = in_stencil_point_function (n);
 	if (!strcmp (t->start, "val") || !strcmp (t->start, "fine") ||
 	    !strcmp (t->start, "coarse")) {
 	  complete_arguments (n, 4);
@@ -2433,6 +2422,18 @@ static void translate (Ast * n, Stack * stack, void * data)
 	}
       }
 
+      if (!strcmp (ast_terminal (identifier)->start, "_assign") ||
+	  !strcmp (ast_terminal (identifier)->start, "r_assign")) {
+	Ast * val = ast_find (n->child[2], sym_function_call);
+	if (val) {
+	  Ast * name = ast_function_call_identifier (val);
+	  str_append (ast_terminal (name)->start,
+		      ast_terminal (identifier)->start[0] == '_' ? "_a" : "_r");
+	  ast_replace_child (n->parent, ast_child_index (n), val);
+	  return;
+	}
+      }
+      
       /**
       ### Macro statement */
 
@@ -2616,7 +2617,7 @@ static void translate (Ast * n, Stack * stack, void * data)
       if (layers) {
 	str_append (src, "(\"", ast_terminal (identifier)->start,
 		    !strcmp (src, "scalar") ? "\",\"\"," : "\",");
-	ast_str_append (layers, src);
+	src = ast_str_append (layers, src);
 	str_append (src, ");");
 	str_prepend (src, "new_block_");
       }
