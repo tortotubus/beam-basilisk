@@ -148,7 +148,7 @@ int main (int argc, char * argv[])
   //  assert (normf(e).max < 0.4);
   
   int n = 0;
-  foreach()
+  foreach (serial)
     n++;
   int nmin = n, nmax = n;
   mpi_all_reduce (nmin, MPI_INT, MPI_MIN);

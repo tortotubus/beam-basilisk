@@ -25,6 +25,3 @@ stencils.c:94: warning: face vector 'f.x' should be assigned with a foreach_face
 stencils.c:94: dirty: 12:f.x
 stencils.c:102: warning: vertex scalar 'b' should be assigned with a foreach_vertex() loop
 stencils.c:102: dirty: 14:b
-stencils.c:110: warning: variable 't' is modified by this foreach loop:
-stencils.c:110: warning: use a loop-local variable, a reduction operation
-stencils.c:110: warning: or a serial loop to get rid of this warning
