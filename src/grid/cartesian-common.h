@@ -9,8 +9,13 @@ void (* debug)    (Point);
 @undef VARIABLES
 @def VARIABLES
   double Delta = L0*_DELTA; /* cell size */
-  foreach_dimension()
-    double Delta_x = Delta; /* cell size (with mapping) */
+  double Delta_x = Delta; /* cell size (with mapping) */
+#if dimension > 1
+  double Delta_y = Delta; /* cell size (with mapping) */
+#endif
+#if dimension > 2
+  double Delta_z = Delta; /* cell size (with mapping) */
+#endif
   /* cell/face center coordinates */
   double x = (ig/2. + _I + 0.5)*Delta + X0; NOT_UNUSED(x);
 #if dimension > 1
@@ -27,8 +32,13 @@ void (* debug)    (Point);
   NOT_UNUSED(z);
   /* we need this to avoid compiler warnings */
   NOT_UNUSED(Delta);
-  foreach_dimension()
-    NOT_UNUSED(Delta_x);
+  NOT_UNUSED(Delta_x);
+#if dimension > 1
+  NOT_UNUSED(Delta_y);
+#endif
+#if dimension > 2
+  NOT_UNUSED(Delta_z);
+#endif
   /* and this when catching FPEs */
   _CATCH;
 @
@@ -36,8 +46,6 @@ void (* debug)    (Point);
 #include "fpe.h"
 
 @define end_foreach_face()
-
-#include "stencils.h"
 
 // field allocation
 
@@ -81,19 +89,7 @@ scalar new_block_scalar (const char * name, const char * ext, int block)
   // need to allocate new slots
   s = (scalar){nvar};
   assert (nvar + block <= _NVARMAX);
-
-  /**
-  Note that _attribute[-1] is reserved to deal with undefined/constant
-  fields in stencils checks. */
-  
-  if (_attribute == NULL) {
-    _attribute = (_Attributes *) calloc (nvar + block + 1, sizeof (_Attributes));
-    _attribute[0].write = (double *) calloc (1, sizeof(double));
-  }
-  else
-    _attribute = (_Attributes *)
-      realloc (_attribute - 1, (nvar + block + 1)*sizeof (_Attributes));
-  _attribute++;
+  qrealloc (_attribute, nvar + block, _Attributes);
   memset (&_attribute[nvar], 0, block*sizeof (_Attributes));
   for (int n = 0; n < block; n++, nvar++) {
     scalar sb = (scalar){nvar};
@@ -248,8 +244,6 @@ vector new_const_vector (const char * name, int i, double * val)
 void scalar_clone (scalar a, scalar b)
 {
   char * name = a.name;
-  double * write = a.write;
-  int * read = a.read;
   double (** boundary) (Point, Point, scalar, void *) = a.boundary;
   double (** boundary_homogeneous) (Point, Point, scalar, void *) =
     a.boundary_homogeneous;
@@ -257,8 +251,6 @@ void scalar_clone (scalar a, scalar b)
   free (a.depends);
   _attribute[a.i] = _attribute[b.i];
   a.name = name;
-  a.write = write;
-  a.read = read;
   a.boundary = boundary;
   a.boundary_homogeneous = boundary_homogeneous;
   for (int i = 0; i < nboundary; i++) {
@@ -294,17 +286,11 @@ void delete (scalar * list)
     return;
 
   for (scalar f in list) {
-    if (f.block > 0) {
-      free (f.write); f.write = NULL;
-      free (f.read); f.read = NULL;
-    }
     for (int i = 0; i < f.block; i++) {
       scalar fb = {f.i + i};
       if (f.delete)
 	f.delete (fb);
       free (fb.name); fb.name = NULL;
-      fb.read = NULL;
-      fb.write = NULL;
       free (fb.boundary); fb.boundary = NULL;
       free (fb.boundary_homogeneous); fb.boundary_homogeneous = NULL;
       free (fb.depends); fb.depends = NULL;
@@ -321,8 +307,8 @@ void delete (scalar * list)
   trash (list);
   for (scalar f in list) {
     if (f.block > 0) {
-      scalar * s;
-      for (s = all; s->i >= 0 && s->i != f.i; s++);
+      scalar * s = all;
+      for (; s->i >= 0 && s->i != f.i; s++);
       if (s->i == f.i) {
 	for (; s[f.block].i >= 0; s++)
 	  s[0] = s[f.block];
@@ -362,8 +348,7 @@ void free_solver()
   }
 
   free (Events); Events = NULL;
-  free ((_attribute - 1)->write);
-  free (_attribute - 1); _attribute = NULL;
+  free (_attribute); _attribute = NULL;
   free (_constant); _constant = NULL;
   free_grid();
   qpclose_all();
@@ -384,7 +369,7 @@ void (* boundary_level) (scalar *, int l);
 void (* boundary_face)  (vectorl);
 
 #define boundary(...)						\
-  boundary_internal ((scalar *)(__VA_ARGS__), __FILE__, LINENO)
+  boundary_internal ((scalar *)__VA_ARGS__, __FILE__, LINENO)
 
 void boundary_flux  (vector * list) __attribute__ ((deprecated));
 
@@ -486,25 +471,13 @@ scalar cartesian_init_scalar (scalar s, const char * name)
   else
     pname = s.name;
   int block = s.block;
-  double * write = s.write;
-  int * read = s.read;
   double (** boundary) (Point, Point, scalar, void *) = s.boundary;
   double (** boundary_homogeneous) (Point, Point, scalar, void *) =
     s.boundary_homogeneous;
   // reset all attributes  
   _attribute[s.i] = (const _Attributes){0};
   s.name = pname;
-  if (block < 0) {
-    scalar base = {s.i + block};
-    s.block = block;
-    s.write = base.write;
-    s.read = base.read;
-  }
-  else {
-    s.block = block > 0 ? block : 1;
-    s.write = write ? write : malloc(_STENCIL_SIZE*sizeof(double));
-    s.read = read ? read : malloc(_STENCIL_SIZE*sizeof(int));    
-  }
+  s.block = block == 0 ? 1 : block;
   /* set default boundary conditions */  
   s.boundary = boundary ? boundary :
     (double (**)(Point, Point, scalar, void *))
@@ -788,6 +761,11 @@ void cartesian_methods()
   debug              = cartesian_debug;
 }
 
+tensor init_symmetric_tensor (tensor t, const char * name)
+{
+  return init_tensor (t, name);
+}
+  
 struct _interpolate {
   scalar v;
   double x, y, z;
@@ -932,4 +910,70 @@ void periodic (int dir)
 double getvalue (Point point, scalar s, int i, int j, int k)
 {
   return s[i,j,k];
+}
+
+void default_stencil (Point p, scalar * list)
+{
+  for (scalar s in list)
+    s.input = true, s.width = 2;
+}
+
+void stencil_val (Point p, scalar s, int i, int j, int k,
+		  const char * file, int line)
+{
+  if (is_constant(s) || s.i < 0)
+    return;
+  int index[] = {i, j, k};
+  bool central = true;
+  for (int d = 0; d < dimension; d++) {
+    int i = (&p.i)[d] + index[d];
+#if 0 // breaks heights.h:110: error: stencil overflow: f
+    if (i > 2 || i < - 2) {
+      fprintf (qstderr(), "%s:%d: error: stencil overflow: %s",
+	       file, line, s.name);
+      //     write_stencil_index (i, _STENCIL/2);
+      fprintf (qstderr(), "\n");
+      fflush (qstderr());
+      abort();
+    }
+#endif
+    if (i != 0)
+      central = false;
+  }
+  if (central) {
+    if (!s.output)
+      s.input = true;
+  }
+  else {
+    s.input = true;
+    int d = 0;
+    foreach_dimension() {
+      int i = (&p.i)[d] + index[d];
+      if ((!s.face || s.v.x.i != s.i) && abs(i) > s.width)
+	s.width = abs(i);
+      d++;
+    }
+  }
+}
+
+void stencil_val_a (Point p, scalar s, int i, int j, int k, bool input,
+		    const char * file, int line)
+{
+  if (is_constant(s) || s.i < 0)
+    abort();
+  int index[] = {i, j, k};
+  for (int d = 0; d < dimension; d++) {
+    int i = (&p.i)[d] + index[d];
+    if (i != 0) {
+      fprintf (qstderr(), "%s:%d: error: illegal write: %s",
+	       file, line, s.name);
+      //     write_stencil_index (i, _STENCIL/2);
+      fprintf (qstderr(), "\n");
+      fflush (qstderr());
+      abort();
+    }
+  }
+  if (input && !s.output)
+    s.input = true;
+  s.output = true;
 }

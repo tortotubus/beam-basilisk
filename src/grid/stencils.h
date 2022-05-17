@@ -6,8 +6,7 @@ Basilisk automatically computes, at runtime, the access pattern
 foreach_vertex()).
 
 This is done in practice by `qcc` which automatically adds, before
-each foreach loop, a modified version of the loop body applied to a
-single grid point of a special stencil grid.
+each foreach loop, a minimal version of the loop body.
 
 The resulting access pattern is stored in the `read` and `write`
 arrays associated with each field.
@@ -16,170 +15,96 @@ The `dirty` attribute is used to store the status of boundary
 conditions for each field. */
 
 attribute {
-  double * write;
-  int * read;
+  // fixme: use a structure
+  bool input, output;
+  int width; // maximum stencil width/height/depth
   int dirty; // // boundary conditions status:
   // 0: all conditions applied
   // 1: nothing applied
   // 2: boundary_face applied
 }
 
-/**
-By default the stencil size is $5^\text{dimension}$.  */
-
-#define _STENCIL 5
-#if dimension == 1
-# define _STENCIL_SIZE _STENCIL
-#elif dimension == 2
-# define _STENCIL_SIZE (_STENCIL*_STENCIL)
-#elif dimension == 3
-# define _STENCIL_SIZE (_STENCIL*_STENCIL*_STENCIL)
-#endif
-
-/**
-This data structure contains information about the foreach loop being
-processed. */
-
 typedef struct {
   const char * fname; // name of the source file
   int line;           // line number in the source
   int first;          // is this the first time the loop is called?
-  const char * each;  // the name of the foreach loop (foreach, foreach_face...)
   int face;           // the face component(s) being traversed
   bool vertex;        // is this a vertex traversal?
 } ForeachData;
 
-/**
-## Stencil access detection
-
-Given a (1D, 2D, 3D) index `i` this function returns the corresponding
-index in the (1D) attribute arrays `read` and `write`, or -1 in case
-of stencil overflow. */
-
-static inline int stencil_index (scalar s, IJK i)
-{
-  int len = 1, index = 0;
-  for (int d = 0; d < dimension; d++) {
-    if (i.i[d] < 0 || i.i[d] >= _STENCIL) // stencil overflow
-      return -1;
-    index += len*i.i[d], len *= _STENCIL;
-  }
-  return index;
-}
-
-/**
-This is the reverse of the function above. */
-
-static inline IJK stencil_ijk (int index)
-{
-  IJK i;
-  int len = _STENCIL_SIZE;
-  for (int d = dimension - 1; d >= 0; d--) {
-    len /= _STENCIL;
-    i.i[d] = index/len;
-    index -= len*i.i[d];
-    i.i[d] -= _STENCIL/2;
-  }
-  return i;
-}
-
-/**
-This displays a (1D,2D,3D) stencil index. */
-
-static void write_stencil_index (IJK i, int shift)
-{
-  sysfprintf (qstderr(), "[%d", i.i[0] - shift);
-  for (int d = 1; d < dimension; d++)
-    sysfprintf (qstderr(), ",%d", i.i[d] - shift);
-  sysfprintf (qstderr(), "]");
-}
-
-/**
-This function is called whenever a field index `i` is called
-(i.e. typically when `s[i,j,k]` code is executed). It checks for
-stencil overflows and updates the `read` stencil array. */
-
-int _stencil_access (scalar s, IJK i, const char * file, int line)
-{
-  if (is_constant(s) || s.i < 0)
-    return 0;
-  int index = stencil_index (s, i);
-  if (index < 0) {
-    sysfprintf (qstderr(), "%s:%d: error: stencil overflow: %s",
-		file, line, s.name);
-    write_stencil_index (i, _STENCIL/2);
-    sysfprintf (qstderr(), "\n");
-    fflush (qstderr());
-    abort();
-  }
-  s.read[index]++;
-  return index;
-}
-
-/**
-The `foreach_stencil()` loop definition replaces the foreach(),
-foreach_face() and foreach_vertex() loops. It implements the
-read/write access detection used for the definition of stencils.
-
-Before loop execution the `read` and `write` arrays are
-initialised. Non-trivial values are set in the `write` array. */
-
+// fixme: this should be rewritten using better macros
 @def foreach_stencil() {
-  for (scalar _s in baseblock) {
-    for (int _i = 0; _i < _STENCIL_SIZE; _i++) {
-      _s.read[_i] = 0;
-      _s.write[_i] = 1.7759437274 + _s.i + _i;
-    }
+  static ForeachData _loop = {
+    S__FILE__, S_LINENO,
+    1, 0, 0
+  };
+  if (baseblock) for (scalar s = baseblock[0], * i = baseblock;
+		s.i >= 0; i++, s = *i) {
+    _attribute[s.i].input = _attribute[s.i].output = false;
+    _attribute[s.i].width = 0;
   }
-  _foreach_data.face = 0;
-  int ig = 0, jg = 0, kg = 0;
-  NOT_UNUSED(ig); NOT_UNUSED(jg); NOT_UNUSED(kg);
-  Point point = {0};
-  // fixme: this assumes that Point is always something like:
-  // struct { int i,.., k, level, n, ...; }
-  // with i,..,k the dimension indices, level the level and
-  // n the number of grid points
-  for (int _i = 0; _i < dimension; _i++)
-    ((int *)&point)[_i] = _STENCIL/2;
-  if (sizeof(Point) >= (dimension + 2)*sizeof(int))
-    ((int *)&point)[dimension + 1] = 1;
-  POINT_VARIABLES
+  int ig = 0, jg = 0, kg = 0; NOT_UNUSED(ig); NOT_UNUSED(jg); NOT_UNUSED(kg);
+  Point point = {0}; NOT_UNUSED (point);
 @
 
-/**
-After the stencil loop execution the `write` array is checked for any
-modification. */
-    
 @def end_foreach_stencil()
-  for (scalar _s in baseblock) {
-    for (int _i = 0; _i < _STENCIL_SIZE; _i++)
-      _s.write[_i] = (_s.write[_i] != 1.7759437274 + _s.i + _i);
-  }
-  end_stencil (&_foreach_data);
+  end_stencil (&_loop);
+  _loop.first = 0;
 }
 @
 
-@define foreach_face_stencil foreach_stencil
-@define end_foreach_face_stencil() end_foreach_stencil()
-
-@define foreach_vertex_stencil foreach_stencil
+@define foreach_vertex_stencil() foreach_stencil() _loop.vertex = true;
 @define end_foreach_vertex_stencil() end_foreach_stencil()
 
-@define is_stencil_face_x() ((_foreach_data.face |= (1 << 0)))
-@define is_stencil_face_y() ((_foreach_data.face |= (1 << 1)))
-@define is_stencil_face_z() ((_foreach_data.face |= (1 << 2)))
+@define foreach_face_stencil() foreach_stencil()
+@define end_foreach_face_stencil() end_foreach_stencil()
 
-/**
-This is the function called in case of missing reductions. */
+@define _stencil_is_face_x() { _loop.face |= (1 << 0);
+@define end__stencil_is_face_x() }
+@define _stencil_is_face_y() { _loop.face |= (1 << 1);
+@define end__stencil_is_face_y() }
+@define _stencil_is_face_z() { _loop.face |= (1 << 2);
+@define end__stencil_is_face_z() }
 
-void reduction_warning (const char * fname, int line, const char * var)
-{
-  fprintf (stderr,
-  "%s:%d: warning: variable '%s' is modified by this foreach loop:\n"
-  "%s:%d: warning: use a loop-local variable, a reduction operation\n"
-  "%s:%d: warning: or a serial loop to get rid of this warning\n",
-	   fname, line, var, fname, line, fname, line);
-}
+void stencil_val (Point p, scalar s, int i, int j, int k,
+		  const char * file, int line);
+void stencil_val_a (Point p, scalar s, int i, int j, int k, bool input,
+		    const char * file, int line);
+
+@def _stencil_val(a,_i,_j,_k)
+  stencil_val (point, a, _i, _j, _k, S__FILE__, S_LINENO)
+@
+@def _stencil_val_a(a,_i,_j,_k)
+  stencil_val_a (point, a, _i, _j, _k, false, S__FILE__, S_LINENO)
+@
+@def _stencil_val_r(a,_i,_j,_k)
+  stencil_val_a (point, a, _i, _j, _k, true, S__FILE__, S_LINENO)
+@
+
+@define _stencil_fine(a,_i,_j,_k) _stencil_val(a,_i,_j,_k)
+@define _stencil_fine_a(a,_i,_j,_k) _stencil_val_a(a,_i,_j,_k)
+@define _stencil_fine_r(a,_i,_j,_k) _stencil_val_r(a,_i,_j,_k)
+
+@define _stencil_coarse(a,_i,_j,_k) _stencil_val(a,_i,_j,_k)
+@define _stencil_coarse_a(a,_i,_j,_k) _stencil_val_a(a,_i,_j,_k)
+@define _stencil_coarse_r(a,_i,_j,_k) _stencil_val_r(a,_i,_j,_k)
+
+@define r_assign(x)
+@define _assign(x)
+
+@define _stencil_neighbor(i,j,k)
+@define _stencil_child(i,j,k)
+@define _stencil_aparent(i,j,k)
+@define _stencil_aparent_a(i,j,k)
+@define _stencil_aparent_r(i,j,k)
+
+int _stencil_nop;
+@define _stencil_val_higher_dimension (_stencil_nop = 1)
+@define _stencil__val_constant(a,_i,_j,_k) (_stencil_nop = 1)
+
+typedef void _stencil_undefined;
+
+@define o_stencil -2
 
 /**
 ## Automatic boundary conditions
@@ -230,57 +155,12 @@ void end_stencil (ForeachData * loop)
   scalar * listc = NULL, * dirty = NULL;
   vectorl listf = {NULL};
   bool flux = false;
-  loop->vertex = !strcmp (loop->each, "foreach_vertex");
   
   /**
   We check the accesses for each field... */
   
   for (scalar s in baseblock) {
-    bool write = false, read = false;
-    int max = 0; // maximum stencil width/height/depth
-
-    /**
-    ... and for each stencil position. */
-    
-    for (int n = 0; n < _STENCIL_SIZE; n++)
-      if (s.write[n] || s.read[n]) {
-	IJK i = stencil_ijk (n);
-
-	/**
-	This stencil position has been write-accessed. Only the
-	central index ([0,0,0]) can be write-accessed. */
-	
-	if (s.write[n]) {
-	  for (int d = 0; d < dimension; d++)
-	    if (i.i[d] != 0) {
-	      fprintf (stderr,
-		       "%s:%d: error: illegal write within this loop: %s",
-		       loop->fname, loop->line, s.name);
-	      write_stencil_index (i, 0);
-	      fprintf (stderr, "\n");
-	      fflush (stderr);
-	      abort();
-	    }
-	  write = true;
-	}
-
-	/**
-	This stencil position has been read-accessed, we record the
-	maximum "width" of the stencil. */
-	
-	if (s.read[n]) {
-	  read = true; // fixme: what if write == true and read == 1 ??
-	  int d = 0;
-	  foreach_dimension() {
-	    if ((!s.face || s.v.x.i != s.i) && abs(i.i[d]) > max)
-	      max = abs(i.i[d]);
-	    d++;
-	  }
-	}
-      }
-    
-    /**
-    We now know whether this field has been read- and/or write-accessed. */
+    bool write = s.output, read = s.input;
     
 #ifdef foreach_layer
     if (_layer == 0 || s.block == 1)
@@ -298,7 +178,7 @@ void end_stencil (ForeachData * loop)
 	be applied, or whether "face" BCs are sufficient. */
 	
 	if (s.face) {
-	  if (max > 0) // face, stencil wider than 0
+	  if (s.width > 0) // face, stencil wider than 0
 	    listc = list_append (listc, s);
 	  else if (!write) { // face, flux only
 	    scalar sn = s.v.x.i >= 0 ? s.v.x : s;
@@ -322,7 +202,7 @@ void end_stencil (ForeachData * loop)
 	For dirty, centered fields BCs need to be applied if the
 	stencil is wider than zero. */
 	
-	else if (max > 0)
+	else if (s.width > 0)
 	  listc = list_append (listc, s);
       }
 
@@ -378,7 +258,18 @@ void end_stencil (ForeachData * loop)
 	      while (s != name && *s != '.') s--;
 	      if (s != name) *s = '\0';
 	    }
-	    init_face_vector (s.v, name);
+	    struct { int x, y, z; } input, output;
+	    vector v = s.v;
+#if 1 // fixme: should not be necessary	    
+	    foreach_dimension()
+	      input.x = v.x.input, output.x = v.x.output;
+#endif
+	    init_face_vector (v, name);
+#if 1 // fixme: should not be necessary	    
+	    
+	    foreach_dimension()
+	      v.x.input = input.x, v.x.output = output.x;
+#endif
 #if PRINTBOUNDARY
 	    fprintf (stderr, "%s:%d: turned %s into a face vector\n",
 		     loop->fname, loop->line, name);
@@ -393,7 +284,7 @@ void end_stencil (ForeachData * loop)
 	      vertex = false;
 	  if (!vertex) {
 	    char * name = NULL;
-	    if (s.name) name = strdup (s.name);
+	    if (s.name) name = strdup (s.name); // fixme: may not be necessary
 	    init_vertex_scalar (s, name);
 	    foreach_dimension()
 	      s.v.x.i = -1;

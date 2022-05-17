@@ -381,7 +381,7 @@ event pressure (i++)
   if (res_eta.i >= 0)
     res = new scalar[nl];
   mgp = mg_solve ({phi,eta}, {rhs,rhs_eta}, residual_nh, relax_nh, &alpha_eta,
-		  res = res_eta.i >= 0 ? {res,res_eta} : NULL,
+		  res = res_eta.i >= 0 ? (scalar *){res,res_eta} : NULL,
 		  nrelax = 4, minlevel = 1,
 		  tolerance = TOLERANCE*sq(h1/(dt*v1)));
   delete ({rhs});

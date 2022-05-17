@@ -31,7 +31,7 @@ default. */
 It uses the relevant headers from the [C
 interface](/src/gotm/common.h) to GOTM. */
 
-#include <gotm/common.h>
+#include "gotm/common.h"
 #include <gotm/gotm/gotm.h>
 // #include <gotm/gotm/diagnostics.h>
 // #include <gotm/util/time.h>
@@ -246,7 +246,7 @@ event viscous_term (i++)
 {
   struct { realtype * x, * y; } gotm_u = { meanflow_u.a, meanflow_v.a };
   struct { realtype * x, * y; } gotm_t = { &airsea_tx, &airsea_ty };
-  foreach (serial, noauto) {
+  foreach() {
     memcpy (&meanflow_h.a[1], &h[], nl*sizeof(double));
     foreach_dimension() {
       *gotm_t.x = airsea_tau.x[];

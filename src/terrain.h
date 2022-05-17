@@ -80,6 +80,8 @@ static void delete_terrain (scalar zb)
   free (zb.kdt);
 }
 
+@define CHARP char * // fixme: workaround for va_arg macro
+
 void terrain (scalar zb, ...)
 {
   zb.kdt = qcalloc (NPROC, void *);
@@ -89,7 +91,7 @@ void terrain (scalar zb, ...)
   va_list ap;
   va_start (ap, zb);
   char * name;
-  while ((name = va_arg (ap, char *))) {
+  while ((name = va_arg (ap, CHARP))) {
     for (int i = 0; i < NPROC; i++) {
       Kdt ** kdt = (Kdt **) zb.kdt[i];
       zb.kdt[i] = qrealloc (kdt, nt + 2, Kdt *);

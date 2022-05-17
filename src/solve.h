@@ -40,9 +40,7 @@ the [mg_solve()](poisson.h#mg_solve) and
 [mg_cycle()](poisson.h#mg_cycle) functions where more
 documentation can be found. */
 
-typedef struct MGSolve MGSolve_t; // fixme: workaround qcc bug
-
-static MGSolve_t solve_init (struct MGSolve p) { return p; }
+static struct MGSolve solve_init (struct MGSolve p) { return p; }
 
 #define solve(_a, _func, _rhs, ...)					\
   do {									\
@@ -87,9 +85,10 @@ static MGSolve_t solve_init (struct MGSolve p) { return p; }
 	    scalar _a = _da;						\
 	    foreach_level_or_leaf (l) {					\
 	      _a[] = 0.;						\
-	      double n = _res[] - (_func);				\
-	      diagonalize(_a)						\
-		double d = (_func);					\
+	      double n = _res[] - (_func), d;				\
+	      diagonalize(_a) {						\
+		d = (_func);						\
+	      }								\
 	      _a[] = n/d;						\
 	    }								\
 	    boundary_level ({_da}, l);					\

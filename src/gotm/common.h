@@ -47,7 +47,9 @@ typedef struct {
   realtype * a;
 } realtype_1d;
 
-#define strlencheck(s) (s != NULL ? strlen(s) : 0)
+int strlencheck (const char * s) {
+  return (s != NULL ? strlen(s) : 0);
+}
 
 extern integer __gotm_MOD_nlev;
 #define gotm_nlev __gotm_MOD_nlev

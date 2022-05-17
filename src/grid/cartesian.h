@@ -61,9 +61,11 @@ foreach_face_generic() {
 
 #define foreach_edge() foreach_face(y,x)
 
-@define is_face_x() (point.j <= point.n)
-@define is_face_y() (point.i <= point.n)
-
+@define is_face_x() { int ig = -1; VARIABLES; if (point.j <= point.n) {
+@define end_is_face_x() }}
+@define is_face_y() { int jg = -1; VARIABLES; if (point.i <= point.n) {
+@define end_is_face_y() }}
+  
 @if TRASH
 @ undef trash
 @ define trash(list) reset(list, undefined)

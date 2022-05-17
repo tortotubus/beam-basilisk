@@ -45,10 +45,10 @@ static int mpi_rank, mpi_npe;
 @ define new new_qcc
 @endif // _cplusplus
 
-@define pi 3.14159265358979
+#define pi 3.14159265358979
 @undef HUGE
 @define HUGE ((double)1e30)
-@define nodata HUGE
+#define nodata HUGE
 @define _NVARMAX 65536
 @define is_constant(v) ((v).i >= _NVARMAX)
 @define constant(v) (is_constant(v) ? _constant[(v).i - _NVARMAX] : nodata)
@@ -60,16 +60,15 @@ static int mpi_rank, mpi_npe;
 @define sign(x) ((x) > 0 ? 1 : -1)
 @define noise() (1. - 2.*rand()/(double)RAND_MAX)
 @define clamp(x,a,b) ((x) < (a) ? (a) : (x) > (b) ? (b) : (x))
-@define swap(type,a,b) do { type __tmp = a; a = b; b = __tmp; } while(0)
+#define swap(type,a,b) do { type __tmp = a; a = b; b = __tmp; } while(0)
 @define unmap(x,y)
 
 @define trash(x)  // data trashing is disabled by default. Turn it on with
                   // -DTRASH=1
 
-@define systderr   stderr
-@define systdout   stdout
-@define sysfprintf fprintf
- 
+@define systderr  stderr
+@define systdout  stdout
+
 @if _MPI
 FILE * qstderr (void);
 FILE * qstdout (void);
@@ -498,8 +497,8 @@ static void trace_off()
 #else
 #define TRACE_TYPE(func) &trace_func
 #endif
-@  define trace(func, file, line)     trace_push (TRACE_TYPE(func), func)
-@  define end_trace(func, file, line) trace_pop (TRACE_TYPE(func), func)
+@  define tracing(func, file, line)     trace_push (TRACE_TYPE(func), func)
+@  define end_tracing(func, file, line) trace_pop (TRACE_TYPE(func), func)
 
 @elif TRACE // built-in function tracing
 
@@ -536,7 +535,7 @@ static void trace_add (const char * func, const char * file, int line,
     t->calls++, t->total += total, t->self += self;
 }
 
-static void trace (const char * func, const char * file, int line)
+static void tracing (const char * func, const char * file, int line)
 {
   struct timeval tv;
   gettimeofday (&tv, NULL);
@@ -550,7 +549,7 @@ static void trace (const char * func, const char * file, int line)
 #endif
 }
 
-static void end_trace (const char * func, const char * file, int line)
+static void end_tracing (const char * func, const char * file, int line)
 {
   struct timeval tv;
   gettimeofday (&tv, NULL);
@@ -647,8 +646,8 @@ static void trace_off()
 }
 
 @else // disable tracing
-@  define trace(...)
-@  define end_trace(...)
+@  define tracing(...)
+@  define end_tracing(...)
 @endif
 
 // OpenMP / MPI
@@ -816,7 +815,6 @@ void mpi_init()
 @define val(a,k,l,m)   data(k,l,m)[_index(a,m)]
 
 double _val_higher_dimension = 0.;
-@define _val_higher_dimension(x,a,b,c) _val_higher_dimension
 
 /* undefined value */
 /* Initialises unused memory with "signaling NaNs".  
@@ -954,69 +952,22 @@ int nboundary = 2*dimension;
 
 #define none -1
 
-@define dirichlet(expr)         (2.*(expr) - val(_s,0,0,0))
-@define dirichlet_homogeneous() (- val(_s,0,0,0))
-@define neumann(expr)           (Delta*(expr) + val(_s,0,0,0))
-@define neumann_homogeneous()   (val(_s,0,0,0))
+@define dirichlet(expr)                 (2.*(expr) - val(_s,0,0,0))
+@define dirichlet_homogeneous()         (- val(_s,0,0,0))
+@define dirichlet_face(expr)            (expr)
+@define dirichlet_face_homogeneous()    (0.)
+@define neumann(expr)                   (Delta*(expr) + val(_s,0,0,0))
+@define neumann_homogeneous()           (val(_s,0,0,0))
 
 double  * _constant = NULL;
-extern size_t datasize;
+size_t datasize = 0;
 typedef struct _Point Point;
 
-// stencils
-
-@define strongif(x) if(x)
-@define IF(x) if((x)||1)
-
-typedef struct { int i[dimension]; } IJK;
-
-void _stencil_fprintf (const char * file, int line,
-		       FILE * stream, const char *format, ...) {}
-void _stencil_printf (const char * file, int line,
-		      const char *format, ...) {}
-void _stencil_fputc (const char * file, int line,
-		     int c, FILE * stream) {}
-void _stencil_fputs (const char * file, int line,
-		     const char * s, FILE * stream) {}
-@define _stencil_qassert(...) ((void)0)
-
-int _stencil_access (scalar s, IJK i, const char * file, int line);
-
-@if dimension == 1
-  @ def _stencil_val(file, line, s, i1, i2, i3)
-  (_attribute[is_constant(s) || s.i < 0 ? -1 : s.i].write
-   [_stencil_access(s, (IJK){{point.i + i1}}, file, line)])
-@
-@elif dimension == 2
-  @def _stencil_val(file, line, s, i1, i2, i3)
-  (_attribute[is_constant(s) || s.i < 0 ? -1 : s.i].write
-   [_stencil_access(s, (IJK){{point.i + i1, point.j + i2}}, file, line)])
-@
-@else // dimension == 3
-  @ def _stencil_val(file, line, s, i1, i2, i3)
-  (_attribute[is_constant(s) || s.i < 0 ? -1 : s.i].write
-   [_stencil_access(s, (IJK){{point.i + i1, point.j + i2, point.k + i3}},
-		    file, line)])
-@
-@endif
-
-/*
-fixme: this mixes fine/coarse accesses */
-  
-@def _stencil_fine(file, line, s, i1, i2, i3)
-  _stencil_val(file, line, s, i1, i2, i3)
-@
-@def _stencil_coarse(file, line, s, i1, i2, i3)
-  _stencil_val(file, line, s, i1, i2, i3)
-@
-  
 #include "grid/boundaries.h"
 
 // attributes for each scalar
 
-@include "_attributes.h"
-
-attribute {
+typedef struct {
   double (** boundary)             (Point, Point, scalar, void *);
   double (** boundary_homogeneous) (Point, Point, scalar, void *);
   double (* gradient)              (double, double, double);
@@ -1036,7 +987,9 @@ attribute {
   bool   nodump, freed;
   int    block;
   scalar * depends; // boundary conditions depend on other fields
-}
+} _Attributes;
+
+static _Attributes * _attribute = NULL;
 
 #define foreach_block() // treatment of block data is disabled by default
 #define foreach_blockf(s)
@@ -1198,7 +1151,7 @@ tensor * tensors_from_vectors (vector * v)
 }
 
 scalar * all = NULL; // all the fields
-scalar * baseblock = NULL; // base block field
+scalar * baseblock = NULL; // base block fields
 
 // basic methods
 
@@ -1236,7 +1189,30 @@ int iter = 0, inext = 0; // current step and step of next event
 double t = 0, tnext = 0; // current time and time of next event
 void init_events (void);
 void event_register (Event event);
-void _init_solver (void);
+static void _init_solver (void);
+
+void init_solver()
+{
+  Events = malloc (sizeof (Event));
+  Events[0].last = 1;
+  _attribute = calloc (datasize/sizeof(double), sizeof (_Attributes));
+  int n = datasize/sizeof(double);
+  all = (scalar *) malloc (sizeof (scalar)*(n + 1));
+  baseblock = (scalar *) malloc (sizeof (scalar)*(n + 1));
+  for (int i = 0; i < n; i++)
+    baseblock[i].i = all[i].i = i;
+  baseblock[n].i = all[n].i = -1;
+@if _CADNA
+  cadna_init (-1);
+@endif
+@if _MPI
+  mpi_init();
+@elif MTRACE == 1
+  char * etrace = getenv ("MTRACE");
+  pmtrace.fp = fopen (etrace ? etrace : "mtrace", "w");
+  pmtrace.fname = systrdup (etrace ? etrace : "mtrace");
+@endif
+}
 
 // timers
 
@@ -1416,33 +1392,7 @@ void matrix_free (void * m)
   free (m);
 }
 
-// Solver initialisation and cleanup
-
-void init_solver()
-{
-@if _CADNA
-  cadna_init (-1);
-@endif
-@if _MPI
-  mpi_init();
-@elif MTRACE == 1
-  char * etrace = getenv ("MTRACE");
-  pmtrace.fp = fopen (etrace ? etrace : "mtrace", "w");
-  pmtrace.fname = systrdup (etrace ? etrace : "mtrace");
-@endif
-}
-
-void allocate_globals (int nvar)
-{
-  _attribute = (_Attributes *) calloc (nvar + 1, sizeof (_Attributes));
-  _attribute[0].write = (double *) calloc (1, sizeof(double));
-  _attribute++;
-  all = (scalar *) malloc (sizeof (scalar)*(nvar + 1));
-  baseblock = (scalar *) malloc (sizeof (scalar)*(nvar + 1));
-  for (int i = 0; i < nvar; i++)
-    baseblock[i].i = all[i].i = i;
-  baseblock[nvar].i = all[nvar].i = -1;
-}
+// Solver cleanup
 
 typedef void (* free_solver_func) (void);
 
@@ -1493,3 +1443,5 @@ void display (struct _display p)
 #if LAYERS
 # include "grid/layers.h"
 #endif
+
+#include "grid/stencils.h"

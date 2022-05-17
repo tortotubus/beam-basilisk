@@ -185,7 +185,7 @@ gradient term. */
 event pressure (i++)
 {
   mgH = mg_solve ({eta}, {rhs_eta}, residual_hydro, relax_hydro, &alpha_eta,
-		  res = res_eta.i >= 0 ? {res_eta} : NULL,
+		  res = res_eta.i >= 0 ? (scalar *){res_eta} : NULL,
 		  nrelax = 4, minlevel = 1,
 		  tolerance = TOLERANCE);
   delete ({rhs_eta, alpha_eta});
