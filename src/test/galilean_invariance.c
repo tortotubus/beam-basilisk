@@ -91,7 +91,7 @@ event monitoring (t += endoftime/100; t = 0.; t <= endoftime)
     static FILE * fpout = fopen (name, "w");
 
     double absdevU = 0., absPhi = 0.;
-    foreach(reduction(max:absdevU) reduction(max:absPhi))
+    foreach()
       foreach_layer() {
         if (fabs(u.x[] - U) > absdevU)
 	  absdevU = fabs(u.x[] - U);

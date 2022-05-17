@@ -443,7 +443,7 @@ static double evaluate_expression (Point point, Node * n)
     scalar s = {n->s};
     int k[3] = {0,0,0};
     for (int i = 0; i < 3; i++)
-      strongif (n->e[i])
+      if (n->e[i])
 	k[i] = evaluate_expression (point, n->e[i]);
     return s[k[0],k[1],k[2]];
   }

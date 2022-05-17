@@ -42,7 +42,7 @@ int main (int argc, char ** argv)
   //  output_cells (stdout);
 
   double max = 0;
-  foreach_face (x, reduction(max:max))
+  foreach_face (x)
     for (int i = -1; i <= 1; i++) {
       double xu = x, yu = y + i*Delta;
       double e = exp(-(xu*xu+yu*yu)/(R0*R0)) - u.x[0,i];
@@ -51,7 +51,7 @@ int main (int argc, char ** argv)
     }
 
   double maxv = 0;
-  foreach_face (y, reduction(max:maxv))
+  foreach_face (y)
     for (int i = -1; i <= 1; i++) {
       double xv = x + i*Delta, yv = y;
       double e = exp(-(xv*xv+yv*yv)/(R0*R0)) - u.y[i,0];

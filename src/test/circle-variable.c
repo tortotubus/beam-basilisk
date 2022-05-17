@@ -55,7 +55,7 @@ void solve (int depth)
     mg_cycle ({a}, lres, {dp}, relax, &p, nrelax, 0, depth());
     residual ({a}, {b}, lres, &p);
     double max = 0.;
-    foreach (reduction(max:max))
+    foreach()
       if (fabs(res[]) > max)
 	max = fabs(res[]);
     iter[i] = clock();
@@ -68,7 +68,7 @@ void solve (int depth)
   }
 
   double max = 0;
-  foreach (reduction(max:max)) {
+  foreach() {
     double e = a[] - solution(x, y);
     if (fabs(e) > max) max = fabs(e);
     //    printf ("%g %g %g %g %g %g\n", x, y, a[], b[], res[], e);

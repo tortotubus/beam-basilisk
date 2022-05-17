@@ -145,7 +145,7 @@ event error (t = end) {
   double ekmax = 0.;
   scalar un[], ec[], kappa[];
   curvature (c, kappa);
-  foreach(reduction(max:ekmax)) {
+  foreach() {
     un[] = norm(u);
     ec[] = c[] - cref[];
     if (kappa[] != nodata) {

@@ -60,8 +60,12 @@ static double vof_concentration_gradient_x (Point point, scalar c, scalar t)
     cl = 1. - cl, cc = 1. - cc, cr = 1. - cr;
   if (cc >= cmin && t.gradient != zero) {
     if (cr >= cmin) {
-      if (cl >= cmin)
-	return t.gradient (t[-1]/cl, t[]/cc, t[1]/cr)/Delta;
+      if (cl >= cmin) {
+	if (t.gradient)
+	  return t.gradient (t[-1]/cl, t[]/cc, t[1]/cr)/Delta;
+	else
+	  return (t[1]/cr - t[-1]/cl)/(2.*Delta);
+      }
       else
 	return (t[1]/cr - t[]/cc)/Delta;
     }
@@ -218,13 +222,10 @@ static void sweep_x (scalar c, scalar cc, scalar * tcl)
     When the upwind cell is entirely full or empty we can avoid this
     computation. */
 
-    double cf; // fixme: ternary operator not properly detected by qcc stencil
-    if (c[i] <= 0. || c[i] >= 1.)
-      cf = c[i];
-    else
-      cf = rectangle_fraction ((coord){-s*n.x[i], n.y[i], n.z[i]}, alpha[i],
-			       (coord){-0.5, -0.5, -0.5},
-			       (coord){s*un - 0.5, 0.5, 0.5});
+    double cf = (c[i] <= 0. || c[i] >= 1.) ? c[i] :
+      rectangle_fraction ((coord){-s*n.x[i], n.y[i], n.z[i]}, alpha[i],
+			  (coord){-0.5, -0.5, -0.5},
+			  (coord){s*un - 0.5, 0.5, 0.5});
     
     /**
     Once we have the upwind volume fraction *cf*, the volume fraction

@@ -103,7 +103,7 @@ pstoedit -f gnuplot -flat 0.1 basilisk.eps basilisk.gnu
   neighborhood (a sphere of diameter $3\Delta$) of each cell. */
   
   scalar nt[], surface = d.surface;
-  foreach (serial, noauto) {
+  foreach() {
     nt[] = 0;
     if (surface[]) {
       coord ** p = (coord **) double_to_pointer (surface[]);

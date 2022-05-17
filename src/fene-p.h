@@ -1,7 +1,9 @@
 /**
-# Macros $f_s$ and $f_r$ for the FENE-P model
+# Functions $f_s$ and $f_r$ for the FENE-P model
 
 See [log-conform.h](log-conform.h). */
+
+#include "log-conform.h"
 
 double L2 = 1.;
 
@@ -10,10 +12,10 @@ static void fenep (double trA, double * nu, double * eta) {
   *nu = 1./(1. - trA/L2);
 } 
 
-#define f_r(trA, nu, eta) fenep (trA, &(nu), &(eta))
-#define f_s(trA, nu, eta) fenep (trA, &(nu), &(eta))
-
-#include "log-conform.h"
+event defaults (i = 0) {
+  f_s = fenep;
+  f_r = fenep;
+}
 
 event init (i = 0) {
 #if AXI

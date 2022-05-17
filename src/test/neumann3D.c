@@ -140,15 +140,19 @@ int main()
     struct Poisson p;
     p.alpha = fs;
     p.lambda = zeroc;
+    p.embed_flux = embed_flux;
     scalar res[];
     double maxp = residual ({a}, {b}, {res}, &p), maxf = 0.;
-    foreach (reduction(max:maxf))
+    foreach()
       if (cs[] == 1. && fabs(res[]) > maxf)
 	maxf = fabs(res[]);
     fprintf (stderr, "maxres %d %.3g %.3g\n", N, maxf, maxp);
 
     timer t = timer_start();
-    mgstats s = poisson (a, b, alpha = fs, tolerance = 1e-6);
+    mgstats s = poisson (a, b, alpha = fs,
+			 embed_flux =
+			 a.boundary[embed] != symmetry ? embed_flux : NULL,
+			 tolerance = 1e-6);
     double dt = timer_elapsed (t);
     printf ("%d %g %d %d\n", N, dt, s.i, s.nrelax);
 

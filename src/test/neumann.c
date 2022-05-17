@@ -173,9 +173,10 @@ int main()
     struct Poisson p;
     p.alpha = fs;
     p.lambda = zeroc;
+    p.embed_flux = embed_flux;
     scalar res[];
     double maxp = residual ({a}, {b}, {res}, &p), maxf = 0.;
-    foreach (reduction(max:maxf))
+    foreach()
       if (cs[] == 1. && fabs(res[]) > maxf)
 	maxf = fabs(res[]);
     fprintf (stderr, "maxres %d %.3g %.3g\n", N, maxf, maxp);

@@ -31,7 +31,7 @@ int main()
 	u[] = 1.; // the initial condition
       double emax = 0.;
       for (t = 0; t <= 2.; t += dt) {
-	foreach(reduction(max:emax)) {
+	foreach() {
 	  double e = fabs (u[] - exp(t*t/2.));
 	  if (e > emax)
 	    emax = e;
