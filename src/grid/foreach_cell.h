@@ -80,7 +80,7 @@ void recursive (Point point)
     while (_s >= 0) {
       int stage;
       _pop();
-      if (!allocated (0))
+      if (!allocated (0,0,0))
 	continue;
       switch (stage) {
       case 0: {
@@ -164,7 +164,7 @@ void recursive (Point point)
     while (_s >= 0) {
       int stage;
       _pop();
-      if (!allocated (0))
+      if (!allocated (0,0,0))
 	continue;
       switch (stage) {
       case 0: {

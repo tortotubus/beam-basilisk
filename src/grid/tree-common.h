@@ -629,7 +629,7 @@ static void tree_boundary_level (scalar * list, int l)
 	  is_refined(neighbor(0,-1)) || is_refined(neighbor(-1,-1))) {
 	// corner
 	for (scalar s in vlist)
-	  s[] = is_vertex (child(0)) ? fine(s) : nodata;
+	  s[] = is_vertex (child(0,0,0)) ? fine(s) : nodata;
       }
       else
 	foreach_dimension()

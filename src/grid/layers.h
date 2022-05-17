@@ -14,15 +14,15 @@ int _layer = 0;
 
 #undef foreach_block
 @define foreach_block() for (_layer = 0; _layer < nl; _layer++)
-@define end_foreach_block() _layer = 0
-
+@define end_foreach_block() _layer = 0;
+  
 /**
 ... and an "inner" traversal, usable within foreach() loops, which
 uses the `point.l` index as local layer index. */
   
 @define foreach_block_inner() for (point.l = 0; point.l < nl; point.l++)
-@define end_foreach_block_inner() point.l = 0
-
+@define end_foreach_block_inner() point.l = 0;
+  
 /**
 We also redefine the "per field" (inner) traversal. */
 
@@ -30,7 +30,7 @@ We also redefine the "per field" (inner) traversal. */
 @def foreach_blockf(_f)
   for (point.l = 0; point.l < _attribute[_f.i].block; point.l++)
 @
-@define end_foreach_blockf() point.l = 0
+@define end_foreach_blockf() point.l = 0;
   
 /**
 The two indices are combined to access field values. In practice only

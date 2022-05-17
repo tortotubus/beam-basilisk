@@ -743,7 +743,8 @@ static void display_destroy()
   }
 }
 
-init_solver void display_init()
+@init_solver
+void display_init()
 {
   if (pid() == 0) {
     const char * port = DISPLAY_RANGE;

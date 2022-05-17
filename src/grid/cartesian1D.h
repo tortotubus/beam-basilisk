@@ -55,9 +55,9 @@ foreach_face_generic() {
 @
 @define end_foreach_vertex() } end_foreach_face_generic()
 
-@define is_face_x() (true)
-@define is_face_y() (point.i <= point.n)
-
+@define is_face_x() { int ig = -1; VARIABLES; {
+@define end_is_face_x() }}
+  
 // ghost cell coordinates for each direction
 static int _ig[] = {1,-1};
 

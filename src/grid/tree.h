@@ -333,6 +333,11 @@ void cache_shrink (Cache * c)
 #if dimension >= 3
   parent.k = (point.k + GHOSTS)/2;
 #endif
+#if TRASH
+  Cell * cellp = point.level <= depth() && allocated(0,0,0) ?
+    (Cell *) NEIGHBOR(0,0,0) : NULL;
+  NOT_UNUSED(cellp);
+#endif
 @
 
 #include "foreach_cell.h"
@@ -582,8 +587,9 @@ static void update_cache_f (void)
       // boundary conditions
       bool has_neighbors = false;
       foreach_neighbor (BGHOSTS)
-	if (allocated(0) && !is_boundary(cell))
-	  has_neighbors = true, break;
+	if (allocated(0) && !is_boundary(cell)) {
+	  has_neighbors = true; break;
+	}
       if (has_neighbors)
 	cache_level_append (&q->boundary[level], point);
       // restriction for masked cells
@@ -691,14 +697,18 @@ static void update_cache_f (void)
   foreach_cache(tree->faces) @
 @define end_foreach_face_generic() end_foreach_cache()
 
-@define is_face_x() (_flags & face_x)
+@define is_face_x() { int ig = -1; VARIABLES; if (_flags & face_x) {
+@define end_is_face_x() }}
+      
 #if dimension >= 2
-@define is_face_y() (_flags & face_y)
+@define is_face_y() { int jg = -1; VARIABLES; if (_flags & face_y) {
+@define end_is_face_y() }}
 #endif
 #if dimension >= 3
-@define is_face_z() (_flags & face_z)
+@define is_face_z() { int kg = -1; VARIABLES; if (_flags & face_z) {
+@define end_is_face_z() }}
 #endif
-
+    
 @def foreach_vertex()
   update_cache();
   foreach_cache(tree->vertices) {
@@ -762,15 +772,14 @@ void reset (void * alist, double val)
   }
 }
 
-@def cache_level_resize(name, a)
+static CacheLevel * cache_level_resize (CacheLevel * name, int a)
 {
   for (int i = 0; i <= depth() - a; i++)
-    free (q->name[i].p);
-  free (q->name);
-  q->name = qcalloc (depth() + 1, CacheLevel);
+    free (name[i].p);
+  free (name);
+  return qcalloc (depth() + 1, CacheLevel);
 }
-@
-
+  
 static void update_depth (int inc)
 {
   Tree * q = tree;
@@ -780,10 +789,10 @@ static void update_depth (int inc)
   q->L = &(q->L[1]);
   if (inc > 0)
     q->L[grid->depth] = new_layer (grid->depth);
-  cache_level_resize (active, inc);
-  cache_level_resize (prolongation, inc);
-  cache_level_resize (boundary, inc);
-  cache_level_resize (restriction, inc);
+  q->active = cache_level_resize (q->active, inc);
+  q->prolongation = cache_level_resize (q->prolongation, inc);
+  q->boundary = cache_level_resize (q->boundary, inc);
+  q->restriction = cache_level_resize (q->restriction, inc);
 }
 
 #if dimension == 1

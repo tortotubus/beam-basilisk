@@ -293,8 +293,9 @@ foreach_face_generic() {
 @define is_coarse() (point.level < depth())
 
 #if dimension == 1
-@define is_face_x() true
-				 
+@define is_face_x() { int ig = -1; VARIABLES; {
+@define end_is_face_x() }}
+
 // foreach_edge?
 
 @def foreach_child() {
@@ -317,9 +318,11 @@ foreach_face_generic() {
 #elif dimension == 2
 #define foreach_edge() foreach_face(y,x)
 
-@define is_face_x() (point.j < point.n + GHOSTS)
-@define is_face_y() (point.i < point.n + GHOSTS)
-
+@define is_face_x() { int ig = -1; VARIABLES; if (point.j < point.n + GHOSTS) {
+@define end_is_face_x() }}
+@define is_face_y() { int jg = -1; VARIABLES; if (point.i < point.n + GHOSTS) {
+@define end_is_face_y() }}
+				 
 @def foreach_child() {
   int _i = 2*point.i - GHOSTS, _j = 2*point.j - GHOSTS;
   point.level++;
@@ -349,11 +352,14 @@ foreach_vertex() {
   foreach_vertex_aux()					\
     foreach_dimension()					\
       if (_a.x < point.n + GHOSTS)
-    
-@define is_face_x() (point.j < point.n + GHOSTS && point.k < point.n + GHOSTS)
-@define is_face_y() (point.i < point.n + GHOSTS && point.k < point.n + GHOSTS)
-@define is_face_z() (point.i < point.n + GHOSTS && point.j < point.n + GHOSTS)
 
+@define is_face_x() { int ig = -1; VARIABLES; if (point.j < point.n + GHOSTS && point.k < point.n + GHOSTS) {
+@define end_is_face_x() }}
+@define is_face_y() { int jg = -1; VARIABLES; if (point.i < point.n + GHOSTS && point.k < point.n + GHOSTS) {
+@define end_is_face_y() }}
+@define is_face_z() { int kg = -1; VARIABLES; if (point.i < point.n + GHOSTS && point.j < point.n + GHOSTS) {
+@define end_is_face_z() }}
+  
 @def foreach_child() {
   int _i = 2*point.i - GHOSTS;
   int _j = 2*point.j - GHOSTS;
