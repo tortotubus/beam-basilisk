@@ -32,7 +32,7 @@ int main (int argc, char * argv[])
   do {
     refined = 0;
     tree->refined.n = 0;
-    foreach()
+    foreach (serial)
       if (is_leaf(cell) && level <= maxlevel &&
 	  sq(x) + sq(y) + sq(z) < sq(0.05)) {
 	refine_cell (point, list, 0, &tree->refined);
@@ -61,7 +61,7 @@ int main (int argc, char * argv[])
 #endif
   
   long nl = 0;
-  foreach()
+  foreach (serial)
     nl++;
   long nt = nl;
   mpi_all_reduce (nt, MPI_LONG, MPI_SUM);

@@ -188,7 +188,7 @@ int main (int argc, char * argv[])
 
   sum = 0.;
   int n = 0;
-  foreach() {
+  foreach (serial) {
     e[] = (long) &(a[]);
     sum += e[];
     n++;
