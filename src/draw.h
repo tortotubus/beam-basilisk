@@ -190,8 +190,14 @@ void view (struct _view_set p)
     v->width *= v->samples;
     v->height *= v->samples;
     framebuffer_destroy (v->fb);
+
+    /* OpenGL somehow generates floating-point exceptions... turn them off */
+    disable_fpe (FE_DIVBYZERO|FE_INVALID);
+    
     v->fb = framebuffer_new (v->width, v->height);
     init_gl();
+
+    enable_fpe (FE_DIVBYZERO|FE_INVALID);    
   }
 
   if (p.cache > 0) {
