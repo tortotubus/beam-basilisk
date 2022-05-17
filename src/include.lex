@@ -4,7 +4,8 @@
   #include <assert.h>
   #include <sys/stat.h>
   #include <sys/types.h>
-
+  #include "ast/allocator.h"
+  
   enum { FUNCTION, TYPEDEF };
 
   typedef struct {
@@ -16,7 +17,8 @@
   static int ntags = 0, target = 1, keywords_only = 0, scope = 0, intypedef = 0;
   static int warninclude = 0;
   static FILE * swigfp = NULL;
-
+  static Allocator * alloc = NULL;
+  
   static void append_tag (Tag t) {
     ntags++;
     tagsa = realloc (tagsa, ntags*sizeof(Tag));
@@ -58,7 +60,7 @@
 
   static char * push (char * s) {
     assert (stack + 1 < 100);
-    char * f = malloc (strlen (s) + 1);
+    char * f = allocate (alloc, strlen (s) + 1);
     strcpy (f, s);
     _stack[++stack] = f;
     return f;    
@@ -98,7 +100,7 @@
   static FILE * openpath (const char * name, const char * mode, char ** path) {
     int i;
     for (i = npath; i >= 0; i--) {
-      char * p = malloc (strlen (paths[i]) + strlen (name) + 3);
+      char * p = allocate (alloc, strlen (paths[i]) + strlen (name) + 3);
       strcpy (p, paths[i]); strcat (p, "//"); strcat (p, name);
       FILE * fp = fopen (p, mode);
       if (fp) {
@@ -109,8 +111,6 @@
 	*path = p;
 	return fp;
       }
-      else
-	free (p);
     }
     return NULL;
   }
@@ -254,7 +254,6 @@ FDECL     {ID}+{SP}*\(
 	  fputs ("\"\n", swigfp);
 	}
       }
-      free (path);
       fclose (fp);
     }
     else {
@@ -464,7 +463,7 @@ static int is_code (const char * file)
 static int include (char * file, FILE * fin, FILE * fout)
 {
   fname = stripslash (file);
-  paths[npath] = malloc (strlen (file) + 1);
+  paths[npath] = allocate (alloc, strlen (file) + 1);
   strcpy (paths[npath], file);
   stripname (paths[npath]);
   yyin = fin;
@@ -475,6 +474,7 @@ static int include (char * file, FILE * fin, FILE * fout)
   incode = is_code (file);
   //  yy_flex_debug = 1;
   int ret = yylex();
+  yylex_destroy();
   if (fout && incode) {
     // Assume the entire file is pure code
     fseek (fout, header, SEEK_SET);
@@ -502,7 +502,7 @@ static int include (char * file, FILE * fin, FILE * fout)
 FILE * writepath (char * path, const char * mode);
 void cleanup (int status, const char * dir);
 
-static int compdir (char * file, char ** out, int nout, const char * dir)
+static void compdir (char * file, const char * dir)
 {
   push (file);
   while (stack >= 0) {
@@ -545,10 +545,8 @@ static int compdir (char * file, char ** out, int nout, const char * dir)
       fputs ("\n#endif\n", fout);
       fclose (fout);
     }
-    out[nout++] = path;
     target = 0;
   }
-  return nout;
 }
 
 static void prepend_path (char * path)
@@ -560,15 +558,16 @@ static void prepend_path (char * path)
   npath++;
 }
 
-int includes (int argc, char ** argv, char ** out, 
+void includes (int argc, char ** argv,
 	      char ** grid1, int * default_grid,
 	      int * dim, int * bg, int * lyrs,
 	      const char * dir)
 {
-  int depend = 0, nout = 0, tags = 0, swig = 0;
+  int depend = 0, tags = 0, swig = 0;
   char * file = NULL, * output = NULL;
   int i;
   warninclude = 0;
+  alloc = new_allocator();
   char * basilisk_include_path = getenv ("BASILISK_INCLUDE_PATH");
   if (basilisk_include_path) {
     basilisk_include_path = strdup (basilisk_include_path);
@@ -670,7 +669,7 @@ int includes (int argc, char ** argv, char ** out,
       fputs ("/common.i\"\n", swigfp);
     }
     target = 1;
-    nout = compdir (file, out, 0, dir);
+    compdir (file, dir);
     if (!hasgrid && is_code (file)) {
       char * path, gridpath[80] = "grid/";
       strcat (gridpath, grid); strcat (gridpath, ".h");
@@ -682,7 +681,7 @@ int includes (int argc, char ** argv, char ** out,
       }
       fclose (fp);
       target = 0;
-      nout = compdir (path, out, nout, dir);
+      compdir (path, dir);
       hasgrid = 0;
     }
     if (swigfp) {
@@ -694,17 +693,16 @@ int includes (int argc, char ** argv, char ** out,
       }
       fclose (fp);
       target = 0;
-      nout = compdir (path, out, nout, dir);
+      compdir (path, dir);
     }
     if (ftags) {
       // reprocess the target file for keywords
       keywords_only = target = 1;
-      compdir (file, out, nout, dir);
+      compdir (file, dir);
     }
     char * path;    
     FILE * fp = openpath ("common.h", "r", &path);
     assert (fp);
-    out[nout++] = path;
     fclose (fp);
   }
   if (fdepend) {
@@ -722,5 +720,5 @@ int includes (int argc, char ** argv, char ** out,
   *bg = bghosts;
   *lyrs = layers;
   free (basilisk_include_path);
-  return nout;
+  free_allocator (alloc);
 }

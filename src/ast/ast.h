@@ -233,9 +233,10 @@ Ast * ast_is_simple_expression (const Ast * n);
 Ast * ast_get_struct_name (Ast * declaration_specifiers);
 bool  ast_are_identical (const Ast * a, const Ast * b);
 Ast * ast_expression_type (Ast * expr, Stack * stack, bool higher_dimension);
-char * ast_typedef_name (Ast * type);
+AstTerminal * ast_type (const Ast * identifier);
+char * ast_typedef_name (const Ast * identifier);
 
 Ast * ast_check_grammar (Ast * n, bool recursive);
 
 bool  ast_is_stencil_function (Ast * n);
-Ast * ast_stencil (Ast * n);
+Ast * ast_stencil (Ast * n, bool parallel);
