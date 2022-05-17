@@ -583,10 +583,7 @@ static scalar compile_expression (char * expr, bool * isexpr)
   									\
   if ((dimension > 2 || args.linear) &&					\
       !args.fc[0] && !args.fc[1] && !args.fc[2])			\
-    args.fc[0] = args.fc[1] = args.fc[2] = 1.;				\
-									\
-  if (args.linear && col.i >= 0)					\
-    boundary ({col});
+    args.fc[0] = args.fc[1] = args.fc[2] = 1.;
 
 #define color_facet(args)						\
   if (args.color && (!args.linear || col.i < 0)) {			\
@@ -766,7 +763,6 @@ bool draw_vof (struct _draw_vof p)
     c.dirty = true;
   }
 #endif // TREE
-  boundary ({c});
     
   bview * view = draw();
 #if dimension == 2
@@ -784,14 +780,14 @@ bool draw_vof (struct _draw_vof p)
 	view->ni++;
       }
       else if (c[] > 0. && c[] < 1.) {
-	coord n = facet_normal (point, c, s), s = {1.,1.};
+	coord n = facet_normal (point, c, s), r = {1.,1.};
 	if (p.filled < 0)
 	  foreach_dimension()
 	    n.x = - n.x;
 	double alpha = plane_alpha (p.filled < 0. ? 1. - c[] : c[], n);
 	alpha += (n.x + n.y)/2.;
 	foreach_dimension()
-	  if (n.x < 0.) alpha -= n.x, n.x = - n.x, s.x = - 1.;
+	  if (n.x < 0.) alpha -= n.x, n.x = - n.x, r.x = - 1.;
 	coord v[5];
 	int nv = 0;
 	if (alpha >= 0. && alpha <= n.x) {
@@ -816,14 +812,14 @@ bool draw_vof (struct _draw_vof p)
 	  v[nv].x = 1., v[nv++].y = 0.;
 	}
 	glBegin (GL_POLYGON);
-	if (s.x*s.y < 0.)
+	if (r.x*r.y < 0.)
 	  for (int i = nv - 1; i >= 0; i--)
-	    glvertex2d (view, x + s.x*(v[i].x - 0.5)*Delta,
-			y + s.y*(v[i].y - 0.5)*Delta);
+	    glvertex2d (view, x + r.x*(v[i].x - 0.5)*Delta,
+			y + r.y*(v[i].y - 0.5)*Delta);
 	else
 	  for (int i = 0; i < nv; i++)
-	    glvertex2d (view, x + s.x*(v[i].x - 0.5)*Delta,
-			y + s.y*(v[i].y - 0.5)*Delta);
+	    glvertex2d (view, x + r.x*(v[i].x - 0.5)*Delta,
+			y + r.y*(v[i].y - 0.5)*Delta);
 	glEnd ();
 	view->ni++;
       }
@@ -1109,7 +1105,6 @@ bool squares (struct _squares p)
     foreach()
       foreach_dimension()
         n.x[] = (Z[1] - Z[-1])/(2.*Delta_x);
-    boundary ((scalar *){n});
   }
 #endif
   colorize_args (p);
@@ -1411,13 +1406,11 @@ bool isosurface (struct _isosurface p)
   foreach_vertex()
     v[] = (f[] + f[-1] + f[0,-1] + f[-1,-1] +
 	   f[0,0,-1] + f[-1,0,-1] + f[0,-1,-1] + f[-1,-1,-1])/8.;
-  boundary ({v});
   
   vector n[];
   foreach()
     foreach_dimension()
       n.x[] = center_gradient(f);
-  boundary ((scalar *){n});
 
   bview * view = draw();
   glShadeModel (GL_SMOOTH);
