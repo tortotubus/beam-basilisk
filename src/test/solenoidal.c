@@ -7,7 +7,7 @@
 double divmax (face vector uf)
 {
   double dmax = 0.;
-  foreach (reduction(max:dmax)) {
+  foreach() {
     double d = 0.;
     foreach_dimension()
       d += uf.x[1] - uf.x[];

@@ -47,7 +47,6 @@ needs to be refined before $h$ and $h$ before $\eta$. */
 
 scalar zb[], h[], eta[];
 vector u[];
-scalar w[];
 
 /**
 The only physical parameter is the acceleration of gravity *G*. Cells
@@ -293,10 +292,12 @@ double update_saint_venant (scalar * evolving, scalar * updates, double dtmax)
       /**
       For [multiple layers](multilayer.h#fluxes-between-layers) we
       need to store the divergence in each layer. */
-
-      scalar div = wl[l];
-      div[] = dhl;
       
+      if (l < nl - 1) {
+	scalar div = wl[l];
+	div[] = dhl;
+      }
+
       /**
       We also need to add the metric terms. They can be written (see
       eq. (8) of [Popinet, 2011](references.bib#popinet2011)) 
@@ -342,7 +343,6 @@ event defaults (i = 0)
   assert (ul == NULL && wl == NULL);
   assert (nl > 0);
   ul = vectors_append (ul, u);
-  wl = list_append (wl, w);
   for (int l = 1; l < nl; l++) {
     scalar w = new scalar;
     vector u = new vector;

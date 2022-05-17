@@ -169,7 +169,7 @@ int tag (scalar t)
   array of unique indices. */
 
   Array * a = array_new();
-  foreach (serial, noauto)
+  foreach (serial)
     if (t[] > 0) {
   
       /**
@@ -291,7 +291,7 @@ void remove_droplets (struct RemoveDroplets p)
   int n = tag (d), size[n];
   for (int i = 0; i < n; i++)
     size[i] = 0;
-  foreach (serial, noauto)
+  foreach (serial)
     if (d[] > 0)
       size[((int) d[]) - 1]++;
 #if _MPI

@@ -58,7 +58,7 @@ event logfile (i++)
 {
   double pe = 0., ke = 0.;
 #if ML  
-  foreach(reduction(+:ke) reduction(+:pe)) {
+  foreach() {
     double H = 0.;
     foreach_layer() {
       ke += Delta*h[]*(sq(u.x[]) + sq(w[]))/2.;
@@ -67,7 +67,7 @@ event logfile (i++)
     pe += Delta*G*sq(H - h0)/2.;
   }
 #else
-  foreach(reduction(+:ke) reduction(+:pe)) {
+  foreach() {
     int l = 0;
     for (vector u in ul)
       ke += Delta*layer[l++]*h[]*sq(u.x[])/2.;

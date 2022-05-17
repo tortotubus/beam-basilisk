@@ -35,7 +35,7 @@ static void relax_diffusion (scalar * a, scalar * b, int l, void * data)
   double dt = p->dt;
   vector u = vector(a[0]), r = vector(b[0]);
 
-  double (* flux) (Point, scalar, vector, double *) = p->embed_flux;
+  double (* embed_flux) (Point, scalar, vector, double *) = p->embed_flux;
   foreach_level_or_leaf (l) {
     double avgmu = 0.;
     foreach_dimension()
@@ -43,7 +43,7 @@ static void relax_diffusion (scalar * a, scalar * b, int l, void * data)
     avgmu = dt*avgmu + SEPS;
     foreach_dimension() {
       double c = 0.;
-      double d = flux ? flux (point, u.x, mu, &c) : 0.;
+      double d = embed_flux ? embed_flux (point, u.x, mu, &c) : 0.;
       scalar s = u.x;
       double a = 0.;
       foreach_dimension()
@@ -72,7 +72,7 @@ static double residual_diffusion (scalar * a, scalar * b, scalar * resl,
   (const) face vector mu = p->mu;
   (const) scalar rho = p->rho;
   double dt = p->dt;
-  double (* flux) (Point, scalar, vector, double *) = p->embed_flux;
+  double (* embed_flux) (Point, scalar, vector, double *) = p->embed_flux;
   vector u = vector(a[0]), r = vector(b[0]), res = vector(resl[0]);
   double maxres = 0.;
 #if TREE
@@ -87,8 +87,8 @@ static double residual_diffusion (scalar * a, scalar * b, scalar * resl,
       foreach_dimension()
 	a += g.x[] - g.x[1];
       res.x[] = r.x[] - rho[]*lambda.x*u.x[] - dt*a/Delta;
-      if (flux) {
-	double c, d = flux (point, u.x, mu, &c);
+      if (embed_flux) {
+	double c, d = embed_flux (point, u.x, mu, &c);
 	res.x[] -= dt*(c + d*u.x[]);
       }
       if (fabs (res.x[]) > maxres)
@@ -104,8 +104,8 @@ static double residual_diffusion (scalar * a, scalar * b, scalar * resl,
       foreach_dimension()
 	a += mu.x[0]*face_gradient_x (s, 0) - mu.x[1]*face_gradient_x (s, 1);
       res.x[] = r.x[] - rho[]*lambda.x*u.x[] - dt*a/Delta;
-      if (flux) {
-	double c, d = flux (point, u.x, mu, &c);
+      if (embed_flux) {
+	double c, d = embed_flux (point, u.x, mu, &c);
 	res.x[] -= dt*(c + d*u.x[]);
       }
       if (fabs (res.x[]) > maxres)

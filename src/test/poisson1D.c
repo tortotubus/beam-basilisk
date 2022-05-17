@@ -29,7 +29,7 @@ int main (int argc, char ** argv)
     poisson (a, b);
 
     double max = 0;
-    foreach(reduction (max:max)) {
+    foreach() {
       double e = a[] - solution(x);
       if (fabs(e) > max) max = fabs(e);
       printf ("%g %g %g %g\n", x, a[], b[], e);

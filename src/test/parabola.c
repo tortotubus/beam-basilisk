@@ -109,7 +109,7 @@ event field (t = 1500) {
 event umean (t += 50; t <= 6000) {
   if (N == 128) {
     double sq = 0., sh = 0.;
-    foreach(reduction(+:sq) reduction(+:sh)) {
+    foreach() {
 #if EXPLICIT || ML
       sq += Delta*h[]*u.x[];
 #else

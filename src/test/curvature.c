@@ -84,7 +84,7 @@ void sample_circles (int nr, double R, int levelmax, norm * n, cstats * sc)
       computation... */
 
       sc[l].h += s.h; sc[l].f += s.f; sc[l].a += s.a; sc[l].c += s.c;
-      foreach (serial)
+      foreach()
 	if (c[] > 0. && c[] < 1.) {
 
           /**

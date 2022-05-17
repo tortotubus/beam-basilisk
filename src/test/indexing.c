@@ -20,7 +20,7 @@ int main (int argc, char ** argv)
   
   scalar reference[];
   int i = 0;
-  foreach(reduction(+:i))
+  foreach()
     reference[] = i++;
 
   mpi_partitioning();

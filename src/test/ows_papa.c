@@ -256,8 +256,7 @@ event init (i = 0)
 {
   if (turbulence_turb_method != 99)
     turbulence_report_model();
-  // fixme: otherwise stencil fails within init_profile()
-  foreach (serial, noauto) {
+  foreach() {
     zb[] = - 250.;
     foreach_layer()
       h[] = 250./nl;

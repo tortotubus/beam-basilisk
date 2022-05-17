@@ -66,10 +66,14 @@ solver](navier-stokes/centered.h). */
 (const) scalar mup = unity;
 
 /**
-Constitutive models other than Oldroyd-B (the default) are defined by
-defining the two macros $\mathbf{f}_s (\mathbf{A})$ and $\mathbf{f}_r
-(\mathbf{A})$. See [the FENE-P model](fene-p.h) for an example.
+Constitutive models other than Oldroyd-B (the default) are defined
+through the two functions $\mathbf{f}_s (\mathbf{A})$ and
+$\mathbf{f}_r (\mathbf{A})$. */
 
+void (* f_s) (double, double *, double *) = NULL;
+void (* f_r) (double, double *, double *) = NULL;
+
+/**
 ## The log conformation approach
 
 The numerical resolution of viscoelastic fluid problems often faces the
@@ -138,10 +142,8 @@ scalar tau_qq[];
 event defaults (i = 0) {
   if (is_constant (a.x))
     a = new face vector;
-
-#if defined(f_s) || defined(f_r)
-  trA = new scalar;
-#endif
+  if (f_s || f_r)
+    trA = new scalar;
 
   foreach() {
     foreach_dimension()
@@ -283,10 +285,9 @@ event tracer_advection (i++)
       $\mathbf{A}$.*/
 
       double eta = 1., nu = 1.;
-#ifdef f_s
-      f_s (trA[], nu, eta);
-#endif
- 
+      if (f_s)
+	f_s (trA[], &nu, &eta);
+
       double fa = (mup[] != 0 ? lambda[]/(mup[]*eta) : 0.);
 
       pseudo_t A;
@@ -448,8 +449,7 @@ event tracer_advection (i++)
       */
 
       double eta = 1., nu = 1.;
-#ifdef f_r
-      {
+      if (f_r) {
 #if 0 // Set to one if the midstep trace is to be used.
 	scalar t = trA;
 	t[] = A.x.x + A.y.y;
@@ -457,10 +457,9 @@ event tracer_advection (i++)
 	t[] += Aqq;
 #endif
 #endif
-	f_r (trA[], nu, eta);
+	f_r (trA[], &nu, &eta);
       }
-#endif
- 
+
       double fa = exp(-nu*eta*dt/lambda[]);
 
 #if AXI
@@ -474,26 +473,23 @@ event tracer_advection (i++)
 
       /**
       The trace at time $n+1$ is also needed for some models. */
-
-#if defined(f_s) || defined(f_r)
-      {
+      
+      if (f_s || f_r) {
 	scalar t = trA;
 	t[] = A.x.x + A.y.y;
 #if AXI
 	t[] += Aqq;
 #endif
       }
-#endif
- 
+
       /**
       Then the stress tensor $\mathbf{\tau}_p^{n+1}$ is computed from
       $\mathbf{A}^{n+1}$ according to the constitutive model,
       $\mathbf{f}_s(\mathbf{A})$.  */
 
       nu = 1; eta = 1.;
-#ifdef f_s
-      f_s (trA[], nu, eta);
-#endif
+      if (f_s)
+	f_s (trA[], &nu, &eta);
 
       fa = mup[]/lambda[]*eta;
       
@@ -592,5 +588,5 @@ event acceleration (i++)
 
 ## See also
 
-* [Macros $f_s$ and $f_r$ for the FENE-P model](fene-p.h)
+* [Functions $f_s$ and $f_r$ for the FENE-P model](fene-p.h)
 */

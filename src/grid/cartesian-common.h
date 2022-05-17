@@ -475,10 +475,6 @@ double (* default_scalar_bc[]) (Point, Point, scalar, void *) = {
   symmetry, symmetry, symmetry, symmetry, symmetry, symmetry
 };
 
-static double centered (double s0, double s1, double s2) {
-  return (s2 - s0)/2.;
-}
-
 scalar cartesian_init_scalar (scalar s, const char * name)
 {
   // keep name
@@ -519,7 +515,7 @@ scalar cartesian_init_scalar (scalar s, const char * name)
   for (int b = 0; b < nboundary; b++)
     s.boundary[b] = s.boundary_homogeneous[b] =
       b < 2*dimension ? default_scalar_bc[b] : symmetry;
-  s.gradient = centered;
+  s.gradient = NULL;
   foreach_dimension() {
     s.d.x = 0;  // not face
     s.v.x.i = -1; // not a vector component

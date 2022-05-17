@@ -262,6 +262,9 @@ struct Poisson {
   double tolerance;
   int nrelax, minlevel;
   scalar * res;
+#if EMBED
+  double (* embed_flux) (Point, scalar, vector, double *);
+#endif
 };
 
 /**
@@ -274,10 +277,7 @@ static void relax (scalar * al, scalar * bl, int l, void * data)
   struct Poisson * p = (struct Poisson *) data;
   (const) face vector alpha = p->alpha;
   (const) scalar lambda = p->lambda;
-#if EMBED
-  bool embedded = (a.boundary[embed] != symmetry);
-#endif
-  
+
   /**
   We use either Jacobi (under)relaxation or we directly reuse values
   as soon as they are updated. For Jacobi, we need to allocate space
@@ -307,8 +307,8 @@ static void relax (scalar * al, scalar * bl, int l, void * data)
       d += alpha.x[1] + alpha.x[];
     }
 #if EMBED
-    if (embedded) {
-      double c, e = embed_flux (point, a, alpha, &c);
+    if (p->embed_flux) {
+      double c, e = p->embed_flux (point, a, alpha, &c);
       n -= c*sq(Delta);
       d += e*sq(Delta);
     }
@@ -348,9 +348,6 @@ static double residual (scalar * al, scalar * bl, scalar * resl, void * data)
   struct Poisson * p = (struct Poisson *) data;
   (const) face vector alpha = p->alpha;
   (const) scalar lambda = p->lambda;
-#if EMBED
-  bool embedded = (a.boundary[embed] != symmetry);
-#endif
   double maxres = 0.;
 #if TREE
   /* conservative coarse/fine discretisation (2nd order) */
@@ -362,8 +359,8 @@ static double residual (scalar * al, scalar * bl, scalar * resl, void * data)
     foreach_dimension()
       res[] -= (g.x[1] - g.x[])/Delta;
 #if EMBED
-    if (embedded) {
-      double c, e = embed_flux (point, a, alpha, &c);
+    if (p->embed_flux) {
+      double c, e = p->embed_flux (point, a, alpha, &c);
       res[] += c - e*a[];
     }
 #endif // EMBED    
@@ -378,8 +375,8 @@ static double residual (scalar * al, scalar * bl, scalar * resl, void * data)
       res[] += (alpha.x[0]*face_gradient_x (a, 0) -
 		alpha.x[1]*face_gradient_x (a, 1))/Delta;  
 #if EMBED
-    if (embedded) {
-      double c, e = embed_flux (point, a, alpha, &c);
+    if (p->embed_flux) {
+      double c, e = p->embed_flux (point, a, alpha, &c);
       res[] += c - e*a[];
     }
 #endif // EMBED
@@ -428,6 +425,10 @@ mgstats poisson (struct Poisson p)
     TOLERANCE = p.tolerance;
 
   scalar a = p.a, b = p.b;
+#if EMBED
+  if (!p.embed_flux && a.boundary[embed] != symmetry)
+    p.embed_flux = embed_flux;
+#endif // EMBED
   mgstats s = mg_solve ({a}, {b}, residual, relax,
 			&p, p.nrelax, p.res, minlevel = max(1, p.minlevel));
 

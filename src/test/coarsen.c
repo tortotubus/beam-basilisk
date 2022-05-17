@@ -8,7 +8,7 @@ int main()
   unrefine (level > 5);
   tree_check();
   long tnc = 0;
-  foreach(reduction(+:tnc))
+  foreach()
     tnc++;
   fprintf (stderr, "depth: %d leaves: %ld mem: %ld\n",
 	   depth(), tnc, pmtrace.total);

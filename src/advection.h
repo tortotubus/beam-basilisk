@@ -26,7 +26,7 @@ centered slope estimation). */
 
 face vector uf[];
 #define u uf
-double (* gradient) (double, double, double) = centered;
+double (* gradient) (double, double, double) = NULL;
 
 /**
 Here we set the gradient functions for each tracer (as defined in the
