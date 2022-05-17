@@ -250,7 +250,8 @@ void init_profile (Point point, const char * fname,
 }
 
 /**
-The inital temperature and salinity profiles are obtained from the data. */
+The initial temperature and salinity profiles are obtained from the
+data. */
  
 event init (i = 0)
 {
