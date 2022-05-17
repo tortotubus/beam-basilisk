@@ -41,8 +41,7 @@ Ast * ast_find_function (Ast * n, const char * name)
 
 Ast * ast_function_identifier (const Ast * function_definition)
 {
-  return ast_schema (function_definition,
-		     sym_function_definition,
+  return ast_schema (function_definition, sym_function_definition,
 		     0, sym_function_declaration,
 		     1, sym_declarator,
 		     0, sym_direct_declarator,
@@ -504,11 +503,11 @@ static char * typedef_name_from_declaration (Ast * declaration)
   return NULL;
 }
 
-char * ast_typedef_name (Ast * type)
+AstTerminal * ast_type (const Ast * identifier)
 {
-  if (!type)
+  if (!identifier)
     return NULL;
-  Ast * declarator = type;
+  const Ast * declarator = identifier;
   while (declarator && declarator->sym != sym_declarator)
     declarator = declarator->parent;
   
@@ -522,7 +521,16 @@ char * ast_typedef_name (Ast * type)
 		   0, sym_generic_identifier,
 		   0, sym_IDENTIFIER))
     return NULL; // this is a pointer
-  return typedef_name_from_declaration (declaration_from_type (type));
+  return ast_terminal (ast_find (declaration_from_type (identifier),
+				 sym_types)->child[0]);
+}
+
+char * ast_typedef_name (const Ast * identifier)
+{
+  AstTerminal * type = ast_type (identifier);
+  if (!type || ((Ast *)type)->sym != sym_TYPEDEF_NAME)
+    return NULL;
+  return type->start;
 }
 
 static Ast * inforeach (Ast * n)
@@ -692,7 +700,7 @@ static Field * field_append (Field ** fields, Ast * identifier,
 
 typedef struct {
   int dimension;
-  bool nolineno;
+  bool nolineno, parallel;
   Field * constants;
   int constants_index, fields_index, nboundary;
   Ast * init_solver, * init_events, * init_fields;
@@ -1565,6 +1573,7 @@ static char * set_boundary (Ast * array, char * ind)
   char * scalar = ast_str_append (array->child[0], NULL);
   char * set = NULL;
   str_append (set,
+	      "_attribute[", scalar, ".i].dirty=1,",
 	      "_attribute[", scalar, ".i].boundary[", bc,
 	      "]=_boundary", ind, ",",
 	      "_attribute[", scalar, ".i].boundary_homogeneous[", bc,
@@ -1750,10 +1759,14 @@ static void global_boundaries_and_stencils (Ast * n, Stack * stack, void * data)
 
   case sym_foreach_statement: {
     if (!strcmp (ast_terminal (n->child[0])->start, "foreach") ||
+	!strcmp (ast_terminal (n->child[0])->start, "foreach_visible") ||
 	!strcmp (ast_terminal (n->child[0])->start, "foreach_vertex") ||
 	!strcmp (ast_terminal (n->child[0])->start, "foreach_face")) {
+      TranslateData * d = data;
+      bool parallel = d->parallel &&
+	strcmp (ast_terminal (n->child[0])->start, "foreach_visible");
       Ast * stencil = ast_copy (n);
-      if (ast_stencil (stencil)) {
+      if (ast_stencil (stencil, parallel)) {
 	str_append (ast_terminal (ast_child (stencil, sym_FOREACH))->start,
 		    "_stencil");
 	Ast * statement = n->parent->parent;
@@ -1909,19 +1922,18 @@ static void translate (Ast * n, Stack * stack, void * data)
       }
 
       /**
-      Here we add the `is_face_x()` condition to the loop statement
-      (except for stencils). */
+      Here we add the `is_face_x()` condition to the loop statement. */
 
-      if (!is_face_stencil) {
-	Ast * expr = ast_parse_expression ("is_face_x(){;}", ast_get_root (n));
-	Ast * cond = ast_find (expr, sym_IDENTIFIER);
-	ast_terminal (cond)->start[strlen(ast_terminal (cond)->start) - 1] =
-	  order[0];
-	ast_replace (expr, ";", ast_last_child (n));
-	ast_set_line (expr, ast_left_terminal (n));
-	ast_replace_child (n, n->child[4] ? 4 : 3,
-			   ast_new_children (ast_new (n, sym_statement), expr));
-      }
+      Ast * expr = ast_parse_expression
+	(is_face_stencil ? "_stencil_is_face_x(){;}" : "is_face_x(){;}",
+	 ast_get_root (n));
+      Ast * cond = ast_find (expr, sym_IDENTIFIER);
+      ast_terminal (cond)->start[strlen(ast_terminal (cond)->start) - 1] =
+	order[0];
+      ast_replace (expr, ";", ast_last_child (n));
+      ast_set_line (expr, ast_left_terminal (n));
+      ast_replace_child (n, n->child[4] ? 4 : 3,
+			 ast_new_children (ast_new (n, sym_statement), expr));
 	
       /**
       Finally, we "dimension-rotate" the statement. */
@@ -1940,11 +1952,9 @@ static void translate (Ast * n, Stack * stack, void * data)
 	  stack_push (stack, &copy);
 	  ast_traverse (copy, stack, rotate, d);
 	  ast_pop_scope (stack, copy);
-	  if (!is_face_stencil) {
-	    Ast * cond = ast_find (copy, sym_IDENTIFIER);
-	    ast_terminal (cond)->start[strlen(ast_terminal (cond)->start) - 1] =
-	      order[i];
-	  }
+	  Ast * cond = ast_find (copy, sym_IDENTIFIER);
+	  ast_terminal (cond)->start[strlen(ast_terminal (cond)->start) - 1] =
+	    order[i];
 	  list = ast_block_list_append (list, item->sym, copy);
 	}
 	if (statement->sym != sym_statement)
@@ -2974,6 +2984,17 @@ static const char * get_field_type (Ast * declaration, AstTerminal * t)
   return typename;
 }
 
+static void mpi_operator (Ast * n, Ast * op)
+{
+  char * operator = ast_left_terminal (op)->start;
+  ast_after (n,
+	     !strcmp(operator, "min") ? "MPI_MIN" :
+	     !strcmp(operator, "max") ? "MPI_MAX" :
+	     !strcmp(operator, "+")   ? "MPI_SUM" :
+	     !strcmp(operator, "||")  ? "MPI_LOR" :
+	     "Unknown", ",");
+}
+
 static void macros (Ast * n, Stack * stack, void * data)
 {
   switch (n->sym) {
@@ -3036,29 +3057,51 @@ static void macros (Ast * n, Stack * stack, void * data)
 					     4, sym_reduction_array,
 					     0, sym_generic_identifier,
 					     0, sym_IDENTIFIER);
+	      AstTerminal * t = ast_terminal (identifier);
 	      Ast * array = ast_schema (reduction, sym_reduction,
 					4, sym_reduction_array,
 					3, sym_expression);
-	      char * operator = ast_left_terminal (reduction->child[2])->start;
 	      if (array) {
-		ast_after (n, "mpi_all_reduce_double(",
-			   ast_terminal (identifier)->start,
-			   ",",
-			   !strcmp(operator, "min") ? "MPI_MIN" : 
-			   !strcmp(operator, "max") ? "MPI_MAX" : 
-			   "MPI_SUM,");
+		ast_after (n, "mpi_all_reduce_array(",
+			   t->start,
+			   ",double,");
+		mpi_operator (n, reduction->child[2]);
 		ast_right_terminal (n)->after =
 		  ast_str_append (array, ast_right_terminal (n)->after);
 		ast_after (n, ");");
 	      }
-	      else
-		ast_after (n, "mpi_all_reduce_double(&",
-			   ast_terminal (identifier)->start,
-			   ",",
-			   !strcmp(operator, "min") ? "MPI_MIN" : 
-			   !strcmp(operator, "max") ? "MPI_MAX" : 
-			   "MPI_SUM",
-			   ",1);");
+	      else {
+		AstTerminal * type = ast_type (ast_identifier_declaration
+					       (stack, t->start));
+		if (!type) {
+		  fprintf (stderr,
+			   "%s:%d: error: cannot determine type of '%s'\n",
+			   t->file, t->line, t->start);
+		  exit (1);
+		}
+		char s[20] = "1";
+		ast_after (n, "mpi_all_reduce_array(&", t->start);
+		if (!strcmp (type->start, "coord")) {
+		  TranslateData * d = data;
+		  snprintf (s, 19, "%d", d->dimension);
+		  ast_after (n, ".x,double");
+		}
+		else if (!strcmp (type->start, "double") ||
+			 !strcmp (type->start, "int") ||
+			 !strcmp (type->start, "long") ||
+			 !strcmp (type->start, "bool"))
+		  ast_after (n, ",", type->start);
+		else {
+		  fprintf (stderr,
+			   "%s:%d: error: does not know how to reduce "
+			   "type '%s' of '%s'\n",
+			   t->file, t->line, type->start, t->start);
+		  exit (1);
+		}
+		ast_after (n, ",");
+		mpi_operator (n, reduction->child[2]);
+		ast_after (n, s, ");");
+	      }
 	      sreductions = ast_str_append (reduction, sreductions);
 	    }
 	  }
@@ -3114,8 +3157,6 @@ static void macros (Ast * n, Stack * stack, void * data)
       if (!strcmp (t->start, "foreach_block"))
 	str_append (t->start, "_inner");
     }
-    if (is_foreach_stencil (foreach) || in_stencil_point_function (n))
-      str_prepend (t->start, "_stencil_");
     ast_before (n, "{");
     ast_after (n, "end_", t->start, "()}");
     break;
@@ -3506,6 +3547,14 @@ static void macros (Ast * n, Stack * stack, void * data)
       }
 
       /**
+      ## _stencil_is_face_... statements */
+
+      else if (!strcmp (t->start, "_stencil_is_face_x") ||
+	       !strcmp (t->start, "_stencil_is_face_y") ||
+	       !strcmp (t->start, "_stencil_is_face_z"))
+	ast_after (n, "end_", t->start, "()");
+
+      /**
       ## Map */
 
       else if (!strcmp (ast_terminal (identifier)->start, "map")) {
@@ -3554,13 +3603,8 @@ static void macros (Ast * n, Stack * stack, void * data)
     /**
     ## Solver initialization and termination. */
 
-    Ast * identifier = ast_schema (n, sym_function_definition,
-				   0, sym_function_declaration,
-				   1, sym_declarator,
-				   0, sym_direct_declarator,
-				   0, sym_direct_declarator,
-				   0, sym_generic_identifier,
-				   0, sym_IDENTIFIER);
+    Ast * identifier = ast_function_identifier (n);
+    char * init;
     if (identifier && !strcmp (ast_terminal (identifier)->start, "main")) {
       Ast * compound_statement = ast_child (n, sym_compound_statement);
       ast_after (compound_statement->child[0],
@@ -3568,7 +3612,13 @@ static void macros (Ast * n, Stack * stack, void * data)
       Ast * end = ast_child (compound_statement, token_symbol ('}'));
       ast_before (end, "free_solver();");
     }
-    
+    else if (identifier && ast_left_terminal (n)->before &&
+	     (init = strstr (ast_left_terminal (n)->before, "@init_solver"))) {
+      for (int i = 0; i < 12; i++)
+	init[i] = ' ';
+      TranslateData * d = data;
+      ast_before (d->init_events, ast_terminal (identifier)->start, "();");
+    }    
     break;
   }
 
@@ -3705,7 +3755,7 @@ void ast_traverse (Ast * n, Stack * stack,
 
 void endfor (FILE * fin, FILE * fout,
 	     const char * grid, int dimension,
-	     bool nolineno, bool progress, bool catch,
+	     bool nolineno, bool progress, bool catch, bool parallel,
 	     FILE * swigfp, char * swigname)
 {
   char * buffer = NULL;
@@ -3735,7 +3785,7 @@ void endfor (FILE * fin, FILE * fout,
   root->alloc = d->alloc; d->alloc = NULL;
 
   TranslateData data = {
-    .dimension = dimension, .nolineno = nolineno,
+    .dimension = dimension, .nolineno = nolineno, .parallel = parallel,
     .constants_index = 0, .fields_index = 0, .nboundary = 0,
     // fixme: splitting of events and fields is not used yet
     .init_solver = NULL, .init_events = NULL, .init_fields = NULL,

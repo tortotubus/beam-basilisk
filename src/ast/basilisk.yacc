@@ -711,6 +711,7 @@ reduction
 reduction_operator
         : generic_identifier
 	| '+'
+	| OR_OP
 	;
 
 reduction_array

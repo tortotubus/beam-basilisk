@@ -552,7 +552,7 @@ void move_field_accesses (Ast * n, Stack * stack, void * data)
 
 typedef struct {
   Ast * scope;
-  bool undefined;
+  bool parallel, undefined;
 } Undefined;
 
 static inline void set_undefined (Ast * n, Ast * scope)
@@ -644,6 +644,44 @@ bool is_local_declaration (Ast * n, Stack * stack, Ast * scope)
 }
 
 static
+void check_missing_reductions (Ast * n, Stack * stack, Ast * scope)
+{
+  Ast * parameters = ast_schema (scope, sym_foreach_statement,
+				 2, sym_foreach_parameters);
+  foreach_item (parameters, 2, param) {
+    Ast * identifier = ast_is_identifier_expression (param->child[0]);
+    if (identifier && !strcmp (ast_terminal (identifier)->start, "serial"))
+      return;
+    Ast * list = ast_schema (param, sym_foreach_parameter,
+			     0, sym_reduction_list);
+    foreach_item (list, 1, reduction) {
+      Ast * identifier = ast_schema (reduction, sym_reduction,
+				     4, sym_reduction_array,
+				     0, sym_generic_identifier,
+				     0, sym_IDENTIFIER);
+      if (!strcmp (ast_terminal (identifier)->start,
+		   ast_terminal (n)->start))
+	return;
+    }
+  }
+  AstTerminal * t = ast_left_terminal (scope);
+  if (scope->sym == sym_foreach_statement)
+    fprintf (stderr,
+	     "%s:%d: error: non-local variable '%s' is modified by "
+	     "this foreach loop:\n"
+	     "%s:%d: error: use a loop-local variable, a reduction operation\n"
+	     "%s:%d: error: or a serial loop to get rid of this error\n",
+	     t->file, t->line, ast_terminal (n)->start,
+	     t->file, t->line, t->file, t->line);
+  else
+    fprintf (stderr,
+	     "%s:%d: error: non-local variable '%s' cannot be modified by this "
+	     "point function\n",
+	     t->file, t->line, ast_terminal (n)->start);
+  exit (1);
+}
+
+static
 void undefined_variables (Ast * n, Stack * stack, void * data)
 {
   Undefined * undef = data;
@@ -706,6 +744,8 @@ void undefined_variables (Ast * n, Stack * stack, void * data)
 	 n->child[1]->sym == sym_DEC_OP) &&
 	(ref = get_variable_reference (n, stack, NULL)) &&
 	!is_local_declaration (ref, stack, undef->scope)) {
+      if (undef->parallel)
+	check_missing_reductions (ref, stack, undef->scope);
       set_undefined (ref, undef->scope);
       ast_erase (n);
       undef->undefined = true;
@@ -719,8 +759,10 @@ void undefined_variables (Ast * n, Stack * stack, void * data)
       Ast * ref = get_variable_reference (n, stack, NULL);
       if (!ref)
 	return;
-      if (!is_local_declaration (ref, stack, undef->scope) ||
-	  n->child[2] == ast_placeholder) {
+      bool local = is_local_declaration (ref, stack, undef->scope);
+      if (!local || n->child[2] == ast_placeholder) {
+	if (!local && undef->parallel)
+	  check_missing_reductions (ref, stack, undef->scope);
 	set_undefined (ref, undef->scope);
 	ast_erase (n);
 	undef->undefined = true;
@@ -749,6 +791,11 @@ void undefined_variables (Ast * n, Stack * stack, void * data)
 	  Ast * ref = get_variable_reference (argument, stack, NULL);
 	  if (!ref)
 	    break;
+#if 0 // we assume non-local variables are not modified	  
+	  if (undef->parallel &&
+	      !is_local_declaration (ref, stack, undef->scope))
+	    check_missing_reductions (ref, stack, undef->scope);
+#endif
 	  set_undefined (ref, undef->scope);
 	  ast_erase (argument);
 	  undef->undefined = true;
@@ -936,9 +983,10 @@ Ast * null_expression (Ast * n)
 			     NA (n, sym_IDENTIFIER, "NULL"))));
 }
 
-static void point_function_calls (Ast * n, Stack * stack, void * scope)
+static void point_function_calls (Ast * n, Stack * stack, void * data)
 {
-  ast_cleanup (n, stack, scope, false);
+  Undefined * undef = data;
+  ast_cleanup (n, stack, undef->scope, false);
   
   if (n->sym != sym_function_call || !is_point_function_call (n))
     return;
@@ -949,7 +997,7 @@ static void point_function_calls (Ast * n, Stack * stack, void * scope)
 	     "%s:%d: warning: stencils: "
 	     "cannot analyze point function pointers\n",
 	     ast_left_terminal (n)->file, ast_left_terminal (n)->line);
-    default_stencil (n, stack, scope);
+    default_stencil (n, stack, undef->scope);
     return;
   }
 
@@ -971,7 +1019,7 @@ static void point_function_calls (Ast * n, Stack * stack, void * scope)
 	     "%s:%d: warning: stencils: point function '%s' is not defined\n",
 	     ast_left_terminal (n)->file, ast_left_terminal (n)->line,
 	     ast_terminal (identifier)->start);
-    default_stencil (n, stack, scope);
+    default_stencil (n, stack, undef->scope);
     return;
   }
 
@@ -979,7 +1027,7 @@ static void point_function_calls (Ast * n, Stack * stack, void * scope)
 
   str_prepend (ast_terminal (identifier)->start, "_stencil_");
   
-  if (function_definition == scope)
+  if (function_definition == undef->scope)
     return; // recursive function call
 
   /**
@@ -1080,7 +1128,7 @@ static void point_function_calls (Ast * n, Stack * stack, void * scope)
 
   if (!new_stencil)
     return;
-  stencil = ast_stencil (stencil);
+  stencil = ast_stencil (stencil, undef->parallel);
   if (!stencil) {
     ast_destroy (new_stencil);
     ast_erase (n);
@@ -1269,19 +1317,22 @@ void remove_unused (Ast * n, Stack * stack, void * data)
     ast_cleanup (n, stack, undef->scope, true);
 }
 
-Ast * ast_stencil (Ast * n)
+Ast * ast_stencil (Ast * n, bool parallel)
 {
+  if (strstr (ast_left_terminal(n)->file, "/src/grid/"))
+    return NULL;
+  
   AstRoot * root = ast_get_root (n);
   Stack * stack = root->stack;
   stack_push (stack, &n);
   ast_traverse (n, stack, move_field_accesses, n);
   Ast * m = n->sym == sym_foreach_statement ? ast_child (n, sym_statement) : n;
-  Undefined u = {n};
+  Undefined u = {n, parallel};
   do {
     u.undefined = false;
     ast_traverse (m, stack, undefined_variables, &u);
   } while (u.undefined);
-  ast_traverse (m, stack, point_function_calls, n);
+  ast_traverse (m, stack, point_function_calls, &u);
 
   Ast * statement =  (n->sym == sym_foreach_statement ?
 		      ast_child (n, sym_statement) :

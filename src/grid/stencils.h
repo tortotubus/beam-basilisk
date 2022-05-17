@@ -59,6 +59,9 @@ typedef struct {
 @define foreach_face_stencil() foreach_stencil()
 @define end_foreach_face_stencil() end_foreach_stencil()
 
+@define foreach_visible_stencil(...) foreach_stencil()
+@define end_foreach_visible_stencil(...) end_foreach_stencil()
+
 @define _stencil_is_face_x() { _loop.face |= (1 << 0);
 @define end__stencil_is_face_x() }
 @define _stencil_is_face_y() { _loop.face |= (1 << 1);

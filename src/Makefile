@@ -3,11 +3,14 @@ CFLAGS += -O2
 # these are not Basilisk programs
 EXCLUDE = qcc.c include.c postproc.c rotate.c stencils.c qplot.c
 
-all: qcc qplot libkdt literatec libfb_dumb libws bview2D bview3D
+all: libast qcc qplot libkdt literatec libfb_dumb libws bview2D bview3D
 	@chmod +x ppm2mpeg ppm2mp4 ppm2ogv ppm2gif runtest \
 		sequence page2html
 	@test -f xyz2kdt || ln -s kdt/xyz2kdt
 	@test -f kdtquery || ln -s kdt/kdtquery
+
+libast:
+	cd ast && make
 
 libkdt:
 	cd kdt && make
@@ -15,39 +18,13 @@ libkdt:
 literatec:
 	cd darcsit && make && cd cgi-bin && make
 
-qcc: qcc.c include.o rotate.o stencils.o config
+qcc: qcc.c include.o postproc.o ast/libast.a config
 	$(CC) $(CFLAGS) -DLIBDIR=\"`pwd`\" \
 		-DCC99="\"$(CC99)\"" \
 		-DCPP99="\"$(CPP99)\"" \
 		-DCADNACC="\"$(CADNACC)\"" \
 		-DBASILISK="\"$(BASILISK)\"" \
-		qcc.c include.o rotate.o stencils.o -o qcc
-
-qcc1: qcc1.c include.o postproc.o ast/libast.a config
-	$(CC) $(CFLAGS) -DLIBDIR=\"`pwd`\" \
-		-DCC99="\"$(CC99)\"" \
-		-DCPP99="\"$(CPP99)\"" \
-		-DCADNACC="\"$(CADNACC)\"" \
-		-DBASILISK="\"$(BASILISK)\"" \
-		qcc1.c include.o postproc.o -o qcc1 -Last -last
-
-rotate.c: rotate.lex
-	flex -P rot -o rotate.c rotate.lex
-
-rotate: rotate.c
-	$(CC) $(CFLAGS) -DTEST rotate.c -o rotate
-
-rotate.o: rotate.c
-	$(CC) $(CFLAGS) -c rotate.c
-
-stencils.c: stencils.lex
-	flex -P sten -o stencils.c stencils.lex
-
-stencils: stencils.c
-	$(CC) $(CFLAGS) -DTEST stencils.c -o stencils
-
-stencils.o: stencils.c
-	$(CC) $(CFLAGS) -c stencils.c
+		qcc.c include.o postproc.o -o qcc -Last -last
 
 include.o: include.c
 	$(CC) $(CFLAGS) -DLIBDIR=\"`pwd`\" -c include.c
@@ -67,17 +44,14 @@ draw_json.h: draw.h json.awk
 include.c: include.lex
 	flex -P inc -o include.c include.lex
 
-postproc.c: postproc.lex
-	flex -P post -o postproc.c postproc.lex
-
-qcc.c: qcc.lex Makefile
-	flex -o qcc.c qcc.lex
-
 libfb_dumb:
 	cd gl && make libfb_dumb.a libglutils.a
 
 libws:
 	cd wsServer && make
+
+postproc.c: postproc.lex
+	flex -P post -o postproc.c postproc.lex
 
 bview2D: qcc bview.c draw_get.h draw_json.h bview.s
 	qcc $(CFLAGS) -DDUMBGL -autolink bview.c -o bview2D -lfb_dumb -lm
