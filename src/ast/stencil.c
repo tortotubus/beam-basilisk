@@ -644,6 +644,17 @@ bool is_local_declaration (Ast * n, Stack * stack, Ast * scope)
 }
 
 static
+Ast * calling_foreach (Stack * stack)
+{
+  Ast ** d;
+  for (int i = 0; (d = stack_index (stack, i)); i++)
+    if ((*d)->sym == sym_foreach_statement)
+      return *d;
+  assert (false);
+  return NULL;
+}
+
+static
 void check_missing_reductions (Ast * n, Stack * stack, Ast * scope)
 {
   Ast * parameters = ast_schema (scope, sym_foreach_statement,
@@ -673,11 +684,17 @@ void check_missing_reductions (Ast * n, Stack * stack, Ast * scope)
 	     "%s:%d: error: or a serial loop to get rid of this error\n",
 	     t->file, t->line, ast_terminal (n)->start,
 	     t->file, t->line, t->file, t->line);
-  else
+  else {
+    AstTerminal * f = ast_left_terminal (calling_foreach (stack));
     fprintf (stderr,
-	     "%s:%d: error: non-local variable '%s' cannot be modified by this "
-	     "point function\n",
-	     t->file, t->line, ast_terminal (n)->start);
+	     "%s:%d: error: non-local variable '%s' is modified by this "
+	     "point function\n"
+	     "%s:%d: error: use a local variable or\n"
+	     "%s:%d: error: a serial loop (here) to get rid of this error\n",
+	     t->file, t->line, ast_terminal (n)->start,
+	     t->file, t->line,
+	     f->file, f->line);
+  }
   exit (1);
 }
 
@@ -1317,6 +1334,19 @@ void remove_unused (Ast * n, Stack * stack, void * data)
     ast_cleanup (n, stack, undef->scope, true);
 }
 
+static
+bool is_serial (Ast * foreach)
+{
+  Ast * parameters = ast_schema (foreach, sym_foreach_statement,
+				 2, sym_foreach_parameters);
+  foreach_item (parameters, 2, param) {
+    Ast * identifier = ast_is_identifier_expression (param->child[0]);
+    if (identifier && !strcmp (ast_terminal (identifier)->start, "serial"))
+      return true;
+  }
+  return false;
+}
+
 Ast * ast_stencil (Ast * n, bool parallel)
 {
   if (strstr (ast_left_terminal(n)->file, "/src/grid/"))
@@ -1325,6 +1355,8 @@ Ast * ast_stencil (Ast * n, bool parallel)
   AstRoot * root = ast_get_root (n);
   Stack * stack = root->stack;
   stack_push (stack, &n);
+  if (parallel && is_serial (n))
+    parallel = false;
   ast_traverse (n, stack, move_field_accesses, n);
   Ast * m = n->sym == sym_foreach_statement ? ast_child (n, sym_statement) : n;
   Undefined u = {n, parallel};
