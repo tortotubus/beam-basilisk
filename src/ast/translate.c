@@ -1762,6 +1762,19 @@ static void global_boundaries_and_stencils (Ast * n, Stack * stack, void * data)
 	!strcmp (ast_terminal (n->child[0])->start, "foreach_visible") ||
 	!strcmp (ast_terminal (n->child[0])->start, "foreach_vertex") ||
 	!strcmp (ast_terminal (n->child[0])->start, "foreach_face")) {
+      Ast * parameters = ast_child (n, sym_foreach_parameters);
+      foreach_item (parameters, 2, item) {
+	Ast * identifier = ast_is_identifier_expression (item->child[0]);
+	if (identifier && !strcmp (ast_terminal (identifier)->start, "noauto")) {
+	  parameters = ast_list_remove (parameters, item);
+	  if (parameters == NULL) {
+	    ast_destroy (n->child[2]);
+	    n->child[2] = n->child[3], n->child[3] = n->child[4],
+	      n->child[4] = NULL;
+	  }
+	  return;
+	}
+      }
       TranslateData * d = data;
       bool parallel = d->parallel &&
 	strcmp (ast_terminal (n->child[0])->start, "foreach_visible");

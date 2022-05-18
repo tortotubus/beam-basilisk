@@ -619,12 +619,12 @@ static void tree_boundary_level (scalar * list, int l)
 
   if (vlist) // vertex scalars
 #if dimension == 1
-    foreach_vertex()
+    foreach_vertex (noauto)
       if (is_refined(cell) || is_refined(neighbor(-1)))
 	for (scalar s in vlist)
 	  s[] = is_vertex (child(0)) ? fine(s) : nodata;
 #elif dimension == 2
-    foreach_vertex() {
+    foreach_vertex (noauto) {
       if (is_refined(cell) || is_refined(neighbor(-1)) ||
 	  is_refined(neighbor(0,-1)) || is_refined(neighbor(-1,-1))) {
 	// corner
@@ -642,7 +642,7 @@ static void tree_boundary_level (scalar * list, int l)
 	  }
     }
 #else // dimension == 3
-    foreach_vertex() {
+    foreach_vertex (noauto) {
       if (is_refined(cell) || is_refined(neighbor(-1)) ||
 	  is_refined(neighbor(0,-1)) || is_refined(neighbor(-1,-1)) ||
 	  is_refined(neighbor(0,0,-1)) || is_refined(neighbor(-1,0,-1)) ||

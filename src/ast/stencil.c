@@ -1349,9 +1349,6 @@ bool is_serial (Ast * foreach)
 
 Ast * ast_stencil (Ast * n, bool parallel)
 {
-  if (strstr (ast_left_terminal(n)->file, "/src/grid/"))
-    return NULL;
-  
   AstRoot * root = ast_get_root (n);
   Stack * stack = root->stack;
   stack_push (stack, &n);
