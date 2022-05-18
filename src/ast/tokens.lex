@@ -124,6 +124,7 @@ static Ast * new_ast (AstRoot * parse,
 "_Atomic"                               { SAST(ATOMIC); }
 "_Bool"                                 { SAST(BOOL); }
 "_Complex"                              { SAST(COMPLEX); }
+"complex"                               { SAST(COMPLEX); }
 "_Generic"                              { SAST(GENERIC); }
 "_Imaginary"                            { SAST(IMAGINARY); }
 "_Noreturn"                             { SAST(NORETURN); }
