@@ -64,7 +64,7 @@ static int yyparse (AstRoot * parse, Ast * root);
 /**
 ## Basilisk C tokens */
 
-%token  MAYBECONST IN NEW_FIELD TRACE
+%token  MAYBECONST NEW_FIELD TRACE
 %token  FOREACH FOREACH_INNER FOREACH_DIMENSION
 %token  REDUCTION
 
@@ -730,12 +730,12 @@ foreach_dimension_statement
 	;
 
 forin_declaration_statement
-        : for_scope '(' declaration_specifiers declarator IN forin_arguments ')' statement
+        : for_scope '(' declaration_specifiers declarator IDENTIFIER forin_arguments ')' statement
 	            { ast_pop_scope (parse->stack, $1); }
         ;
 
 forin_statement
-        : for_scope '(' expression IN forin_arguments ')' statement
+        : for_scope '(' expression IDENTIFIER forin_arguments ')' statement
 	            { ast_pop_scope (parse->stack, $1); }
 	;
 

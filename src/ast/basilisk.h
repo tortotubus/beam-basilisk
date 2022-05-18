@@ -128,13 +128,12 @@ extern int yydebug;
     STATIC_ASSERT = 329,           /* STATIC_ASSERT  */
     THREAD_LOCAL = 330,            /* THREAD_LOCAL  */
     MAYBECONST = 331,              /* MAYBECONST  */
-    IN = 332,                      /* IN  */
-    NEW_FIELD = 333,               /* NEW_FIELD  */
-    TRACE = 334,                   /* TRACE  */
-    FOREACH = 335,                 /* FOREACH  */
-    FOREACH_INNER = 336,           /* FOREACH_INNER  */
-    FOREACH_DIMENSION = 337,       /* FOREACH_DIMENSION  */
-    REDUCTION = 338                /* REDUCTION  */
+    NEW_FIELD = 332,               /* NEW_FIELD  */
+    TRACE = 333,                   /* TRACE  */
+    FOREACH = 334,                 /* FOREACH  */
+    FOREACH_INNER = 335,           /* FOREACH_INNER  */
+    FOREACH_DIMENSION = 336,       /* FOREACH_DIMENSION  */
+    REDUCTION = 337                /* REDUCTION  */
   };
   typedef enum yytokentype yytoken_kind_t;
 #endif
