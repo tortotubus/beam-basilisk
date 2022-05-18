@@ -1,18 +1,15 @@
-@include <stdlib.h>
-@include <stdio.h>
-@include <stddef.h>
-@include <stdbool.h>
-@include <stdarg.h>
-@include <string.h>
-@include <float.h>
-@include <limits.h>
-@ifndef assert
-@ include <assert.h>
-@endif
-@include <math.h>
-@include <time.h>
-@include <sys/time.h>
-@include <sys/resource.h>
+#include <stdlib.h>
+#include <stdio.h>
+#include <stddef.h>
+#include <stdbool.h>
+#include <stdarg.h>
+#include <string.h>
+#include <float.h>
+#include <limits.h>
+#include <math.h>
+#include <time.h>
+#include <sys/time.h>
+#include <sys/resource.h>
 
 @if _OPENMP
 @ include <omp.h>
@@ -33,17 +30,17 @@ static int mpi_rank, mpi_npe;
 
 @endif // _MPI
 
-@if _CADNA
-@ include <cadna.h>
-@endif // CADNA
+#if _CADNA
+# include <cadna.h>
+#endif // CADNA
 
-@if __cplusplus
-@ define delete delete_qcc
-@ define right right_qcc
-@ define left left_qcc
-@ define norm norm_qcc
-@ define new new_qcc
-@endif // _cplusplus
+#if __cplusplus
+# define delete delete_qcc
+# define right right_qcc
+# define left left_qcc
+# define norm norm_qcc
+# define new new_qcc
+#endif // _cplusplus
 
 #define pi 3.14159265358979
 @undef HUGE

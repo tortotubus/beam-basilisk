@@ -145,10 +145,8 @@ int main (int argc, char ** argv)
       dimension = 1 + argv[i][12] - '1';
     else if (catch && !strncmp (argv[i], "-O", 2))
       ;
-    else if (!strcmp (argv[i], "-nolineno")) {
+    else if (!strcmp (argv[i], "-nolineno"))
       nolineno = 1;
-      strcat (command1, " -D'assert(x)=((void)(x))'"); // fixme: not sure that this is correct
-    }
     else if (!strcmp (argv[i], "-o")) {
       strcat (command1, " ");
       strcat (command1, argv[i++]);
@@ -284,23 +282,9 @@ int main (int argc, char ** argv)
       /* grid */
       if (default_grid)
 	fprintf (fout, "#include \"grid/%s.h\"\n", grid);
-      /* declaration of boundary condition fonctions */
-      //      fputs ("@include \"_boundarydecl.h\"\n", fout);
       char s[81];
-      while (fgets (s, 81, fin)) {
-	// replace '#include <' with '@include <'
-	char * s1 = s; while (strchr (" \t", *s1)) s1++;
-	if (*s1 == '#') {
-	  char *s2 = s1 + 1; while (strchr (" \t", *s2)) s2++;
-	  if (!strncmp (s2, "include", 7)) {
-	    while (!strchr (" \t", *s2)) s2++;
-	    while (strchr (" \t", *s2)) s2++;
-	    if (*s2 == '<')
-	      *s1 = '@';
-	  }
-	}
+      while (fgets (s, 81, fin))
 	fputs (s, fout);
-      }
       if (swigfp)
 	fputs ("#include \"python.h\"\n", fout);
       if (progress)
@@ -346,6 +330,9 @@ int main (int argc, char ** argv)
       if (pedantic)
 	for (i = 0; i < strlen ("-pedantic"); i++)
 	  pedantic[i] = ' ';
+      strcat (preproc, " -I");
+      strcat (preproc, BASILISK);
+      strcat (preproc, "/ast/std");
       strcat (preproc, " -I. -I");
       strcat (preproc, LIBDIR);
       strcat (preproc, " ");
