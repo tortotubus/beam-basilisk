@@ -217,12 +217,6 @@ FDECL     {ID}+{SP}*\(
   }
 }
 
-^{SP}*#{SP}*include{SP}+<.*>{SP}*\n {
-  // #include <...>
-  char * s = yytext; nonspace(s); *s = '@';
-  echo();
-}
-
 ^{SP}*#{SP}*include{SP}+\"[^\"]*\"[^\n]*\n {
   // include "..."
   if (fdepend && strstr (yytext, "// nodep"))
@@ -480,20 +474,8 @@ static int include (char * file, FILE * fin, FILE * fout)
     fseek (fout, header, SEEK_SET);
     rewind (fin);
     char s[81];
-    while (fgets (s, 81, fin)) {
-      // replace '#include <' with '@include <'
-      char * s1 = s; while (strchr (" \t", *s1)) s1++;
-      if (*s1 == '#') {
-	char *s2 = s1 + 1; while (strchr (" \t", *s2)) s2++;
-	if (!strncmp (s2, "include", 7)) {
-	  while (!strchr (" \t", *s2)) s2++;
-	  while (strchr (" \t", *s2)) s2++;
-	  if (*s2 == '<')
-	    *s1 = '@';
-	}
-      }
+    while (fgets (s, 81, fin))
       fputs (s, fout);
-    }
   }
   free (fname);
   return ret;
