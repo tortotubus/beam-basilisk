@@ -141,7 +141,6 @@ static Ast * new_ast (AstRoot * parse,
 "face"{WS}+"vector"                     { SAST(TYPEDEF_NAME); }
 "symmetric"{WS}+"tensor"                { SAST(TYPEDEF_NAME); }
 "(const)"                               { SAST(MAYBECONST); }
-"in"			                { SAST(IN); }
 "trace"			                { SAST(TRACE); }
 "reduction"			        { SAST(REDUCTION); }
 
