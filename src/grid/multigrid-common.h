@@ -86,7 +86,7 @@ static inline void no_data (Point point, scalar s) {
 void wavelet (scalar s, scalar w)
 {
   restriction ({s});
-  for (int l = depth() - 1; l >= 0; l--) {
+  for (int l = grid->maxdepth - 1; l >= 0; l--) {
     foreach_coarse_level (l) {
       foreach_child()
         w[] = s[];
@@ -111,7 +111,7 @@ void inverse_wavelet (scalar s, scalar w)
   foreach_level(0) 
     s[] = w[];
   boundary_level ({s}, 0);
-  for (int l = 0; l <= depth() - 1; l++) {
+  for (int l = 0; l <= grid->maxdepth - 1; l++) {
     foreach_coarse_level (l) {
       s.prolongation (point, s);
       foreach_child()
