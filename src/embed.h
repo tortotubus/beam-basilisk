@@ -508,7 +508,7 @@ trace
 void embed_force (scalar p, vector u, face vector mu, coord * Fp, coord * Fmu)
 {
   coord Fps = {0}, Fmus = {0};
-  foreach (reduction(+:Fps) reduction(+:Fmus))
+  foreach (reduction(+:Fps) reduction(+:Fmus), nowarning)
     if (cs[] > 0. && cs[] < 1.) {
 
       /**

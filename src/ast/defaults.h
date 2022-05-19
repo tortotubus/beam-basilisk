@@ -29,7 +29,8 @@ typedef char GLubyte;
 ## From standard C libraries */
 
 typedef int bool;
-typedef long size_t, clock_t, int64_t, int32_t, uint32_t, uint16_t, uint64_t;
+typedef long ssize_t, size_t, clock_t;
+typedef int64_t, int32_t, uint32_t, uint16_t, uint64_t;
 typedef void va_list, FILE;
 
 /**

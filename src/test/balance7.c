@@ -32,7 +32,7 @@ int main (int argc, char * argv[])
   do {
     refined = 0;
     tree->refined.n = 0;
-    foreach (serial)
+    foreach (serial, nowarning)
       if (is_leaf(cell) && level <= maxlevel &&
 	  sq(x) + sq(y) + sq(z) < sq(0.05)) {
 	refine_cell (point, list, 0, &tree->refined);

@@ -517,7 +517,7 @@ Ast * move_field_access (Ast * parent, Ast * n, bool after, bool overflow)
 
 typedef struct {
   Ast * scope;
-  bool parallel, overflow;
+  bool parallel, overflow, nowarning;
   bool undefined;
 } Undefined;
 
@@ -1014,10 +1014,11 @@ static void point_function_calls (Ast * n, Stack * stack, void * data)
 
   Ast * identifier = ast_function_call_identifier (n);
   if (!identifier) {
-    fprintf (stderr,
-	     "%s:%d: warning: stencils: "
-	     "cannot analyze point function pointers\n",
-	     ast_left_terminal (n)->file, ast_left_terminal (n)->line);
+    if (!undef->nowarning)
+      fprintf (stderr,
+	       "%s:%d: warning: stencils: "
+	       "cannot analyze point function pointers\n",
+	       ast_left_terminal (n)->file, ast_left_terminal (n)->line);
     default_stencil (n, stack, undef->scope);
     return;
   }
@@ -1036,10 +1037,11 @@ static void point_function_calls (Ast * n, Stack * stack, void * data)
       function_declaration = NULL;
   }
   else {
-    fprintf (stderr,
-	     "%s:%d: warning: stencils: point function '%s' is not defined\n",
-	     ast_left_terminal (n)->file, ast_left_terminal (n)->line,
-	     ast_terminal (identifier)->start);
+    if (!undef->nowarning)
+      fprintf (stderr,
+	       "%s:%d: warning: stencils: point function '%s' is not defined\n",
+	       ast_left_terminal (n)->file, ast_left_terminal (n)->line,
+	       ast_terminal (identifier)->start);
     default_stencil (n, stack, undef->scope);
     return;
   }
@@ -1149,7 +1151,8 @@ static void point_function_calls (Ast * n, Stack * stack, void * data)
 
   if (!new_stencil)
     return;
-  stencil = ast_stencil (stencil, undef->parallel, undef->overflow);
+  stencil = ast_stencil (stencil,
+			 undef->parallel, undef->overflow, undef->nowarning);
   if (!stencil) {
     ast_destroy (new_stencil);
     ast_erase (n);
@@ -1351,14 +1354,14 @@ bool is_serial (Ast * foreach)
   return false;
 }
 
-Ast * ast_stencil (Ast * n, bool parallel, bool overflow)
+Ast * ast_stencil (Ast * n, bool parallel, bool overflow, bool nowarning)
 {
   AstRoot * root = ast_get_root (n);
   Stack * stack = root->stack;
   stack_push (stack, &n);
   if (parallel && is_serial (n))
     parallel = false;
-  Undefined u = {n, parallel, overflow};
+  Undefined u = {n, parallel, overflow, nowarning};
   ast_traverse (n, stack, move_field_accesses, &u);
   Ast * m = n->sym == sym_foreach_statement ? ast_child (n, sym_statement) : n;
   do {

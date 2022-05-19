@@ -82,7 +82,7 @@ static double residual_diffusion (scalar * a, scalar * b, scalar * resl,
     face vector g[];
     foreach_face()
       g.x[] = mu.x[]*face_gradient_x (s, 0);
-    foreach (reduction(max:maxres)) {
+    foreach (reduction(max:maxres), nowarning) {
       double a = 0.;
       foreach_dimension()
 	a += g.x[] - g.x[1];
@@ -97,7 +97,7 @@ static double residual_diffusion (scalar * a, scalar * b, scalar * resl,
   }
 #else
   /* "naive" discretisation (only 1st order on trees) */
-  foreach (reduction(max:maxres))
+  foreach (reduction(max:maxres), nowarning)
     foreach_dimension() {
       scalar s = u.x;
       double a = 0.;
