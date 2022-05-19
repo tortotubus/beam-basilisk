@@ -354,7 +354,7 @@ static double residual (scalar * al, scalar * bl, scalar * resl, void * data)
   face vector g[];
   foreach_face()
     g.x[] = alpha.x[]*face_gradient_x (a, 0);
-  foreach (reduction(max:maxres)) {
+  foreach (reduction(max:maxres), nowarning) {
     res[] = b[] - lambda[]*a[];
     foreach_dimension()
       res[] -= (g.x[1] - g.x[])/Delta;
@@ -369,7 +369,7 @@ static double residual (scalar * al, scalar * bl, scalar * resl, void * data)
   }
 #else // !TREE
   /* "naive" discretisation (only 1st order on trees) */
-  foreach (reduction(max:maxres)) {
+  foreach (reduction(max:maxres), nowarning) {
     res[] = b[] - lambda[]*a[];
     foreach_dimension()
       res[] += (alpha.x[0]*face_gradient_x (a, 0) -

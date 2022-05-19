@@ -1762,14 +1762,19 @@ static void global_boundaries_and_stencils (Ast * n, Stack * stack, void * data)
 	!strcmp (ast_terminal (n->child[0])->start, "foreach_visible") ||
 	!strcmp (ast_terminal (n->child[0])->start, "foreach_vertex") ||
 	!strcmp (ast_terminal (n->child[0])->start, "foreach_face")) {
-      bool overflow = false;
+      bool overflow = false, nowarning = false;
       Ast * parameters = ast_child (n, sym_foreach_parameters);
       foreach_item (parameters, 2, item) {
 	Ast * identifier = ast_is_identifier_expression (item->child[0]);
 	bool noauto;
 	if (identifier &&
 	    ((noauto = !strcmp (ast_terminal (identifier)->start, "noauto")) ||
-	     !strcmp (ast_terminal (identifier)->start, "overflow"))) {
+	     !strcmp (ast_terminal (identifier)->start, "overflow") ||
+	     !strcmp (ast_terminal (identifier)->start, "nowarning"))) {
+	  if (!strcmp (ast_terminal (identifier)->start, "overflow"))
+	    overflow = true;
+	  else if (!strcmp (ast_terminal (identifier)->start, "nowarning"))
+	    nowarning = true;
 	  parameters = ast_list_remove (parameters, item);
 	  if (parameters == NULL) {
 	    ast_destroy (n->child[2]);
@@ -1778,14 +1783,13 @@ static void global_boundaries_and_stencils (Ast * n, Stack * stack, void * data)
 	  }
 	  if (noauto)
 	    return;
-	  overflow = true;
 	}
       }
       TranslateData * d = data;
       bool parallel = d->parallel &&
 	strcmp (ast_terminal (n->child[0])->start, "foreach_visible");
       Ast * stencil = ast_copy (n);
-      if (ast_stencil (stencil, parallel, overflow)) {
+      if (ast_stencil (stencil, parallel, overflow, nowarning)) {
 	str_append (ast_terminal (ast_child (stencil, sym_FOREACH))->start,
 		    "_stencil");
 	Ast * statement = n->parent->parent;
