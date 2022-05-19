@@ -70,12 +70,15 @@ typedef struct {
 @define end__stencil_is_face_z() }
 
 void stencil_val (Point p, scalar s, int i, int j, int k,
-		  const char * file, int line);
+		  const char * file, int line, bool overflow);
 void stencil_val_a (Point p, scalar s, int i, int j, int k, bool input,
 		    const char * file, int line);
 
 @def _stencil_val(a,_i,_j,_k)
-  stencil_val (point, a, _i, _j, _k, S__FILE__, S_LINENO)
+  stencil_val (point, a, _i, _j, _k, S__FILE__, S_LINENO, false)
+@
+@def _stencil_val_o(a,_i,_j,_k)
+  stencil_val (point, a, _i, _j, _k, S__FILE__, S_LINENO, true)
 @
 @def _stencil_val_a(a,_i,_j,_k)
   stencil_val_a (point, a, _i, _j, _k, false, S__FILE__, S_LINENO)

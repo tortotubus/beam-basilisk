@@ -1762,24 +1762,30 @@ static void global_boundaries_and_stencils (Ast * n, Stack * stack, void * data)
 	!strcmp (ast_terminal (n->child[0])->start, "foreach_visible") ||
 	!strcmp (ast_terminal (n->child[0])->start, "foreach_vertex") ||
 	!strcmp (ast_terminal (n->child[0])->start, "foreach_face")) {
+      bool overflow = false;
       Ast * parameters = ast_child (n, sym_foreach_parameters);
       foreach_item (parameters, 2, item) {
 	Ast * identifier = ast_is_identifier_expression (item->child[0]);
-	if (identifier && !strcmp (ast_terminal (identifier)->start, "noauto")) {
+	bool noauto;
+	if (identifier &&
+	    ((noauto = !strcmp (ast_terminal (identifier)->start, "noauto")) ||
+	     !strcmp (ast_terminal (identifier)->start, "overflow"))) {
 	  parameters = ast_list_remove (parameters, item);
 	  if (parameters == NULL) {
 	    ast_destroy (n->child[2]);
 	    n->child[2] = n->child[3], n->child[3] = n->child[4],
 	      n->child[4] = NULL;
 	  }
-	  return;
+	  if (noauto)
+	    return;
+	  overflow = true;
 	}
       }
       TranslateData * d = data;
       bool parallel = d->parallel &&
 	strcmp (ast_terminal (n->child[0])->start, "foreach_visible");
       Ast * stencil = ast_copy (n);
-      if (ast_stencil (stencil, parallel)) {
+      if (ast_stencil (stencil, parallel, overflow)) {
 	str_append (ast_terminal (ast_child (stencil, sym_FOREACH))->start,
 		    "_stencil");
 	Ast * statement = n->parent->parent;
@@ -2445,12 +2451,15 @@ static void translate (Ast * n, Stack * stack, void * data)
 	}
       }
 
-      if (!strcmp (ast_terminal (identifier)->start, "_assign") ||
+      if (!strcmp (ast_terminal (identifier)->start, "_overflow") ||
+	  !strcmp (ast_terminal (identifier)->start, "_assign") ||
 	  !strcmp (ast_terminal (identifier)->start, "r_assign")) {
 	Ast * val = ast_find (n->child[2], sym_function_call);
 	if (val) {
 	  Ast * name = ast_function_call_identifier (val);
 	  str_append (ast_terminal (name)->start,
+		      !strcmp (ast_terminal (identifier)->start, "_overflow") ?
+		      "_o" :
 		      ast_terminal (identifier)->start[0] == '_' ? "_a" : "_r");
 	  ast_replace_child (n->parent, ast_child_index (n), val);
 	  return;

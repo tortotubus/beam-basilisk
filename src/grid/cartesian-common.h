@@ -918,26 +918,36 @@ void default_stencil (Point p, scalar * list)
     s.input = true, s.width = 2;
 }
 
+/**
+This displays a (1D,2D,3D) stencil index. */
+
+static void write_stencil_index (int * index)
+{
+  fprintf (qstderr(), "[%d", index[0]);
+  for (int d = 1; d < dimension; d++)
+    fprintf (qstderr(), ",%d", index[d]);
+  fputs ("]", qstderr());
+}
+
 void stencil_val (Point p, scalar s, int i, int j, int k,
-		  const char * file, int line)
+		  const char * file, int line, bool overflow)
 {
   if (is_constant(s) || s.i < 0)
     return;
   int index[] = {i, j, k};
+  for (int d = 0; d < dimension; d++)
+    index[d] += (&p.i)[d];      
   bool central = true;
   for (int d = 0; d < dimension; d++) {
-    int i = (&p.i)[d] + index[d];
-#if 0 // breaks heights.h:110: error: stencil overflow: f
-    if (i > 2 || i < - 2) {
+    if (!overflow && (index[d] > 2 || index[d] < - 2)) {
       fprintf (qstderr(), "%s:%d: error: stencil overflow: %s",
 	       file, line, s.name);
-      //     write_stencil_index (i, _STENCIL/2);
+      write_stencil_index (index);
       fprintf (qstderr(), "\n");
       fflush (qstderr());
       abort();
     }
-#endif
-    if (i != 0)
+    if (index[d] != 0)
       central = false;
   }
   if (central) {
@@ -948,9 +958,8 @@ void stencil_val (Point p, scalar s, int i, int j, int k,
     s.input = true;
     int d = 0;
     foreach_dimension() {
-      int i = (&p.i)[d] + index[d];
-      if ((!s.face || s.v.x.i != s.i) && abs(i) > s.width)
-	s.width = abs(i);
+      if ((!s.face || s.v.x.i != s.i) && abs(index[d]) > s.width)
+	s.width = abs(index[d]);
       d++;
     }
   }
@@ -962,17 +971,17 @@ void stencil_val_a (Point p, scalar s, int i, int j, int k, bool input,
   if (is_constant(s) || s.i < 0)
     abort();
   int index[] = {i, j, k};
-  for (int d = 0; d < dimension; d++) {
-    int i = (&p.i)[d] + index[d];
-    if (i != 0) {
+  for (int d = 0; d < dimension; d++)
+    index[d] += (&p.i)[d];    
+  for (int d = 0; d < dimension; d++)
+    if (index[d] != 0) {
       fprintf (qstderr(), "%s:%d: error: illegal write: %s",
 	       file, line, s.name);
-      //     write_stencil_index (i, _STENCIL/2);
+      write_stencil_index (index);
       fprintf (qstderr(), "\n");
       fflush (qstderr());
       abort();
     }
-  }
   if (input && !s.output)
     s.input = true;
   s.output = true;

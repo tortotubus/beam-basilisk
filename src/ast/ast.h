@@ -239,4 +239,4 @@ char * ast_typedef_name (const Ast * identifier);
 Ast * ast_check_grammar (Ast * n, bool recursive);
 
 bool  ast_is_stencil_function (Ast * n);
-Ast * ast_stencil (Ast * n, bool parallel);
+Ast * ast_stencil (Ast * n, bool parallel, bool overflow);
