@@ -66,6 +66,7 @@ static bool is_field_access (Ast * n, Stack * stack)
 	 !strcmp (t->start, "aparent") ||
 	 !strcmp (t->start, "child") ||
 	 !strcmp (t->start, "_assign") ||
+	 !strcmp (t->start, "_overflow") ||
 	 !strcmp (t->start, "r_assign")))
       return true;
     if (is_point_function_call (n))
@@ -475,7 +476,7 @@ void ast_cleanup (Ast * n, Stack * stack, Ast * scope, bool init_declarator)
 }
 
 static
-Ast * move_field_access (Ast * parent, Ast * n, bool after)
+Ast * move_field_access (Ast * parent, Ast * n, bool after, bool overflow)
 {
   Ast * assignment = ast_parent (n, sym_assignment_expression);
   Ast * op = ast_child (assignment, sym_assignment_operator);
@@ -483,12 +484,13 @@ Ast * move_field_access (Ast * parent, Ast * n, bool after)
     return NULL; // already on its own in an expression statement
   Ast * item = ast_block_list_get_item (parent);
   Ast * postfix = n->parent;
-  if (op) {
+  if (op || overflow) {
     Ast * assign = ast_attach (ast_new_unary_expression (parent),
 			       postfix);
     AstTerminal * func = NB(assign, sym_IDENTIFIER,
-			    op->child[0]->sym == token_symbol('=') ?
-			    "_assign" : "r_assign");
+			    op ? (op->child[0]->sym == token_symbol('=') ?
+				  "_assign" : "r_assign") :
+			    "_overflow");
     postfix = NN(parent, sym_postfix_expression,
 		 NN(parent, sym_function_call,
 		    NN(parent, sym_postfix_expression,
@@ -513,12 +515,19 @@ Ast * move_field_access (Ast * parent, Ast * n, bool after)
     return ast_block_list_insert_before2 (item, statement);
 }
 
+typedef struct {
+  Ast * scope;
+  bool parallel, overflow;
+  bool undefined;
+} Undefined;
+
 /**
 Move field accesses into their own expression statement, before their
 parent statement or declaration. */
 
 void move_field_accesses (Ast * n, Stack * stack, void * data)
 {
+  Undefined * u = data;
   if (is_field_access (n, stack)) {
     Ast * parent = n->parent;
     while (parent &&
@@ -532,7 +541,7 @@ void move_field_accesses (Ast * n, Stack * stack, void * data)
       case sym_jump_statement:
       case sym_selection_statement:
       case sym_expression_statement: {
-	move_field_access (parent, n, false);
+	move_field_access (parent, n, false, u->overflow);
 	break;
       }
 	
@@ -543,17 +552,12 @@ void move_field_accesses (Ast * n, Stack * stack, void * data)
     }
     else {
       assert (parent->sym == sym_declaration);
-      move_field_access (parent, n, true);
+      move_field_access (parent, n, true, u->overflow);
     }
   }
   else
-    ast_cleanup (n, stack, data, false);
+    ast_cleanup (n, stack, u->scope, false);
 }
-
-typedef struct {
-  Ast * scope;
-  bool parallel, undefined;
-} Undefined;
 
 static inline void set_undefined (Ast * n, Ast * scope)
 {
@@ -1145,7 +1149,7 @@ static void point_function_calls (Ast * n, Stack * stack, void * data)
 
   if (!new_stencil)
     return;
-  stencil = ast_stencil (stencil, undef->parallel);
+  stencil = ast_stencil (stencil, undef->parallel, undef->overflow);
   if (!stencil) {
     ast_destroy (new_stencil);
     ast_erase (n);
@@ -1347,16 +1351,16 @@ bool is_serial (Ast * foreach)
   return false;
 }
 
-Ast * ast_stencil (Ast * n, bool parallel)
+Ast * ast_stencil (Ast * n, bool parallel, bool overflow)
 {
   AstRoot * root = ast_get_root (n);
   Stack * stack = root->stack;
   stack_push (stack, &n);
   if (parallel && is_serial (n))
     parallel = false;
-  ast_traverse (n, stack, move_field_accesses, n);
+  Undefined u = {n, parallel, overflow};
+  ast_traverse (n, stack, move_field_accesses, &u);
   Ast * m = n->sym == sym_foreach_statement ? ast_child (n, sym_statement) : n;
-  Undefined u = {n, parallel};
   do {
     u.undefined = false;
     ast_traverse (m, stack, undefined_variables, &u);

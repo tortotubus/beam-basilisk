@@ -267,9 +267,10 @@ void heights (scalar c, vector h)
         s.x[] = c[2*j];
 
     /**
-    We sum the half-column, downward or upward. */
+    We sum the half-column, downward or upward. We (exceptionally)
+    need to allow for stencil overflow. */
 
-    foreach()
+    foreach (overflow)
       half_column (point, c, h, s, j);
   }
 
