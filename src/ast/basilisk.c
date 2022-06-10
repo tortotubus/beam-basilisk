@@ -67,7 +67,7 @@
 
 
 /* First part of user prologue.  */
-#line 31 "basilisk.yacc"
+#line 54 "basilisk.yacc"
 
 #include <string.h>
 #include <assert.h>
@@ -714,42 +714,42 @@ static const yytype_int8 yytranslate[] =
   /* YYRLINE[YYN] -- Source line where rule number YYN was defined.  */
 static const yytype_int16 yyrline[] =
 {
-       0,    82,    82,    83,    84,    85,    86,    90,    91,    92,
-      93,    94,    98,    99,   103,   104,   105,   109,   113,   114,
-     118,   122,   123,   127,   128,   132,   133,   134,   135,   136,
-     137,   138,   139,   143,   144,   148,   149,   153,   154,   158,
-     162,   163,   164,   168,   169,   173,   174,   175,   176,   177,
-     178,   179,   180,   181,   185,   186,   187,   188,   189,   190,
-     194,   195,   201,   202,   203,   204,   208,   209,   210,   214,
-     215,   216,   220,   221,   222,   223,   224,   228,   229,   230,
-     234,   235,   239,   240,   244,   245,   249,   250,   254,   255,
-     259,   260,   264,   265,   266,   267,   268,   272,   273,   274,
-     275,   276,   277,   278,   279,   280,   281,   282,   286,   287,
-     291,   295,   296,   297,   301,   302,   303,   304,   305,   306,
-     307,   308,   309,   310,   314,   315,   319,   320,   324,   325,
-     326,   327,   328,   329,   330,   334,   338,   339,   340,   341,
-     342,   343,   344,   345,   346,   347,   348,   349,   350,   351,
-     352,   353,   357,   358,   359,   360,   361,   365,   366,   370,
-     371,   375,   376,   377,   381,   382,   383,   384,   388,   389,
-     393,   394,   395,   399,   400,   401,   402,   403,   407,   408,
-     412,   413,   417,   421,   422,   423,   424,   425,   429,   430,
-     434,   435,   439,   440,   444,   445,   446,   447,   448,   449,
-     450,   451,   452,   453,   454,   455,   456,   457,   458,   462,
-     463,   467,   468,   469,   470,   474,   475,   479,   480,   484,
-     485,   489,   490,   491,   495,   496,   500,   501,   505,   506,
-     507,   511,   512,   513,   514,   515,   516,   517,   518,   519,
-     520,   521,   522,   523,   524,   525,   526,   527,   528,   529,
-     530,   531,   535,   539,   540,   541,   545,   546,   547,   548,
-     552,   556,   557,   561,   562,   566,   570,   571,   572,   573,
-     574,   575,   576,   577,   581,   582,   583,   587,   589,   589,
-     595,   596,   600,   601,   605,   606,   610,   611,   612,   616,
-     620,   621,   622,   624,   626,   630,   632,   637,   638,   639,
-     640,   641,   645,   646,   647,   648,   649,   650,   651,   652,
-     656,   660,   662,   667,   668,   675,   676,   677,   678,   679,
-     680,   684,   688,   689,   693,   694,   698,   699,   703,   704,
-     708,   712,   713,   714,   718,   719,   723,   724,   728,   729,
-     733,   738,   743,   744,   748,   752,   753,   754,   758,   759,
-     760,   764,   768,   769,   773,   777
+       0,   105,   105,   106,   107,   108,   109,   113,   114,   115,
+     116,   117,   121,   122,   126,   127,   128,   132,   136,   137,
+     141,   145,   146,   150,   151,   155,   156,   157,   158,   159,
+     160,   161,   162,   166,   167,   171,   172,   176,   177,   181,
+     185,   186,   187,   191,   192,   196,   197,   198,   199,   200,
+     201,   202,   203,   204,   208,   209,   210,   211,   212,   213,
+     217,   218,   224,   225,   226,   227,   231,   232,   233,   237,
+     238,   239,   243,   244,   245,   246,   247,   251,   252,   253,
+     257,   258,   262,   263,   267,   268,   272,   273,   277,   278,
+     282,   283,   287,   288,   289,   290,   291,   295,   296,   297,
+     298,   299,   300,   301,   302,   303,   304,   305,   309,   310,
+     314,   318,   319,   320,   324,   325,   326,   327,   328,   329,
+     330,   331,   332,   333,   337,   338,   342,   343,   347,   348,
+     349,   350,   351,   352,   353,   357,   361,   362,   363,   364,
+     365,   366,   367,   368,   369,   370,   371,   372,   373,   374,
+     375,   376,   380,   381,   382,   383,   384,   388,   389,   393,
+     394,   398,   399,   400,   404,   405,   406,   407,   411,   412,
+     416,   417,   418,   422,   423,   424,   425,   426,   430,   431,
+     435,   436,   440,   444,   445,   446,   447,   448,   452,   453,
+     457,   458,   462,   463,   467,   468,   469,   470,   471,   472,
+     473,   474,   475,   476,   477,   478,   479,   480,   481,   485,
+     486,   490,   491,   492,   493,   497,   498,   502,   503,   507,
+     508,   512,   513,   514,   518,   519,   523,   524,   528,   529,
+     530,   534,   535,   536,   537,   538,   539,   540,   541,   542,
+     543,   544,   545,   546,   547,   548,   549,   550,   551,   552,
+     553,   554,   558,   562,   563,   564,   568,   569,   570,   571,
+     575,   579,   580,   584,   585,   589,   593,   594,   595,   596,
+     597,   598,   599,   600,   604,   605,   606,   610,   612,   612,
+     618,   619,   623,   624,   628,   629,   633,   634,   635,   639,
+     643,   644,   645,   647,   649,   653,   655,   660,   661,   662,
+     663,   664,   668,   669,   670,   671,   672,   673,   674,   675,
+     679,   683,   685,   690,   691,   698,   699,   700,   701,   702,
+     703,   707,   711,   712,   716,   717,   721,   722,   726,   727,
+     731,   735,   736,   737,   741,   742,   746,   747,   751,   752,
+     756,   761,   766,   767,   771,   775,   776,   777,   781,   782,
+     783,   787,   791,   792,   796,   800
 };
 #endif
 
@@ -2376,157 +2376,157 @@ yyreduce:
   switch (yyn)
     {
   case 4: /* translation_unit: translation_unit error ';'  */
-#line 84 "basilisk.yacc"
+#line 107 "basilisk.yacc"
                                       { yyvsp[-1]->sym = YYSYMBOL_YYerror; }
 #line 2382 "basilisk.c"
     break;
 
   case 5: /* translation_unit: translation_unit error '}'  */
-#line 85 "basilisk.yacc"
+#line 108 "basilisk.yacc"
                                       { yyvsp[-1]->sym = YYSYMBOL_YYerror; }
 #line 2388 "basilisk.c"
     break;
 
   case 6: /* translation_unit: translation_unit error ')'  */
-#line 86 "basilisk.yacc"
+#line 109 "basilisk.yacc"
                                       { yyvsp[-1]->sym = YYSYMBOL_YYerror; }
 #line 2394 "basilisk.c"
     break;
 
   case 13: /* expression_error: error  */
-#line 99 "basilisk.yacc"
+#line 122 "basilisk.yacc"
                         { yyvsp[0]->sym = YYSYMBOL_YYerror; }
 #line 2400 "basilisk.c"
     break;
 
   case 111: /* declaration: declaration_specifiers ';' type_not_specified  */
-#line 295 "basilisk.yacc"
+#line 318 "basilisk.yacc"
                                                                                { ast_push_declaration (parse->stack, yyval); }
 #line 2406 "basilisk.c"
     break;
 
   case 112: /* declaration: declaration_specifiers init_declarator_list ';' type_not_specified  */
-#line 296 "basilisk.yacc"
+#line 319 "basilisk.yacc"
                                                                                { ast_push_declaration (parse->stack, yyval); }
 #line 2412 "basilisk.c"
     break;
 
   case 135: /* type_specifier: types  */
-#line 334 "basilisk.yacc"
+#line 357 "basilisk.yacc"
                    { parse->type_already_specified = true; }
 #line 2418 "basilisk.c"
     break;
 
   case 155: /* struct_or_union_specifier: struct_or_union '{' error '}'  */
-#line 360 "basilisk.yacc"
+#line 383 "basilisk.yacc"
                                                             { yyvsp[-1]->sym = YYSYMBOL_YYerror; }
 #line 2424 "basilisk.c"
     break;
 
   case 156: /* struct_or_union_specifier: struct_or_union generic_identifier '{' error '}'  */
-#line 361 "basilisk.yacc"
+#line 384 "basilisk.yacc"
                                                             { yyvsp[-1]->sym = YYSYMBOL_YYerror; }
 #line 2430 "basilisk.c"
     break;
 
   case 206: /* direct_declarator: direct_declarator '(' type_not_specified error ')'  */
-#line 456 "basilisk.yacc"
+#line 479 "basilisk.yacc"
                                                                                            { yyvsp[-1]->sym = YYSYMBOL_YYerror; }
 #line 2436 "basilisk.c"
     break;
 
   case 252: /* type_not_specified: %empty  */
-#line 535 "basilisk.yacc"
+#line 558 "basilisk.yacc"
            { parse->type_already_specified = false; }
 #line 2442 "basilisk.c"
     break;
 
   case 273: /* statement: error ';'  */
-#line 577 "basilisk.yacc"
+#line 600 "basilisk.yacc"
                      { yyvsp[-1]->sym = YYSYMBOL_YYerror; }
 #line 2448 "basilisk.c"
     break;
 
   case 278: /* @1: %empty  */
-#line 589 "basilisk.yacc"
+#line 612 "basilisk.yacc"
                            { stack_push (parse->stack, &(yyvsp[0])); yyval->sym = YYSYMBOL_YYUNDEF; }
 #line 2454 "basilisk.c"
     break;
 
   case 279: /* compound_statement: '{' @1 block_item_list '}'  */
-#line 591 "basilisk.yacc"
+#line 614 "basilisk.yacc"
                            { ast_pop_scope (parse->stack, yyvsp[-3]); }
 #line 2460 "basilisk.c"
     break;
 
   case 289: /* for_scope: FOR  */
-#line 616 "basilisk.yacc"
+#line 639 "basilisk.yacc"
               { stack_push (parse->stack, &(yyval)); }
 #line 2466 "basilisk.c"
     break;
 
   case 292: /* iteration_statement: for_scope '(' expression_statement expression_statement ')' statement  */
-#line 623 "basilisk.yacc"
+#line 646 "basilisk.yacc"
                     { ast_pop_scope (parse->stack, yyvsp[-5]); }
 #line 2472 "basilisk.c"
     break;
 
   case 293: /* iteration_statement: for_scope '(' expression_statement expression_statement expression ')' statement  */
-#line 625 "basilisk.yacc"
+#line 648 "basilisk.yacc"
                     { ast_pop_scope (parse->stack, yyvsp[-6]); }
 #line 2478 "basilisk.c"
     break;
 
   case 295: /* for_declaration_statement: for_scope '(' declaration expression_statement ')' statement  */
-#line 631 "basilisk.yacc"
+#line 654 "basilisk.yacc"
                     { ast_pop_scope (parse->stack, yyvsp[-5]); }
 #line 2484 "basilisk.c"
     break;
 
   case 296: /* for_declaration_statement: for_scope '(' declaration expression_statement expression ')' statement  */
-#line 633 "basilisk.yacc"
+#line 656 "basilisk.yacc"
                     { ast_pop_scope (parse->stack, yyvsp[-6]); }
 #line 2490 "basilisk.c"
     break;
 
   case 309: /* external_declaration: error compound_statement  */
-#line 652 "basilisk.yacc"
+#line 675 "basilisk.yacc"
                                                 { yyvsp[-1]->sym = YYSYMBOL_YYerror; }
 #line 2496 "basilisk.c"
     break;
 
   case 310: /* function_declaration: declaration_specifiers declarator  */
-#line 656 "basilisk.yacc"
+#line 679 "basilisk.yacc"
                                             { ast_push_function_definition (parse->stack, yyvsp[0]);  }
 #line 2502 "basilisk.c"
     break;
 
   case 311: /* function_definition: function_declaration declaration_list compound_statement  */
-#line 661 "basilisk.yacc"
+#line 684 "basilisk.yacc"
                                                 { ast_pop_scope (parse->stack, yyvsp[-2]->child[1]); }
 #line 2508 "basilisk.c"
     break;
 
   case 312: /* function_definition: function_declaration compound_statement  */
-#line 663 "basilisk.yacc"
+#line 686 "basilisk.yacc"
                                                 { ast_pop_scope (parse->stack, yyvsp[-1]->child[1]); }
 #line 2514 "basilisk.c"
     break;
 
   case 340: /* forin_declaration_statement: for_scope '(' declaration_specifiers declarator IDENTIFIER forin_arguments ')' statement  */
-#line 734 "basilisk.yacc"
+#line 757 "basilisk.yacc"
                     { ast_pop_scope (parse->stack, yyvsp[-7]); }
 #line 2520 "basilisk.c"
     break;
 
   case 341: /* forin_statement: for_scope '(' expression IDENTIFIER forin_arguments ')' statement  */
-#line 739 "basilisk.yacc"
+#line 762 "basilisk.yacc"
                     { ast_pop_scope (parse->stack, yyvsp[-6]); }
 #line 2526 "basilisk.c"
     break;
 
   case 355: /* root: translation_unit  */
-#line 777 "basilisk.yacc"
+#line 800 "basilisk.yacc"
                            {
 	  yyval = root;
 	  yyval->sym = yyr1[yyn];
@@ -2733,7 +2733,7 @@ yyreturn:
   return yyresult;
 }
 
-#line 787 "basilisk.yacc"
+#line 810 "basilisk.yacc"
 
 
 /**

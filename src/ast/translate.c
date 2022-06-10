@@ -1,8 +1,20 @@
+/**
+# The Basilisk C to C99 translator
+
+Uses the [AST](README) library to transform the AST obtained when
+parsing code with the [Basilisk C grammar](basilisk.yacc) into an AST
+respecting the C99 grammar (with added macros).
+
+## Utility functions */
+
 #include <stdlib.h>
 #include <assert.h>
 #include <string.h>
 #include "ast.h"
 #include "symbols.h"
+
+/**
+By default grammar checks are turned off. */
 
 #if 0
 # define CHECK(x, recursive) ast_check_grammar(x, recursive)
@@ -987,6 +999,9 @@ void ast_replace_child_same_symbol (Ast * parent, int index, Ast * replacement)
   ast_replace_child (parent, index, replacement);
 }
 
+/**
+### (const) fields combinations */
+
 typedef struct {
   Ast ** consts;
   int bits;
@@ -1012,9 +1027,6 @@ void replace_const (Ast * n, Ast * type, void * data)
     ast_replace_child_same_symbol (unary, 0, n);
   }
 }
-
-/**
-### (const) fields combinations */
 
 static
 char * combination_constants (TranslateData * d, Ast ** consts, int bits,
@@ -1358,7 +1370,7 @@ static Ast * compound_jump (Ast * return_statement, Ast * function_definition,
 }
 
 /**
-## Boundary conditions 
+### Boundary conditions 
 
 This function replaces neumann/dirichlet(...) with
 neumann/dirichlet(0) and returns the number of replacements. */
@@ -1635,7 +1647,7 @@ Ast * ast_block_list_insert_before2 (Ast * insert, Ast * item)
 }
 
 /**
-# Global boundaries and stencils */
+# First pass: Global boundaries and stencils */
 
 static void global_boundaries_and_stencils (Ast * n, Stack * stack, void * data)
 {
@@ -1812,6 +1824,9 @@ static void global_boundaries_and_stencils (Ast * n, Stack * stack, void * data)
   }
 }
 
+/**
+# Second pass: Most transformations */
+
 static void diagonalize (Ast * n, Stack * stack, void * field)
 {
   if (n->sym == sym_function_call) {
@@ -1828,12 +1843,6 @@ static void diagonalize (Ast * n, Stack * stack, void * field)
     }
   }
 }
-
-/**
-   TODO:
-   
-   try to parse system headers
-*/
 
 static bool is_foreach_stencil (Ast * n)
 {
@@ -2977,6 +2986,12 @@ static void translate (Ast * n, Stack * stack, void * data)
   }
 }
 
+/**
+# Third pass: "macro" expressions 
+
+This pass should regroup all transformations which require the use of
+macros which are not included in the Basilisk C grammar. */
+
 static void trace_return (Ast * n, Stack * stack, void * data)
 {
   Ast * function_definition = ((void **)data)[0];
@@ -3666,6 +3681,12 @@ static void macros (Ast * n, Stack * stack, void * data)
   }
 }
 
+/**
+# Traversal functions 
+
+These functions traverse the tree while maintaining a stack of
+declared symbols. */
+
 void ast_push_declaration (Stack * stack, Ast * n)
 {
   if (n == ast_placeholder)
@@ -3778,6 +3799,11 @@ void ast_traverse (Ast * n, Stack * stack,
     break;
   }
 }
+
+/**
+# The entry function
+
+Called by [qcc](/src/qcc.c) to trigger the translation. */
 
 void endfor (FILE * fin, FILE * fout,
 	     const char * grid, int dimension,

@@ -1,3 +1,12 @@
+/**
+# Interface for the Abstract Syntax Tree (AST) library
+
+It is divided in two parts: a first part for functions which are meant
+to be independent from the grammar, and a second part for (Basilisk C)
+grammar-dependent functions. 
+
+## Grammar-independent functions */
+
 #include <stdio.h>
 #include <stdbool.h>
 #include <assert.h>
@@ -181,7 +190,7 @@ static inline AstTerminal * NA (Ast * parent, int sym, const char * name)
 #define NCA(parent,sym) NA(parent, token_symbol((sym)[0]), sym)
 
 /**
-# Grammar-specific functions */
+## Grammar-specific functions */
 
 void  ast_push_declaration         (Stack * stack, Ast * declaration);
 Ast * ast_push_function_definition (Stack * stack, Ast * declarator);
