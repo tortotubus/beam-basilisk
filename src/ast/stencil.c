@@ -1,5 +1,17 @@
 /**
-# Automatic boundary conditions */
+# Stencils accesses for automatic boundary conditions
+
+This file defines the `ast_stencil()` function which returns an
+[AST](README) containing code obtained by transforming the input point
+function or foreach loop into a simplified version containing only
+calls to functions recording stencil read/write accesses to different
+fields.
+
+This code is typically added by the [Basilisk C
+translator](translate.c#stencils) before each foreach loop body to
+detect which fields will be modified by the loop and which fields
+require updates to boundary conditions (to ensure consistent stencil
+accesses). */
 
 #include <stdlib.h>
 #include <string.h>
@@ -475,6 +487,14 @@ void ast_cleanup (Ast * n, Stack * stack, Ast * scope, bool init_declarator)
   }
 }
 
+/**
+## First pass: move field accesses 
+
+This pass move all field accesses into their own expression
+statement. 
+
+It also records the type of access (assign or read). */
+
 static
 Ast * move_field_access (Ast * parent, Ast * n, bool after, bool overflow)
 {
@@ -558,6 +578,14 @@ void move_field_accesses (Ast * n, Stack * stack, void * data)
   else
     ast_cleanup (n, stack, u->scope, false);
 }
+
+/**
+## Second pass: propagate undefined values 
+
+After field accesses have been moved, undefined values are left
+behind. If these values are assigned to variables, the corresponding
+variables also need to be undefined, as well as any reference to these
+variables. */
 
 static inline void set_undefined (Ast * n, Ast * scope)
 {
@@ -864,6 +892,11 @@ void undefined_variables (Ast * n, Stack * stack, void * data)
 }
 
 /**
+## Third pass: point function calls
+
+Point functions calls need to be replaced by their `ast_stencil()`
+transform.
+
 Return a previously defined stencil function matching
 *function_definition* or NULL if none can be found. */
 
@@ -1199,6 +1232,11 @@ static void point_function_calls (Ast * n, Stack * stack, void * data)
   }
 }
 
+/**
+## Fourth pass: cleanup of unused and undefined variables
+
+Mostly to avoid compiler warnings. */
+
 Ast * ast_scope_parent (Ast * n, int sym, int scope)
 {
   n = n->parent;
@@ -1353,6 +1391,15 @@ bool is_serial (Ast * foreach)
   }
   return false;
 }
+
+/**
+## The `ast_stencil()` function
+
+The parameters are the input foreach loop or point function and the
+tuning options. 
+
+The function may return a NULL pointer, for example when the loop body
+does not contain any field access. */
 
 Ast * ast_stencil (Ast * n, bool parallel, bool overflow, bool nowarning)
 {

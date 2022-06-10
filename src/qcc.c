@@ -1,3 +1,32 @@
+/**
+# The Basilisk C to C99 pre-processor
+
+This is the front-end for the Basilisk C to C99 translator described
+in [ast/README](). 
+
+Usage:
+
+~~~
+qcc -grid=[GRID] [OPTIONS] FILE.c
+~~~
+
+A summary of the options/switches:
+
+* `-grid=[GRID]` : specifies the grid to use
+* `-MD` : generates .d dependency file
+* `-tags` : generates .tags file
+* `-python` : generates python wrapper code
+* `-debug` : internal debugging
+* `-events` : displays a trace of events on standard error
+* `-catch` : catch floating point errors
+* `-source` : generate C99 source file (with an underscore prefix)
+* `-autolink` : use the 'autolink' pragma to link required libraries
+* `-progress` : the running code will generate a 'progress' file
+* `-cadna` : support for CADNA
+* `-nolineno` : does not generate code containing code line numbers
+
+All other options will be passed directly to the C compiler. */
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
@@ -12,7 +41,6 @@ int dimension = 2, bghosts = 0, layers = 0;
   
 int debug = 0, catch = 0, cadna = 0, nolineno = 0, events = 0, progress = 0;
 int parallel = 0;
-int nohook = 0;
 char dir[] = ".qccXXXXXX";
 
 char * autolink = NULL;
@@ -117,8 +145,6 @@ int main (int argc, char ** argv)
       source = 1;
     else if (!strcmp (argv[i], "-autolink"))
       autolinks = 1;
-    else if (!strcmp (argv[i], "-nohook"))
-      nohook = 1;
     else if (!strcmp (argv[i], "-progress"))
       progress = 1;
     else if (!strcmp (argv[i], "-Wall")) {

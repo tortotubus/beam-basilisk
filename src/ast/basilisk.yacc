@@ -1,7 +1,31 @@
 /**
-# Yacc Grammar for Basilisk C
+# Yacc/Bison Grammar for Basilisk C
 
-Closely based on the [C99 grammar](c.yacc). 
+The grammar is closely based on the [C99 grammar](c.yacc).
+
+The main difference with the C99 grammar is the addition of the
+Basilisk C syntax and the further subdivision of some the C99 entries,
+to simplify parsing.
+
+A classical difficulty with the C grammar is that it is "almost
+context-free" but not quite. The problem comes from the different uses
+in the grammar of identifiers and typedefs. This problem has been known
+for a long time and complicates the design of a Yacc grammar for C
+(see [Jourdan et al., 2017](#jourdan2017) for a comprehensive review
+and solutions).
+
+In the following we use a ["lexical
+tie-in"](https://www.gnu.org/software/bison/manual/html_node/Lexical-Tie_002dins.html)
+as described in the [bison
+manual](https://www.gnu.org/software/bison/manual/html_node/index.html)
+to "solve" the issue. This corresponds with the `type_not_specified`
+entry in the grammar. I put quotes around "solve" because solving this
+context issue truly consistently is very difficult, as described in
+[Jourdan et al., 2017](#jourdan2017). The level of robustness of this
+approach should be appropriate for the vast majority of use cases of
+Basilisk, however.
+
+The C and Basilisk C tokens are in [tokens.lex]().
 
 ## References
 
@@ -20,8 +44,7 @@ journal = {Dr. Dobb's Journal}
 Jim Roskind's C grammar
 https://blog.robertelder.org/jim-roskind-grammar/c%2B%2Bgrammar2.0.tar.Z
 ~~~
-
-See also [/home/popinet/local/src/C11parser/](). */
+*/
 
 %param { AstRoot * parse }
 %parse-param { Ast * root }

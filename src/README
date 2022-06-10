@@ -209,6 +209,11 @@ $$
 * [Community Ocean Vertical Mixing (CVMix) interface](cvmix/cvmix.h)
 * [A C interface to the General Ocean Turbulence Model](gotm/common.h)
 
+# The Basilisk C preprocessor
+
+* [qcc](qcc.c): the command line preprocessor/compiler
+* [The Abstract Syntax Tree (AST) library](ast/README)
+
 # General orthogonal coordinates
 
 When not written in vector form, some of the equations above will
