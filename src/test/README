@@ -6,6 +6,10 @@ changes.
 Note that only the documented test cases appear in the list below
 (follow the [All tests](/src/test/) link for a complete list).
 
+## Advection
+
+* [Pure rotation of a smooth tracer field](rotation.c)
+
 ## Systems of conservation laws
 
 * [Bouncing Saint-Venant bump](bump2D1.c)
