@@ -8,7 +8,6 @@ Darcy-Weissbach friction is imposed on the bottom.
 ~~~gnuplot Topography
 set xlabel 'x (m)'
 set ylabel 'z (m)'
-set size ratio -1
 zb(x) = - 50.*exp(-(x/1000.)**2) - 0.001*x 
 plot [-5000:5000] zb(x) w l t ''
 ~~~
