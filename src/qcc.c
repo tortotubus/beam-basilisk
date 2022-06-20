@@ -96,17 +96,15 @@ void compdir (FILE * fin, FILE * fout, FILE * swigfp,
 {
   FILE * fout1 = dopen ("_endfor.c", "w");
 
-  extern int endfor (FILE * fin, FILE * fout,
-		     const char * grid, int dimension,
-		     int nolineno, int progress, int catch, int parallel,
-		     FILE * swigfp, char * siwgname);
-  if (endfor (fin, fout1, grid, dimension, nolineno, progress, catch, parallel,
-	      swigfp, swigname)) {
-    fclose (fout1);
-    cleanup (1, dir);    
-  }
-  fclose (fout1);
+  void endfor (FILE * fin, FILE * fout,
+	       const char * grid, int dimension,
+	       int nolineno, int progress, int catch, int parallel,
+	       FILE * swigfp, char * swigname);
 
+  endfor (fin, fout1, grid, dimension, nolineno, progress, catch, parallel,
+	  swigfp, swigname);
+  fclose (fout1);
+  
   fout1 = dopen ("_endfor.c", "r");
   extern int postproc (FILE * fin, FILE * fout, char ** autolink, int nolineno);
   postproc (fout1, fout, &autolink, nolineno);
