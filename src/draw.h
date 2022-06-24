@@ -557,6 +557,7 @@ static scalar compile_expression (char * expr, bool * isexpr)
     col = compile_expression (args.color, &args.expr);			\
     if (col.i < 0)							\
       return false;							\
+    boundary ({col});							\
   }									\
 									\
   double cmap[NCMAP][3];						\
