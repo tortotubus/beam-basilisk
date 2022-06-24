@@ -20,7 +20,7 @@ sudo apt install darcs flex bison make gawk
 To get the latest Basilisk source code do
 
 ~~~bash
-darcs get --lazy http://basilisk.fr/basilisk
+darcs get http://basilisk.fr/basilisk
 ~~~
 
 If later you want to update the source code, you just need to do
@@ -33,7 +33,8 @@ darcs pull
 and recompile using
 
 ~~~bash
-make clean
+make -k clean
+make -k
 make
 ~~~
 
