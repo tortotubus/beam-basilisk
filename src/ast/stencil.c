@@ -666,6 +666,8 @@ static Ast * is_undefined_parameter (const Ast * n)
 static
 bool is_local_declaration (Ast * n, Stack * stack, Ast * scope)
 {
+  if (!strcmp (ast_terminal (n)->start, "point"))
+    return true;
   Ast ** d;
   for (int i = 0; (d = stack_index (stack, i)); i++)
     if (*d == n)
