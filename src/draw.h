@@ -1412,6 +1412,7 @@ bool isosurface (struct _isosurface p)
   foreach()
     foreach_dimension()
       n.x[] = center_gradient(f);
+  boundary ({n}); // fixme: not detected by interp() below
 
   bview * view = draw();
   glShadeModel (GL_SMOOTH);
