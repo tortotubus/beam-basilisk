@@ -336,6 +336,7 @@ void ast_cleanup (Ast * n, Stack * stack, Ast * scope, bool init_declarator)
     }
     break;
 
+  case sym_forin_declaration_statement:
   case sym_foreach_inner_statement:
     assert (!ast_child (n, sym_statement));
     ast_erase (n);
