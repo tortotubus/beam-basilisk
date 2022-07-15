@@ -3833,6 +3833,10 @@ void endfor (FILE * fin, FILE * fout,
   
   AstRoot * root = ast_parse (buffer, d);
   free (buffer);
+  if (!root) {
+    fprintf (stderr, "qcc: error: cannot parse input (missing closing braces?)\n");
+    exit (1);
+  }
   root->stack = d->stack; d->stack = NULL;
   root->alloc = d->alloc; d->alloc = NULL;
 
