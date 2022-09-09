@@ -2700,7 +2700,7 @@ static void translate (Ast * n, Stack * stack, void * data)
   ## Static FILE * */
 
   case sym_declaration: {
-    Ast * type, * pointer;
+    Ast * type, * pointer, * identifier, * equal;
     if (ast_schema (n, sym_declaration,
 		    0, sym_declaration_specifiers,
 		    0, sym_storage_class_specifier,
@@ -2717,29 +2717,24 @@ static void translate (Ast * n, Stack * stack, void * data)
 			       0, sym_init_declarator,
 			       0, sym_declarator,
 			       0, sym_pointer)) &&
-	!pointer->child[1]) {
-      Ast * parent = n->parent;
-      while (parent && parent->sym != sym_event_definition)
-	parent = parent->parent;
-      Ast * identifier, * equal;
-      if (parent->sym == sym_event_definition &&
-	  (identifier = ast_schema (n, sym_declaration,
-				    1, sym_init_declarator_list,
-				    0, sym_init_declarator,
-				    0, sym_declarator,
-				    1, sym_direct_declarator,
-				    0, sym_generic_identifier,
-				    0, sym_IDENTIFIER)) &&
-	  (equal = ast_schema (n, sym_declaration,
-			       1, sym_init_declarator_list,
-			       0, sym_init_declarator,
-			       1, token_symbol ('='))))
-	ast_after (equal, "NULL;if(!",
-		   ast_terminal (identifier)->start,
-		   "||i==0)",
-		   ast_terminal (identifier)->start,
-		   "=pid()>0?fopen(\"/dev/null\",\"w\"):");
-    }
+	!pointer->child[1] &&
+	ast_parent (n, sym_event_definition) &&
+	(identifier = ast_schema (n, sym_declaration,
+				  1, sym_init_declarator_list,
+				  0, sym_init_declarator,
+				  0, sym_declarator,
+				  1, sym_direct_declarator,
+				  0, sym_generic_identifier,
+				  0, sym_IDENTIFIER)) &&
+	(equal = ast_schema (n, sym_declaration,
+			     1, sym_init_declarator_list,
+			     0, sym_init_declarator,
+			     1, token_symbol ('='))))
+      ast_after (equal, "NULL;if(!",
+		 ast_terminal (identifier)->start,
+		 "||i==0)",
+		 ast_terminal (identifier)->start,
+		 "=pid()>0?fopen(\"/dev/null\",\"w\"):");
     break;
   }
 
