@@ -447,7 +447,7 @@ Ast * ast_expression_type (Ast * expr, Stack * stack, bool higher_dimension)
     assert (expr->child && expr->child[0]);
     if (expr->child[1] == NULL || expr->child[2] == NULL)
       return ast_expression_type (expr->child[0], stack, higher_dimension);
-    if (expr->child[1]->sym == token_symbol('.')) {
+    if (expr->child[1]->sym == token_symbol('.') || expr->child[1]->sym == sym_PTR_OP) {
       // struct member access
       Ast * str = ast_expression_type (expr->child[0], stack, higher_dimension);
       if (str) {
@@ -496,10 +496,6 @@ Ast * ast_expression_type (Ast * expr, Stack * stack, bool higher_dimension)
 				    2, sym_struct_declaration_list)))
 	  return find_struct_member (str, ast_terminal (member)->start);
       }
-    }
-    else if (expr->child[1]->sym == sym_PTR_OP) {
-      // struct member pointer access
-      //      ast_print_tree (expr, stderr, 0);
     }
     break;
     
