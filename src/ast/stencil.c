@@ -50,7 +50,15 @@ static Ast * is_point_function_call (Ast * n)
   foreach_item (arguments, 2, argument)
     if (argument != ast_placeholder) {
       Ast * identifier = ast_is_identifier_expression (argument->child[0]);
-      if (identifier && !strcmp (ast_terminal(identifier)->start, "point"))
+      if (identifier) {
+	if (!strcmp (ast_terminal(identifier)->start, "point"))
+	  return argument;
+      }
+      else if ((identifier = ast_function_call_identifier
+		(ast_schema (ast_is_unary_expression (argument->child[0]), sym_unary_expression,
+			     0, sym_postfix_expression,
+			     0, sym_function_call))) &&
+	       !strcmp (ast_terminal (identifier)->start, "neighborp"))
 	return argument;
     }
   return NULL;
@@ -74,7 +82,6 @@ static bool is_field_access (Ast * n, Stack * stack)
 	 !strcmp (t->start, "fine") ||
 	 !strcmp (t->start, "coarse") ||
 	 !strcmp (t->start, "neighbor") ||
-	 !strcmp (t->start, "neighborp") ||
 	 !strcmp (t->start, "aparent") ||
 	 !strcmp (t->start, "child") ||
 	 !strcmp (t->start, "_assign") ||
@@ -181,6 +188,9 @@ static Ast * is_field (Ast * n, Stack * stack)
 static
 bool has_field_arguments (Ast * function_call, Stack * stack)
 {
+  Ast * identifier = ast_function_call_identifier (function_call);
+  if (identifier && !strcmp (ast_terminal (identifier)->start, "neighborp"))
+    return true;
   Ast * arguments = ast_child (function_call, sym_argument_expression_list);
   foreach_item (arguments, 2, argument)
     if (is_field (argument, stack))
