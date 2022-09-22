@@ -104,6 +104,8 @@ void stencil_val_a (Point p, scalar s, int i, int j, int k, bool input,
 @define _stencil_aparent_a(i,j,k)
 @define _stencil_aparent_r(i,j,k)
 
+@define _stencil_neighborp(i,j,k) neighborp(i,j,k)
+
 int _stencil_nop;
 @define _stencil_val_higher_dimension (_stencil_nop = 1)
 @define _stencil__val_constant(a,_i,_j,_k) (_stencil_nop = 1)
