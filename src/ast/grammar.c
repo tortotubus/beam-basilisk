@@ -70,6 +70,7 @@ int main()
 	    n++;
 	  }
 	} while (c != '|' && c != ';');
+	printf (" && !n->child[%d]", n);
 	printf (")");
 	m++;
       } while (c != ';');
