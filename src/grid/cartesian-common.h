@@ -108,7 +108,9 @@ scalar new_scalar (const char * name)
 
 scalar new_vertex_scalar (const char * name)
 {
-  return init_vertex_scalar (new_scalar (name), name);
+  scalar s = new_block_scalar (name, "", 1);
+  init_vertex_scalar (s, NULL);
+  return s;
 }
 
 static vector alloc_block_vector (const char * name, int block)
@@ -499,6 +501,7 @@ scalar cartesian_init_scalar (scalar s, const char * name)
 
 scalar cartesian_init_vertex_scalar (scalar s, const char * name)
 {
+  s = cartesian_init_scalar (s, name);
   foreach_dimension()
     s.d.x = -1;
   for (int d = 0; d < nboundary; d++)
