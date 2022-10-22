@@ -545,7 +545,15 @@ void reset (void * alist, double val)
 @define neighborp(k,l,o) neighbor(k,l,o)
 
 static double periodic_bc (Point point, Point neighbor, scalar s, void * data);
-			
+
+static inline bool is_vertex_scalar (scalar s)
+{
+  foreach_dimension()
+    if (s.d.x != -1)
+      return false;
+  return true;
+}
+
 static void box_boundary_level (const Boundary * b, scalar * scalars, int l)
 {
   disable_fpe (FE_DIVBYZERO|FE_INVALID);
@@ -571,11 +579,13 @@ static void box_boundary_level (const Boundary * b, scalar * scalars, int l)
 	}
       
       if (list) {
+	extern double (* default_scalar_bc[]) (Point, Point, scalar, void *);
+	if (default_scalar_bc[d] != periodic_bc)
 	foreach_boundary_dir (l, d) {
 	  scalar s, sb;
 	  for (s,sb in list,listb) {
-	    if (s.face && sb.i == s.v.x.i) {
-	      // normal component of face vector
+	    if ((s.face && sb.i == s.v.x.i) || is_vertex_scalar (s)) {
+	      // normal component of face vector, or vertex scalar
 	      if (bghost == 1)
 		foreach_block()
 		  s[(ig + 1)/2,(jg + 1)/2,(kg + 1)/2] =
