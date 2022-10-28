@@ -13,7 +13,6 @@ void flux (const double * s, double * f, double e[2])
   double h = s[0], q = s[1], u = q/h;
   f[0] = q;
   f[1] = q*u + G*h*h/2.;
-  f[2] = s[2]*u;
   // min/max eigenvalues
   double c = sqrt(G*h);
   e[0] = u - c; // min
