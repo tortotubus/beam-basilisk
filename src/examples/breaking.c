@@ -138,8 +138,9 @@ event movie (t += 8.*T0/(45*25))
   sprintf (s, "t = %.2f T0", t/T0);
   draw_string (s, size = 80);
   for (double x = -1; x <= 1; x++)
-    translate (x)
+    translate (x) {
       squares ("u29.x", linear = true, z = "eta", min = -0.15, max = 0.6);
+    }
   save ("movie.mp4");
 }
 
