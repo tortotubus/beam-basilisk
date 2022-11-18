@@ -1251,8 +1251,10 @@ static char * delete_fields (char ** delete)
       fields[strlen (fields) - 1] = '\0';
       str_append (fields, "});");
     }
-    if (automatics)
-      str_append (fields, automatics);
+    if (automatics) {
+      str_prepend (fields, "{");
+      str_append (fields, automatics, "}");
+    }
     delete[0] = fields;
     return fields;
   }
