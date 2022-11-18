@@ -113,6 +113,16 @@ scalar new_vertex_scalar (const char * name)
   return s;
 }
 
+scalar new_block_vertex_scalar (const char * name, int block)
+{
+  scalar s = new_block_scalar (name, "", block);
+  for (int i = 0; i < block; i++) {
+    scalar sb = {s.i + i};
+    init_vertex_scalar (sb, NULL);
+  }
+  return s;
+}
+
 static vector alloc_block_vector (const char * name, int block)
 {
   vector v;
