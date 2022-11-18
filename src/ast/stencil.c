@@ -1009,7 +1009,8 @@ static void append_function_declaration (Ast * parent, Ast * declaration)
 
 static void default_stencil (Ast * n, Stack * stack, void * scope)
 {
-  AstTerminal * open = NCA (n, "{"), * close = NCA (n, "}");
+  Ast * initializer = NN (n, sym_postfix_initializer,
+			  NCA (n, "{"), ast_placeholder, NCA (n, "}"));
   ast_replace_child (n, 0,
 		     NN (n, sym_postfix_expression,
 			 NN (n, sym_primary_expression,
@@ -1023,9 +1024,8 @@ static void default_stencil (Ast * n, Stack * stack, void * scope)
 				       NN (n, sym_primary_expression,
 					   NB (n, sym_IDENTIFIER, "point"))))));
   ast_set_child (n, 2, args);
-  args = ast_list_append (args, sym_argument_expression_list_item,
-			  NN (n, sym_postfix_initializer,
-			      open, list, close));
+  args = ast_list_append (args, sym_argument_expression_list_item, initializer);
+  ast_set_child (initializer, 1, list);
   foreach_item (arguments, 2, argument)
     if (argument != ast_placeholder && is_field (argument, stack)) {
       if (!list->child)
