@@ -66,15 +66,15 @@ FILE * writepath (char * path, const char * mode)
   return fopen (path, mode);
 }
 
-void cleanup (int status, const char * dir)
+static void exiting (void)
 {
-  if (!debug && dir) {
+  if (!debug && !strncmp (dir, ".qcc", 4)) {
     char command[80] = "rm -r -f ";
     strcat (command, dir);
     if (system (command) < 0)
       fprintf (stderr, "qcc: warning: could not cleanup\n");
   }
-  exit (status);
+  free (autolink);
 }
 
 char * dname (const char * fname)
@@ -108,7 +108,9 @@ void compdir (FILE * fin, FILE * fout, FILE * swigfp,
   
   fout1 = dopen ("_endfor.c", "r");
   extern int postproc (FILE * fin, FILE * fout, char ** autolink, int nolineno);
+  extern int postlex_destroy (void);
   postproc (fout1, fout, &autolink, nolineno);
+  postlex_destroy();
   fclose (fout1);
   fflush (fout);
 
@@ -231,6 +233,7 @@ int main (int argc, char ** argv)
     perror (dir);
     return 1;
   }
+  atexit (exiting);
   if (file) {
     char * grid = NULL;
     int default_grid;
@@ -269,7 +272,7 @@ int main (int argc, char ** argv)
       FILE * fin = dopen (file, "r");
       if (!fin) {
 	perror (file);
-	cleanup (1, dir);
+	exit (1);
       }
       FILE * fp = dopen ("_attributes.h", "w");
       fputs ("typedef struct {\n", fp);
@@ -319,7 +322,7 @@ int main (int argc, char ** argv)
       fout = dopen (file, "w");
       if (!fout) {
 	perror (file);
-	cleanup (1, dir);
+	exit (1);
       }
 
       char preproc[1000], * cppcommand = getenv ("CPP99");
@@ -379,7 +382,7 @@ int main (int argc, char ** argv)
       if (!fin) {
 	fclose (fout);
 	perror (preproc);
-	cleanup (1, dir);
+	exit (1);
       }
 
       compdir (fin, fout, swigfp, swigname, grid);
@@ -388,7 +391,7 @@ int main (int argc, char ** argv)
       if (status == -1 ||
 	  (WIFSIGNALED (status) && (WTERMSIG (status) == SIGINT || 
 				    WTERMSIG (status) == SIGQUIT)))
-	cleanup (1, dir);
+	exit (1);
 
       fout = dopen ("_tmp", "w");
       fin = dopen (file, "r");
@@ -421,7 +424,7 @@ int main (int argc, char ** argv)
   }
   else if (dep || tags) {
     fprintf (stderr, "usage: qcc -grid=[GRID] [OPTIONS] FILE.c\n");
-    cleanup (1, dir);
+    exit (1);
   }
   else
     strcat (command, command1);
@@ -435,9 +438,9 @@ int main (int argc, char ** argv)
     if (status == -1 ||
 	(WIFSIGNALED (status) && (WTERMSIG (status) == SIGINT || 
 				  WTERMSIG (status) == SIGQUIT)))
-      cleanup (1, dir);
-    cleanup (WEXITSTATUS (status), dir);
+      exit (1);
+    exit (WEXITSTATUS (status));
   }
-  cleanup (0, dir);
+  exit (0);
   return 0;
 }
