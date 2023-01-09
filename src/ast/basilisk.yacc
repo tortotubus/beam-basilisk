@@ -200,8 +200,7 @@ unary_expression
 	| SIZEOF unary_expression
 	| SIZEOF '(' type_name ')'
 	| ALIGNOF '(' type_name ')'
-	| NEW_FIELD /* Basilisk C extension */
-	| NEW_FIELD '[' postfix_expression ']' /* Basilisk C extension */
+	| new_field /* Basilisk C extension */
 	;
 
 unary_operator
@@ -794,6 +793,11 @@ external_foreach_dimension
 
 attribute
         : generic_identifier '{' struct_declaration_list '}'
+	;
+
+new_field
+        : NEW_FIELD
+	| NEW_FIELD '[' postfix_expression ']'
 	;
 
 root

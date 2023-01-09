@@ -111,13 +111,35 @@ Ast * ast_list_append (Ast * list, int item_sym, Ast * item)
   ast_set_line (item, ast_right_terminal (list));
   Ast * parent = list->parent;
   int index = ast_child_index (list);
-  Ast * l =  ast_new_children (ast_new (parent, list->sym),
-			       list, 
-			       ast_terminal_new_char (item, ","),
-			       ast_new (item, item_sym));
-  ast_attach (l->child[2], item);
+  Ast * l;
+  if (item->sym == item_sym)
+    l = ast_new_children (ast_new (parent, list->sym),
+			  list, 
+			  ast_terminal_new_char (item, ","),
+			  item);
+  else {
+    l =  ast_new_children (ast_new (parent, list->sym),
+			   list, 
+			   ast_terminal_new_char (item, ","),
+			   ast_new (item, item_sym));
+    ast_attach (l->child[2], item);
+  }
   ast_set_child (parent, index, l);
   return l;
+}
+
+/**
+Prepends `item` to `list`. The list item symbol is `item_sym`. */
+
+Ast * ast_block_list_prepend (Ast * list, int item_sym, Ast * item)
+{
+  Ast * r = list;
+  while (r->child[0]->sym != item_sym)
+    r = r->child[0];
+  Ast * l = ast_block_list_append (r, item_sym, item), * tmp = r->child[0];
+  ast_set_child (r, 0, l->child[1]);
+  ast_set_child (l, 1, tmp);
+  return r != list ? list : l;
 }
 
 /**
@@ -267,7 +289,7 @@ Ast * ast_initializer_list (Ast * list)
   return start;
 }
 
-Ast * ast_new_unary_expression (Ast * parent)
+Ast * ast_new_cast_expression (Ast * parent)
 {
   return ast_new (parent,
 		  sym_assignment_expression,
@@ -282,8 +304,13 @@ Ast * ast_new_unary_expression (Ast * parent)
 		  sym_shift_expression,
 		  sym_additive_expression,
 		  sym_multiplicative_expression,
-		  sym_cast_expression,
-		  sym_unary_expression);
+		  sym_cast_expression);
+}
+
+Ast * ast_new_unary_expression (Ast * parent)
+{
+  return ast_attach (ast_new_cast_expression (parent),
+		     ast_new (parent, sym_unary_expression));
 }
 
 Ast * ast_is_unary_expression (const Ast * n)
@@ -312,6 +339,27 @@ Ast * ast_is_unary_expression (const Ast * n)
     if (n->sym == sym_unary_expression)
       return (Ast *) n;
   return NULL;
+}
+
+Ast * ast_new_assignment_function_call (Ast * parent, const char * func)
+{
+  return ast_attach (ast_new_unary_expression (parent),
+		     NN(parent, sym_postfix_expression,
+			NN(parent, sym_function_call,
+			   NN(parent, sym_postfix_expression,
+			      NN(parent, sym_primary_expression,
+				 NA(parent, sym_IDENTIFIER, func))),
+			   NCA(parent, "("),
+			   NCA(parent, ")"))));
+}
+
+Ast * ast_new_function_call (Ast * parent, const char * func)
+{
+  return NN(parent, sym_statement,
+	    NN(parent, sym_expression_statement,
+	       NN(parent, sym_expression,
+		  ast_new_assignment_function_call (parent, func)),
+	       NCA(parent, ";")));
 }
 
 Ast * ast_is_identifier_expression (const Ast * n)
@@ -361,6 +409,47 @@ Ast * ast_new_constant (Ast * parent, int symbol, const char * value)
 		     ast_terminal_new (parent, symbol, value));
 }
 
+Ast * ast_new_empty_scalar (Ast * parent)
+{
+  return NN(parent, sym_initializer,
+	    NCA(parent, "{"),
+	    NN(parent, sym_initializer_list,
+	       NN(parent, sym_initializer,
+		  ast_attach(ast_new_cast_expression (parent),
+			     NN(parent, sym_unary_expression,
+				NN(parent, sym_unary_operator,
+				   NCA(parent, "-")),
+				NN(parent, sym_cast_expression,
+				   NN(parent, sym_unary_expression,
+				      NN(parent, sym_postfix_expression,
+					 NN(parent, sym_primary_expression,
+					    NN(parent, sym_constant,
+					       NA(parent, sym_I_CONSTANT, "1")))))))))),
+	    NCA(parent, "}"));
+}
+
+Ast * ast_new_empty_vector (Ast * parent, int dimension)
+{
+  Ast * list = NN(parent, sym_initializer_list,
+		  ast_new_empty_scalar (parent));
+  Ast * ret = NN(parent, sym_initializer,
+		 NCA(parent, "{"), list, NCA(parent, "}"));
+  for (int i = 1; i < dimension; i++)
+    ast_list_append (list, sym_initializer, ast_new_empty_scalar (parent));
+  return ret;
+}
+
+Ast * ast_new_empty_tensor (Ast * parent, int dimension)
+{
+  Ast * list = NN(parent, sym_initializer_list,
+		  ast_new_empty_vector (parent, dimension));
+  Ast * ret = NN(parent, sym_initializer,
+		 NCA(parent, "{"), list, NCA(parent, "}"));
+  for (int i = 1; i < dimension; i++)
+    ast_list_append (list, sym_initializer, ast_new_empty_vector (parent, dimension));
+  return ret;
+}
+
 Ast * ast_new_identifier (Ast * parent, const char * name)
 {
   return ast_attach (ast_new (parent,
@@ -407,8 +496,10 @@ static Ast * find_struct_member (Ast * n, const char * member)
   return NULL;
 }
 
-static Ast * declaration_from_type (const Ast * type)
+Ast * ast_declaration_from_type (const Ast * type)
 {
+  if (!type)
+    return NULL;
   while (type->sym != sym_declaration &&
 	 type->sym != sym_function_declaration &&
 	 type->sym != sym_parameter_declaration &&
@@ -421,7 +512,7 @@ static Ast * declaration_from_type (const Ast * type)
 
 Ast * ast_expression_type (Ast * expr, Stack * stack, bool higher_dimension)
 {
-  if (expr == ast_placeholder)
+  if (!expr || expr == ast_placeholder)
     return NULL;
   switch (expr->sym) {
 
@@ -431,7 +522,8 @@ Ast * ast_expression_type (Ast * expr, Stack * stack, bool higher_dimension)
 				  higher_dimension);
     else
       return ast_identifier_declaration (stack, ast_terminal (expr)->start);
-    
+
+  case sym_unary_expression:
   case sym_primary_expression:
   case sym_argument_expression_list_item:
     return ast_expression_type (expr->child[0], stack, higher_dimension);
@@ -454,7 +546,7 @@ Ast * ast_expression_type (Ast * expr, Stack * stack, bool higher_dimension)
 	Ast * member = ast_find (expr->child[2], sym_member_identifier,
 				 0, sym_generic_identifier,
 				 0, sym_IDENTIFIER);
-	Ast * declaration = ast_find (declaration_from_type (str), sym_types);
+	Ast * declaration = ast_find (ast_declaration_from_type (str), sym_types);
 	assert (declaration);
 	AstTerminal * typename = (AstTerminal *)
 	  ast_schema (declaration, sym_types,
@@ -468,11 +560,16 @@ Ast * ast_expression_type (Ast * expr, Stack * stack, bool higher_dimension)
 	if (typename) {
 	  Ast * type = ast_identifier_declaration (stack, typename->start);
 	  if (!type) {
+#if 0	    
 	    fprintf (stderr, "%s:%d: warning: unknown type name '%s'\n",
 		     typename->file, typename->line, typename->start);
+#endif
 	    return NULL;
 	  }
 
+	  if (!member)
+	    return NULL;
+	  
 	  /**
 	  Special treatment of vector and tensor fields, to deal with
 	  possibly undefined components in lower dimensions. */
@@ -484,7 +581,10 @@ Ast * ast_expression_type (Ast * expr, Stack * stack, bool higher_dimension)
 	     (!strcmp (ast_terminal (type)->start, "vector") ||
 	      !strcmp (ast_terminal (type)->start, "tensor"))) ? "x" :
 	    ast_terminal (member)->start;
-	    
+
+	  if (!strcmp (ast_terminal (type)->start, "scalar"))
+	    type = ast_identifier_declaration (stack, "_Attributes");
+
 	  while (type->sym != sym_declaration)
 	    type = type->parent;
 	  return
@@ -494,7 +594,7 @@ Ast * ast_expression_type (Ast * expr, Stack * stack, bool higher_dimension)
 	else if ((str = ast_schema (declaration, sym_types,
 				    0, sym_struct_or_union_specifier,
 				    2, sym_struct_declaration_list)))
-	  return find_struct_member (str, ast_terminal (member)->start);
+	  return member ? find_struct_member (str, ast_terminal (member)->start) : NULL;
       }
     }
     break;
@@ -515,10 +615,7 @@ AstTerminal * ast_type (const Ast * identifier)
 {
   if (!identifier)
     return NULL;
-  const Ast * declarator = identifier;
-  while (declarator && declarator->sym != sym_declarator)
-    declarator = declarator->parent;
-  
+  const Ast * declarator = ast_parent (identifier, sym_declarator);
   if (!ast_schema (declarator, sym_declarator,
 		   0, sym_direct_declarator,
 		   0, sym_generic_identifier,
@@ -529,7 +626,7 @@ AstTerminal * ast_type (const Ast * identifier)
 		   0, sym_generic_identifier,
 		   0, sym_IDENTIFIER))
     return NULL; // this is a pointer
-  return ast_terminal (ast_find (declaration_from_type (identifier),
+  return ast_terminal (ast_find (ast_declaration_from_type (identifier),
 				 sym_types)->child[0]);
 }
 
@@ -711,7 +808,7 @@ typedef struct {
   bool nolineno, parallel;
   Field * constants;
   int constants_index, fields_index, nboundary;
-  Ast * init_solver, * init_events, * init_fields;
+  Ast * init_solver, * init_events, * init_fields, * last_events;
   Ast * boundary;
   char * swigname, * swigdecl, * swiginit;
 } TranslateData;
@@ -925,7 +1022,7 @@ static Ast * is_point_point (const Ast * identifier)
   return NULL;
 }
 
-static Ast * is_point_function (const Ast * declarator)
+Ast * ast_is_point_function (const Ast * declarator)
 {
   Ast * parameters = ast_find (declarator, sym_parameter_type_list);
   if (parameters)
@@ -1150,7 +1247,7 @@ static int field_list_type (Ast * list, Stack * stack, bool mustbe)
   return type > 3 ? -1 : type;
 }
 
-static bool is_field (const char * typename)
+bool ast_is_field (const char * typename)
 {
   return typename && (!strcmp (typename, "scalar") ||
 		      !strcmp (typename, "vertex scalar") ||
@@ -1223,9 +1320,9 @@ void foreach_field_allocator (Stack * stack, TranslateData * t, Ast * scope,
 	  ((declarator = ast_ancestor (*d, 3)) &&
 	   (init_declarator = declarator->parent)->sym == sym_init_declarator &&
 	   (allocator = declarator_is_automatic (declarator)))) {
-	Ast * declaration = declaration_from_type (allocator);
+	Ast * declaration = ast_declaration_from_type (allocator);
 	const char * typename = typedef_name_from_declaration (declaration);
-	if (is_field (typename))
+	if (ast_is_field (typename))
 	  func (stack, t, typename, init_declarator, declarator, allocator,
 		data);
       }
@@ -1265,10 +1362,8 @@ static char * delete_fields (char ** delete)
       fields[strlen (fields) - 1] = '\0';
       str_append (fields, "});");
     }
-    if (automatics) {
-      str_prepend (fields, "{");
-      str_append (fields, automatics, "}");
-    }
+    if (automatics)
+      str_append (fields, automatics);
     delete[0] = fields;
     return fields;
   }
@@ -1627,6 +1722,27 @@ static Ast * function_scope (Ast * n, Stack * stack)
 }
 
 /**
+Inserts `item` after `insert` in the list containing `insert`. */
+
+Ast * ast_list_insert_after (Ast * insert, Ast * item)
+{
+  Ast * list_item = insert->parent, * list = list_item->parent,
+    * parent = list->parent;
+  int item_sym = list_item->sym;
+  int index = ast_child_index (list);
+  Ast * nlist = NN(list, list->sym,
+		   list,
+		   NCB (list, ","),
+		   NN (list, item_sym,
+		       item));
+  if (parent->sym != list->sym)
+    ast_set_child (parent, index, nlist);
+  else 
+    ast_set_child (parent, 0, nlist);
+  return list;
+}
+
+/**
 Inserts `item` after `insert` in the (block) list containing `insert`. */
 
 Ast * ast_block_list_insert_after (Ast * insert, Ast * item)
@@ -1662,6 +1778,48 @@ Ast * ast_block_list_insert_before2 (Ast * insert, Ast * item)
   return list;
 }
 
+const char * ast_crop_before (const char * s)
+{
+  while (strchr (" \t\n\r", *s)) s++;
+  while (*s == '#' || *s == '@') {
+    s++;
+    while (*s != '\0' && *s != '\n') s++;
+    while (strchr (" \t\n\r", *s)) s++;
+  }
+  return s;
+}
+
+static
+void compound_init (Ast * compound, Ast * n)
+{
+  Ast * list = NN(compound, sym_block_item_list,
+		  NN(compound, sym_block_item,
+		     n));
+  ast_new_children (compound, compound->child[0], list, compound->child[1]);
+}
+
+static
+void compound_append (Ast * compound, Ast * n)
+{
+  Ast * list = ast_schema (compound, sym_compound_statement,
+			   1, sym_block_item_list);
+  if (!list)
+    compound_init (compound, n);
+  else
+    ast_block_list_append (list, sym_block_item, n);
+}
+  
+static
+void compound_prepend (Ast * compound, Ast * n)
+{
+  Ast * list = ast_schema (compound, sym_compound_statement,
+			   1, sym_block_item_list);
+  if (!list)
+    compound_init (compound, n);
+  else
+    ast_block_list_prepend (list, sym_block_item, n);
+}
+  
 /**
 # First pass: Global boundaries and stencils */
 
@@ -1677,7 +1835,7 @@ static void global_boundaries_and_stencils (Ast * n, Stack * stack, void * data)
     char * s = NULL;
     s = ast_str_append (n, s);
     fprintf (stderr, "%s:%d: warning: Basilisk C parse error near `%s'\n",
-	     t->file, t->line, s);
+	     t->file, t->line, ast_crop_before (s));
     free (s);
     break;
   }
@@ -1860,7 +2018,7 @@ static void diagonalize (Ast * n, Stack * stack, void * field)
   }
 }
 
-static bool is_foreach_stencil (Ast * n)
+bool ast_is_foreach_stencil (const Ast * n)
 {
   Ast * foreach = ast_schema (n, sym_foreach_statement,
 			      0, sym_FOREACH);
@@ -1872,12 +2030,77 @@ static bool is_foreach_stencil (Ast * n)
 
 static Ast * higher_dimension (Ast * n)
 {
-  char * s = is_foreach_stencil (inforeach (n)) || in_stencil_point_function (n)
+  char * s = ast_is_foreach_stencil (inforeach (n)) || in_stencil_point_function (n)
     ? "_stencil_val_higher_dimension" : "_val_higher_dimension";
   return ast_attach (ast_new (n, sym_primary_expression),
 		     ast_terminal_new (n, sym_IDENTIFIER, s));
 }
-				     
+
+static char * append_initializer (char * init, Ast * initializer, const char * typename)
+{
+  if (!strcmp (typename, "vector")) {
+    str_append (init, "(double[])");
+    Ast * list = ast_schema (initializer, sym_initializer,
+			     1, sym_initializer_list);
+    if (list) {
+      char * initialize = ast_str_append (list, NULL);
+      str_append (init, "{", initialize);
+      free (initialize);
+      int nr = 3;
+      foreach_item (list, 2, item) nr--;
+      while (nr--)
+	str_append (init, ",0.");
+      str_append (init, "}");
+      return init;
+    }
+  }
+  char * initialize = ast_str_append (initializer, NULL);
+  str_append (init, initialize);
+  free (initialize);
+  return init;
+}
+
+/**
+## Attribute declaration */
+
+static void attribute (Ast * n, Stack * stack, void * data)
+{
+  if (n->sym != sym_attribute)
+    return;
+  Ast * identifier = ast_schema (n, sym_attribute,
+				 0, sym_generic_identifier,
+				 0, sym_IDENTIFIER);
+  if (identifier &&
+      !strcmp (ast_terminal (identifier)->start, "attribute")) {
+
+    /**
+       Remove 'attribute' from external declarations. */
+
+    Ast * translation = n->parent->parent;
+    assert (translation->child[1]);
+    Ast * next = translation->child[0];
+    assert (translation->parent->child[1]);
+    ast_set_child (translation->parent, 0, next);
+    assert (next->child[1]);
+    str_prepend (ast_left_terminal (translation->parent->child[1])->before,
+		 ast_left_terminal (n)->before);
+
+    /**
+       Add attributes to typedef '_Attributes'. */
+      
+    Ast * attr = ast_identifier_declaration (stack, "_Attributes");
+    while (attr->sym != sym_declaration)
+      attr = attr->parent;
+    ast_list_append_list (ast_find (attr, sym_struct_declaration_list),
+			  n->child[2]);
+
+    /**
+       Cleanup. */
+      
+    ast_destroy (translation);
+  }
+}
+
 static void translate (Ast * n, Stack * stack, void * data)
 {
   typedef struct {
@@ -2016,7 +2239,7 @@ static void translate (Ast * n, Stack * stack, void * data)
     /**
     ### (const) fields combinations (except for stencils) */
 
-    if (!is_foreach_stencil (n)) {
+    if (!ast_is_foreach_stencil (n)) {
       Ast ** consts = NULL;
       maybeconst (n, stack, append_const, &consts);
       if (consts) {
@@ -2034,9 +2257,9 @@ static void translate (Ast * n, Stack * stack, void * data)
   ## (const) fields combinations for Point functions */
 
   case sym_function_definition: {
-    if (is_point_function (ast_schema (n, sym_function_definition,
-				       0, sym_function_declaration,
-				       1, sym_declarator)) &&
+    if (ast_is_point_function (ast_schema (n, sym_function_definition,
+					   0, sym_function_declaration,
+					   1, sym_declarator)) &&
 	!ast_is_stencil_function (n)) {
       Ast ** consts = NULL;
       maybeconst (n, stack, append_const, &consts);
@@ -2116,7 +2339,7 @@ static void translate (Ast * n, Stack * stack, void * data)
       }
       if (!func)
 	func = ast_new_identifier (n, "val");
-      if (is_foreach_stencil (foreach) || in_stencil_point_function (n))
+      if (ast_is_foreach_stencil (foreach) || in_stencil_point_function (n))
 	str_prepend (ast_terminal (ast_find (func, sym_IDENTIFIER))->start,
 		     "_stencil_");
       ast_set_child (n, 2,
@@ -2169,45 +2392,10 @@ static void translate (Ast * n, Stack * stack, void * data)
     break;
   }
 
-  /**
-  ## Attribute declaration */
-
-  case sym_attribute: {
-    Ast * identifier = ast_schema (n, sym_attribute,
-				   0, sym_generic_identifier,
-				   0, sym_IDENTIFIER);
-    if (identifier &&
-	!strcmp (ast_terminal (identifier)->start, "attribute")) {
-
-      /**
-      Remove 'attribute' from external declarations. */
-
-      Ast * translation = n->parent->parent;
-      assert (translation->child[1]);
-      Ast * next = translation->child[0];
-      assert (translation->parent->child[1]);
-      ast_set_child (translation->parent, 0, next);
-      assert (next->child[1]);
-      str_prepend (ast_left_terminal (translation->parent->child[1])->before,
-		   ast_left_terminal (n)->before);
-
-      /**
-      Add attributes to typedef '_Attributes'. */
-      
-      Ast * attr = ast_identifier_declaration (stack, "_Attributes");
-      while (attr->sym != sym_declaration)
-	attr = attr->parent;
-      ast_list_append_list (ast_find (attr, sym_struct_declaration_list),
-			    n->child[2]);
-
-      /**
-      Cleanup. */
-      
-      ast_destroy (translation);
-    }
+  case sym_attribute:
+    attribute (n, stack, data);
     break;
-  }
-
+    
   /**
   ## Replacement of some identifiers */
   
@@ -2260,9 +2448,9 @@ static void translate (Ast * n, Stack * stack, void * data)
   case sym_init_declarator: {
     Ast * declarator = declarator_is_allocator (n->child[0]);
     if (declarator) {
-      Ast * declaration = declaration_from_type (declarator);
+      Ast * declaration = ast_declaration_from_type (declarator);
       const char * typename = typedef_name_from_declaration (declaration);
-      if (is_field (typename)) {
+      if (ast_is_field (typename)) {
 	char * func = strdup (typename);
 	for (char * s = func; *s != '\0'; s++)
 	  if (*s == ' ')
@@ -2301,13 +2489,16 @@ static void translate (Ast * n, Stack * stack, void * data)
 				      &d->constants_index);
 	    field->value = (void *)(long) c->index + 65536;
 	    char * src = field_value (c, "_NVARMAX+", c->type);
-	    char * initializer = ast_str_append (n->child[2], NULL);
-	    ast_before (ast_child (d->init_fields, token_symbol ('}')),
-			"  init_const_", const_func, "((", typename, ")",
-			src, ",\"", name, "\",",
-			!strcmp (typename, "vector") ? "(double[])" : "",
-			initializer, ");\n");
-	    free (initializer);
+	    char * init = NULL;
+	    str_append (init,
+			"init_const_", const_func, "((", typename, ")",
+			src, ",\"", name, "\",");
+	    init = append_initializer (init, n->child[2], typename);
+	    str_append (init, ");");
+	    Ast * finit = ast_parse_expression (init, ast_get_root (n));
+	    free (init);
+	    ast_set_line (finit, ast_right_terminal (d->init_fields));
+	    compound_append (d->init_fields, NN(n, sym_statement, finit));
 	    
 	    str_prepend (src, typename, " s=");
 	    str_append (src, ";");
@@ -2327,16 +2518,11 @@ static void translate (Ast * n, Stack * stack, void * data)
 	      !strcmp (typename, "scalar") ? 1 : d->dimension;
 	    str_append (src, "double a = new_const_",
 			const_func, "(\"", name, "\",",
-			ind, ",", !strcmp (typename, "vector") ?
-			"(double[]){initializer});" : "initializer);");
+			ind, ",");
+	    src = append_initializer (src, n->child[2], typename);
+	    str_append (src, ");");
 	    Ast * expr = ast_parse_expression (src, ast_get_root (n));
 	    free (src);
-	    if (!strcmp (typename, "vector"))
-	      assert
-		(ast_replace (expr, "initializer",
-			      ast_find (n->child[2], sym_initializer_list)));
-	    else
-	      assert (ast_replace (expr, "initializer", n->child[2]->child[0]));
 	    ast_replace_child (n, 2, ast_find (expr, sym_initializer));	    
 	    ast_destroy (expr);
 	  }
@@ -2352,9 +2538,13 @@ static void translate (Ast * n, Stack * stack, void * data)
 	  field_init (&c, typename, d->dimension, &d->fields_index);
 	  field->value = (void *)(long) c.index + 1;
 	  char * src = field_value (&c, "", c.type);
-	  ast_before (ast_child (d->init_fields, token_symbol ('}')),
+	  char * init = NULL;
+	  str_append (init,
 		      "  init_", func, "((", typename, ")", src, ",\"",
-		      name, "\");\n");
+		      name, "\");");
+	  Ast * finit = ast_parse_expression (init, ast_get_root (n));
+	  free (init);
+	  compound_append (d->init_fields, NN(n, sym_statement, finit));
 	  str_prepend (src, typename, " _field_=");
 	  str_append (src, ";");
 
@@ -2397,7 +2587,7 @@ static void translate (Ast * n, Stack * stack, void * data)
 	free (func);
       }
     }
-    else if (n->child[1] && declaration_from_type (n)->parent->sym
+    else if (n->child[1] && ast_declaration_from_type (n)->parent->sym
 	     == sym_external_declaration) {
 	    
       /**
@@ -2465,7 +2655,7 @@ static void translate (Ast * n, Stack * stack, void * data)
 	if (!strcmp (t->start, "val") || !strcmp (t->start, "fine") ||
 	    !strcmp (t->start, "coarse")) {
 	  complete_arguments (n, 4);
-	  if (is_foreach_stencil (foreach) || stencil_function)
+	  if (ast_is_foreach_stencil (foreach) || stencil_function)
 	    str_prepend (t->start, "_stencil_");
 	}
 	else if (!strcmp (t->start, "allocated") ||
@@ -2475,7 +2665,7 @@ static void translate (Ast * n, Stack * stack, void * data)
 		 !strcmp (t->start, "aparent") ||
 		 !strcmp (t->start, "child")) {
 	  complete_arguments (n, 3);
-	  if (is_foreach_stencil (foreach) || stencil_function)
+	  if (ast_is_foreach_stencil (foreach) || stencil_function)
 	    str_prepend (t->start, "_stencil_");
 	}
       }
@@ -2503,7 +2693,7 @@ static void translate (Ast * n, Stack * stack, void * data)
 	str_append (name, "begin_", t->start);
 	Ast * type = ast_identifier_declaration (stack, name);
 	if (type &&
-	    declaration_from_type (type)->sym == sym_function_declaration) {
+	    ast_declaration_from_type (type)->sym == sym_function_declaration) {
 	  ast_before (identifier, "{");
 	  ast_after (n, ";");
 	  ast_after (n->parent, "end_", t->start, "();}");
@@ -2635,7 +2825,7 @@ static void translate (Ast * n, Stack * stack, void * data)
 				  0, sym_direct_declarator,
 				  0, sym_generic_identifier,
 				  0, sym_IDENTIFIER)))
-      declaration = declaration_from_type (identifier);
+      declaration = ast_declaration_from_type (identifier);
     else if ((identifier = ast_schema (parent, sym_assignment_expression,
 				       0, sym_unary_expression,
 				       0, sym_postfix_expression,
@@ -2649,7 +2839,7 @@ static void translate (Ast * n, Stack * stack, void * data)
 		 t->file, t->line, t->start);
 	exit (1);
       }
-      declaration = declaration_from_type (declaration);
+      declaration = ast_declaration_from_type (declaration);
     }
     else {
       AstTerminal * t = ast_terminal (n);
@@ -2659,7 +2849,7 @@ static void translate (Ast * n, Stack * stack, void * data)
       exit (1);
     }
     const char * typename = typedef_name_from_declaration (declaration);
-    if (is_field (typename)) {
+    if (ast_is_field (typename)) {
       if (!strstr (ast_terminal (n)->start, typename)) {
 	AstTerminal * t = ast_terminal (n);
 	fprintf (stderr,
@@ -2673,7 +2863,7 @@ static void translate (Ast * n, Stack * stack, void * data)
       for (char * s = src; *s; s++)
 	if (*s == ' ')
 	  *s = '_';
-      Ast * layers = ast_schema (n->parent, sym_unary_expression,
+      Ast * layers = ast_schema (n->parent, sym_new_field,
 				 2, sym_postfix_expression);
       if (layers) {
 	str_append (src, "(\"", ast_terminal (identifier)->start,
@@ -2778,7 +2968,8 @@ static void translate (Ast * n, Stack * stack, void * data)
       /**
       Define the event expressions. */
 
-      char * expr = NULL, * iarray = NULL, * tarray = NULL, anexpr[20];
+      char * iarray = NULL, * tarray = NULL, anexpr[20];
+      AstRoot * root = ast_get_root (n);
       int nexpr = 0;
       foreach_item (n->child[3], 2, event_parameter) {
 	Ast * initializer = ast_child (event_parameter, sym_postfix_initializer);
@@ -2794,21 +2985,35 @@ static void translate (Ast * n, Stack * stack, void * data)
 	    exit (1);
 	  }
 	  snprintf (anexpr, 19, "%d", nexpr++);
-	  str_append (expr, "static int ", name, "_expr", anexpr,
-		      "(int *ip,double *tp,Event *_ev)"
-		      "{int i=*ip;double t=*tp;"
-		      "int ret=(1);*ip=i;*tp=t;return ret;}");
-	  if (!strcmp (ast_terminal (identifier)->start, "t")) {
-	    str_append (tarray, name, "_array");
-	    str_append (expr, "static double ", tarray, "[]=");
+	  {
+	    char * expr = NULL;
+	    str_append (expr, "static int ", name, "_expr", anexpr,
+			"(int *ip,double *tp,Event *_ev)"
+			"{int i=*ip;double t=*tp;"
+			"int ret=(1);*ip=i;*tp=t;return ret;}");
+	    Ast * expr0 = ast_parse_external_declaration (expr, root);
+	    ast_set_line (expr0, ast_left_terminal (n));
+	    free (expr);
+	    ast_block_list_insert_before (n->parent->child[0], expr0->child[0]);
 	  }
-	  else {
-	    str_append (iarray, name, "_array");
-	    str_append (expr, "static int ", iarray, "[]=");
+	  {
+	    char * expr = NULL;
+	    if (!strcmp (ast_terminal (identifier)->start, "t")) {
+	      str_append (tarray, name, "_array");
+	      str_append (expr, "static double ", tarray, "[]=");
+	    }
+	    else {
+	      str_append (iarray, name, "_array");
+	      str_append (expr, "static int ", iarray, "[]=");
+	    }
+	    ast_before (ast_last_child(initializer), ",-1");
+	    expr = ast_str_append (initializer, expr);
+	    str_append (expr, ";");
+	    Ast * expr0 = ast_parse_external_declaration (expr, root);
+	    ast_set_line (expr0, ast_left_terminal (n));
+	    free (expr);
+	    ast_block_list_insert_before (n->parent->child[0], expr0->child[0]);
 	  }
-	  ast_before (ast_last_child(initializer), ",-1");
-	  expr = ast_str_append (initializer, expr);
-	  str_append (expr, ";");
 	  break;
 	}
 	else {
@@ -2825,6 +3030,7 @@ static void translate (Ast * n, Stack * stack, void * data)
 	  }
 	  else {
 	    snprintf (anexpr, 19, "%d", nexpr++);
+	    char * expr = NULL;
 	    str_append (expr, "static int ", name, "_expr", anexpr,
 			"(int *ip,double *tp,Event *_ev)"
 			"{int i=*ip;double t=*tp;"
@@ -2837,7 +3043,11 @@ static void translate (Ast * n, Stack * stack, void * data)
 	      ast_terminal (identifier)->start = strdup ("1234567890");
 	    }
 	    expr = ast_str_append (event_parameter, expr);
-	    str_append (expr, ");*ip=i;*tp=t;return ret;}");
+	    str_append (expr, ")!=0;*ip=i;*tp=t;return ret;}");
+	    Ast * expr0 = ast_parse_external_declaration (expr, root);
+	    ast_set_line (expr0, ast_left_terminal (n));
+	    free (expr);
+	    ast_block_list_insert_before (n->parent->child[0], expr0->child[0]);
 	  }
 	}
       }
@@ -2859,10 +3069,12 @@ static void translate (Ast * n, Stack * stack, void * data)
 		  tarray ? tarray : "((double *)0)",
 		  ",",
 		  ast_file_line (t, d->nolineno), ",\"", t->start, "\"});\n");
+      Ast * registration = NN(n, sym_statement,
+			      ast_parse_expression (reg, root));
       if (last)
-	ast_before (ast_child (d->init_events, token_symbol ('}')), reg);
+	compound_append (d->last_events, registration);
       else
-	ast_after (ast_child (d->init_events, token_symbol ('{')), reg);
+	compound_append (d->init_events, registration);
       free (reg);
       free (iarray);
       free (tarray);
@@ -2883,7 +3095,7 @@ static void translate (Ast * n, Stack * stack, void * data)
 		  "static int ", name,
 		  "(const int i,const double t,Event *_ev)"
 		  "{_statement_;return 0;}");
-      Ast * def = ast_parse_external_declaration (src, ast_get_root (n));
+      Ast * def = ast_parse_external_declaration (src, root);
       Ast * identifier = ast_schema (def, sym_external_declaration,
 				     0, sym_function_definition,
 				     0, sym_function_declaration,
@@ -2894,13 +3106,10 @@ static void translate (Ast * n, Stack * stack, void * data)
 				     0, sym_IDENTIFIER);
       ast_terminal (identifier)->value = (void *) last;
       free (src);
-      parent = n->parent;
       ast_replace (def, "_statement_", statement);
-      ast_replace_child (parent, 0, def->child[0]);
-      ast_before (parent->child[0], expr);
+      ast_replace_child (n->parent, 0, def->child[0]);
       ast_destroy (def);
 
-      free (expr);
       free (name);      
     }
     break;
@@ -2964,9 +3173,21 @@ static void translate (Ast * n, Stack * stack, void * data)
 					0, sym_direct_declarator,
 					0, sym_generic_identifier,
 					0, sym_IDENTIFIER))) {
+	    Ast * init =
+	      NN(n, sym_statement,
+		 NN(n, sym_expression_statement,
+		    NN(n, sym_expression,
+		       NN(n, sym_assignment_expression,
+			  NN(n, sym_unary_expression,
+			     NN(n, sym_postfix_expression,
+				NN(n, sym_primary_expression,
+				   ast_copy (identifier)))),
+			  NN(n, sym_assignment_operator,
+			     NCA(n, "=")),
+			  ast_new_assignment_function_call (n, "new_bid"))),
+		    NCA(n, ";")));
 	    TranslateData * d = data;
-	    ast_before (d->init_fields,
-			ast_terminal (identifier)->start, "=new_bid();");
+	    compound_append (d->init_fields, init);
 	  }
     }
     break;
@@ -3021,7 +3242,7 @@ static void trace_return (Ast * n, Stack * stack, void * data)
 static const char * get_field_type (Ast * declaration, AstTerminal * t)
 {
   if (declaration)
-    declaration = declaration_from_type (declaration);
+    declaration = ast_declaration_from_type (declaration);
   const char * typename = NULL;
   if (!declaration ||
       !(typename = typedef_name_from_declaration (declaration)) ||
@@ -3075,7 +3296,7 @@ static void macros (Ast * n, Stack * stack, void * data)
       free (ast_terminal (n->child[0])->start);
       ast_terminal (n->child[0])->start = strdup ("foreach_face_generic");
     }
-    else if (!is_foreach_stencil (n)) { // maps for !foreach_face() loops
+    else if (!ast_is_foreach_stencil (n)) { // maps for !foreach_face() loops
       char * maps = str_append_maps (NULL, stack);
       if (maps) {
 	Ast * statement = ast_child (n, sym_statement);
@@ -3102,7 +3323,7 @@ static void macros (Ast * n, Stack * stack, void * data)
 	  parameters = ast_list_remove (parameters, item);
 	}
 	else if (item->child[0]->sym == sym_reduction_list) {
-	  if (!is_foreach_stencil (n)) {
+	  if (!ast_is_foreach_stencil (n)) {
 	    Ast * reductions = item->child[0];
 	    foreach_item (reductions, 1, reduction) {
 	      Ast * identifier = ast_schema (reduction, sym_reduction,
@@ -3166,7 +3387,7 @@ static void macros (Ast * n, Stack * stack, void * data)
       }
     }
 
-    if (!is_foreach_stencil (n)) {
+    if (!ast_is_foreach_stencil (n)) {
       if (serial)
 	ast_before (n, "\n"
 		    "#if _OPENMP\n"
@@ -3249,7 +3470,7 @@ static void macros (Ast * n, Stack * stack, void * data)
       ast_replace_child (initializer, 0, arg);
     }
     else {
-      assert (arg->sym == sym_postfix_initializer);
+      arg = ast_find (arg, sym_postfix_initializer);
       Ast * initializer = ast_find (expr, sym_cast_expression);
       ast_replace_child (initializer, 3, arg);
       initializer->sym = sym_postfix_expression;
@@ -3417,6 +3638,7 @@ static void macros (Ast * n, Stack * stack, void * data)
 	  scope = scope->parent;
 	}
 	if (external) {
+	  char * src = NULL;
 	  foreach_item (list, 2, expr) {
 	    const char * typename =
 	      ast_typedef_name (ast_expression_type (expr, stack, false));
@@ -3509,8 +3731,18 @@ static void macros (Ast * n, Stack * stack, void * data)
 		  ast_terminal(dot)->start[0] = '\0';
 		}
 	      }
-	      free (t->start), t->start = field_value (&c, "", type);
+	      str_prepend (src, field_value (&c, "", type), src ? "," : "");
 	    }
+	  }
+	  if (src) {
+	    str_prepend (src, "int a = {");
+	    str_append (src, "};");
+	    Ast * expr = ast_parse_expression (src, ast_get_root (n));
+	    free (src);
+	    Ast * initializer = ast_find (expr, sym_initializer);
+	    ast_replace_child (n->parent, ast_child_index (n), initializer);
+	    ast_destroy (expr);
+	    n = initializer;
 	  }
 	}
 
@@ -3519,30 +3751,64 @@ static void macros (Ast * n, Stack * stack, void * data)
 
 	else
 	  foreach_item (list, 2, expr) {
-	    AstTerminal * t = ast_right_terminal (expr);
 	    const char * typename =
 	      ast_typedef_name (ast_expression_type (expr, stack, false));
 	    if ((type == 1 && !strcmp (typename, "vector")) ||
 		(type == 2 && !strcmp (typename, "tensor"))) {
+	      Ast * unary = ast_find (expr, sym_unary_expression);
+	      ast_set_child (unary, 0,
+			     NN(expr, sym_postfix_expression,
+				unary->child[0],
+				NCA(expr, "."),
+				NN(expr, sym_member_identifier,
+				   NN(expr, sym_generic_identifier,
+				      NA(expr, sym_IDENTIFIER, "x")))));
+	      Ast * a = expr->child[0];
 	      TranslateData * d = data;
-	      ast_after ((Ast *) t, ".x");
 	      for (int i = 1; i < d->dimension; i++) {
-		char s[] = ".x"; s[1] = 'x' + i;
-		ast_after ((Ast *) t, ",", t->start, s);
+		Ast * b = ast_copy (a);
+		Ast * id = ast_find (b, sym_member_identifier,
+				     0, sym_generic_identifier,
+				     0, sym_IDENTIFIER);
+		ast_terminal (id)->start[0] = 'x' + i;
+		ast_list_insert_after (a, b);
+		a = b;
 	      }
 	    }
 	    else if (type == 1 && !strcmp (typename, "tensor")) {
+	      Ast * unary = ast_find (expr, sym_unary_expression);
+	      ast_set_child (unary, 0,
+			     NN(expr, sym_postfix_expression,
+				NN(expr, sym_postfix_expression,
+				   unary->child[0],
+				   NCA(expr, "."),
+				   NN(expr, sym_member_identifier,
+				      NN(expr, sym_generic_identifier,
+					 NA(expr, sym_IDENTIFIER, "x")))),
+				NCA(expr, "."),
+				NN(expr, sym_member_identifier,
+				   NN(expr, sym_generic_identifier,
+				      NA(expr, sym_IDENTIFIER, "x")))));
+	      Ast * a = expr->child[0];
 	      TranslateData * d = data;
-	      for (int i = 0; i < d->dimension; i++) {
-		char a[] = ".x"; a[1] = 'x' + i;
-		for (int j = 0; j < d->dimension; j++) {
-		  char b[] = ".x"; b[1] = 'x' + j;
-		  if (i > 0 || j > 0)
-		    ast_after ((Ast *) t, ",", t->start, a, b);
-		  else
-		    ast_after ((Ast *) t, a, b);
-		}
-	      }
+	      for (int i = 0; i < d->dimension; i++)
+		for (int j = 0; j < d->dimension; j++)
+		  if (i || j) {
+		    Ast * b = ast_copy (a);
+		    Ast * i1 = ast_find (b, sym_postfix_expression,
+					 0, sym_postfix_expression,
+					 2, sym_member_identifier,
+					 0, sym_generic_identifier,
+					 0, sym_IDENTIFIER);
+		    ast_terminal (i1)->start[0] = 'x' + i;
+		    Ast * i2 = ast_find (b, sym_postfix_expression,
+					 2, sym_member_identifier,
+					 0, sym_generic_identifier,
+					 0, sym_IDENTIFIER);
+		    ast_terminal (i2)->start[0] = 'x' + j;
+		    ast_list_insert_after (a, b);
+		    a = b;
+		  }
 	    }
 	  }
 
@@ -3550,26 +3816,62 @@ static void macros (Ast * n, Stack * stack, void * data)
 	Finalize both global and local lists */
 	
 	if (type == 1) // scalar
-	  ast_before (n->child[2], ",{-1}");
+	  ast_list_append (n->child[1], sym_initializer, ast_new_empty_scalar (n));
 	else if (type == 2) { // vector
 	  TranslateData * d = data;
-	  for (int i = 0; i < d->dimension; i++)
-	    ast_before (n->child[2], i == 0 ? ",{" : ",", "{-1}");
-	  ast_before (n->child[2], "}");
+	  ast_list_append (n->child[1], sym_initializer, ast_new_empty_vector (n, d->dimension));
 	}
 	else { // tensor
 	  TranslateData * d = data;
-	  for (int j = 0; j < d->dimension; j++) {
-	    ast_before (n->child[2], j == 0 ? ",{" : ",");
-	    for (int i = 0; i < d->dimension; i++)
-	      ast_before (n->child[2], i == 0 ? "{" : ",", "{-1}");
-	    ast_before (n->child[2], "}");
-	  }
-	  ast_before (n->child[2], "}");
+	  ast_list_append (n->child[1], sym_initializer, ast_new_empty_tensor (n, d->dimension));
 	}
-	ast_before (n, (type == 1 ? "((scalar[])" :
-			type == 2 ? "((vector[])" : "((tensor[])"));
-	ast_after (n->child[2], ")");
+
+	Ast * type_name = NN(n, sym_type_name,
+			     NN(n, sym_specifier_qualifier_list,
+				NN(n, sym_type_specifier,
+				   NN(n, sym_types,
+				      NA(n, sym_TYPEDEF_NAME,
+					 (type == 1 ? "scalar" : type == 2 ? "vector" : "tensor"))))),
+			     NN(n, sym_abstract_declarator,
+				NN(n, sym_direct_abstract_declarator,
+				   NCA(n, "["), NCA(n, "]"))));
+	int index = ast_child_index (n);
+	Ast * parent = n->parent;
+	Ast * unary = NN(parent, sym_unary_expression,
+			 NN(parent, sym_postfix_expression,
+			    NN(parent, sym_primary_expression,
+			       NCA(n, "("),
+			       NN(parent, sym_expression_error,
+				  NN(parent, sym_expression,
+				     ast_attach (ast_new_unary_expression (parent),
+						 NN(parent, sym_postfix_expression,
+						    NCA(n, "("), type_name, NCA(n, ")"),
+						    n)))),
+			       NCA(n, ")"))));
+	n->sym = sym_postfix_initializer;
+	if (parent->sym == sym_forin_arguments)
+	  ast_set_child (parent, index,
+			 NN(parent, sym_expression,
+			    ast_attach (ast_new_cast_expression (parent), unary)));
+	else if (parent->sym == sym_initializer_list ||
+		 parent->sym == sym_init_declarator)
+	  ast_set_child (parent, index,
+			 NN(parent, sym_initializer,
+			    ast_attach (ast_new_cast_expression (parent), unary)));
+	else if (parent->sym == sym_postfix_expression) {
+	  assert (index == 3);
+	  ast_set_child (parent, 3,
+			 NN(parent, sym_cast_expression, unary));
+	  Ast * ancestor = ast_ancestor (parent, 2);
+	  if (ancestor->sym == sym_cast_expression)
+	    ast_set_child (ancestor->parent, ast_child_index (ancestor), parent);
+	  else
+	    ast_set_child (ast_ancestor (parent, 3), 0, parent);
+	  parent->sym = sym_cast_expression;
+	}
+	else
+	  ast_set_child (parent, index,
+			 ast_attach (ast_new_cast_expression (parent), unary));
       }
     }
     break;
@@ -3659,18 +3961,16 @@ static void macros (Ast * n, Stack * stack, void * data)
     char * init;
     if (identifier && !strcmp (ast_terminal (identifier)->start, "main")) {
       Ast * compound_statement = ast_child (n, sym_compound_statement);
-      ast_after (compound_statement->child[0],
-		 "_init_solver();");
-      Ast * end = ast_child (compound_statement, token_symbol ('}'));
-      ast_before (end, "free_solver();");
+      compound_prepend (compound_statement, ast_new_function_call (n, "_init_solver"));
+      compound_append (compound_statement, ast_new_function_call (n, "free_solver"));
     }
     else if (identifier && ast_left_terminal (n)->before &&
 	     (init = strstr (ast_left_terminal (n)->before, "@init_solver"))) {
       for (int i = 0; i < 12; i++)
 	init[i] = ' ';
       TranslateData * d = data;
-      ast_before (d->init_events, ast_terminal (identifier)->start, "();");
-    }    
+      compound_prepend (d->last_events, ast_new_function_call (n, ast_terminal (identifier)->start));
+    }
     break;
   }
 
@@ -3725,6 +4025,8 @@ void ast_push_declaration (Stack * stack, Ast * n)
 
 void ast_pop_scope (Stack * stack, Ast * scope)
 {
+  if (!scope)
+    return;
   Ast * n;
   while ((n = *((Ast **)stack_pop (stack))) != scope);
 }
@@ -3742,12 +4044,34 @@ Ast * ast_push_function_definition (Stack * stack, Ast * declarator)
   return identifier;
 }
 
-void ast_traverse (Ast * n, Stack * stack,
-		   void func (Ast *, Stack *, void *),
-		   void * data)
+static
+void declarations_from_struct_declarations (Ast * n)
 {
-  if (!n || n == ast_placeholder)
-    return;
+  if (n->sym == sym_struct_declaration)
+    n->sym = sym_declaration;
+  else if (n->sym == sym_struct_declarator_list)
+    n->sym = sym_init_declarator_list;
+  else if (n->sym == sym_struct_declarator)
+    n->sym = sym_init_declarator;
+  else if (n->sym == sym_specifier_qualifier_list)
+    n->sym = sym_declaration_specifiers;
+  if (n->child)
+    for (Ast ** c = n->child; *c; c++)
+      declarations_from_struct_declarations (*c);
+}
+
+void declare_point_variables (Stack * stack)
+{
+  Ast * list = ast_find (ast_parent (ast_identifier_declaration (stack, "_Variables"),
+				     sym_declaration),
+			 sym_struct_declaration_list);
+  declarations_from_struct_declarations (list);
+  foreach_item (list, 1, declaration)
+    ast_push_declaration (stack, declaration);
+}
+
+Ast * ast_push_declarations (Ast * n, Stack * stack)
+{
   switch (n->sym) {
 
   /**
@@ -3757,32 +4081,31 @@ void ast_traverse (Ast * n, Stack * stack,
   case sym_function_definition: {
     Ast * declarator = ast_find (n, sym_direct_declarator);
     ast_push_function_definition (stack, declarator);
-    for (Ast ** c = n->child; *c; c++)
-      ast_traverse (*c, stack, func, data);  
-    func (n, stack, data);
-    ast_pop_scope (stack, declarator);
-    break;
+    if (ast_is_point_function (ast_schema (n, sym_function_definition,
+					   0, sym_function_declaration,
+					   1, sym_declarator)) &&
+	!ast_is_stencil_function (n))
+      declare_point_variables (stack);
+    return declarator;
   }
     
   case sym_compound_statement:
-  case sym_for_declaration_statement: {
+  case sym_for_declaration_statement:
     stack_push (stack, &n);
-    for (Ast ** c = n->child; *c; c++)
-      ast_traverse (*c, stack, func, data);      
-    func (n, stack, data);
-    ast_pop_scope (stack, n);
-    break;
-  }
+    return n;
     
-  case sym_forin_declaration_statement: {
+  case sym_forin_declaration_statement:
     stack_push (stack, &n);
     ast_push_declaration (stack, n->child[3]);
-    for (Ast ** c = n->child; *c; c++)
-      ast_traverse (*c, stack, func, data);  
-    func (n, stack, data);
-    ast_pop_scope (stack, n);
-    break;
-  }
+    return n;
+
+  case sym_foreach_statement:
+    if (!ast_is_foreach_stencil (n)) {
+      stack_push (stack, &n);
+      declare_point_variables (stack);
+      return n;
+    }
+    return NULL;
 
   case sym_macro_statement: {
     Ast * identifier = ast_schema (n, sym_macro_statement,
@@ -3792,23 +4115,85 @@ void ast_traverse (Ast * n, Stack * stack,
 				   0, sym_IDENTIFIER);
     if (!strcmp (ast_terminal (identifier)->start, "map"))
       stack_push (stack, &n);
-    for (Ast ** c = n->child; *c; c++)
-      ast_traverse (*c, stack, func, data);
-    func (n, stack, data);
-    break; 
+    return NULL;
   }
 
   case sym_declaration:
     ast_push_declaration (stack, n);
-    // fall through
-    
-  default:
-    if (n->child)
-      for (Ast ** c = n->child; *c; c++)
-	ast_traverse (*c, stack, func, data);
-    func (n, stack, data);
-    break;
+    return NULL;
+
+  /**
+  ## Local boundary conditions */
+
+  case sym_assignment_expression: {
+    Ast * array;
+    if (n->child[1] && function_scope (n, stack) &&
+	(array = ast_schema (n, sym_assignment_expression,
+			     0, sym_unary_expression,
+			     0, sym_postfix_expression,
+			     0, sym_array_access))) {
+      const char * typename =
+	ast_typedef_name (ast_expression_type (array->child[0], stack, false));
+      Ast * member = NULL;
+      if ((typename &&
+	   (!strcmp (typename, "scalar") ||
+	    !strcmp (typename, "vertex scalar"))) ||
+	  ((member = ast_schema (array->child[0], sym_postfix_expression,
+				 2, sym_member_identifier,
+				 0, sym_generic_identifier,
+				 0, sym_IDENTIFIER)) &&
+	   (!strcmp (ast_terminal (member)->start, "n") ||
+	    !strcmp (ast_terminal (member)->start, "t") ||
+	    !strcmp (ast_terminal (member)->start, "r")) &&
+	   (typename =
+	    ast_typedef_name (ast_expression_type (array->child[0]->child[0],
+						   stack, false))) &&
+	   (!strcmp (typename, "vector") ||
+	    !strcmp (typename, "face vector")))) {
+	stack_push (stack, &n);
+	declare_point_variables (stack);
+	return n;
+      }
+    }
+    return NULL;
   }
+
+  /**
+  ## Global boundary conditions */
+    
+  case sym_boundary_definition: {
+    Ast * expr = ast_schema (n, sym_boundary_definition,
+			     0, sym_assignment_expression,
+			     2, sym_assignment_expression);
+    Ast * array = ast_find (n, sym_array_access);
+    if (expr && array) {
+      stack_push (stack, &n);
+      declare_point_variables (stack);
+      return n;
+    }
+    return NULL;
+  }    
+    
+  }
+
+  return NULL;
+}
+
+void ast_traverse (Ast * n, Stack * stack,
+		   void func (Ast *, Stack *, void *),
+		   void * data)
+{
+  if (!n || n == ast_placeholder)
+    return;
+
+  Ast * scope = ast_push_declarations (n, stack);
+
+  if (n->child)
+    for (Ast ** c = n->child; *c; c++)
+      ast_traverse (*c, stack, func, data);
+  func (n, stack, data);
+
+  ast_pop_scope (stack, scope);
 }
 
 /**
@@ -3868,11 +4253,16 @@ void endfor (FILE * fin, FILE * fout,
   str_prepend (ast_left_terminal (data.init_solver)->before, "\n");  
   ast_block_list_append (ast_find ((Ast *)root, sym_translation_unit),
 			 sym_external_declaration, data.init_solver);
-  data.init_events = data.init_fields =
+  data.last_events = 
     ast_find (ast_find (data.init_solver, sym_compound_statement)->child[1],
 	      sym_compound_statement);
+  data.init_fields =
+    ast_find (ast_find (data.last_events, sym_compound_statement)->child[1],
+	      sym_compound_statement);
+  data.init_events =
+    ast_find (ast_find (data.init_fields, sym_compound_statement)->child[1],
+	      sym_compound_statement);
   ast_destroy ((Ast *) init);
-
   stack_push (root->stack, &root);
   ast_traverse ((Ast *) root, root->stack,
 		global_boundaries_and_stencils, &data);
@@ -3891,14 +4281,25 @@ void endfor (FILE * fin, FILE * fout,
     Ast * call_init_solver = ast_find (data.init_solver, sym_function_call);
     char n[10];
     snprintf (n, 9, "%d", data.fields_index);
-    ast_before (call_init_solver, "datasize=", n, "*sizeof(double);");
+    char * src = NULL;
+    str_append (src, "datasize=", n, "*sizeof(double);");
+    Ast * expr = ast_parse_expression (src, root);
+    free (src);
+    ast_block_list_insert_before2 (ast_parent (call_init_solver, sym_block_item),
+				   NN(call_init_solver, sym_statement, expr));
   }
 
-  ast_before (data.init_events, grid, "_methods();");
+  char methods[strlen(grid) + strlen("_methods") + 1];
+  strcpy (methods, grid);
+  strcat (methods, "_methods");
+  compound_prepend (data.last_events, ast_new_function_call (data.last_events, methods));
   if (catch)
-    ast_after (data.init_events, "catch_fpe();");
+    compound_append (data.last_events, 
+		     ast_new_function_call (data.last_events, "catch_fpe"));
   if (progress)
-    ast_after (data.init_events, "last_events();");
+    compound_append (data.last_events, 
+		     ast_new_function_call (data.last_events, "last_events"));
+
 
   /* SWIG interface */
   if (data.swigname) {

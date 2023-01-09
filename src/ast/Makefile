@@ -44,6 +44,8 @@ allocator.o: allocator.h
 
 check.o: ast.h symbols.h grammar.h
 
+expr.o: ast.h symbols.h
+
 clean:
 	rm -f *.o *.a
 
