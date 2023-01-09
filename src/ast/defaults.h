@@ -6,7 +6,9 @@
 To avoid having to parse large (and non-standard) system header
 files. */
 
-typedef void QFILE, extrae_type_t, extrae_value_t;
+typedef int extrae_type_t, extrae_value_t;
+typedef void QFILE;
+struct timeval { long tv_sec, tv_usec; };
 
 /**
 For Python/SWIG */
@@ -29,7 +31,8 @@ typedef char GLubyte;
 ## From standard C libraries */
 
 typedef int bool;
-typedef long ssize_t, size_t, clock_t, ptrdiff_t;
+typedef long ssize_t, size_t, clock_t;
+typedef int64_t, int32_t, uint32_t, uint16_t, uint64_t;
 typedef void va_list, FILE;
 typedef unsigned char uint8_t;
 typedef char int8_t;
@@ -56,3 +59,9 @@ Need to know about these implicitly declared variables/macros. */
 void point;
 int BGHOSTS, o_stencil;
 double HUGE;
+
+typedef struct {
+  double x, y, z;
+  double Delta;
+  int level;
+} _Variables;

@@ -222,5 +222,6 @@ enum yysymbol_kind_t
   sym_boundary_definition = 215,      /* boundary_definition  */
   sym_external_foreach_dimension = 216, /* external_foreach_dimension  */
   sym_attribute = 217,                /* attribute  */
-  sym_root = 218                      /* root  */
+  sym_new_field = 218,                /* new_field  */
+  sym_root = 219                      /* root  */
 };
