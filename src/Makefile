@@ -1,11 +1,10 @@
 CFLAGS += -O2
 
 # these are not Basilisk programs
-EXCLUDE = qcc.c include.c postproc.c rotate.c stencils.c qplot.c
+EXCLUDE = qcc.c include.c postproc.c
 
-all: libast qcc qplot libkdt literatec libfb_dumb libws bview2D bview3D
-	@chmod +x ppm2mpeg ppm2mp4 ppm2ogv ppm2gif runtest \
-		sequence page2html
+all: libast qcc libkdt literatec libfb_dumb libws bview2D bview3D
+	@chmod +x ppm2mpeg ppm2mp4 ppm2ogv ppm2gif runtest page2html
 	@test -f xyz2kdt || ln -s kdt/xyz2kdt
 	@test -f kdtquery || ln -s kdt/kdtquery
 
@@ -28,12 +27,6 @@ qcc: qcc.c include.o postproc.o ast/libast.a config
 
 include.o: include.c
 	$(CC99) $(CFLAGS) -DLIBDIR=\"`pwd`\" -c include.c
-
-qplot.o: qplot.c
-	$(CC) $(CFLAGS) -c qplot.c
-
-qplot: qplot.o
-	$(CC) $(CFLAGS) qplot.o -o qplot
 
 draw_get.h: draw.h params.awk
 	awk -f params.awk < draw.h > draw_get.h
