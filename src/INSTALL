@@ -113,7 +113,7 @@ echo "export PATH=\$PATH:$BASILISK" >> ~/.bashrc
 - pstoedit
 
 and also
-[gprof2dot](http://code.google.com/p/jrfonseca/wiki/Gprof2Dot). On a
+[gprof2dot](https://github.com/jrfonseca/gprof2dot). On a
 Debian-like system (i.e. Debian, Ubuntu, Mint etc...) you just need to do
 
 ~~~bash
