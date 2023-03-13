@@ -891,7 +891,10 @@ static void periodic_boundary (int d)
 {
   /* We change the conditions for existing scalars. */
   for (scalar s in all)
-    s.boundary[d] = s.boundary_homogeneous[d] = periodic_bc;
+    if (is_vertex_scalar (s))
+      s.boundary[d] = s.boundary_homogeneous[d] = NULL;
+    else
+      s.boundary[d] = s.boundary_homogeneous[d] = periodic_bc;
   /* Normal components of face vector fields should remain NULL. */
   for (scalar s in all)
     if (s.face) {

@@ -546,17 +546,21 @@ void reset (void * alist, double val)
 
 static double periodic_bc (Point point, Point neighbor, scalar s, void * data);
 
-static inline bool is_vertex_scalar (scalar s)
-{
-  foreach_dimension()
-    if (s.d.x != -1)
-      return false;
-  return true;
-}
-
 static void box_boundary_level (const Boundary * b, scalar * scalars, int l)
 {
+  extern double (* default_scalar_bc[]) (Point, Point, scalar, void *);
   disable_fpe (FE_DIVBYZERO|FE_INVALID);
+  for (int d = 0; d < 2*dimension; d++)
+    if (default_scalar_bc[d] == periodic_bc)
+      for (scalar s in scalars)
+	if (!is_constant(s) && s.block > 0) {
+	  if (is_vertex_scalar (s))
+	    s.boundary[d] = s.boundary_homogeneous[d] = NULL;
+	  else if (s.face) {
+	    vector v = s.v;
+	    v.x.boundary[d] = v.x.boundary_homogeneous[d] = NULL;
+	  }
+	}
   for (int bghost = 1; bghost <= BGHOSTS; bghost++)
     for (int d = 0; d < 2*dimension; d++) {
 
@@ -579,8 +583,6 @@ static void box_boundary_level (const Boundary * b, scalar * scalars, int l)
 	}
       
       if (list) {
-	extern double (* default_scalar_bc[]) (Point, Point, scalar, void *);
-	if (default_scalar_bc[d] != periodic_bc)
 	foreach_boundary_dir (l, d) {
 	  scalar s, sb;
 	  for (s,sb in list,listb) {

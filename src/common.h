@@ -1147,6 +1147,14 @@ tensor * tensors_from_vectors (vector * v)
   return list;
 }
 
+static inline bool is_vertex_scalar (scalar s)
+{
+  foreach_dimension()
+    if (s.d.x != -1)
+      return false;
+  return true;
+}
+
 scalar * all = NULL; // all the fields
 scalar * baseblock = NULL; // base block fields
 
