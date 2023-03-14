@@ -1547,7 +1547,7 @@ static Ast * boundary_function (Ast * expr, Stack * stack, TranslateData * d,
 		"NOT_UNUSED(", index[i], "g);");
   assert (before);
   src = str_append_point_variables (src, stack);
-  str_append (src, "return ", before, "_expr_;}}");
+  str_append (src, "return(", before, "_expr_);}}");
   free (before);
   Ast * boundary =
     ast_child (ast_parse_external_declaration (src, ast_get_root (expr)),
