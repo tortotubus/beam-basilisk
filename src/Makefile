@@ -27,7 +27,7 @@ qcc: qcc.c include.o postproc.o ast/libast.a config
 		qcc.c include.o postproc.o -o qcc -Last -last
 
 include.o: include.c
-	$(CC) $(CFLAGS) -DLIBDIR=\"`pwd`\" -c include.c
+	$(CC99) $(CFLAGS) -DLIBDIR=\"`pwd`\" -c include.c
 
 qplot.o: qplot.c
 	$(CC) $(CFLAGS) -c qplot.c

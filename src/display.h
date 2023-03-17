@@ -706,7 +706,12 @@ void display_url (FILE * fp)
   hostname[1023] = '\0';
   gethostname (hostname, 1023);
   struct hostent * h = gethostbyname (hostname);
-  fprintf (fp, DISPLAY_JS "?ws://%s:%d", h->h_name, Display.port);
+  if (!h)
+    fprintf (stderr,
+	     "display_url(): warning: gethostbyname(\"%s\") returned NULL\n",
+	     hostname);
+  fprintf (fp, DISPLAY_JS "?ws://%s:%d", h ? h->h_name : "127.0.0.1",
+	   Display.port);
 }
 
 int display_usage = 20; // use 20% of runtime, maximum
@@ -769,10 +774,14 @@ void display_init()
     }
 
     FILE * fp = fopen ("display.html", "w");
-    fputs ("<head><meta http-equiv=\"refresh\" content=\"0;URL=", fp);
-    display_url (fp);
-    fputs ("\"></head>\n", fp);
-    fclose (fp);
+    if (!fp)
+      perror ("display.html");
+    else {
+      fputs ("<head><meta http-equiv=\"refresh\" content=\"0;URL=", fp);
+      display_url (fp);
+      fputs ("\"></head>\n", fp);
+      fclose (fp);
+    }
   }
 
   Display.objects = kh_init (strhash);
