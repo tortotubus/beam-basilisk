@@ -1,7 +1,15 @@
 # -*-Makefile-*-
 
+# This is the configuration file has been tested on a:
+#   Mac mini (M1, 2020)
+#   macOS Monterey, version 12.6.3
+#   Apple clang version 13.1.6
+#   Target: arm64-apple-darwin21.6.0
+
 # how to launch the C99 compiler
-CC99 = gcc -std=c99 -Wno-unused-result -Wno-unused-function 
+CC99 = gcc -std=c99 -Wno-unused-result \
+                    -Wno-unused-function \
+                    -Wno-nonportable-include-path
 
 # how to strip unused code
 # STRIPFLAGS = -fdata-sections -ffunction-sections -Wl,--gc-sections -w

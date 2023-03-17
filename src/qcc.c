@@ -71,7 +71,8 @@ void cleanup (int status, const char * dir)
   if (!debug && dir) {
     char command[80] = "rm -r -f ";
     strcat (command, dir);
-    int s = system (command); s = s;
+    if (system (command) < 0)
+      fprintf (stderr, "qcc: warning: could not cleanup\n");
   }
   exit (status);
 }
