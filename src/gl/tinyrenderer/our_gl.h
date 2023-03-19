@@ -13,4 +13,4 @@ struct IShader {
 };
 
 void triangle(const vec4 clip_verts[3], IShader &shader, TGAImage &image, std::vector<double> &zbuffer);
-
+void line(const vec4 clip_verts0, const vec4 clip_verts1, TGAImage &image, TGAColor color);
