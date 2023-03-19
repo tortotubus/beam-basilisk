@@ -8,6 +8,7 @@ constexpr vec3 light_dir{1,1,1}; // light source
 constexpr vec3       eye{1,1,3}; // camera position
 constexpr vec3    center{0,0,0}; // camera direction
 constexpr vec3        up{0,1,0}; // camera up vector
+const TGAColor white{255,255,255,255}, red{0,0,255,255};
 
 extern mat<4,4> ModelView; // "OpenGL" state matrices
 extern mat<4,4> Projection;
@@ -73,7 +74,14 @@ int main(int argc, char** argv) {
             vec4 clip_vert[3]; // triangle coordinates (clip coordinates), written by VS, read by FS
             for (int j : {0,1,2})
                 shader.vertex(i, j, clip_vert[j]); // call the vertex shader for each triangle vertex
+#if 0	    
             triangle(clip_vert, shader, framebuffer, zbuffer); // actual rasterization routine call
+#endif
+#if 1
+	    line(clip_vert[0], clip_vert[1], framebuffer, red);
+	    line(clip_vert[1], clip_vert[2], framebuffer, red);
+	    line(clip_vert[2], clip_vert[0], framebuffer, red);
+#endif
         }
     }
     framebuffer.write_tga_file("framebuffer.tga");

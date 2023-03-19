@@ -54,3 +54,36 @@ void triangle(const vec4 clip_verts[3], IShader &shader, TGAImage &image, std::v
     }
 }
 
+void line(const vec4 clip_verts0, const vec4 clip_verts1, TGAImage &image, TGAColor color) {
+    vec4 pts[2]  = { Viewport*clip_verts0,    Viewport*clip_verts1 };  // line screen coordinates before persp. division
+    vec2 pts2[2] = { proj<2>(pts[0]/pts[0][3]), proj<2>(pts[1]/pts[1][3]) };  // line screen coordinates after  perps. division
+    int x0 = pts2[0][0], y0 = pts2[0][1], x1 = pts2[1][0], y1 = pts2[1][1];
+    bool steep = false;
+    if (std::abs(x0-x1)<std::abs(y0-y1)) {
+        std::swap(x0, y0);
+        std::swap(x1, y1);
+        steep = true;
+    }
+    if (x0>x1) {
+        std::swap(x0, x1);
+        std::swap(y0, y1);
+    }
+    int dx = x1-x0;
+    int dy = y1-y0;
+    int derror2 = std::abs(dy)*2;
+    int error2 = 0;
+    int yf = y0;
+    for (int xf=x0; xf<=x1; xf++) {
+        int x, y;
+        if (steep)
+	  x = yf, y = xf;
+	else
+	  x = xf, y = yf;
+	image.set(x, y, color);
+        error2 += derror2;
+        if (error2 > dx) {
+            yf += (y1>y0?1:-1);
+            error2 -= dx*2;
+        }
+    }
+}
