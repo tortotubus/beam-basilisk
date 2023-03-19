@@ -1,7 +1,6 @@
 /**
 TODO:
 
-* line thickness
 * color interpolation
 * GL interface
 

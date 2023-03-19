@@ -54,41 +54,46 @@ void triangle(const vec4 clip_verts[3], IShader &shader, TGAImage &image, std::v
     }
 }
 
-void line(const vec4 clip_verts0, const vec4 clip_verts1, TGAImage &image, std::vector<double> &zbuffer, TGAColor color) {
+void line(const vec4 clip_verts0, const vec4 clip_verts1, TGAImage &image, std::vector<double> &zbuffer,
+	  TGAColor color, float thickness) {
     vec4 pts[2]  = { Viewport*clip_verts0,    Viewport*clip_verts1 };  // line screen coordinates before persp. division
     vec2 pts2[2] = { proj<2>(pts[0]/pts[0][3]), proj<2>(pts[1]/pts[1][3]) };  // line screen coordinates after  perps. division
     int x0 = pts2[0][0], y0 = pts2[0][1], x1 = pts2[1][0], y1 = pts2[1][1];
     double z0 = clip_verts0[2], z1 = clip_verts1[2];
-    bool steep = false;
-    if (std::abs(x0-x1)<std::abs(y0-y1)) {
-        std::swap(x0, y0);
-        std::swap(x1, y1);
-        steep = true;
-    }
-    if (x0>x1) {
-        std::swap(x0, x1);
-        std::swap(y0, y1);
-        std::swap(z0, z1);
-    }
-    int dx = x1-x0;
-    int dy = y1-y0;
-    int derror2 = std::abs(dy)*2;
-    int error2 = 0;
-    int yf = y0;
-    for (int xf=x0; xf<=x1; xf++) {
-        int x, y;
-        if (steep)
-	  x = yf, y = xf;
-	else
-	  x = xf, y = yf;
-	double frag_depth = z0 + (xf - x0)*(z1 - z0)/(double)(x1 - x0);
-        error2 += derror2;
-        if (error2 > dx) {
-            yf += (y1>y0?1:-1);
-            error2 -= dx*2;
-        }
-	if (0.99*frag_depth > zbuffer[x+y*image.width()]) continue;
-	zbuffer[x+y*image.width()] = frag_depth;
+    // from: http://members.chello.at/~easyfilter/bresenham.html
+    int dx = abs(x1-x0), sx = x0 < x1 ? 1 : -1; 
+    int dy = abs(y1-y0), sy = y0 < y1 ? 1 : -1; 
+    int err = dx-dy, e2, x2, y2;                          /* error value e_xy */
+    float ed = dx+dy == 0 ? 1 : sqrt((float)dx*dx+(float)dy*dy);
+    int x = x0, y = y0;
+    for (thickness = (thickness+1)/2; ; ) {                                   /* pixel loop */
+      double frag_depth = (z0 + (x - x0)*(z1 - z0)/(double)(x1 - x0)) - 0.01;
+      bool draw = frag_depth < zbuffer[x+y*image.width()];
+      if (draw) {
 	image.set(x, y, color);
+	zbuffer[x+y*image.width()] = frag_depth;
+      }      
+      //      setPixelColor(x,y,max(0,255*(abs(err-dx+dy)/ed-thickness+1))); // antialiasing
+      e2 = err; x2 = x;
+      if (2*e2 >= -dx) {                                           /* x step */
+	if (draw)
+	  for (e2 += dy, y2 = y; e2 < ed*thickness && (y1 != y2 || dx > dy); e2 += dx) {
+	    image.set(x, y2 += sy, color);
+	    zbuffer[x+y2*image.width()] = frag_depth;
+	  }	
+	  // setPixelColor(x, y2 += sy, max(0,255*(abs(e2)/ed-thickness+1)));
+	if (x == x1) break;
+	e2 = err; err -= dy; x += sx; 
+      } 
+      if (2*e2 <= dy) {                                            /* y step */
+	if (draw)
+	  for (e2 = dx-e2; e2 < ed*thickness && (x1 != x2 || dx < dy); e2 += dy) {
+	    image.set(x2 += sx, y, color);
+	    zbuffer[x2+y*image.width()] = frag_depth;
+	  }
+	// setPixelColor(x2 += sx, y, max(0,255*(abs(e2)/ed-thickness+1))); // antialising
+	if (y == y1) break;
+	err += dx; y += sy; 
+      }
     }
 }
