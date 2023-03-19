@@ -1,3 +1,13 @@
+/**
+TODO:
+
+* line thickness
+* color interpolation
+* GL interface
+
+* convert to straight C
+*/
+
 #include <limits>
 #include "model.h"
 #include "our_gl.h"

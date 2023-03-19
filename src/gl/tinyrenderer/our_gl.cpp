@@ -54,10 +54,11 @@ void triangle(const vec4 clip_verts[3], IShader &shader, TGAImage &image, std::v
     }
 }
 
-void line(const vec4 clip_verts0, const vec4 clip_verts1, TGAImage &image, TGAColor color) {
+void line(const vec4 clip_verts0, const vec4 clip_verts1, TGAImage &image, std::vector<double> &zbuffer, TGAColor color) {
     vec4 pts[2]  = { Viewport*clip_verts0,    Viewport*clip_verts1 };  // line screen coordinates before persp. division
     vec2 pts2[2] = { proj<2>(pts[0]/pts[0][3]), proj<2>(pts[1]/pts[1][3]) };  // line screen coordinates after  perps. division
     int x0 = pts2[0][0], y0 = pts2[0][1], x1 = pts2[1][0], y1 = pts2[1][1];
+    double z0 = clip_verts0[2], z1 = clip_verts1[2];
     bool steep = false;
     if (std::abs(x0-x1)<std::abs(y0-y1)) {
         std::swap(x0, y0);
@@ -67,6 +68,7 @@ void line(const vec4 clip_verts0, const vec4 clip_verts1, TGAImage &image, TGACo
     if (x0>x1) {
         std::swap(x0, x1);
         std::swap(y0, y1);
+        std::swap(z0, z1);
     }
     int dx = x1-x0;
     int dy = y1-y0;
@@ -79,11 +81,14 @@ void line(const vec4 clip_verts0, const vec4 clip_verts1, TGAImage &image, TGACo
 	  x = yf, y = xf;
 	else
 	  x = xf, y = yf;
-	image.set(x, y, color);
+	double frag_depth = z0 + (xf - x0)*(z1 - z0)/(double)(x1 - x0);
         error2 += derror2;
         if (error2 > dx) {
             yf += (y1>y0?1:-1);
             error2 -= dx*2;
         }
+	if (0.99*frag_depth > zbuffer[x+y*image.width()]) continue;
+	zbuffer[x+y*image.width()] = frag_depth;
+	image.set(x, y, color);
     }
 }
