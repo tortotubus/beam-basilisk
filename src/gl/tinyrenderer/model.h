@@ -1,6 +1,5 @@
 #include <vector>
 #include <string>
-#include "geometry.h"
 #include "tgaimage.h"
 
 class Model {

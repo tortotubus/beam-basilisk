@@ -1,5 +1,12 @@
 # Tiny Renderer or how OpenGL works: software rendering in 500 lines of code
 
+**Please note that this directory contains a modified version of the [original code](https://github.com/ssloy/tinyrenderer).**
+
+The main changes are:
+
+* A pure C99 implementation of the rasterizer
+* A new line drawing primitive with z-buffering and line thickness
+
 # Check [the wiki](https://github.com/ssloy/tinyrenderer/wiki) for the detailed lessons.
 
 ## compilation
@@ -14,7 +21,7 @@ cmake --build . -j &&
 ```
 The rendered image is saved to `framebuffer.tga`.
 
-You can open the project in Gitpod, a free online dev evironment for GitHub:
+You can open the project in Gitpod, a free online dev environment for GitHub:
 [![Open in Gitpod](https://gitpod.io/button/open-in-gitpod.svg)](https://gitpod.io/#https://github.com/ssloy/tinyrenderer)
 
 On open, the editor will compile & run the program as well as open the resulting image in the editor's preview.

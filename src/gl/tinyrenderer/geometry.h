@@ -1,212 +1,238 @@
-#pragma once
-#include <cmath>
-#include <cassert>
-#include <iostream>
+#include <math.h>
+#include <assert.h>
 
-template<int n> struct vec {
-    double data[n] = {0};
-    double& operator[](const int i)       { assert(i>=0 && i<n); return data[i]; }
-    double  operator[](const int i) const { assert(i>=0 && i<n); return data[i]; }
-    double norm2() const { return *this * *this; }
-    double norm()  const { return std::sqrt(norm2()); }
-};
+typedef struct { double x, y; } vec2;
+typedef struct { double x, y, z; } vec3;
 
-template<int n> double operator*(const vec<n>& lhs, const vec<n>& rhs) {
-    double ret = 0;
-    for (int i=n; i--; ret+=lhs[i]*rhs[i]);
-    return ret;
+static inline double vec3_norm2 (vec3 v)
+{
+  return v.x*v.x + v.y*v.y + v.z*v.z;
 }
 
-template<int n> vec<n> operator+(const vec<n>& lhs, const vec<n>& rhs) {
-    vec<n> ret = lhs;
-    for (int i=n; i--; ret[i]+=rhs[i]);
-    return ret;
+static inline double vec3_norm  (vec3 v)
+{
+  return sqrt (vec3_norm2 (v));
 }
 
-template<int n> vec<n> operator-(const vec<n>& lhs, const vec<n>& rhs) {
-    vec<n> ret = lhs;
-    for (int i=n; i--; ret[i]-=rhs[i]);
-    return ret;
+static inline vec3 vec3_normalized (vec3 v)
+{
+  double norm = vec3_norm (v);
+  if (norm)
+    return (vec3){v.x/norm, v.y/norm, v.z/norm};
+  return v;
 }
 
-template<int n> vec<n> operator*(const double& rhs, const vec<n> &lhs) {
-    vec<n> ret = lhs;
-    for (int i=n; i--; ret[i]*=rhs);
-    return ret;
+static inline vec3 vec3_embed (vec2 v)
+{
+  return (vec3) { v.x, v.y, 1. };
 }
 
-template<int n> vec<n> operator*(const vec<n>& lhs, const double& rhs) {
-    vec<n> ret = lhs;
-    for (int i=n; i--; ret[i]*=rhs);
-    return ret;
+static inline vec3 vec3_sub (vec3 v1, vec3 v2)
+{
+  return (vec3){v1.x - v2.x, v1.y - v2.y, v1.z - v2.z};
 }
 
-template<int n> vec<n> operator/(const vec<n>& lhs, const double& rhs) {
-    vec<n> ret = lhs;
-    for (int i=n; i--; ret[i]/=rhs);
-    return ret;
+static inline vec3 vec3_div (vec3 v, double a)
+{
+  assert (a);
+  return (vec3){v.x/a, v.y/a, v.z/a};
 }
 
-template<int n1,int n2> vec<n1> embed(const vec<n2> &v, double fill=1) {
-    vec<n1> ret;
-    for (int i=n1; i--; ret[i]=(i<n2?v[i]:fill));
-    return ret;
+static inline vec3 vec3_mul (vec3 v, double a)
+{
+  return (vec3){v.x*a, v.y*a, v.z*a};
 }
 
-template<int n1,int n2> vec<n1> proj(const vec<n2> &v) {
-    vec<n1> ret;
-    for (int i=n1; i--; ret[i]=v[i]);
-    return ret;
+static inline double vec3_scalar (vec3 v1, vec3 v2)
+{
+  return v1.x*v2.x + v1.y*v2.y + v1.z*v2.z;
 }
 
-template<int n> std::ostream& operator<<(std::ostream& out, const vec<n>& v) {
-    for (int i=0; i<n; i++) out << v[i] << " ";
-    return out;
+typedef struct { double x, y, z, t; } vec4;
+
+static inline vec4 vec4_div (vec4 v, double a)
+{
+  assert (a);
+  return (vec4){v.x/a, v.y/a, v.z/a, v.t/a};  
 }
 
-template<> struct vec<2> {
-    double x = 0, y = 0;
-    double& operator[](const int i)       { assert(i>=0 && i<2); return i ? y : x; }
-    double  operator[](const int i) const { assert(i>=0 && i<2); return i ? y : x; }
-    double norm2() const { return *this * *this; }
-    double norm()  const { return std::sqrt(norm2()); }
-    vec<2> normalized() { return (*this)/norm(); }
-};
+static inline vec2 vec4_proj2 (vec4 v)
+{
+  return (vec2) { v.x, v.y };
+}
 
-template<> struct vec<3> {
-    double x = 0, y = 0, z = 0;
-    double& operator[](const int i)       { assert(i>=0 && i<3); return i ? (1==i ? y : z) : x; }
-    double  operator[](const int i) const { assert(i>=0 && i<3); return i ? (1==i ? y : z) : x; }
-    double norm2() const { return *this * *this; }
-    double norm()  const { return std::sqrt(norm2()); }
-    vec<3> normalized() { return (*this)/norm(); }
-};
+static inline vec3 vec4_proj3 (vec4 v)
+{
+  return (vec3) { v.x, v.y, v.z };
+}
 
-typedef vec<2> vec2;
-typedef vec<3> vec3;
-typedef vec<4> vec4;
-vec3 cross(const vec3 &v1, const vec3 &v2);
+static inline vec4 vec4_embed (vec3 v, double fill)
+{
+  return (vec4) { v.x, v.y, v.z, fill };
+}
 
-template<int n> struct dt;
+typedef struct { vec3 x, y, z; } mat3;
 
-template<int nrows,int ncols> struct mat {
-    vec<ncols> rows[nrows] = {{}};
+static inline mat3 mat3_transpose (mat3 m)
+{
+  return (mat3) {
+    { m.x.x, m.y.x, m.z.x },
+    { m.x.y, m.y.y, m.z.y },
+    { m.x.z, m.y.z, m.z.z }
+  };
+}
 
-          vec<ncols>& operator[] (const int idx)       { assert(idx>=0 && idx<nrows); return rows[idx]; }
-    const vec<ncols>& operator[] (const int idx) const { assert(idx>=0 && idx<nrows); return rows[idx]; }
+static inline double mat3_det (mat3 m)
+{
+  return (m.x.x*(m.y.y*m.z.z - m.z.y*m.y.z) - 
+	  m.x.y*(m.y.x*m.z.z - m.z.x*m.y.z) + 
+	  m.x.z*(m.y.x*m.z.y - m.z.x*m.y.y));
+}
 
-    vec<nrows> col(const int idx) const {
-        assert(idx>=0 && idx<ncols);
-        vec<nrows> ret;
-        for (int i=nrows; i--; ret[i]=rows[i][idx]);
-        return ret;
+static inline mat3 mat3_invert (mat3 m)
+{
+  double det = mat3_det (m);
+  assert (det);
+
+  mat3 mi;
+  mi.x.x = (m.y.y*m.z.z - m.y.z*m.z.y)/det; 
+  mi.x.y = (m.z.y*m.x.z - m.x.y*m.z.z)/det;
+  mi.x.z = (m.x.y*m.y.z - m.y.y*m.x.z)/det; 
+  mi.y.x = (m.y.z*m.z.x - m.y.x*m.z.z)/det; 
+  mi.y.y = (m.x.x*m.z.z - m.z.x*m.x.z)/det; 
+  mi.y.z = (m.y.x*m.x.z - m.x.x*m.y.z)/det; 
+  mi.z.x = (m.y.x*m.z.y - m.z.x*m.y.y)/det; 
+  mi.z.y = (m.z.x*m.x.y - m.x.x*m.z.y)/det; 
+  mi.z.z = (m.x.x*m.y.y - m.x.y*m.y.x)/det; 
+  return mi;
+}
+
+static inline mat3 mat3_invert_transpose (const mat3 m)
+{
+  return mat3_transpose (mat3_invert (m));
+}
+
+static inline vec3 mat3_mul (mat3 m, vec3 v)
+{
+  return (vec3) {
+    m.x.x*v.x + m.x.y*v.y + m.x.z*v.z,
+    m.y.x*v.x + m.y.y*v.y + m.y.z*v.z,
+    m.z.x*v.x + m.z.y*v.y + m.z.z*v.z
+  };
+}
+
+static inline vec3 mat3_col (mat3 m, int idx)
+{
+  assert (idx >= 0 && idx < 3);
+  return (vec3) { *(&m.x.x + idx), *(&m.y.x + idx), *(&m.z.x + idx) };
+}
+
+static inline int set_col3 (mat3 * m, int idx, vec3 v)
+{
+  assert (idx >= 0 && idx < 3);
+  *(&m->x.x + idx) = v.x;
+  *(&m->y.x + idx) = v.y;
+  *(&m->z.x + idx) = v.z;
+  return 0; // fixme
+}
+
+typedef struct { vec4 x, y, z, t; } mat4;
+
+static inline vec4 mat4_mul (mat4 m, vec4 v)
+{
+  return (vec4) {
+    m.x.x*v.x + m.x.y*v.y + m.x.z*v.z + m.x.t*v.t,
+    m.y.x*v.x + m.y.y*v.y + m.y.z*v.z + m.y.t*v.t,
+    m.z.x*v.x + m.z.y*v.y + m.z.z*v.z + m.z.t*v.t,
+    m.t.x*v.x + m.t.y*v.y + m.t.z*v.z + m.t.t*v.t
+  };
+}
+
+static inline mat4 mat4_mul4 (mat4 m1, mat4 m2)
+{
+  mat4 ret;
+  const double * p1 = &m1.x.x, * p2 = &m2.x.x;
+  double * p = &ret.x.x;
+  for (int i = 0; i < 4; i++, p1 += 4, p += 4)
+    for (int j = 0; j < 4; j++) {
+      double a = 0.;
+      for (int k = 0; k < 4; k++)
+	a += p1[k]*(p2 + 4*k)[j];
+      p[j] = a;
     }
-
-    void set_col(const int idx, const vec<nrows> &v) {
-        assert(idx>=0 && idx<ncols);
-        for (int i=nrows; i--; rows[i][idx]=v[i]);
-    }
-
-    static mat<nrows,ncols> identity() {
-        mat<nrows,ncols> ret;
-        for (int i=nrows; i--; )
-            for (int j=ncols;j--; ret[i][j]=(i==j));
-        return ret;
-    }
-
-    double det() const {
-        return dt<ncols>::det(*this);
-    }
-
-    mat<nrows-1,ncols-1> get_minor(const int row, const int col) const {
-        mat<nrows-1,ncols-1> ret;
-        for (int i=nrows-1; i--; )
-            for (int j=ncols-1;j--; ret[i][j]=rows[i<row?i:i+1][j<col?j:j+1]);
-        return ret;
-    }
-
-    double cofactor(const int row, const int col) const {
-        return get_minor(row,col).det()*((row+col)%2 ? -1 : 1);
-    }
-
-    mat<nrows,ncols> adjugate() const {
-        mat<nrows,ncols> ret;
-        for (int i=nrows; i--; )
-            for (int j=ncols; j--; ret[i][j]=cofactor(i,j));
-        return ret;
-    }
-
-    mat<nrows,ncols> invert_transpose() const {
-        mat<nrows,ncols> ret = adjugate();
-        return ret/(ret[0]*rows[0]);
-    }
-
-    mat<nrows,ncols> invert() const {
-        return invert_transpose().transpose();
-    }
-
-    mat<ncols,nrows> transpose() const {
-        mat<ncols,nrows> ret;
-        for (int i=ncols; i--; ret[i]=this->col(i));
-        return ret;
-    }
-};
-
-template<int nrows,int ncols> vec<nrows> operator*(const mat<nrows,ncols>& lhs, const vec<ncols>& rhs) {
-    vec<nrows> ret;
-    for (int i=nrows; i--; ret[i]=lhs[i]*rhs);
-    return ret;
+  return ret;
 }
 
-template<int R1,int C1,int C2>mat<R1,C2> operator*(const mat<R1,C1>& lhs, const mat<C1,C2>& rhs) {
-    mat<R1,C2> result;
-    for (int i=R1; i--; )
-        for (int j=C2; j--; result[i][j]=lhs[i]*rhs.col(j));
-    return result;
+static inline mat4 mat4_invert (mat4 M)
+{
+  mat4 I;
+  double * m = &M.x.x, * i = &I.x.x;
+  
+  i[0] = m[5]*m[10]*m[15] - m[5]*m[11]*m[14] - m[9]*m[6]*m[15] + m[9]*m[7]*m[14] + m[13]*m[6]*m[11] - m[13]*m[7]*m[10];
+  i[4] = -m[4]*m[10]*m[15] + m[4]*m[11]*m[14] + m[8]*m[6]*m[15] - m[8]*m[7]*m[14] - m[12]*m[6]*m[11] + m[12]*m[7]*m[10];
+  i[8] = m[4]*m[9]*m[15] - m[4]*m[11]*m[13] - m[8]*m[5]*m[15] + m[8]*m[7]*m[13] + m[12]*m[5]*m[11] - m[12]*m[7]*m[9];
+  i[12] = -m[4]*m[9]*m[14] + m[4]*m[10]*m[13] +m[8]*m[5]*m[14] - m[8]*m[6]*m[13] - m[12]*m[5]*m[10] + m[12]*m[6]*m[9];
+  i[1] = -m[1]*m[10]*m[15] + m[1]*m[11]*m[14] + m[9]*m[2]*m[15] - m[9]*m[3]*m[14] - m[13]*m[2]*m[11] + m[13]*m[3]*m[10];
+  i[5] = m[0]*m[10]*m[15] - m[0]*m[11]*m[14] - m[8]*m[2]*m[15] + m[8]*m[3]*m[14] + m[12]*m[2]*m[11] - m[12]*m[3]*m[10];
+  i[9] = -m[0]*m[9]*m[15] + m[0]*m[11]*m[13] + m[8]*m[1]*m[15] - m[8]*m[3]*m[13] - m[12]*m[1]*m[11] + m[12]*m[3]*m[9];
+  i[13] = m[0]*m[9]*m[14] - m[0]*m[10]*m[13] - m[8]*m[1]*m[14] + m[8]*m[2]*m[13] + m[12]*m[1]*m[10] - m[12]*m[2]*m[9];
+  i[2] = m[1]*m[6]*m[15] - m[1]*m[7]*m[14] - m[5]*m[2]*m[15] + m[5]*m[3]*m[14] + m[13]*m[2]*m[7] - m[13]*m[3]*m[6];
+  i[6] = -m[0]*m[6]*m[15] + m[0]*m[7]*m[14] + m[4]*m[2]*m[15] - m[4]*m[3]*m[14] - m[12]*m[2]*m[7] + m[12]*m[3]*m[6];
+  i[10] = m[0]*m[5]*m[15] - m[0]*m[7]*m[13] - m[4]*m[1]*m[15] + m[4]*m[3]*m[13] + m[12]*m[1]*m[7] - m[12]*m[3]*m[5];
+  i[14] = -m[0]*m[5]*m[14] + m[0]*m[6]*m[13] + m[4]*m[1]*m[14] - m[4]*m[2]*m[13] - m[12]*m[1]*m[6] + m[12]*m[2]*m[5];
+  i[3] = -m[1]*m[6]*m[11] + m[1]*m[7]*m[10] + m[5]*m[2]*m[11] - m[5]*m[3]*m[10] - m[9]*m[2]*m[7] + m[9]*m[3]*m[6];
+  i[7] = m[0]*m[6]*m[11] - m[0]*m[7]*m[10] - m[4]*m[2]*m[11] + m[4]*m[3]*m[10] + m[8]*m[2]*m[7] - m[8]*m[3]*m[6];
+  i[11] = -m[0]*m[5]*m[11] + m[0]*m[7]*m[9] + m[4]*m[1]*m[11] - m[4]*m[3]*m[9] - m[8]*m[1]*m[7] + m[8]*m[3]*m[5];
+  i[15] = m[0]*m[5]*m[10] - m[0]*m[6]*m[9] - m[4]*m[1]*m[10] + m[4]*m[2]*m[9] + m[8]*m[1]*m[6] - m[8]*m[2]*m[5];
+
+  double det = m[0]*i[0] + m[1]*i[4] + m[2]*i[8] + m[3]*i[12];
+  if (det == 0)
+    return M;
+
+  for (int j = 0; j < 16; j++)
+    i[j] /= det;
+
+  return I;
 }
 
-template<int nrows,int ncols>mat<nrows,ncols> operator*(const mat<nrows,ncols>& lhs, const double& val) {
-    mat<nrows,ncols> result;
-    for (int i=nrows; i--; result[i] = lhs[i]*val);
-    return result;
+static inline mat4 mat4_transpose (mat4 m)
+{
+  return (mat4) {
+    { m.x.x, m.y.x, m.z.x, m.t.x },
+    { m.x.y, m.y.y, m.z.y, m.t.y },
+    { m.x.z, m.y.z, m.z.z, m.t.z },
+    { m.x.t, m.y.t, m.z.t, m.t.t }
+  };
 }
 
-template<int nrows,int ncols>mat<nrows,ncols> operator/(const mat<nrows,ncols>& lhs, const double& val) {
-    mat<nrows,ncols> result;
-    for (int i=nrows; i--; result[i] = lhs[i]/val);
-    return result;
+static inline mat4 mat4_invert_transpose (const mat4 m)
+{
+  return mat4_transpose (mat4_invert (m));
 }
 
-template<int nrows,int ncols>mat<nrows,ncols> operator+(const mat<nrows,ncols>& lhs, const mat<nrows,ncols>& rhs) {
-    mat<nrows,ncols> result;
-    for (int i=nrows; i--; )
-        for (int j=ncols; j--; result[i][j]=lhs[i][j]+rhs[i][j]);
-    return result;
+typedef struct { vec3 x, y; } mat23;
+
+static inline int set_col23 (mat23 * m, int idx, vec2 v)
+{
+  assert (idx >= 0 && idx < 3);
+  *(&m->x.x + idx) = v.x;
+  *(&m->y.x + idx) = v.y;
+  return 0; // fixme  
 }
 
-template<int nrows,int ncols>mat<nrows,ncols> operator-(const mat<nrows,ncols>& lhs, const mat<nrows,ncols>& rhs) {
-    mat<nrows,ncols> result;
-    for (int i=nrows; i--; )
-        for (int j=ncols; j--; result[i][j]=lhs[i][j]-rhs[i][j]);
-    return result;
+static inline vec2 mat23_mul (mat23 m, vec3 v)
+{
+  return (vec2) {
+    m.x.x*v.x + m.x.y*v.y + m.x.z*v.z,
+    m.y.x*v.x + m.y.y*v.y + m.y.z*v.z
+  };
 }
 
-template<int nrows,int ncols> std::ostream& operator<<(std::ostream& out, const mat<nrows,ncols>& m) {
-    for (int i=0; i<nrows; i++) out << m[i] << std::endl;
-    return out;
+static inline vec3 cross(vec3 v1, vec3 v2)
+{
+  return (vec3){
+    v1.y*v2.z - v1.z*v2.y,
+    v1.z*v2.x - v1.x*v2.z,
+    v1.x*v2.y - v1.y*v2.x
+  };
 }
-
-template<int n> struct dt {
-    static double det(const mat<n,n>& src) {
-        double ret = 0;
-        for (int i=n; i--; ret += src[0][i]*src.cofactor(0,i));
-        return ret;
-    }
-};
-
-template<> struct dt<1> {
-    static double det(const mat<1,1>& src) {
-        return src[0][0];
-    }
-};
-
