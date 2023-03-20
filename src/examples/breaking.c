@@ -173,7 +173,7 @@ module load intel gcc
 NAME=breaking
 mpicc -Wall -std=c99 -O2 _$NAME.c -o $NAME \
     -I/home/popinet/local -L/home/popinet/local/gl -L/home/popinet/local/lib \
-    -lglutils -lfb_osmesa -lOSMesa -lGLU -lppr -lgfortran -lm
+    -lglutils -lfb_osmesa -lOSMesa -lppr -lgfortran -lm
 
 export LD_LIBRARY_PATH=/home/popinet/local/lib:$LD_LIBRARY_PATH
 export PATH=$PATH:/home/popinet/local/bin

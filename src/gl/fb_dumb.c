@@ -41,8 +41,6 @@ void glTexImage1D (GLenum target, GLint level, GLint internalFormat,
 		   GLsizei width, GLint border, GLenum format, GLenum type,
 		   const void * data) {}
 void glTexParameteri (GLenum target, GLenum pname, GLint param) {}
-void gluPerspective (GLdouble fovy, GLdouble aspect, GLdouble zNear,
-		     GLdouble zFar) {}
 void glVertex3d (GLdouble x, GLdouble y, GLdouble z) {}
 void glVertex3f (GLfloat x, GLfloat y, GLfloat z) {}
 

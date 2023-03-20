@@ -47,14 +47,14 @@ manually using e.g.:
 
 ~~~bash
 qcc -Wall -O2 program.c -o program \
-    -L$BASILISK/gl -lglutils -lfb_osmesa -lGLU -lOSMesa -lm
+    -L$BASILISK/gl -lglutils -lfb_osmesa -lOSMesa -lm
 ~~~
 
 or
 
 ~~~bash
 qcc -Wall -O2 program.c -o program \
-    -L$BASILISK/gl -lglutils -lfb_glx -lGLU -lGLEW -lGL -lX11
+    -L$BASILISK/gl -lglutils -lfb_glx -lGLEW -lGL -lX11
 ~~~
 
 depending on which version of OpenGL should be used.
@@ -260,14 +260,14 @@ static void redraw() {
 
   if (view->far <= view->near) { // "traditional" camera parameters
     double max = 2.;    
-    gluPerspective (view->fov, view->width/(float)view->height, 1., 1. + 2.*max);
+    gl_Perspective (view->fov, view->width/(float)view->height, 1., 1. + 2.*max);
 
     glMatrixMode (GL_MODELVIEW);	    
     glLoadIdentity ();
     glTranslatef (view->tx, view->ty, - (1. + max));
   }
   else { // camera parameters compatible with interactive Basilisk View
-    gluPerspective (view->fov, view->width/(float)view->height,
+    gl_Perspective (view->fov, view->width/(float)view->height,
 		    view->near, view->far);
 
     glMatrixMode (GL_MODELVIEW);	    

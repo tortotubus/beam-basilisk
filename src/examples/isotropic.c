@@ -178,7 +178,7 @@ module purge
 module load openmpi
 module load intel
 mpicc -Wall -O2 -std=c99 _isotropic.c -o isotropic \
-        -I$HOME -L$HOME/gl -lglutils -lfb_osmesa -lGLU -lOSMesa -lm
+        -I$HOME -L$HOME/gl -lglutils -lfb_osmesa -lOSMesa -lm
 sed 's/WALLTIME/10:00/g' run.sh | sbatch
 ~~~
 
@@ -223,7 +223,7 @@ On mesu (using 512 cores)
 ~~~bash
 module load mpt
 mpicc -Wall -O2 -std=c99 _isotropic.c -o isotropic -I$HOME -L$HOME/gl -lglutils \
-	-lfb_osmesa -lGLU -lOSMesa -lm
+	-lfb_osmesa -lOSMesa -lm
 sed 's/WALLTIME/10:00/g' run.sh | qsub
 ~~~
 
@@ -300,7 +300,7 @@ On irene
 
 ~~~bash
 mpicc -Wall -O2 -std=c99 -xCORE-AVX512 _isotropic.c -o isotropic \
-        -I$HOME -L$HOME/gl -lglutils -lfb_osmesa -lGLU -lOSMesa -lm
+        -I$HOME -L$HOME/gl -lglutils -lfb_osmesa -lOSMesa -lm
 sed -e 's/WALLTIME/600/g' -e 's/LEVEL/7/g' run.sh | ccc_msub -n 512
 ~~~
 

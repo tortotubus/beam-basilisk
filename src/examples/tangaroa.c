@@ -318,7 +318,7 @@ with the following `run.sh` script
 set -x
 cd ${BRIDGE_MSUB_PWD}
 
-mpicc -Wall -std=c99 -O2 _tangaroa.c -o tangaroa -I$HOME -L$HOME/gl -lglutils -lfb_osmesa -lOSMesa -lGLU -lm
+mpicc -Wall -std=c99 -O2 _tangaroa.c -o tangaroa -I$HOME -L$HOME/gl -lglutils -lfb_osmesa -lOSMesa -lm
 ccc_mprun -n ${BRIDGE_MSUB_NPROC} ./tangaroa -m WALLTIME 12 0.4 \
     2>> log-${BRIDGE_MSUB_NPROC} >> out-${BRIDGE_MSUB_NPROC}
 ~~~
