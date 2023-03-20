@@ -101,6 +101,13 @@ void glLoadIdentity (void)
     current[i] = identity[i];
 }
 
+void glLoadMatrixd (const GLdouble * m)
+{
+  int i;
+  for (i = 0; i < 16; i++)
+    current[i] = m[i];
+}
+
 void glScalef (GLfloat x, GLfloat y, GLfloat z)
 {
   glMultMatrixf ((GLfloat []){

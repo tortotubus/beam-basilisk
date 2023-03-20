@@ -378,6 +378,10 @@ trace
 static pointer compose_image (bview * view)
 {
   unsigned char * image = framebuffer_image (view->fb);
+  if (!image) {
+    fprintf (stderr, "compose_image() failed: framebuffer is empty: are you using gl/libfb_dumb?\n");
+    return NULL;
+  }
   if (npe() > 1) {
     MPI_Op op;
     MPI_Op_create (compose_image_op, true, &op);
