@@ -271,7 +271,7 @@ module load intel
 
 NAME=atomisation
 mpicc -Wall -std=c99 -O2 _$NAME.c -o $NAME \
-      -L$HOME/gl -lglutils -lfb_osmesa -lOSMesa -lGLU -lm
+      -L$HOME/gl -lglutils -lfb_osmesa -lOSMesa -lm
 srun --mpi=pmi2 -K1 --resv-ports -n $SLURM_NTASKS ./$NAME $LEVEL \
      2> log-$LEVEL-$SLURM_NTASKS > out-$LEVEL-$SLURM_NTASKS
 ~~~
@@ -307,7 +307,7 @@ with the following `run.sh` script
 # load modules 
 module load mpt
 mpicc -Wall -O2 -std=c99 _atomisation.c -o atomisation \
-     -L$HOME/gl -lglutils -lfb_osmesa -lOSMesa -lGLU -lm
+     -L$HOME/gl -lglutils -lfb_osmesa -lOSMesa -lm
 # change to the directory where program job_script_file is located 
 cd $PBS_O_WORKDIR 
 # mpirun -np 672 !!!! does not work !!!!

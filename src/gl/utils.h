@@ -31,5 +31,6 @@ float sphere_diameter (double x, double y, double z, double r, Frustum * f);
 void gl_check_error();
 
 int polygonize (const double val[8], double isolevel, double triangles[5][3][3]);
+void gl_Perspective (double fovy, double aspect, double zNear, double zFar);
 
 #include "parser.h"

@@ -49,7 +49,7 @@ export CADNACC="clang -D_CADNA=1 -x c++ -m64 \
         -Wno-address-of-array-temporary"
 
 # OpenGL libraries
-export OPENGLIBS="-lfb_osmesa -lGLU -lOSMesa"
+export OPENGLIBS="-lfb_osmesa -lOSMesa"
 
 # howto kill tests
 

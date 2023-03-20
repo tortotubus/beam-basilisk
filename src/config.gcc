@@ -31,8 +31,8 @@ PYTHONINCLUDE = /usr/include/python2.7
 OPENGLIBS = -lfb_dumb
 CFLAGS += -DDUMBGL
 
-# OPENGLIBS = -lfb_osmesa -lGLU -lOSMesa
-# OPENGLIBS = -lfb_glx -lGLU -lGLEW -lGL -lX11
+# OPENGLIBS = -lfb_osmesa -lOSMesa
+# OPENGLIBS = -lfb_glx -lGLEW -lGL -lX11
 
 # Compiler and libraries to use with CADNA.
 # See [README.cadna]() for more documentation.

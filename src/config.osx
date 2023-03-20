@@ -42,8 +42,8 @@ CHECKSUM = shasum -c --status
 OPENGLIBS = -lfb_dumb
 CFLAGS += -DDUMBGL
 
-# OPENGLIBS = -lfb_glx -lGLU -lGLEW -lGL -lX11
-# OPENGLIBS = -L/opt/local/lib/ -lfb_osmesa -lGLU -lOSMesa 
+# OPENGLIBS = -lfb_glx -lGLEW -lGL -lX11
+# OPENGLIBS = -L/opt/local/lib/ -lfb_osmesa -lOSMesa 
 
 # Compiler and libraries to use with CADNA.
 # See [README.cadna]() for more documentation.
