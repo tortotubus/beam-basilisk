@@ -1,12 +1,14 @@
-CFLAGS += -Wall -O2 -g -I$(BASILISK) -DBASILISK=\"$(BASILISK)\"
+CFLAGS += -I.. -DBASILISK=\"$(subst /ast,,$(CURDIR))\"
 
 libast.a: ast.o tokens.o basilisk.o translate.o allocator.o \
 	stack.o stencil.o check.o
 	ar cr $@ $^
 
-basilisk.c: basilisk.yacc
-	bison -Dparse.trace -d -o basilisk.c basilisk.yacc
-	sed -i 's/^ *YY_REDUCE_PRINT *(yyn);/ YY_REDUCE_PRINT (yyn); DEFAULT_ACTION (yyn);/' basilisk.c
+# Uncomment the recipe below if you need to re-generate basilisk.c
+
+# basilisk.c: basilisk.yacc
+# 	bison -Dparse.trace -d -o basilisk.c basilisk.yacc
+# 	sed -i 's/^ *YY_REDUCE_PRINT *(yyn);/ YY_REDUCE_PRINT (yyn); DEFAULT_ACTION (yyn);/' basilisk.c
 
 symbols.h: basilisk.c Makefile
 	echo "// Automatically generated from basilisk.yacc" > symbols.h
@@ -19,10 +21,12 @@ grammar.h: basilisk.yacc grammar
 	./grammar < basilisk.yacc  > grammar.h
 
 grammar: grammar.c
-	cc -Wall grammar.c -o grammar
+	$(CC) $(CFLAGS) grammar.c -o grammar
 
-tokens.c: tokens.lex
-	flex -o tokens.c tokens.lex
+# Uncomment the recipe below if you need to re-generate tokens.c
+
+# tokens.c: tokens.lex
+#	flex -o tokens.c tokens.lex
 
 basilisk.o: ast.h parser.h
 

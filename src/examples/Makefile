@@ -1,3 +1,5 @@
+include ../Makefile.defs
+
 # the default CFLAGS are set in $(BASILISK)/config
 CFLAGS += -O2 -fopenmp
 
@@ -25,4 +27,3 @@ shoal-ml.c: shoal.c
 shoal-ml.tst: shoal.s
 shoal-ml.tst: CFLAGS += -DML=1
 
-include $(BASILISK)/Makefile.defs

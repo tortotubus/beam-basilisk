@@ -1,11 +1,15 @@
 CFLAGS += -O2
 
+export BASILISK = $(CURDIR)
+
 # these are not Basilisk programs
 EXCLUDE = qcc.c include.c postproc.c bview.c
 
+TOPTARGETS = all clean
+
 SUBDIRS = darcsit ast kdt wsServer gl
 
-.PHONY: subdirs $(SUBDIRS)
+.PHONY: subdirs $(SUBDIRS) $(TOPTARGETS)
 
 all: subdirs qcc literatec bview2D bview3D
 	@chmod +x ppm2mpeg ppm2mp4 ppm2ogv ppm2gif runtest page2html
@@ -14,8 +18,9 @@ all: subdirs qcc literatec bview2D bview3D
 
 subdirs: $(SUBDIRS)
 
+$(TOPTARGETS): $(SUBDIRS)
 $(SUBDIRS):
-	$(MAKE) -C $@
+	$(MAKE) -C $@ $(filter-out $(SUBDIRS),$(MAKECMDGOALS))
 
 literatec:
 	cd darcsit && $(MAKE) && cd cgi-bin && $(MAKE)
@@ -37,17 +42,20 @@ draw_get.h: draw.h params.awk
 draw_json.h: draw.h json.awk
 	awk -f json.awk < draw.h > draw_json.h
 
-include.c: include.lex
-	flex -P inc -o include.c include.lex
+# Uncomment the recipes below if you need to re-generate include.c or
+# postproc.c
 
-postproc.c: postproc.lex
-	flex -P post -o postproc.c postproc.lex
+# include.c: include.lex
+#	flex -P inc -o include.c include.lex
 
-bview2D: qcc bview.c draw_get.h draw_json.h bview.s
-	qcc $(CFLAGS) -autolink bview.c -o bview2D -lfb_tiny -lm
+# postproc.c: postproc.lex
+#	flex -P post -o postproc.c postproc.lex
 
-bview3D: qcc bview.c draw_get.h draw_json.h bview.s
-	qcc $(CFLAGS) -autolink -grid=octree bview.c -o bview3D -lfb_tiny -lm
+bview2D: qcc bview.c draw_get.h draw_json.h
+	./qcc $(CFLAGS) -autolink bview.c -o bview2D -lfb_tiny -lm
+
+bview3D: qcc bview.c draw_get.h draw_json.h
+	./qcc $(CFLAGS) -autolink -grid=octree bview.c -o bview3D -lfb_tiny -lm
 
 alltags:
 	cd navier-stokes && $(MAKE) tags
