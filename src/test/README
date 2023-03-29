@@ -184,7 +184,12 @@ Note that only the documented test cases appear in the list below
 * [Kuramoto--Sivashinsky equation](kuramoto.c)
 * [Convergence of the Runge--Kutta solvers](runge-kutta.c)
 * [Segment traversal](segment.c)
-* [CVMix KPP interface](cvmix.c)
+
+## Unmaintained
+
+The following tests are not maintained anymore.
+
+* [CVMix KPP interface](unmaintained/cvmix.c)
 
 ## [All tests](/src/test/)
 

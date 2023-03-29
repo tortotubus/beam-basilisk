@@ -9,7 +9,7 @@ CFLAGS += -O2 -DMTRACE=3
 
 # list only non-default tests
 check: halo.vtst interpolate.vtst events.vtst faces.vtst coarsen.vtst \
-	lid-restore.tst poiseuille.vtst tag.ctst cvmix.vtst
+	lid-restore.tst poiseuille.vtst tag.ctst
 
 # these tests have special dependencies/compilation requirements
 
