@@ -1,22 +1,15 @@
--include ../config
+CFLAGS += -I..
 
-CFLAGS += -O2 -I..
+.PHONY: tinyrenderer all clean
 
-all: libglutils.a libfb_dumb.a libfb_osmesa.a libfb_glx.a
+all: tinyrenderer libglutils.a libfb_tiny.a
+
+clean: tinyrenderer
+tinyrenderer:
+	$(MAKE) -C $@ $(filter-out tinyrenderer,$(MAKECMDGOALS))
 
 libglutils.a: trackball.o utils.o polygonize.o \
 		og_stroke_mono_roman.o parser.o
-	ar cr $@ $^
-
-libfb_dumb.a: fb_dumb.o
-	ar cr $@ $^
-
-fb_dumb.o: gl.h
-
-libfb_osmesa.a: fb_osmesa.o
-	ar cr $@ $^
-
-libfb_glx.a: fb_glx.o OffscreenContextGLX.o fbo.o
 	ar cr $@ $^
 
 utils.o: utils.h
@@ -32,3 +25,19 @@ parser.o: parser.tab.c parser.h
 
 clean:
 	rm -f *.o *.a
+
+libfb_tiny.a: fb_tiny.o tinyrenderer/tiny.o
+	ar cr $@ $^
+
+tinyrenderer/tiny.o:
+	cd tinyrenderer && $(MAKE)
+
+fb_tiny.o: gl.h tinyrenderer/tiny.h tinyrenderer/geometry.h 
+
+## These libraries depend on OpenGL and are not built by default
+
+libfb_osmesa.a: fb_osmesa.o
+	ar cr $@ $^
+
+libfb_glx.a: fb_glx.o OffscreenContextGLX.o fbo.o
+	ar cr $@ $^

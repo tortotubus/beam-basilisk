@@ -1,63 +1,42 @@
 #include <stdlib.h>
+#include <stdio.h>
+#include <limits.h>
 #include "geometry.h"
-#include "../framebuffer.h"
 #include "tiny.h"
-
-mat4 TinyModelView;
-mat4 TinyProjection;
 
 static mat4 Viewport;
 
-void tiny_viewport(const int x, const int y, const int w, const int h) {
-  Viewport = (mat4){{w/2., 0, 0, x+w/2.}, {0, h/2., 0, y+h/2.}, {0,0,1,0}, {0,0,0,1}};
-}
-
-void tiny_projection(const double f) { // check https://en.wikipedia.org/wiki/Camera_matrix
-  TinyProjection = (mat4){{1,0,0,0}, {0,-1,0,0}, {0,0,1,0}, {0,0,-1/f,0}};
-}
-
-// check https://github.com/ssloy/tinyrenderer/wiki/Lesson-5-Moving-the-camera
-void tiny_lookat(const vec3 eye, const vec3 center, const vec3 up) {
-  vec3 z = vec3_normalized (vec3_sub (center, eye));
-  vec3 x = vec3_normalized (cross(up, z));
-  vec3 y = vec3_normalized (cross(z, x));
-  mat4 Minv = (mat4){{x.x,x.y,x.z,0},   {y.x,y.y,y.z,0},   {z.x,z.y,z.z,0},   {0,0,0,1}};
-  mat4 Tr   = (mat4){{1,0,0,-eye.x}, {0,1,0,-eye.y}, {0,0,1,-eye.z}, {0,0,0,1}};
-  TinyModelView = mat4_mul4 (Minv, Tr);
-}
-
-vec3 tiny_barycentric(const vec2 tri[3], const vec2 P) {
-  mat3 ABC = {vec3_embed(tri[0]), vec3_embed(tri[1]), vec3_embed(tri[2])};
-  // for a degenerate triangle generate negative coordinates, it will
-  // be thrown away by the rasterizator
-  if (mat3_det(ABC) < 1e-3) return (vec3){-1,1,1};
-  return mat3_mul (mat3_invert_transpose(ABC), vec3_embed(P));
+void tiny_viewport (const int x, const int y, const int w, const int h)
+{
+  Viewport = (mat4){{w/2., 0, 0, x + w/2.}, {0, h/2., 0, y + h/2.}, {0,0,1,0}, {0,0,0,1}};
 }
 
 /**
 ## Framebuffer */
 
-struct _framebuffer {
-  unsigned char * image;
-  int width, height;
-  double * zbuffer;
-};
+framebuffer * TinyFramebuffer = NULL;
 
 void framebuffer_destroy (framebuffer * p) {
   free (p->image);
   free (p->zbuffer);
+  free (p->depth);
   free (p);
+  TinyFramebuffer = NULL;
 }
 
 framebuffer * framebuffer_new (unsigned width, unsigned height)
 {
   framebuffer * f = (framebuffer *) malloc (sizeof (framebuffer));
   f->image = (unsigned char *) calloc (width*height*4, sizeof (unsigned char));
+  f->depth = NULL;
   f->width = width, f->height = height;
-  f->zbuffer = (double *) malloc (width*height*sizeof (double));
-  double * p = f->zbuffer;
+  f->zmax = -1e30, f->zmin = 1e30;
+  f->zbuffer = (real *) malloc (width*height*sizeof (real));
+  real * p = f->zbuffer;
   for (unsigned int i = 0; i < width*height; i++, p++)
-    *p = 1e100;
+    *p = 1e30;
+  TinyFramebuffer = f;
+  tiny_viewport (0., 0., width, height);
   return f;
 }
 
@@ -65,18 +44,28 @@ unsigned char * framebuffer_image (framebuffer * p) {
   return p->image;
 }
 
-fbdepth_t * framebuffer_depth (framebuffer * p) {
-  return NULL;
+fbdepth_t * framebuffer_depth (framebuffer * p)
+{
+  if (!p->depth)
+    p->depth = (fbdepth_t *) malloc (p->width*p->height*sizeof (fbdepth_t));
+  real * z = p->zbuffer;
+  fbdepth_t * d = p->depth;
+  for (unsigned int i = 0; i < p->width*p->height; i++, z++, d++) {
+    real a = p->zmax > p->zmin ? (*z - p->zmin)/(p->zmax - p->zmin) : 0.;
+    *d = (a < 0. ? 0. : a > 1. ? 1. : a)*UINT_MAX;
+  }
+  return p->depth;
 }
 
 static inline
-void framebuffer_set_depth (framebuffer * f, int x, int y, const Color color, double frag_depth)
+void framebuffer_set_depth (framebuffer * f, int x, int y, const TinyColor * color, real frag_depth)
 {
-  if (x < 0 || x >= f->width || y < 0 || y >= f->height) return;
   unsigned char * c = f->image + 4*(x + y*f->width);
   for (int i = 0; i < 4; i++)
-    c[i] = color[i];
+    c[i] = ((unsigned char *)color)[i];
   f->zbuffer[x + y*f->width] = frag_depth;
+  if (frag_depth > f->zmax) f->zmax = frag_depth;
+  if (frag_depth < f->zmin) f->zmin = frag_depth;
 }
 
 /**
@@ -84,8 +73,24 @@ void framebuffer_set_depth (framebuffer * f, int x, int y, const Color color, do
 
 #define min(a,b) ((a) < (b) ? (a) : (b))
 #define max(a,b) ((a) > (b) ? (a) : (b))
+#define swap(a,b) do { typeof (a) c; c = a; a = b; b = c; } while (0)
 
-void tiny_triangle (const vec4 clip_verts[3], const void * shader, const TinyShader fragment,
+static int constant_color (const void * data, const vec3 bar, TinyColor * frag_color)
+{
+  const TinyColor * color = data;
+  *frag_color = *color;
+  return 0;
+}
+
+static inline
+real orient2d (const vec2 a, const vec2 b, const vec2 c)
+{
+  return (b.x - a.x)*(c.y - a.y) - (b.y - a.y)*(c.x - a.x);
+}
+
+void tiny_triangle (const vec4 clip_verts[3],
+		    const void * shader, const TinyShader fragment,
+		    const int face,
 		    framebuffer * image)
 {
   vec4 pts[3] = {
@@ -93,79 +98,104 @@ void tiny_triangle (const vec4 clip_verts[3], const void * shader, const TinySha
     mat4_mul (Viewport, clip_verts[1]),
     mat4_mul (Viewport, clip_verts[2])
   };  // triangle screen coordinates before persp. division
-  vec2 pts2[3] = {
+  vec2 v[3] = {
     vec4_proj2(vec4_div (pts[0], pts[0].t)),
     vec4_proj2(vec4_div (pts[1], pts[1].t)),
     vec4_proj2(vec4_div (pts[2], pts[2].t))
-  };  // triangle screen coordinates after  perps. division
+  };  // triangle screen coordinates after  persp. division
 
-  int bboxmin[2] = {image->width-1, image->height-1};
-  int bboxmax[2] = {0, 0};
-  for (int i=0; i<3; i++) {
-    bboxmin[0] = min(bboxmin[0], pts2[i].x);
-    bboxmax[0] = max(bboxmax[0], pts2[i].x);
-    bboxmin[1] = min(bboxmin[1], pts2[i].y);
-    bboxmax[1] = max(bboxmax[1], pts2[i].y);
-  }
-  // #pragma omp parallel for
-  for (int x=max(bboxmin[0], 0); x<=min(bboxmax[0], image->width-1); x++)
-    for (int y=max(bboxmin[1], 0); y<=min(bboxmax[1], image->height-1); y++) {
-      vec3 bc_screen = tiny_barycentric(pts2, (vec2){x, y});
-      vec3 bc_clip   = {bc_screen.x/pts[0].t, bc_screen.y/pts[1].t, bc_screen.z/pts[2].t};
-      // check https://github.com/ssloy/tinyrenderer/wiki/Technical-difficulties-linear-interpolation-with-perspective-deformations
-      bc_clip = vec3_div (bc_clip, bc_clip.x+bc_clip.y+bc_clip.z);
-      double frag_depth = vec3_scalar ((vec3){clip_verts[0].z, clip_verts[1].z, clip_verts[2].z}, bc_clip);
-      if (bc_screen.x<0 || bc_screen.y<0 || bc_screen.z<0 || frag_depth > image->zbuffer[x+y*image->width]) continue;
-      Color color;
-      if (fragment (shader, bc_clip, color)) continue; // fragment shader can discard current fragment
-      framebuffer_set_depth (image, x, y, color, frag_depth);
+  // backface culling
+  real area = orient2d (v[0], v[1], v[2]);
+  if (!area || face*area < 0) return;
+  
+  int bboxmin[2] = {100000, 100000};
+  int bboxmax[2] = {- 100000, - 100000};
+  for (int i = 0; i < 3; i++) {
+    if (bboxmin[0] > v[i].x) bboxmin[0] = v[i].x;
+    if (bboxmax[0] < v[i].x) bboxmax[0] = v[i].x;
+    if (bboxmin[1] > v[i].y) bboxmin[1] = v[i].y;
+    if (bboxmax[1] < v[i].y) bboxmax[1] = v[i].y;
+  } // fixme: make this a function and return, also add to tiny_line 
+
+  if (bboxmin[0] < 0) bboxmin[0] = 0;
+  if (bboxmin[1] < 0) bboxmin[1] = 0;  
+  if (bboxmax[0] >= image->width) bboxmax[0] = image->width - 1;
+  if (bboxmax[1] >= image->height) bboxmax[1] = image->height - 1;
+
+#if 0 // OpenMP does accelerate somewhat but not much
+#pragma omp parallel for
+#endif
+  for (int y = bboxmin[1]; y <= bboxmax[1]; y++)
+    for (int x = bboxmin[0]; x <= bboxmax[0]; x++) {
+      vec3 bc; // barycentric coordinates
+      if ((bc.x = orient2d (v[1], v[2], (vec2){x, y})/area) >= 0 &&
+	  (bc.y = orient2d (v[2], v[0], (vec2){x, y})/area) >= 0 &&
+	  (bc.z = orient2d (v[0], v[1], (vec2){x, y})/area) >= 0) {
+#if 1
+	// check https://github.com/ssloy/tinyrenderer/wiki/Technical-difficulties-linear-interpolation-with-perspective-deformations	
+	bc = (vec3){bc.x/pts[0].t, bc.y/pts[1].t, bc.z/pts[2].t};
+	bc = vec3_div (bc, bc.x + bc.y + bc.z);
+#endif
+	real frag_depth = vec3_scalar ((vec3){clip_verts[0].z, clip_verts[1].z, clip_verts[2].z}, bc);
+	if (frag_depth >= image->zbuffer[x + y*image->width])
+	  continue;
+	TinyColor color;
+	if (fragment (shader, bc, &color)) continue; // fragment shader can discard current fragment
+	framebuffer_set_depth (image, x, y, &color, frag_depth);
+      }
     }
 }
 
-void tiny_line (const vec4 clip_verts0, const vec4 clip_verts1, const Color color, float thickness,
+void tiny_line (const vec4 clip_verts0, const vec4 clip_verts1, const TinyColor * color, float thickness,
 		framebuffer * image)
-{	  
+{
   vec4 pts[2]  = {
     mat4_mul (Viewport, clip_verts0),
     mat4_mul (Viewport, clip_verts1)
   };  // line screen coordinates before persp. division
-  vec2 pts2[2] = {
+  vec2 v[2] = {
     vec4_proj2 (vec4_div (pts[0], pts[0].t)),
     vec4_proj2 (vec4_div (pts[1], pts[1].t))
-  };  // line screen coordinates after  perps. division
-  int x0 = pts2[0].x, y0 = pts2[0].y, x1 = pts2[1].x, y1 = pts2[1].y;
+  };  // line screen coordinates after  persp. division
+
+  if (thickness > 1) {
+    vec2 t = vec2_normalized (vec2_sub (v[1], v[0]));
+    mat4 i = mat4_invert (Viewport);
+    thickness /= 2.;
+    float ext = 0.;
+    vec4 v1 = mat4_mul (i, (vec4){ pts[0].t*(v[0].x + (- t.x*ext + t.y)*thickness),
+				   pts[0].t*(v[0].y + (- t.y*ext - t.x)*thickness),
+				   pts[0].z, pts[0].t });
+    vec4 v2 = mat4_mul (i, (vec4){ pts[1].t*(v[1].x + (+ t.x*ext + t.y)*thickness),
+				   pts[1].t*(v[1].y + (+ t.y*ext - t.x)*thickness),
+				   pts[1].z, pts[1].t });
+    vec4 v3 = mat4_mul (i, (vec4){ pts[1].t*(v[1].x + (+ t.x*ext - t.y)*thickness),
+				   pts[1].t*(v[1].y + (+ t.y*ext + t.x)*thickness),
+				   pts[1].z, pts[1].t });
+    vec4 v4 = mat4_mul (i, (vec4){ pts[0].t*(v[0].x + (- t.x*ext - t.y)*thickness),
+				   pts[0].t*(v[0].y + (- t.y*ext + t.x)*thickness),
+				   pts[0].z, pts[0].t });
+    tiny_triangle ((vec4[3]){v1, v2, v3}, color, constant_color, 0, image);
+    tiny_triangle ((vec4[3]){v3, v4, v1}, color, constant_color, 0, image);
+    return;
+  }
+  
+  int x0 = v[0].x, y0 = v[0].y, x1 = v[1].x, y1 = v[1].y;
   if (x1 == x0 && y1 == y0) return;
-  double z0 = clip_verts0.z, z1 = clip_verts1.z;
+  real z0 = clip_verts0.z, z1 = clip_verts1.z;
   // from: http://members.chello.at/~easyfilter/bresenham.html
-  int dx = abs(x1-x0), sx = x0 < x1 ? 1 : -1;
-  int dy = abs(y1-y0), sy = y0 < y1 ? 1 : -1;
-  int err = dx-dy, e2, x2, y2;                          /* error value e_xy */
-  float ed = dx+dy == 0 ? 1 : sqrt((float)dx*dx+(float)dy*dy);
+  int dx = abs (x1 - x0), sx = x0 < x1 ? 1 : -1;
+  int dy = abs (y1 - y0), sy = y0 < y1 ? 1 : -1;
+  real a = (z1 - z0)/(real)(dx > dy ? (x1 - x0) : (y1 - y0));
+  int err = dx - dy; /* error value e_xy */
   int x = x0, y = y0;
-  for (thickness = (thickness+1)/2; ; ) {                                   /* pixel loop */
-    double frag_depth = (abs(x1 - x0) > abs(y1 - y0) ?
-			 (z0 + (x - x0)*(z1 - z0)/(double)(x1 - x0)) :
-			 (z0 + (y - y0)*(z1 - z0)/(double)(y1 - y0))) - 0.01;
-    int draw = frag_depth < image->zbuffer[x+y*image->width];
-    if (draw)
+  while (x != x1 || y != y1) {
+    real frag_depth = z0 - 0.01 + a*(dx > dy ? (x - x0) : (y - y0));
+    if (x >= 0 && y >= 0 && x < image->width && y < image->height &&
+	frag_depth < image->zbuffer[x + y*image->width])
       framebuffer_set_depth (image, x, y, color, frag_depth);
-    //      setPixelColor(x,y,max(0,255*(abs(err-dx+dy)/ed-thickness+1))); // antialiasing
-    e2 = err; x2 = x;
-    if (2*e2 >= -dx) {                                           /* x step */
-      if (draw)
-	for (e2 += dy, y2 = y; e2 < ed*thickness && (y1 != y2 || dx > dy); e2 += dx)
-	  framebuffer_set_depth (image, x, y2 += sy, color, frag_depth);
-      // setPixelColor(x, y2 += sy, max(0,255*(abs(e2)/ed-thickness+1)));
-      if (x == x1) break;
-      e2 = err; err -= dy; x += sx; 
-    } 
-    if (2*e2 <= dy) {                                            /* y step */
-      if (draw)
-	for (e2 = dx-e2; e2 < ed*thickness && (x1 != x2 || dx < dy); e2 += dy)
-	  framebuffer_set_depth (image, x2 += sx, y, color, frag_depth);
-      // setPixelColor(x2 += sx, y, max(0,255*(abs(e2)/ed-thickness+1))); // antialising
-      if (y == y1) break;
-      err += dx; y += sy; 
-    }
+    int e2 = 2*err;
+    if (e2 >= - dy) { err -= dy; x += sx; } /* e_xy+e_x > 0 */
+    if (e2 <= dx) { err += dx; y += sy; } /* e_xy+e_y < 0 */
   }
 }

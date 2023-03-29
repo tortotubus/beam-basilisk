@@ -1460,7 +1460,9 @@ YY_RULE_SETUP
       strcat (command, "' -frames:v 1 -q:v 2 -loglevel quiet -stats -y '");
       strcat (command, snapshot);
       strcat (command, "'");
-      system (command);
+      int status = system (command); // fixme: warning
+      if (status < 0)
+	fputs ("", stderr);
       output_s (snapshot);
       output_s ("\">");
       free (snapshot);
@@ -1509,7 +1511,7 @@ YY_RULE_SETUP
 case 18:
 /* rule 18 can match eol */
 YY_RULE_SETUP
-#line 495 "literate-c.lex"
+#line 497 "literate-c.lex"
 {
   // empty link e.g. [Tutorial]()
   uline();
@@ -1521,7 +1523,7 @@ YY_RULE_SETUP
 case 19:
 /* rule 19 can match eol */
 YY_RULE_SETUP
-#line 503 "literate-c.lex"
+#line 505 "literate-c.lex"
 {
   uline();
   output_s (yytext);
@@ -1529,7 +1531,7 @@ YY_RULE_SETUP
 	YY_BREAK
 case 20:
 YY_RULE_SETUP
-#line 508 "literate-c.lex"
+#line 510 "literate-c.lex"
 {
   uline();
   if (yyextra->incode && yyextra->first && yyextra->type) {
@@ -1542,7 +1544,7 @@ YY_RULE_SETUP
 	YY_BREAK
 case 21:
 YY_RULE_SETUP
-#line 518 "literate-c.lex"
+#line 520 "literate-c.lex"
 {
   /* STRING_LITERAL */
   uline();
@@ -1551,10 +1553,10 @@ YY_RULE_SETUP
 	YY_BREAK
 case 22:
 YY_RULE_SETUP
-#line 524 "literate-c.lex"
+#line 526 "literate-c.lex"
 ECHO;
 	YY_BREAK
-#line 1558 "lex.yy.c"
+#line 1560 "lex.yy.c"
 			case YY_STATE_EOF(INITIAL):
 				yyterminate();
 
@@ -2699,7 +2701,7 @@ static void yyfree (void * ptr , yyscan_t yyscanner)
 
 #define YYTABLES_NAME "yytables"
 
-#line 524 "literate-c.lex"
+#line 526 "literate-c.lex"
 
 
 static void revert (char * src, char * bak)

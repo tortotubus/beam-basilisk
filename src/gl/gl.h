@@ -1,15 +1,11 @@
 /**
 # Minimal OpenGL header
 
-See also [fb_dumb.c]().
+See also [fb_tiny.c]().
 
 It would be handy if the following constants were the same for all
 OpenGL implementations (they are copied from the Mesa
-implementation).
-
-If they vary between implementations, it means that we need to make
-sure that the same <GL/gl.h> header file is used to compile both
-libfb_dumb.a and the final Basilisk code. */
+implementation). */
 
 #define GL_MODELVIEW				0x1700
 #define GL_MODELVIEW_MATRIX			0x0BA6
@@ -34,15 +30,16 @@ libfb_dumb.a and the final Basilisk code. */
 #define GL_LIGHT0                               0x4000
 #define GL_LIGHTING				0x0B50
 #define GL_LIGHTING_BIT				0x00000040
+#define GL_FRONT				0x0404
+#define GL_BACK					0x0405
 #define GL_FRONT_AND_BACK			0x0408
+#define GL_AMBIENT				0x1200
 #define GL_AMBIENT_AND_DIFFUSE			0x1602
 #define GL_COLOR_MATERIAL			0x0B57
 #define GL_COLOR_MATERIAL_FACE			0x0B55
 #define GL_COLOR_MATERIAL_PARAMETER		0x0B56
 #define GL_PROJECTION				0x1701
 #define GL_PROJECTION_MATRIX			0x0BA7
-#define GL_LIGHTING				0x0B50
-#define GL_LIGHTING_BIT				0x00000040
 #define GL_QUADS				0x0007
 #define GL_INVALID_ENUM				0x0500
 #define GL_INVALID_VALUE			0x0501
@@ -143,6 +140,7 @@ void glGetDoublev (GLenum pname, GLdouble * params);
 void glGetIntegerv (GLenum pname, GLint * params);
 void glHint (GLenum target, GLenum mode);
 void glLightfv (GLenum light, GLenum pname, const GLfloat *params);
+void glGetLightfv (GLenum light, GLenum pname, GLfloat * params);
 void glLightModeli (GLenum pname, GLint param);
 void glLineWidth (GLfloat width);
 void glNormal3d (GLdouble nx, GLdouble ny, GLdouble nz);
@@ -168,3 +166,4 @@ void glRotatef (GLfloat angle, GLfloat x, GLfloat y, GLfloat z);
 void glMatrixMode (GLenum mode);
 void glPopMatrix (void);
 void glPushMatrix (void);
+void glLoadMatrixd (const GLdouble * m);

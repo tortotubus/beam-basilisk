@@ -22,9 +22,11 @@ PNG = pngcairo
 MDFLAGS = -fpic
 PYTHONINCLUDE = /usr/include/python2.7
 
-# OpenGL libraries
+# "OpenGL" libraries
+
+OPENGLIBS = -lfb_tiny
 # OPENGLIBS = -lfb_osmesa -lOSMesa
-OPENGLIBS = -lfb_glx -lGLEW -lGL -lX11
+# OPENGLIBS = -lfb_glx -lGLEW -lGL -lX11
 
 # Compiler and libraries to use with CADNA.
 # See [README.cadna]() for more documentation.

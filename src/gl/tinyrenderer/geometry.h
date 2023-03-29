@@ -1,22 +1,53 @@
 #include <math.h>
 #include <assert.h>
 
-typedef struct { double x, y; } vec2;
-typedef struct { double x, y, z; } vec3;
+typedef double real;
 
-static inline double vec3_norm2 (vec3 v)
+typedef struct { real x, y; } vec2;
+
+static inline vec2 vec2_sub (vec2 v1, vec2 v2)
+{
+  return (vec2){v1.x - v2.x, v1.y - v2.y};
+}
+
+static inline real vec2_cross (vec2 v1, vec2 v2)
+{
+  return v1.x*v2.y - v1.y*v2.x;
+}
+
+static inline real vec2_norm2 (vec2 v)
+{
+  return v.x*v.x + v.y*v.y;
+}
+
+static inline real vec2_norm  (vec2 v)
+{
+  return sqrt (vec2_norm2 (v));
+}
+
+static inline vec2 vec2_normalized (vec2 v)
+{
+  real norm = vec2_norm (v);
+  if (norm)
+    return (vec2){v.x/norm, v.y/norm};
+  return v;
+}
+
+typedef struct { real x, y, z; } vec3;
+
+static inline real vec3_norm2 (vec3 v)
 {
   return v.x*v.x + v.y*v.y + v.z*v.z;
 }
 
-static inline double vec3_norm  (vec3 v)
+static inline real vec3_norm  (vec3 v)
 {
   return sqrt (vec3_norm2 (v));
 }
 
 static inline vec3 vec3_normalized (vec3 v)
 {
-  double norm = vec3_norm (v);
+  real norm = vec3_norm (v);
   if (norm)
     return (vec3){v.x/norm, v.y/norm, v.z/norm};
   return v;
@@ -32,25 +63,25 @@ static inline vec3 vec3_sub (vec3 v1, vec3 v2)
   return (vec3){v1.x - v2.x, v1.y - v2.y, v1.z - v2.z};
 }
 
-static inline vec3 vec3_div (vec3 v, double a)
+static inline vec3 vec3_div (vec3 v, real a)
 {
   assert (a);
   return (vec3){v.x/a, v.y/a, v.z/a};
 }
 
-static inline vec3 vec3_mul (vec3 v, double a)
+static inline vec3 vec3_mul (vec3 v, real a)
 {
   return (vec3){v.x*a, v.y*a, v.z*a};
 }
 
-static inline double vec3_scalar (vec3 v1, vec3 v2)
+static inline real vec3_scalar (vec3 v1, vec3 v2)
 {
   return v1.x*v2.x + v1.y*v2.y + v1.z*v2.z;
 }
 
-typedef struct { double x, y, z, t; } vec4;
+typedef struct { real x, y, z, t; } vec4;
 
-static inline vec4 vec4_div (vec4 v, double a)
+static inline vec4 vec4_div (vec4 v, real a)
 {
   assert (a);
   return (vec4){v.x/a, v.y/a, v.z/a, v.t/a};  
@@ -66,7 +97,7 @@ static inline vec3 vec4_proj3 (vec4 v)
   return (vec3) { v.x, v.y, v.z };
 }
 
-static inline vec4 vec4_embed (vec3 v, double fill)
+static inline vec4 vec4_embed (vec3 v, real fill)
 {
   return (vec4) { v.x, v.y, v.z, fill };
 }
@@ -82,7 +113,7 @@ static inline mat3 mat3_transpose (mat3 m)
   };
 }
 
-static inline double mat3_det (mat3 m)
+static inline real mat3_det (mat3 m)
 {
   return (m.x.x*(m.y.y*m.z.z - m.z.y*m.y.z) - 
 	  m.x.y*(m.y.x*m.z.z - m.z.x*m.y.z) + 
@@ -91,7 +122,7 @@ static inline double mat3_det (mat3 m)
 
 static inline mat3 mat3_invert (mat3 m)
 {
-  double det = mat3_det (m);
+  real det = mat3_det (m);
   assert (det);
 
   mat3 mi;
@@ -151,11 +182,11 @@ static inline vec4 mat4_mul (mat4 m, vec4 v)
 static inline mat4 mat4_mul4 (mat4 m1, mat4 m2)
 {
   mat4 ret;
-  const double * p1 = &m1.x.x, * p2 = &m2.x.x;
-  double * p = &ret.x.x;
+  const real * p1 = &m1.x.x, * p2 = &m2.x.x;
+  real * p = &ret.x.x;
   for (int i = 0; i < 4; i++, p1 += 4, p += 4)
     for (int j = 0; j < 4; j++) {
-      double a = 0.;
+      real a = 0.;
       for (int k = 0; k < 4; k++)
 	a += p1[k]*(p2 + 4*k)[j];
       p[j] = a;
@@ -166,7 +197,7 @@ static inline mat4 mat4_mul4 (mat4 m1, mat4 m2)
 static inline mat4 mat4_invert (mat4 M)
 {
   mat4 I;
-  double * m = &M.x.x, * i = &I.x.x;
+  real * m = &M.x.x, * i = &I.x.x;
   
   i[0] = m[5]*m[10]*m[15] - m[5]*m[11]*m[14] - m[9]*m[6]*m[15] + m[9]*m[7]*m[14] + m[13]*m[6]*m[11] - m[13]*m[7]*m[10];
   i[4] = -m[4]*m[10]*m[15] + m[4]*m[11]*m[14] + m[8]*m[6]*m[15] - m[8]*m[7]*m[14] - m[12]*m[6]*m[11] + m[12]*m[7]*m[10];
@@ -185,7 +216,7 @@ static inline mat4 mat4_invert (mat4 M)
   i[11] = -m[0]*m[5]*m[11] + m[0]*m[7]*m[9] + m[4]*m[1]*m[11] - m[4]*m[3]*m[9] - m[8]*m[1]*m[7] + m[8]*m[3]*m[5];
   i[15] = m[0]*m[5]*m[10] - m[0]*m[6]*m[9] - m[4]*m[1]*m[10] + m[4]*m[2]*m[9] + m[8]*m[1]*m[6] - m[8]*m[2]*m[5];
 
-  double det = m[0]*i[0] + m[1]*i[4] + m[2]*i[8] + m[3]*i[12];
+  real det = m[0]*i[0] + m[1]*i[4] + m[2]*i[8] + m[3]*i[12];
   if (det == 0)
     return M;
 
