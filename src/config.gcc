@@ -21,16 +21,9 @@ PNG = pngcairo
 MDFLAGS = -fpic
 PYTHONINCLUDE = /usr/include/python2.7
 
-# OpenGL libraries
+# "OpenGL" libraries
 
-# This is the "dumb" OpenGL implementation and needs to be replaced by
-# one of the implementations below (fb_osmesa or fb_glx) if you want
-# to use online visualisation with view.h. In this case, the following
-# two lines must be commented out. See [INSTALL#visualisation]() for details.
-
-OPENGLIBS = -lfb_dumb
-CFLAGS += -DDUMBGL
-
+OPENGLIBS = -lfb_tiny
 # OPENGLIBS = -lfb_osmesa -lOSMesa
 # OPENGLIBS = -lfb_glx -lGLEW -lGL -lX11
 

@@ -1,7 +1,12 @@
-Two options are possible: off-screen rendering or using
-graphics-acceleration hardware.
+The default installation relies on a [small implementation](fb_tiny.c)
+without any dependencies other than the C library. This should be
+portable to any system. Only follow the instructions below if you
+think that you *really* need another implementation.
 
-# Using off-screen rendering
+Two alternative options are possible: off-screen rendering with OSMesa
+or using graphics-acceleration hardware.
+
+# Off-screen rendering with OSMesa
 
 [OSMesa](https://www.mesa3d.org/osmesa.html) is a software-only
 implementation of OpenGL i.e. it does not require any graphics

@@ -120,22 +120,6 @@ Debian-like system (i.e. Debian, Ubuntu, Mint etc...) you just need to do
 sudo apt install gnuplot imagemagick ffmpeg graphviz valgrind gifsicle pstoedit
 ~~~
 
-# Visualisation
-
-By default Basilisk will be configured for interactive visualisation
-with [Basilisk View](jview/README). Online visualisation with
-[view.h]() will not work however (it will just produce black
-images). Online visualisation requires an implementation of OpenGL
-which allows writing into framebuffers, which can be difficult to
-setup on some systems.
-
-To setup online visualisation, three steps are required:
-
-1. Follow the instructions in [gl/INSTALL]() to choose an OpenGL
-   implementation and compile the libraries.
-2. Edit the `config` file to setup the corresponding libraries.
-3. Make again.
-
 # Using Basilisk from within python
 
 You will need [SWIG](http://www.swig.org/) which can easily be installed with

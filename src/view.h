@@ -260,14 +260,14 @@ static void redraw() {
 
   if (view->far <= view->near) { // "traditional" camera parameters
     double max = 2.;    
-    gl_Perspective (view->fov, view->width/(float)view->height, 1., 1. + 2.*max);
+    gl_perspective (view->fov, view->width/(float)view->height, 1., 1. + 2.*max);
 
     glMatrixMode (GL_MODELVIEW);	    
     glLoadIdentity ();
     glTranslatef (view->tx, view->ty, - (1. + max));
   }
   else { // camera parameters compatible with interactive Basilisk View
-    gl_Perspective (view->fov, view->width/(float)view->height,
+    gl_perspective (view->fov, view->width/(float)view->height,
 		    view->near, view->far);
 
     glMatrixMode (GL_MODELVIEW);	    
@@ -308,6 +308,8 @@ bview * draw() {
     /* OpenGL somehow generates floating-point exceptions... turn them off
        See also: https://bugs.freedesktop.org/show_bug.cgi?id=108856 */
     disable_fpe (FE_DIVBYZERO|FE_INVALID);
+  glMatrixMode (GL_PROJECTION);
+  glTranslatef (0, 0, - 1e-4); // next object is drawn below the current one
   return view;
 }
 
@@ -343,6 +345,7 @@ trace
 static pointer compose_image (bview * view)
 {
   unsigned char * image = framebuffer_image (view->fb);
+  assert (image);
   if (npe() > 1) {
     MPI_Op op;
     MPI_Op_create (compose_image_op, true, &op);    
@@ -378,10 +381,7 @@ trace
 static pointer compose_image (bview * view)
 {
   unsigned char * image = framebuffer_image (view->fb);
-  if (!image) {
-    fprintf (stderr, "compose_image() failed: framebuffer is empty: are you using gl/libfb_dumb?\n");
-    return NULL;
-  }
+  assert (image);
   if (npe() > 1) {
     MPI_Op op;
     MPI_Op_create (compose_image_op, true, &op);

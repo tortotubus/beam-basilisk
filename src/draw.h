@@ -602,7 +602,10 @@ static scalar compile_expression (char * expr, bool * isexpr)
     }									\
     else {								\
       double _v = val;							\
-      glTexCoord1d (clamp(((_v) - args.min)/(args.max - args.min), 0., 1.)); \
+      if (args.max > args.min)						\
+	glTexCoord1d (clamp(((_v) - args.min)/(args.max - args.min), 0., 1.)); \
+      else								\
+	glTexCoord1d (0.);						\
     }									\
   }
 

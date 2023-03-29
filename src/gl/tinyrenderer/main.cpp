@@ -3,8 +3,23 @@
 #include "geometry.h"
 #include "model.h"
 extern "C" {
-#include "../framebuffer.h"
 #include "tiny.h"
+}
+
+mat4 Projection, ModelView;
+
+void projection(const double f) { // check https://en.wikipedia.org/wiki/Camera_matrix
+  Projection = (mat4){{1,0,0,0}, {0,-1,0,0}, {0,0,1,0}, {0,0,-1/f,0}};
+}
+
+// check https://github.com/ssloy/tinyrenderer/wiki/Lesson-5-Moving-the-camera
+void lookat(const vec3 eye, const vec3 center, const vec3 up) {
+  vec3 z = vec3_normalized (vec3_sub (center, eye));
+  vec3 x = vec3_normalized (cross(up, z));
+  vec3 y = vec3_normalized (cross(z, x));
+  mat4 Minv = (mat4){{x.x,x.y,x.z,0},   {y.x,y.y,y.z,0},   {z.x,z.y,z.z,0},   {0,0,0,1}};
+  mat4 Tr   = (mat4){{1,0,0,-eye.x}, {0,1,0,-eye.y}, {0,0,1,-eye.z}, {0,0,0,1}};
+  ModelView = mat4_mul4 (Minv, Tr);
 }
 
 constexpr int width  = 1600; // output image size
@@ -13,7 +28,7 @@ constexpr vec3 light_dir = {1,1,1}; // light source
 constexpr vec3       eye = {1,1,3}; // camera position
 constexpr vec3    center = {0,0,0}; // camera direction
 constexpr vec3        up = {0,1,0}; // camera up vector
-const Color white = {255,255,255,255}, red = {0,0,255,255}, black = {0,0,0,255};
+const TinyColor white = {255,255,255,255}, red = {0,0,255,255}, black = {0,0,0,255};
 
 struct Shader {
   const Model &model;
@@ -24,7 +39,7 @@ struct Shader {
 
   Shader(const Model &m) : model(m) {
     // transform the light vector to view coordinates
-    uniform_l = vec3_normalized (vec4_proj3 (mat4_mul (TinyModelView, vec4_embed(light_dir, 0.))));
+    uniform_l = vec3_normalized (vec4_proj3 (mat4_mul (ModelView, vec4_embed(light_dir, 0.))));
   }
 
   static TGAColor sample2D(const TGAImage &img, vec2 &uvf) {
@@ -34,15 +49,15 @@ struct Shader {
   virtual void vertex(const int iface, const int nthvert, vec4& gl_Position) {
     set_col23 (&varying_uv, nthvert, model.uv (iface, nthvert));
     set_col3 (&varying_nrm, nthvert,
-	      vec4_proj3(mat4_mul (mat4_invert_transpose (TinyModelView),
+	      vec4_proj3(mat4_mul (mat4_invert_transpose (ModelView),
 				   vec4_embed(model.normal(iface, nthvert), 0.))));
-    gl_Position = mat4_mul (TinyModelView, vec4_embed (model.vert(iface, nthvert), 1.));
+    gl_Position = mat4_mul (ModelView, vec4_embed (model.vert(iface, nthvert), 1.));
     set_col3 (&view_tri, nthvert, vec4_proj3 (gl_Position));
-    gl_Position = mat4_mul (TinyProjection, gl_Position);
+    gl_Position = mat4_mul (Projection, gl_Position);
   }
 };
 
-static int fragment (const void * shader, const vec3 bar, Color gl_FragColor)
+static int fragment (const void * shader, const vec3 bar, TinyColor * gl_FragColor)
 {
   Shader * s = (Shader *) shader;
   vec3 bn = vec3_normalized (mat3_mul (s->varying_nrm, bar)); // per-vertex normal interpolation
@@ -71,7 +86,7 @@ static int fragment (const void * shader, const vec3 bar, Color gl_FragColor)
     
   TGAColor c = s->sample2D(s->model.diffuse(), uv);
   for (int i : {0,1,2}) // (a bit of ambient light, diff + spec), clamp the result
-    gl_FragColor[i] = std::min<int>(10 + c[i]*(diff + spec), 255);
+    ((unsigned char *)gl_FragColor)[i] = std::min<int>(10 + c[i]*(diff + spec), 255);
   return false; // the pixel is not discarded
 }
 
@@ -81,9 +96,9 @@ int main (int argc, char** argv) {
     return 1;
   }
   framebuffer * image = framebuffer_new (width, height);
-  tiny_lookat (eye, center, up);                            // build the ModelView matrix
+  lookat (eye, center, up);                            // build the ModelView matrix
   tiny_viewport (width/8, height/8, width*3/4, height*3/4); // build the Viewport matrix
-  tiny_projection (vec3_norm (vec3_sub (eye, center)));     // build the Projection matrix
+  projection (vec3_norm (vec3_sub (eye, center)));     // build the Projection matrix
 
   for (int m = 1; m < argc; m++) { // iterate through all input objects
     Model model(argv[m]);
@@ -94,12 +109,12 @@ int main (int argc, char** argv) {
 	shader.vertex(i, j, clip_vert[j]); // call the vertex shader for each triangle vertex
 #if 1
       float thickness = 1.;
-      tiny_line (clip_vert[0], clip_vert[1], red, thickness, image);
-      tiny_line (clip_vert[1], clip_vert[2], red, thickness, image);
-      tiny_line (clip_vert[2], clip_vert[0], red, thickness, image);
+      tiny_line (clip_vert[0], clip_vert[1], &red, thickness, image);
+      tiny_line (clip_vert[1], clip_vert[2], &red, thickness, image);
+      tiny_line (clip_vert[2], clip_vert[0], &red, thickness, image);
 #endif
 #if 1	    
-      tiny_triangle (clip_vert, &shader, fragment, image); // actual rasterization routine call
+      tiny_triangle (clip_vert, &shader, fragment, 1, image); // actual rasterization routine call
 #endif
     }
   }

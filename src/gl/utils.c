@@ -43,7 +43,6 @@ This is the basic OpenGL setup. */
 
 void init_gl() {
   GLfloat light0_pos[4]   = { 0.0, 0.0, 50.0, 0.0 };
-  GLfloat light0_color[4] = { 1., 1., 1., 1.0 }; /* white light */
 
   glDisable (GL_CULL_FACE);
   glEnable (GL_DEPTH_TEST);
@@ -58,7 +57,8 @@ void init_gl() {
   /* light */
   glLightModeli (GL_LIGHT_MODEL_TWO_SIDE, GL_TRUE);
   glLightfv (GL_LIGHT0, GL_POSITION, light0_pos);
-  glLightfv (GL_LIGHT0, GL_DIFFUSE,  light0_color);
+  GLfloat diffuse[4] = { 0.8, 0.8, 0.8, 1 };
+  glLightfv (GL_LIGHT0, GL_DIFFUSE, diffuse);
   glEnable (GL_LIGHT0);
   glEnable (GL_LIGHTING);
 
@@ -101,7 +101,7 @@ void gl_draw_texture (GLuint id, int width, int height)
 #define RC(r,c) m[(r)+(c)*4]
 #define RCM(m,r,c) (m)[(r)+(c)*4]
 
-void matrix_multiply (float * m, float * n)
+void matrix_multiply (float * m, const float * n)
 {
   float o[16];
   int i;
@@ -140,7 +140,7 @@ void matrix_multiply (float * m, float * n)
           RCM(o,3,2)*RCM(n,2,3)+RCM(o,3,3)*RCM(n,3,3);
 }
 
-void vector_multiply (float * v, float * m)
+void vector_multiply (float * v, const float * m)
 {
   float o[4];
   int i;
@@ -303,7 +303,7 @@ void glhFrustumf2(double *matrix, double left, double right,
   matrix[15] = 0.0;
 }
 
-void gl_Perspective (double fovy, double aspect, double znear, double zfar)
+void gl_perspective (double fovy, double aspect, double znear, double zfar)
 {
   double matrix[16];
   double ymax, xmax;
@@ -314,4 +314,24 @@ void gl_Perspective (double fovy, double aspect, double znear, double zfar)
   glhFrustumf2 (matrix, -xmax, xmax, -ymax, ymax, znear, zfar);
   glMatrixMode (GL_PROJECTION);
   glLoadMatrixd (matrix);
+}
+
+// derived from: Mesa-7.8.2/src/glu/sgi/libutil/project.c:234
+int gl_project (float objx, float objy, float objz, 
+		const float modelMatrix[16], 
+		const float projMatrix[16],
+		const int viewport[4],
+		float *winx, float *winy, float *winz)
+{
+  float in[4] = { objx, objy, objz, 1. };
+
+  vector_multiply (in, modelMatrix);
+  vector_multiply (in, projMatrix);
+  
+  if (in[3] == 0.0) return 0;
+
+  *winx = viewport[0] + viewport[2]*(in[0]/in[3] + 1.)/2.;
+  *winy = viewport[1] + viewport[3]*(in[1]/in[3] + 1.)/2.;
+  *winz = (in[2]/in[3] + 1.)/2.;
+  return 1;
 }

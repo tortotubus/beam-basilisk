@@ -14,7 +14,6 @@ plot 'inter' w l t ''
 
 #include "embed.h"
 #include "navier-stokes/centered.h"
-#include "view.h"
 
 int maxlevel = 5;
 

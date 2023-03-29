@@ -446,7 +446,9 @@ savefig{SP}*[(]{SP}*['"][^'"]+['"] {
       strcat (command, "' -frames:v 1 -q:v 2 -loglevel quiet -stats -y '");
       strcat (command, snapshot);
       strcat (command, "'");
-      system (command);
+      int status = system (command); // fixme: warning
+      if (status < 0)
+	fputs ("", stderr);
       output_s (snapshot);
       output_s ("\">");
       free (snapshot);
