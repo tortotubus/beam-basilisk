@@ -62,10 +62,6 @@ echo "updating Makefile.tests"
 	 sed -n 's/\(^[a-zA-Z_0-9-]*\)\.*tst[ ]*:.*/	\1.c \\/p'
     ) | sort | uniq
     echo ""
-    echo "plots: \\"
-    showfiles plot | sed 's/\(.*\)\.plot/\1\/plot.png/g'
-    showpages '.c' | sed 's/\(.*\)\.c/\1\/plots/g'
-    echo ""
     echo "TESTS = \\"
     singleline < Makefile | 		                   \
 	grep '^check:' | tr ' ' '\n' |                     \

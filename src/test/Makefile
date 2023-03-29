@@ -4,9 +4,7 @@ all: check 3D-tests mpi-tests load-balancing curvature-tests axi-tests \
 failed:
 	$(MAKE) -k `find . -name fail | sed -e 's|\./||g' -e 's|/fail|.tst|g'`
 
-include $(BASILISK)/Makefile.defs
-
-# the default CFLAGS are set in $(BASILISK)/config
+# the default CFLAGS are set in ../config
 CFLAGS += -O2 -DMTRACE=3
 
 # list only non-default tests
@@ -484,3 +482,5 @@ ows_papa.tst: ows_papa-kpp.tst
 # Stencils
 
 stencils.tst: CFLAGS += -DPRINTBOUNDARY=1
+
+include ../Makefile.defs

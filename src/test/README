@@ -321,9 +321,3 @@ make -k -j8
 where *-k* tells *make* not to stop at the first error and *-j8* uses
 parallel processing (assuming you have at least 8 cores on your
 system).
-
-If you want to generate all the graphs at once, do
-
-~~~bash
-make plots
-~~~

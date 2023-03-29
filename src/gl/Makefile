@@ -14,8 +14,10 @@ libglutils.a: trackball.o utils.o polygonize.o \
 
 utils.o: utils.h
 
-parser.tab.c: parser.y
-	bison parser.y
+# Uncomment the recipe below if you need to re-generate parser.tab.c
+
+# parser.tab.c: parser.y
+#	bison parser.y
 
 parser: parser.tab.c parser.h
 	$(CC) $(CFLAGS) -DSTANDALONE=1 -o parser parser.tab.c -lm

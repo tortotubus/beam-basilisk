@@ -1,5 +1,7 @@
 # -*-Makefile-*-
 
+export BASILISK := $(patsubst %/,%,$(dir $(realpath $(lastword $(MAKEFILE_LIST)))))
+
 PNG = png
 GENSUM = md5sum
 CHECKSUM = md5sum -c --status
