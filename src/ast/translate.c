@@ -878,8 +878,15 @@ void maybeconstfield (Ast * n, Stack * stack,
       if (ast_schema (ast_child (declaration, sym_declaration_specifiers),
 		      sym_declaration_specifiers,
 		      0, sym_type_qualifier,
-		      0, sym_MAYBECONST))
+		      0, sym_MAYBECONST)) {
+	if (!strcmp (ast_terminal (identifier)->start, "fs") &&
+	    ast_terminal (identifier)->line == 233) {
+	  ast_stack_print (stack, stderr);
+	  ast_print (identifier, stderr, 0);
+	  abort();
+	}
 	func (n, type, data);
+      }
     }
   }
   if (n->child)
@@ -943,23 +950,34 @@ static Ast * is_point_function (const Ast * declarator)
   return NULL;
 }
 
+typedef struct {
+  void (* func) (Ast * n, Ast * type, void * data);
+  void * data;
+} ConstData;
+
+static
+void maybeconst_traverse (Ast * n, Stack * stack, void * vd)
+{
+  Ast * identifier = ast_function_call_identifier (n);
+  if (identifier) {
+    ConstData * d = vd;
+    const char * name = ast_terminal (identifier)->start;
+    if (!strcmp (name, "val") || !strcmp (name, "fine") ||
+	!strcmp (name, "coarse"))
+      maybeconstfield (ast_find (n->child[2], sym_argument_expression_list_item),
+		       stack, d->func, d->data);
+  }
+}
+
 static
 void maybeconst (Ast * n, Stack * stack,
 		 void func (Ast * n, Ast * type, void * data),
 		 void * data)
 {
-  if (n->child)
-    for (Ast ** c = n->child; *c; c++)
-      maybeconst (*c, stack, func, data);  
-  
-  Ast * identifier = ast_function_call_identifier (n);
-  if (identifier) {
-    const char * name = ast_terminal (identifier)->start;
-    if (!strcmp (name, "val") || !strcmp (name, "fine") ||
-	!strcmp (name, "coarse"))
-      maybeconstfield (ast_find (n->child[2], sym_argument_expression_list_item),
-		       stack, func, data);
-  }
+  stack_push (stack, &n);
+  ConstData d = { func, data };
+  ast_traverse (n, stack, maybeconst_traverse, &d);
+  ast_pop_scope (stack, n);
 }
 
 static
