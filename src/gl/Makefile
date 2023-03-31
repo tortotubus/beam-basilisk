@@ -34,7 +34,7 @@ libfb_tiny.a: fb_tiny.o tinyrenderer/tiny.o
 tinyrenderer/tiny.o:
 	cd tinyrenderer && $(MAKE)
 
-fb_tiny.o: gl.h tinyrenderer/tiny.h tinyrenderer/geometry.h 
+fb_tiny.o: tinygl.h tinyrenderer/tiny.h tinyrenderer/geometry.h 
 
 ## These libraries depend on OpenGL and are not built by default
 

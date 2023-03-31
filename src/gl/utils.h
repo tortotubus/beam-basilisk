@@ -1,4 +1,4 @@
-#include <gl/gl.h>
+#include <gl/tinygl.h>
 #include <stdio.h>
 #include <stdbool.h>
 
