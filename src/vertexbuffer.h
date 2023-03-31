@@ -58,7 +58,7 @@ void vertex_buffer_free()
   VertexBuffer.index = NULL;
 }
 
-static void vertex_buffer_glBegin (int state)
+static void vertex_buffer_glBegin (unsigned int state)
 {
   if (VertexBuffer.index) {
 
