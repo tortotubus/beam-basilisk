@@ -1,5 +1,3 @@
-CFLAGS = -O2
-
 all: literate-c codeblock pagemagic sanitize urldecode
 
 codeblock: codeblock.c
