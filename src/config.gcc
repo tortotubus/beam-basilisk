@@ -20,6 +20,11 @@ VALGRIND = valgrind -q --tool=memcheck --suppressions=$(BASILISK)/openmpi.supp \
 # if gnuplot supports pngcairo, otherwise comment this out
 PNG = pngcairo
 
+# for development uncomment this line to make sure that awk scripts
+# are POSIXly-correct
+# AWK = gawk --posix
+AWK = awk
+
 # configuration for python modules (requires swig)
 MDFLAGS = -fpic
 PYTHONINCLUDE = /usr/include/python2.7
