@@ -1,4 +1,4 @@
-CFLAGS += -O2
+CFLAGS += $(C99_FLAGS) -O2
 
 export BASILISK = $(CURDIR)
 
