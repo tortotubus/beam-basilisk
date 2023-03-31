@@ -70,7 +70,7 @@ script()
    else
 	if ! $GDB -batch -return-child-result -ex "run 2> $log > $out" ./$test > gdb.log 2> gdb.err; then
 	    pass=false
-	    awk '
+	    $AWK '
      {
        if (NF > 0)
          a[nb++] = $0;
@@ -479,8 +479,8 @@ if test -f $test.$ext && checksum $test.s $test.$ext; then
     if $source_modified; then
 	if test -n "$SANDBOX"; then
 	    rm -f $test/warn
-	    gawk -f $BASILISK/gnuplot.awk < $src > $test/plots
-	    gawk -f $BASILISK/python.awk < $src > $test/plots.py
+	    $AWK -f $BASILISK/gnuplot.awk < $src > $test/plots
+	    $AWK -f $BASILISK/python.awk < $src > $test/plots.py
 	    chksum=`(cat $test.s && pwd && echo $test) | $GENSUM | cut -d' ' -f1`.$ext
 	    cd $test
 	    doplots "$test"
@@ -503,8 +503,8 @@ elif ! test -f $test/fail.$ext || ! test -f $test/fail || ! checksum $test.s $te
     $GENSUM $src $test.s > $test.$ext
 
     mkdir -p $test && cp -f $src $test
-    gawk -f $BASILISK/gnuplot.awk < $src > $test/plots
-    gawk -f $BASILISK/python.awk < $src > $test/plots.py
+    $AWK -f $BASILISK/gnuplot.awk < $src > $test/plots
+    $AWK -f $BASILISK/python.awk < $src > $test/plots.py
     cp -f $test.* $test 2> /dev/null || true
     run=`echo $test | sed 's/^~//'`
     if test "$run" != "$test"; then

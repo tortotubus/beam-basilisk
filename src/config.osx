@@ -20,6 +20,9 @@ CFLAGS += -g -Wall -Wno-unused-function -pipe
 # if gnuplot supports pngcairo, otherwise comment this out
 PNG = pngcairo
 
+# Awk
+AWK = awk
+
 # If you have managed to make gdb work (congratulations!), uncomment this
 # GDB = gdb
 
