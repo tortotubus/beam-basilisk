@@ -18,7 +18,7 @@ https://fgiesen.wordpress.com/2013/02/06/the-barycentric-conspirac/
 #include <string.h>
 #include <assert.h>
 #include <stdio.h>
-#include "gl.h"
+#include "tinygl.h"
 #include "tinyrenderer/geometry.h"
 #include "tinyrenderer/tiny.h"
 
