@@ -522,8 +522,8 @@ bool save (struct _save p)
   }
 
   bview * view = p.view ? p.view : get_view();
-  
-  if (!strcmp (p.format, "png") ||
+
+  if ((!strcmp (p.format, "png") && which ("convert")) ||
       !strcmp (p.format, "jpg") ||
       (p.file && is_animation (p.file))) {
     bview_draw (view);
@@ -552,6 +552,13 @@ bool save (struct _save p)
     unsigned char * image = (unsigned char *) compose_image (view);
     if (pid() == 0)
       gl_write_image (p.fp, image, view->width, view->height, view->samples);    
+  }
+
+  else if (!strcmp (p.format, "png")) {
+    bview_draw (view);
+    unsigned char * image = (unsigned char *) compose_image (view);
+    if (pid() == 0)
+      gl_write_image_png (p.fp, image, view->width, view->height, view->samples);
   }
 
   else if (!strcmp (p.format, "bv")) {
