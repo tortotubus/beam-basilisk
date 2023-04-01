@@ -48,7 +48,7 @@ export CADNACC="clang -D_CADNA=1 -x c++ -m64 \
         -Wno-address-of-array-temporary"
 
 # OpenGL libraries
-export OPENGLIBS="-lfb_osmesa -lOSMesa"
+export OPENGLIBS="-lfb_tiny"
 
 # howto kill tests
 

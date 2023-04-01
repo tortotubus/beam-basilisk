@@ -42,22 +42,11 @@ libraries. This can be done automatically using something like:
 qcc -autolink -Wall -O2 program.c -o program -lm
 ~~~
 
-(provided qcc is [properly configured](INSTALL#visualisation)) or
-manually using e.g.:
+or manually using e.g.:
 
 ~~~bash
-qcc -Wall -O2 program.c -o program \
-    -L$BASILISK/gl -lglutils -lfb_osmesa -lOSMesa -lm
+qcc -Wall -O2 program.c -o program -L$BASILISK/gl -lglutils -lfb_tiny -lm
 ~~~
-
-or
-
-~~~bash
-qcc -Wall -O2 program.c -o program \
-    -L$BASILISK/gl -lglutils -lfb_glx -lGLEW -lGL -lX11
-~~~
-
-depending on which version of OpenGL should be used.
 
 # Implementation
 
