@@ -4,6 +4,8 @@
 
 void gl_write_image (FILE * fp, const GLubyte * buffer,
 		     unsigned width, unsigned height, unsigned samples);
+void gl_write_image_png (FILE * fp, const GLubyte * buffer,
+			 unsigned width, unsigned height, unsigned samples);
 void init_gl();
 
 void matrix_multiply (float * m, const float * n);

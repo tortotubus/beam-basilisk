@@ -9,7 +9,7 @@ tinyrenderer:
 	$(MAKE) -C $@ $(filter-out tinyrenderer,$(MAKECMDGOALS))
 
 libglutils.a: trackball.o utils.o polygonize.o \
-		og_stroke_mono_roman.o parser.o
+		og_stroke_mono_roman.o parser.o TinyPngOut.o
 	ar cr $@ $^
 
 utils.o: utils.h

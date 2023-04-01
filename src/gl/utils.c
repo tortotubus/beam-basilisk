@@ -3,6 +3,7 @@
 #include <stdlib.h>
 #include <assert.h>
 #include "utils.h"
+#include "TinyPngOut.h"
 
 /**
 ## Various helper functions
@@ -35,6 +36,47 @@ void gl_write_image (FILE * fp, const GLubyte * buffer,
       fputc (r/samples/samples, fp); /* write red */
       fputc (g/samples/samples, fp); /* write green */
       fputc (b/samples/samples, fp); /* write blue */
+    }
+}
+
+/**
+A helper function to write a PNG file from a RGB buffer. Downsampling
+by averaging is performed if *samples* is larger than one. */
+
+void gl_write_image_png (FILE * fp, const GLubyte * buffer,
+			 unsigned width, unsigned height, unsigned samples)
+{
+  const GLubyte *ptr = buffer;
+
+  if (samples < 1)
+    samples = 1;
+  if (samples > 4)
+    samples = 4;
+
+  width /= samples, height /= samples;
+  struct TinyPngOut pngout;
+  enum TinyPngOut_Status status = TinyPngOut_init (&pngout, width, height, fp);
+  if (status != TINYPNGOUT_OK) {
+    fprintf (stderr, "error: TinyPngOut init failed\n");
+    return;
+  }
+
+  int x, y, j, k;
+  for (y = height - 1; y >= 0; y--)
+    for (x = 0; x < width; x++) {
+      int r = 0, g = 0, b = 0;
+      for (j = 0; j < samples; j++)
+	for (k = 0; k < samples; k++) {
+	  int i = (((y*samples + j)*width + x)*samples + k)*4;
+	  if (ptr)
+	    r += ptr[i], g += ptr[i+1], b += ptr[i+2];
+	}
+      uint8_t pixel[3] = { r/samples/samples, g/samples/samples, b/samples/samples };
+      status = TinyPngOut_write (&pngout, pixel, 1);
+      if (status != TINYPNGOUT_OK) {
+	fprintf (stderr, "error: TinyPngOut write failed\n");
+	return;
+      }
     }
 }
 
