@@ -104,7 +104,7 @@ event acceleration (i++)
 	  phi[-1] < nodata ? phi[-1] :
 	  0.;
 
-	ia.x[] += alpha.x[]/fm.x[]*phif*(f[] - f[-1])/Delta;
+	ia.x[] += alpha.x[]/(fm.x[] + SEPS)*phif*(f[] - f[-1])/Delta;
       }
 
   /**
