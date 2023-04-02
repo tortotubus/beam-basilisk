@@ -1,3 +1,33 @@
+/**
+# Viscous solver with embedded boundaries
+
+We consider the Stokes equations
+$$
+\rho \mathbf{u}_t = \rho \mathbf{g} +
+\nabla \cdot [\mu ( \nabla \mathbf{u} + \nabla^T \mathbf{u})]
+$$
+with $\mathbf{g}$ the acceleration and $T$ the transpose.
+
+In the case of incompressible flow and uniform viscosity, the viscous term
+can be further simplified. Since
+$$
+\nabla \cdot (\mu  \nabla \mathbf{u}) =
+(\nabla \mu) \cdot \nabla \mathbf{u} + \mu \nabla (\nabla \cdot  \mathbf{u}) = 0
+$$
+the viscous term reduces to
+$$
+\nabla \cdot [\mu ( \nabla \mathbf{u} + \nabla^T \mathbf{u})] =
+\nabla \cdot (\mu \nabla^T \mathbf{u}) = \nabla^2 (\mu \mathbf{u})
+$$
+and the equations for each velocity component are decoupled. For each
+component $v_i$, the following discrete implicit equation is solved
+using the multigrid solver
+$$
+\frac{\Delta t} \nabla (\mu \nabla v_i^{n+1}) - (\rho + \lambda_i) v_i^{n+1}
++ \underbrace{(\rho v_i^{n} + g_i\, Delta t)}_{r_i} = 0
+$$
+$\lambda_i$ is a possible extra term due to the metric. */
+
 #include "poisson.h"
 
 struct Viscosity {
@@ -11,16 +41,17 @@ struct Viscosity {
 };
 
 #if AXI
-// fixme: RHO here not correct
-# define lambda ((coord){1., 1. + dt/RHO*(mu.x[] + mu.x[1] + \
-					  mu.y[] + mu.y[0,1])/2./sq(y)})
+# define lambda ((coord){0, dt*(mu.x[] + mu.x[1]			\
+				+ mu.y[] + mu.y[0,1])*sq(cs[])		\
+	/(fm.x[] + fm.x[1] + fm.y[] + fm.y[0,1] + SEPS)/(cm[] + SEPS)})
+
 #else // not AXI
 # if dimension == 1
-#   define lambda ((coord){1.})
+#   define lambda ((coord){0})
 # elif dimension == 2
-#   define lambda ((coord){1.,1.})
+#   define lambda ((coord){0.,0.})
 # elif dimension == 3
-#   define lambda ((coord){1.,1.,1.})
+#   define lambda ((coord){0.,0.,0.})
 #endif
 #endif
 
@@ -49,7 +80,7 @@ static void relax_diffusion (scalar * a, scalar * b, int l, void * data)
       foreach_dimension()
 	a += mu.x[1]*s[1] + mu.x[]*s[-1];
       u.x[] = (dt*a + (r.x[] - dt*c)*sq(Delta))/
-	(sq(Delta)*(rho[]*lambda.x + dt*d) + avgmu);
+	(sq(Delta)*(rho[] + lambda.x + dt*d) + avgmu);
     }
   }
   
@@ -86,7 +117,7 @@ static double residual_diffusion (scalar * a, scalar * b, scalar * resl,
       double a = 0.;
       foreach_dimension()
 	a += g.x[] - g.x[1];
-      res.x[] = r.x[] - rho[]*lambda.x*u.x[] - dt*a/Delta;
+      res.x[] = r.x[] - (rho[] + lambda.x)*u.x[] - dt*a/Delta;
       if (embed_flux) {
 	double c, d = embed_flux (point, u.x, mu, &c);
 	res.x[] -= dt*(c + d*u.x[]);
@@ -103,7 +134,7 @@ static double residual_diffusion (scalar * a, scalar * b, scalar * resl,
       double a = 0.;
       foreach_dimension()
 	a += mu.x[0]*face_gradient_x (s, 0) - mu.x[1]*face_gradient_x (s, 1);
-      res.x[] = r.x[] - rho[]*lambda.x*u.x[] - dt*a/Delta;
+      res.x[] = r.x[] - (rho[] + lambda.x)*u.x[] - dt*a/Delta;
       if (embed_flux) {
 	double c, d = embed_flux (point, u.x, mu, &c);
 	res.x[] -= dt*(c + d*u.x[]);
