@@ -152,6 +152,11 @@ rising-axi.c: rising.c
 rising-axi.tst: rising.s
 rising-axi.tst: CFLAGS += -DAXIS=1
 
+rising-axi-momentum.c: rising.c
+	ln -s rising.c rising-axi-momentum.c
+rising-axi-momentum.s: CFLAGS += -DAXIS=1 -DMOMENTUM=1
+rising-axi-momentum.tst: CFLAGS += -DAXIS=1 -DMOMENTUM=1
+
 rising2.c: rising.c
 	ln -s rising.c rising2.c
 rising2.tst: rising.s
@@ -188,7 +193,7 @@ coarsen.vtst: CFLAGS = -DMTRACE=3 -progress
 # Axisymmetric tests
 
 axi-tests: axiadvection.tst axi.tst poiseuille-axi.tst \
-	rising-axi.tst
+	rising-axi.tst rising-axi-momentum.tst
 
 # 3D tests
 

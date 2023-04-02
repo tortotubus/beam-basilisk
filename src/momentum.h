@@ -39,12 +39,11 @@ averages (i.e. harmonic). */
 #endif
 
 event properties (i++) {
-  // fixme: metric
   foreach()
-    rhov[] = rho(f[]);
+    rhov[] = rho(f[])*cm[];
   foreach_face () {
-    alphav.x[] = 2./(rhov[] + rhov[-1]);
     double ff = (f[] + f[-1])/2.;
+    alphav.x[] = fm.x[]/rho(ff);
     muv.x[] = fm.x[]*mu(ff);
   }
 }

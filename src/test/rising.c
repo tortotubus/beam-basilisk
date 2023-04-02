@@ -15,8 +15,12 @@ gravity. */
 #if AXIS
 # include "axi.h" // fixme: does not run with -catch
 #endif
+#if MOMENTUM
+# include "momentum.h"
+#else
 #include "navier-stokes/centered.h"
 #include "two-phase.h"
+#endif
 #include "tension.h"
 #if REDUCED
 # include "reduced.h"
@@ -30,8 +34,13 @@ gravity. */
 The boundary conditions are slip lateral walls (the default) and
 no-slip on the right and left walls. */
 
+#if MOMENTUM
+q.t[right] = dirichlet(0);
+q.t[left]  = dirichlet(0);
+#else
 u.t[right] = dirichlet(0);
 u.t[left]  = dirichlet(0);
+#endif
 
 /**
 We make sure there is no flow through the top and bottom boundary,
@@ -118,15 +127,21 @@ event logfile (i++) {
   double xb = 0., vb = 0., sb = 0.;
   foreach(reduction(+:xb) reduction(+:vb) reduction(+:sb)) {
     double dv = (1. - f[])*dv();
-    xb += x*dv;
+#if MOMENTUM
+    vb += q.x[]*dv/rho(f[]);
+#else
     vb += u.x[]*dv;
+#endif
+    xb += x*dv;
     sb += dv;
   }
   printf ("%g %g %g %g %g %g %g %g ", 
 	  t, sb, -1., xb/sb, vb/sb, dt, perf.t, perf.speed);
+#if !MOMENTUM
   mg_print (mgp);
   mg_print (mgpf);
   mg_print (mgu);
+#endif
   putchar ('\n');
   fflush (stdout);
 }
@@ -174,7 +189,9 @@ set size ratio -1
 set grid
 plot [][0:0.4]'../c1g3l4s.txt' u 2:($1-0.5) w l t 'MooNMD', \
               'log' u 1:2 w l t 'Basilisk', \
-              '../rising-axi/log' u 1:2 w l t 'Basilisk (axisymmetric)'
+              '../rising-axi/log' u 1:2 w l t 'Basilisk (axisymmetric)', \
+              '../rising-axi-momentum/log' u 1:2 w l \
+	                   t 'Basilisk (axi + momentum)'
 ~~~
 
 For test case 2, the mesh in Basilisk is too coarse to accurately
@@ -195,7 +212,9 @@ set xlabel 'Time'
 set key bottom right
 plot [0:3][0:]'../c1g3l4.txt' u 1:5 w l t 'MooNMD', \
               'out' u 1:5 w l t 'Basilisk', \
-              '../rising-axi/out' u 1:5 w l t 'Basilisk (axisymmetric)'
+              '../rising-axi/out' u 1:5 w l t 'Basilisk (axisymmetric)', \
+              '../rising-axi-momentum/out' u 1:5 w l \
+                      t 'Basilisk (axi + momentum)'
 ~~~
 
 ~~~gnuplot Rise velocity as a function of time for test case 2.
