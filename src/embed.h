@@ -19,6 +19,8 @@ The volume and area fractions are stored in these fields. */
 scalar cs[];
 face vector fs[];
 
+double (* metric_embed_factor) (Point, coord) = NULL;
+
 /**
 Embedded boundary operators specific to trees are defined in this
 file. */
@@ -534,7 +536,7 @@ void embed_force (scalar p, vector u, face vector mu, coord * Fp, coord * Fmu)
 	double mua = 0., fa = 0.;
 	foreach_dimension() {
 	  mua += mu.x[] + mu.x[1];
-	  fa  += fs.x[] + fs.x[1];
+	  fa  += fm.x[] + fm.x[1];
 	}
 	mua /= fa;
 
@@ -678,6 +680,8 @@ double embed_flux (Point point, scalar s, face vector mu, double * val)
   coord n = facet_normal (point, cs, fs), p;
   double alpha = plane_alpha (cs[], n);
   double area = plane_area_center (n, alpha, &p);
+  if (metric_embed_factor)
+    area *= metric_embed_factor (point, p);
 
   /**
   If the boundary condition is Dirichlet, we need to compute the
@@ -695,10 +699,10 @@ double embed_flux (Point point, scalar s, face vector mu, double * val)
   double mua = 0., fa = 0.;
   foreach_dimension() {
     mua += mu.x[] + mu.x[1];
-    fa  += fs.x[] + fs.x[1];
+    fa  += fm.x[] + fm.x[1];
   }
   *val = - mua/(fa + SEPS)*grad*area/Delta;
-  return - mua/(fa + SEPS)*coef*area/Delta;;
+  return - mua/(fa + SEPS)*coef*area/Delta;
 }
 
 /**
@@ -822,7 +826,7 @@ void update_tracer (scalar f, face vector uf, face vector flux, double dt)
     \Delta t_{max} = \frac{c_s\Delta}{max(f_i|u_i|)}
     $$
     Note that *fs* does not appear in the code below because *uf*
-    already stores the product $f_su$. */
+    already stores the product $u_f \, f_m$. */
     
     else {
       double umax = 0.;
@@ -830,7 +834,7 @@ void update_tracer (scalar f, face vector uf, face vector flux, double dt)
 	foreach_dimension()
 	  if (fabs(uf.x[i]) > umax)
 	    umax = fabs(uf.x[i]);
-      double dtmax = Delta*cs[]/(umax + SEPS);
+      double dtmax = Delta*cm[]/(umax + SEPS);
 
       /**
       We compute the sum of the fluxes. */
@@ -838,7 +842,7 @@ void update_tracer (scalar f, face vector uf, face vector flux, double dt)
       double F = 0.;
       foreach_dimension()
 	F += flux.x[] - flux.x[1];
-      F /= Delta*cs[];
+      F /= Delta*cm[];
 
       /**
       If the timestep is smaller than $\Delta t_{max}$, the cell
@@ -860,8 +864,8 @@ void update_tracer (scalar f, face vector uf, face vector flux, double dt)
 	f[] += dtmax*F;
 	double scs = 0.;
 	foreach_neighbor(1)
-	  scs += sq(cs[]);
-	e[] = (dt - dtmax)*F*cs[]/scs;
+	  scs += sq(cm[]);  //Correct?
+	e[] = (dt - dtmax)*F*cm[]/scs;
       }
     }
   }
@@ -882,14 +886,29 @@ void update_tracer (scalar f, face vector uf, face vector flux, double dt)
 ## Default settings
 
 To apply the volume/area fraction-weighting to the solvers, we define
-the metric using the embedded fractions. */
+the embedded solid using the embedded fractions. The fields are no
+longer constant and must be allocated.
+
+The *cm* and *fm* fields contain the product of the metric and solid
+factors. For a Cartesian coordinate system *cm* and *fm* are thus
+identical to the solid factor fields *cs* and *fs*. */
 
 event metric (i = 0)
 {
-  foreach()
-    cs[] = 1.;
+  if (is_constant (fm.x)) {
+    foreach_dimension()
+      assert (constant (fm.x) == 1.);
+    fm = fs;
+  }
   foreach_face()
     fs.x[] = 1.;
+  if (is_constant (cm)) {
+    assert (constant (cm) == 1.);
+    cm = cs;
+  }
+  foreach()
+    cs[] = 1.;
+
 #if TREE
   cs.refine = embed_fraction_refine;
 
@@ -912,12 +931,6 @@ event metric (i = 0)
   
 #endif
   restriction ({cs, fs});
-
-  // fixme: embedded boundaries cannot be combined with (another) metric yet
-  assert (is_constant (cm) || cm.i == cs.i);
-  
-  cm = cs;
-  fm = fs;
 }
 
 /**

@@ -107,6 +107,7 @@ Note that only the documented test cases appear in the list below
 
 * [Poisson equation on complex domains](neumann.c)
 * [Poisson equation on complex domains in 3D](neumann3D.c)
+* [Poisson equation on complex axisymmetric domains](neumann-axi.c)
 * [Stability of the embedded face velocity interpolation](uf.c)
 * [Hydrostatic balance with refined embedded boundaries](hydrostatic2.c)
 * [Hydrostatic balance with refined embedded boundaries in 3D](hydrostatic3.c)

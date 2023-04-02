@@ -462,6 +462,11 @@ dirichlet.tst: CFLAGS += -DDIRICHLET=1
 dirichlet.c: neumann.c
 	ln -s neumann.c dirichlet.c
 
+dirichlet-axi.c: neumann-axi.c
+	ln -s neumann-axi.c dirichlet-axi.c
+dirichlet-axi.s: CFLAGS += -DDIRICHLET=1
+dirichlet-axi.tst: CFLAGS += -DDIRICHLET=1
+
 dirichlet3D.tst: CFLAGS += -DDIRICHLET=1
 dirichlet3D.c: neumann3D.c
 	ln -s neumann3D.c dirichlet3D.c
@@ -471,7 +476,8 @@ hydrostatic2.tst: CC = mpicc -D_MPI=8
 embed-tests: neumann.tst dirichlet.tst poiseuille45.tst \
 	couette.tst wannier.tst hydrostatic2.tst cylinders.tst \
 	porous.tst porous1.tst uf.tst starting.tst \
-	neumann3D.tst dirichlet3D.tst hydrostatic3.tst spheres.tst
+	neumann3D.tst dirichlet3D.tst hydrostatic3.tst spheres.tst \
+        neumann-axi.tst dirichlet-axi.tst
 
 # General Ocean Turbulence Model (GOTM) tests
 
