@@ -18,6 +18,12 @@ VALGRIND = valgrind -q --tool=memcheck --leak-check=full
 # if gnuplot supports pngcairo, otherwise comment this out
 PNG = pngcairo
 
+# Posix Awk
+AWK = awk
+
+# configuration for python plots
+PYTHON_PLOT = MPLBACKEND=agg python3
+
 # configuration for python modules (requires swig)
 MDFLAGS = -fpic
 PYTHONINCLUDE = /usr/include/python2.7
