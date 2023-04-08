@@ -533,8 +533,10 @@ static scalar compile_expression (char * expr, bool * isexpr)
   }
   if (node->type == 'v' && node->e[0] == NULL) {
     scalar s = {node->s};
-    free_node (node);
-    return s;
+    if (s.block > 0) {
+      free_node (node);
+      return s;
+    }
   }
   s = new scalar;
   free (s.name);
@@ -1109,6 +1111,7 @@ bool squares (struct _squares p)
     foreach()
       foreach_dimension()
         n.x[] = (Z[1] - Z[-1])/(2.*Delta_x);
+    boundary ({n});
   }
 #endif
   colorize_args (p);
