@@ -318,7 +318,8 @@ with the following `run.sh` script
 set -x
 cd ${BRIDGE_MSUB_PWD}
 
-mpicc -Wall -std=c99 -O2 _tangaroa.c -o tangaroa -I$HOME -L$HOME/gl -lglutils -lfb_tiny -lm
+mpicc -Wall -std=c99 -D_XOPEN_SOURCE=700 -O2 _tangaroa.c -o tangaroa \
+      -L$HOME/gl -lglutils -lfb_tiny -lm
 ccc_mprun -n ${BRIDGE_MSUB_NPROC} ./tangaroa -m WALLTIME 12 0.4 \
     2>> log-${BRIDGE_MSUB_NPROC} >> out-${BRIDGE_MSUB_NPROC}
 ~~~

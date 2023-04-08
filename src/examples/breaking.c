@@ -172,8 +172,8 @@ module load openmpi
 module load intel gcc
 
 NAME=breaking
-mpicc -Wall -std=c99 -O2 _$NAME.c -o $NAME \
-    -I/home/popinet/local -L/home/popinet/local/gl -L/home/popinet/local/lib \
+mpicc -Wall -std=c99 -D_XOPEN_SOURCE=700 -O2 _$NAME.c -o $NAME \
+    -L/home/popinet/local/gl -L/home/popinet/local/lib \
     -lglutils -lfb_tiny -lppr -lgfortran -lm
 
 export LD_LIBRARY_PATH=/home/popinet/local/lib:$LD_LIBRARY_PATH

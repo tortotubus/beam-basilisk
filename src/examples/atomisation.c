@@ -270,7 +270,8 @@ module load openmpi
 module load intel
 
 NAME=atomisation
-mpicc -Wall -std=c99 -O2 _$NAME.c -o $NAME -L$HOME/gl -lglutils -lfb_tiny -lm
+mpicc -Wall -std=c99 -D_XOPEN_SOURCE=700 -O2 _$NAME.c -o $NAME \
+      -L$HOME/gl -lglutils -lfb_tiny -lm
 srun --mpi=pmi2 -K1 --resv-ports -n $SLURM_NTASKS ./$NAME $LEVEL \
      2> log-$LEVEL-$SLURM_NTASKS > out-$LEVEL-$SLURM_NTASKS
 ~~~
@@ -305,7 +306,7 @@ with the following `run.sh` script
 #PBS -j oe  
 # load modules 
 module load mpt
-mpicc -Wall -O2 -std=c99 _atomisation.c -o atomisation \
+mpicc -Wall -O2 -std=c99 -D_XOPEN_SOURCE=700 _atomisation.c -o atomisation \
         -L$HOME/gl -lglutils -lfb_tiny -lm
 # change to the directory where program job_script_file is located 
 cd $PBS_O_WORKDIR 
