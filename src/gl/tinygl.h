@@ -116,6 +116,8 @@ implementation). */
 #define GL_CLAMP_TO_EDGE			0x812F
 #define GL_TEXTURE_1D                           0x0DE0
 #define GL_TEXTURE_WRAP_T			0x2803
+#define GL_POINTS                               0x0000
+
 
 typedef unsigned int    GLenum;
 typedef int             GLint;
@@ -143,6 +145,7 @@ void glLightfv (GLenum light, GLenum pname, const GLfloat *params);
 void glGetLightfv (GLenum light, GLenum pname, GLfloat * params);
 void glLightModeli (GLenum pname, GLint param);
 void glLineWidth (GLfloat width);
+void glPointSize (GLfloat size);
 void glNormal3d (GLdouble nx, GLdouble ny, GLdouble nz);
 void glOrtho (GLdouble left, GLdouble right, GLdouble bottom, GLdouble top,
 	      GLdouble nearVal, GLdouble farVal);
