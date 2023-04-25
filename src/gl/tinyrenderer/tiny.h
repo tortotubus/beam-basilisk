@@ -29,3 +29,5 @@ void tiny_triangle (const vec4 clip_verts[3],
 void tiny_line (const vec4 clip_verts0, const vec4 clip_verts1,
 		const TinyColor * color, float thickness,
 		framebuffer * image);
+void tiny_point (const vec4 clip_verts0, const TinyColor * color, float raidus,
+		 framebuffer * image);

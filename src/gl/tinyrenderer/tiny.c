@@ -3,7 +3,7 @@
 #include <limits.h>
 #include "geometry.h"
 #include "tiny.h"
-
+#define sq(x) ((x)*(x))
 static mat4 Viewport;
 
 void tiny_viewport (const int x, const int y, const int w, const int h)
@@ -198,4 +198,18 @@ void tiny_line (const vec4 clip_verts0, const vec4 clip_verts1, const TinyColor 
     if (e2 >= - dy) { err -= dy; x += sx; } /* e_xy+e_x > 0 */
     if (e2 <= dx) { err += dx; y += sy; } /* e_xy+e_y < 0 */
   }
+}
+
+void tiny_point (const vec4 clip_verts0, const TinyColor * color, float radius,
+		 framebuffer * image) {
+  vec4 a  =  mat4_mul (Viewport, clip_verts0);
+  // point screen coordinates before persp. division
+  vec2 b = vec4_proj2 (vec4_div (a, a.t));
+  // line screen coordinates after  persp. division
+  for (real x = b.x - radius; x <= b.x + radius; x++) 
+    for (real y = b.y - radius; y <= b.y + radius; y++) 
+      if (sq(x - b.x) + sq(y - b.y) < sq(radius) &&
+	  x >= 0 && y >= 0 && x < image->width &&  y < image->height &&
+	  clip_verts0.z < image->zbuffer[(int)x + (int)y*image->width])
+	framebuffer_set_depth (image, x, y, color, clip_verts0.z);
 }

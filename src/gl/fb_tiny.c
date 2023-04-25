@@ -336,6 +336,12 @@ void glLineWidth (GLfloat width) {
   LineWidth = width;
 }
 
+static float PointSize = 4.;
+
+void glPointSize (GLfloat size) {
+  PointSize = size;
+}
+
 // Maximum number of vertices in any single POLYGON or TRIANGLE_FAN
 #define NVERTMAX 1024
 static vec3 color[NVERTMAX];
@@ -501,6 +507,11 @@ void glVertex3d (GLdouble x, GLdouble y, GLdouble z)
     }
     break;
 
+  case GL_POINTS:
+    tiny_point (vertex[0], &FgColor, PointSize, TinyFramebuffer);
+    reset_vertices();
+    break;
+    
   case GL_POLYGON:
   case GL_TRIANGLE_FAN:
     break;
