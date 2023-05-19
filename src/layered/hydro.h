@@ -662,7 +662,7 @@ double segment_flux (coord segment[2], double * flux, scalar h, vector u)
     for (int i = 0; i < 2; i++) {
       coord a = p[i];
       foreach_layer()
-	flux[_layer] += dl/2.*
+	flux[point.l] += dl/2.*
 	interpolate_linear (point, (struct _interpolate)
 			    {h, a.x, a.y, 0.})*
 	(m.x*interpolate_linear (point, (struct _interpolate)
