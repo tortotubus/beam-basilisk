@@ -1,16 +1,14 @@
-typedef unsigned int fbdepth_t;
-
 typedef struct { // fixme: should be opaque
   unsigned char * image;
   int width, height;
-  real * zbuffer, zmin, zmax;
-  fbdepth_t * depth;
+  real * zbuffer;
+  float * depth;
 } framebuffer;
 
 framebuffer * framebuffer_new (unsigned width, unsigned height);
 void framebuffer_destroy (framebuffer * p);
 unsigned char * framebuffer_image (framebuffer * p);
-fbdepth_t * framebuffer_depth (framebuffer * p);
+float * framebuffer_depth (framebuffer * p);
 
 extern framebuffer * TinyFramebuffer;
 
