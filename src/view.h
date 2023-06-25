@@ -381,11 +381,11 @@ static pointer compose_image (bview * view)
 			    (MPI_Datatype[]){MPI_BYTE, MPI_FLOAT},
 			    &rgba);
     MPI_Type_commit (&rgba);
-    fbdepth_t * depth = framebuffer_depth (view->fb);
+    float * depth = framebuffer_depth (view->fb);
     int size = view->width*view->height;
     RGBA * buf = malloc (size*sizeof(RGBA));
     unsigned char * ptr = image;
-    fbdepth_t * dptr = depth;
+    float * dptr = depth;
     for (int i = 0; i < size; i++) {
       for (int j = 0; j < 4; j++)
 	buf[i].a[j] = *ptr++;

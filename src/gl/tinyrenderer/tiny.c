@@ -30,7 +30,6 @@ framebuffer * framebuffer_new (unsigned width, unsigned height)
   f->image = (unsigned char *) calloc (width*height*4, sizeof (unsigned char));
   f->depth = NULL;
   f->width = width, f->height = height;
-  f->zmax = -1e30, f->zmin = 1e30;
   f->zbuffer = (real *) malloc (width*height*sizeof (real));
   real * p = f->zbuffer;
   for (unsigned int i = 0; i < width*height; i++, p++)
@@ -44,16 +43,14 @@ unsigned char * framebuffer_image (framebuffer * p) {
   return p->image;
 }
 
-fbdepth_t * framebuffer_depth (framebuffer * p)
+float * framebuffer_depth (framebuffer * p)
 {
   if (!p->depth)
-    p->depth = (fbdepth_t *) malloc (p->width*p->height*sizeof (fbdepth_t));
+    p->depth = (float *) malloc (p->width*p->height*sizeof (float));
   real * z = p->zbuffer;
-  fbdepth_t * d = p->depth;
-  for (unsigned int i = 0; i < p->width*p->height; i++, z++, d++) {
-    real a = p->zmax > p->zmin ? (*z - p->zmin)/(p->zmax - p->zmin) : 0.;
-    *d = (a < 0. ? 0. : a > 1. ? 1. : a)*UINT_MAX;
-  }
+  float * d = p->depth;
+  for (unsigned long i = 0; i < p->width*p->height; i++, z++, d++)
+    *d = *z;
   return p->depth;
 }
 
@@ -64,8 +61,6 @@ void framebuffer_set_depth (framebuffer * f, int x, int y, const TinyColor * col
   for (int i = 0; i < 4; i++)
     c[i] = ((unsigned char *)color)[i];
   f->zbuffer[x + y*f->width] = frag_depth;
-  if (frag_depth > f->zmax) f->zmax = frag_depth;
-  if (frag_depth < f->zmin) f->zmin = frag_depth;
 }
 
 /**
