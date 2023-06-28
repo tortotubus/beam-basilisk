@@ -390,8 +390,7 @@ void glNormal3d (GLdouble nx, GLdouble ny, GLdouble nz)
   assert (TinyFramebuffer);
   assert (nnormal < NVERTMAX);
   normal[nnormal++] = vec3_normalized ((vec3){nx, ny, nz});
-  if (nnormal == 1)
-    constant_normal_shade = normal_shade (normal[nnormal - 1]);
+  constant_normal_shade = normal_shade (normal[nnormal - 1]);
 }
 
 static inline
