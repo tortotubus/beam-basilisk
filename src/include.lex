@@ -212,7 +212,8 @@ FDECL     {ID}+{SP}*\(
 "}" {
   scope--;
   if (scope < 0) {
-    fprintf (stderr, "%s:%d: warning: mismatched '}'\n", fname, yylineno);
+    fprintf (stderr, "%s:%d: error: mismatched '}'\n", fname, yylineno);
+    exit (1);
     scope = 0;
   }
 }
