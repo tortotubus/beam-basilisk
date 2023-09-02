@@ -315,7 +315,7 @@ void advect (scalar * tracers, face vector hu, face vector hf, double dt)
     
     for (scalar s in tracers) {
       foreach_face() {
-	double un = dt*hu.x[]/(hf.x[]*Delta + dry), a = sign(un);
+	double un = dt*hu.x[]/((hf.x[] + dry)*Delta), a = sign(un);
 	int i = -(a + 1.)/2.;
 	double g = s.gradient ?
 	  s.gradient (s[i-1], s[i], s[i+1])/Delta :

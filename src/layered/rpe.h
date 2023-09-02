@@ -78,13 +78,13 @@ double area_integral (Zarea * a, double z1, double z2, double * Az)
 	   (cube(z2) - cube(z))/3.*(f2 - f1))/(z2 - z);
   }
   else
-    v2 = zv2 = 0.;
+    v2 = 0., zv2 = 0.;
   
   int i1;
   double v1, zv1;
   if (z1 <= a->min)
-    v1 = zv1 = 0., i1 = -1;
-  else {  
+    v1 = 0., zv1 = 0., i1 = -1;
+  else {
     i1 = (z1 - a->min)/(a->max - a->min)*(a->n - 1);
     double f1, f2, z;
     if (i1 >= a->n - 1) {
@@ -104,7 +104,7 @@ double area_integral (Zarea * a, double z1, double z2, double * Az)
 	     (cube(z) - cube(z1))/3.*(f2 - f1))/(z - z1);
     }
     else
-      v1 = zv1 = 0.;
+      v1 = 0., zv1 = 0.;
   }
     
   double V = v1 + v2;

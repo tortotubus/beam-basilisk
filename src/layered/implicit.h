@@ -129,7 +129,7 @@ event acceleration (i++)
   double C = - sq(theta_H*dt);
   foreach_face() {
     double ax = theta_H*a_baro (eta, 0);
-    su.x[] = alpha_eta.x[] = 0.;
+    su.x[] = 0., alpha_eta.x[] = 0.;
     foreach_layer() {
       double hl = h[-1] > dry ? h[-1] : 0.;
       double hr = h[] > dry ? h[] : 0.;
