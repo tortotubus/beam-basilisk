@@ -19,6 +19,8 @@ QCC = $(BASILISK)/qcc
 
 check: $(subst .c,.tst,$(filter-out $(TESTS),$(filter-out $(EXCLUDE),$(ALLTESTS)))) Makefile.deps
 
+compile: $(subst .c,.s,$(filter-out $(TESTS),$(filter-out $(EXCLUDE),$(ALLTESTS)))) Makefile.deps
+
 tags: $(subst .page,.tags,$(ALLPAGES))
 
 itags: $(subst .page,.itags,$(filter %.h.page, $(ALLPAGES)))

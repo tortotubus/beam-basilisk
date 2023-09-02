@@ -79,3 +79,5 @@ clean:
 	@rm -f $(SRC)/sha1/*.o
 	@rm -f $(SRC)/*.o
 	@rm -f $(LIB)
+
+check:

@@ -21,3 +21,5 @@ literate-c: literate-c.c
 
 clean:
 	rm -f literate-c codeblock pagemagic sanitize urldecode
+
+check:
