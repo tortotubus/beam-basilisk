@@ -20,21 +20,21 @@ boundaries3.tst: boundaries3.ctst
 
 dry-explicit.c: dry.c
 	ln -s dry.c dry-explicit.c 
-dry-explicit.tst: dry.s
+dry-explicit.s: CFLAGS += -DEXPLICIT=1 
 dry-explicit.tst: CFLAGS += -DEXPLICIT=1
 
 dry.tst: dry-explicit.tst
 
 drybump-explicit.c: drybump.c
 	ln -s drybump.c drybump-explicit.c 
-drybump-explicit.tst: drybump.s
+drybump-explicit.s: CFLAGS += -DEXPLICIT=1
 drybump-explicit.tst: CFLAGS += -DEXPLICIT=1
 
 drybump.tst: drybump-explicit.tst
 
 drybump2D-implicit.c: drybump2D.c
 	ln -s drybump2D.c drybump2D-implicit.c 
-drybump2D-implicit.tst: drybump2D.s
+drybump2D-implicit.s: CFLAGS += -DIMPLICIT=1
 drybump2D-implicit.tst: CFLAGS += -DIMPLICIT=1
 
 drybump2D.tst: drybump2D-implicit.tst
@@ -43,12 +43,12 @@ lake-tr.tst: lake-tr-explicit.tst lake-tr-ml.tst
 
 lake-tr-explicit.c: lake-tr.c
 	ln -s lake-tr.c lake-tr-explicit.c
-lake-tr-explicit.tst: lake-tr.s
+lake-tr-explicit.s: CFLAGS += -DEXPLICIT=1
 lake-tr-explicit.tst: CFLAGS += -DEXPLICIT=1
 
 lake-tr-ml.c: lake-tr.c
 	ln -s lake-tr.c lake-tr-ml.c
-lake-tr-ml.tst: lake-tr.s
+lake-tr-ml.s: CFLAGS += -DML=1
 lake-tr-ml.tst: CFLAGS += -DML=1
 
 multiriverinflow.tst: multiriverinflow.ctst
@@ -57,26 +57,26 @@ multiriverinflow.ctst: CFLAGS += -fopenmp
 
 parabola-explicit.c: parabola.c
 	ln -s parabola.c parabola-explicit.c 
-parabola-explicit.tst: parabola.s
+parabola-explicit.s: CFLAGS += -DEXPLICIT=1
 parabola-explicit.tst: CFLAGS += -DEXPLICIT=1
 
 parabola.tst: parabola-explicit.tst parabola-ml.tst
 
 seawallsv.c: seawall.c
 	ln -s seawall.c seawallsv.c 
-seawallsv.tst: seawall.s
+seawallsv.s: CFLAGS += -DSAINT_VENANT=1
 seawallsv.tst: CFLAGS += -DSAINT_VENANT=1
 
 seawall.tst: seawallsv.tst seawall-ml.tst
 
 conicalsv.c: conical.c
 	ln -s conical.c conicalsv.c 
-conicalsv.tst: conical.s
+conicalsv.s: CFLAGS += -DSAINT_VENANT=1
 conicalsv.tst: CFLAGS += -DSAINT_VENANT=1
 
 conical-implicit.c: conical.c
 	ln -s conical.c conical-implicit.c 
-conical-implicit.tst: conical.s
+conical-implicit.s: CFLAGS += -DSAINT_VENANT=1 -DIMPLICIT=1
 conical-implicit.tst: CFLAGS += -DSAINT_VENANT=1 -DIMPLICIT=1
 
 conical.tst: conicalsv.tst conical-implicit.tst conical-ml.tst
@@ -85,17 +85,17 @@ curvature.tst: curvature.3D.tst
 
 explicit.c: implicit.c
 	ln -s implicit.c explicit.c 
-explicit.tst: implicit.s
+explicit.s: CFLAGS += -DEXPLICIT=1
 explicit.tst: CFLAGS += -DEXPLICIT=1
 
 explicit-ml.c: implicit.c
 	ln -s implicit.c explicit-ml.c 
-explicit-ml.tst: implicit.s
+explicit-ml.s: CFLAGS += -DML=1 -DEXPLICIT=1
 explicit-ml.tst: CFLAGS += -DML=1 -DEXPLICIT=1
 
 implicit-ml.c: implicit.c
 	ln -s implicit.c implicit-ml.c 
-implicit-ml.tst: implicit.s
+implicit-ml.s: CFLAGS += -DML=1
 implicit-ml.tst: CFLAGS += -DML=1
 
 implicit.tst: explicit.tst explicit-ml.tst implicit-ml.tst
@@ -113,7 +113,7 @@ laplacian.tst: laplacian.ctst
 
 lidmac.c: lid.c
 	ln -s lid.c lidmac.c
-lidmac.tst: lid.s
+lidmac.s: CFLAGS += -DMAC=1
 lidmac.tst: CFLAGS += -DMAC=1
 
 lid.tst: lidmac.tst
@@ -126,21 +126,21 @@ lid-restore.tst: lid-restore.dump
 
 oscillation-momentum.c: oscillation.c
 	ln -s oscillation.c oscillation-momentum.c 
-oscillation-momentum.s: oscillation.s
+oscillation-momentum.s: CFLAGS += -DMOMENTUM=1
 oscillation-momentum.tst: CFLAGS += -DMOMENTUM=1
 
 oscillation.tst: oscillation-momentum.tst
 
 ponds-implicit.c: ponds.c
 	ln -s ponds.c ponds-implicit.c
-ponds-implicit.s: ponds.s
+ponds-implicit.s: CFLAGS += -DIMPLICIT=1
 ponds-implicit.tst: CFLAGS += -DIMPLICIT=1
 
 ponds.tst: ponds-implicit.tst
 
 poiseuille-fenep.c: poiseuille-oldroydb.c
 	ln -s poiseuille-oldroydb.c poiseuille-fenep.c
-poiseuille-fenep.s: poiseuille-oldroydb.s
+poiseuille-fenep.s: CFLAGS += -DFENE_P=1
 poiseuille-fenep.tst: CFLAGS += -DFENE_P=1
 
 poiseuille-oldroydb.tst: poiseuille-fenep.tst
@@ -149,7 +149,7 @@ poisson.tst: poisson.ctst
 
 rising-axi.c: rising.c
 	ln -s rising.c rising-axi.c
-rising-axi.tst: rising.s
+rising-axi.s: CFLAGS += -DAXIS=1
 rising-axi.tst: CFLAGS += -DAXIS=1
 
 rising-axi-momentum.c: rising.c
@@ -159,12 +159,12 @@ rising-axi-momentum.tst: CFLAGS += -DAXIS=1 -DMOMENTUM=1
 
 rising2.c: rising.c
 	ln -s rising.c rising2.c
-rising2.tst: rising.s
+rising2.s: CFLAGS += -DCASE2=1
 rising2.tst: CFLAGS += -DCASE2=1
 
 rising-reduced.c: rising.c
 	ln -s rising.c rising-reduced.c
-rising-reduced.tst: rising.s
+rising-reduced.s: CFLAGS += -DREDUCED=1
 rising-reduced.tst: CFLAGS += -DREDUCED=1
 
 reversed.tst: reversed.ctst
@@ -173,12 +173,12 @@ rotate.tst: rotate.ctst
 
 rt-reduced.c: rt.c
 	ln -s rt.c rt-reduced.c
-rt-reduced.tst: rt.s
+rt-reduced.s: CFLAGS += -DREDUCED=1
 rt-reduced.tst: CFLAGS += -DREDUCED=1
 
 taylor-green-all-mach.c: taylor-green.c
 	ln -s taylor-green.c taylor-green-all-mach.c 
-taylor-green-all-mach.tst: taylor-green-all-mach.s
+taylor-green-all-mach.s: CFLAGS += -DALL_MACH=1
 taylor-green-all-mach.tst: CFLAGS += -DALL_MACH=1
 
 taylor-green.tst: taylor-green-all-mach.tst
@@ -225,7 +225,7 @@ overflow.tst: overflow-isopycnal.tst
 
 overflow-isopycnal.c: overflow.c
 	ln -s overflow.c overflow-isopycnal.c 
-overflow-isopycnal.tst: overflow-isopycnal.s
+overflow-isopycnal.s: CFLAGS += -DISOPYCNAL=1
 overflow-isopycnal.tst: CFLAGS += -DISOPYCNAL=1
 
 kh.tst: kh-ns.tst kh-hydro.tst
@@ -234,7 +234,7 @@ kh-ns.tst: CC = mpicc -D_MPI=8
 
 kh-hydro.c: kh.c
 	ln -s kh.c kh-hydro.c 
-kh-hydro.tst: kh-hydro.s
+kh-hydro.s: CFLAGS += -DHYDRO=1
 kh-hydro.tst: CFLAGS += -DHYDRO=1
 
 dispersion-gn.c: dispersion.c
@@ -245,61 +245,62 @@ dispersion.tst: CFLAGS += -DML=1
 
 bar-ml.c: bar.c
 	ln -s bar.c bar-ml.c 
-bar-ml.tst: bar-ml.s
+bar-ml.s: CFLAGS += -DML=1
 bar-ml.tst: CFLAGS += -DML=1
 
 wind-driven-nh.c: wind-driven.c
 	ln -s wind-driven.c wind-driven-nh.c 
-wind-driven-nh.tst: wind-driven-nh.s
+wind-driven-nh.s: CFLAGS += -DML=1 -DNH=1
 wind-driven-nh.tst: CFLAGS += -DML=1 -DNH=1
 
 wind-driven-stvt.c: wind-driven.c
 	ln -s wind-driven.c wind-driven-stvt.c 
-wind-driven-stvt.tst: wind-driven-stvt.s
 
+wind-driven.s: CFLAGS += -DML=1
 wind-driven.tst: CFLAGS += -DML=1
 
 large.tst: large-ns.tst
 
 gaussian-hydro.c: gaussian.c
 	ln -s gaussian.c gaussian-hydro.c 
-gaussian-hydro.tst: gaussian-hydro.s
+gaussian-hydro.s: CFLAGS += -DML=1 -DHYDRO=1
 gaussian-hydro.tst: CFLAGS += -DML=1 -DHYDRO=1
 
 gaussian-nometric.c: gaussian.c
 	ln -s gaussian.c gaussian-nometric.c 
-gaussian-nometric.tst: gaussian-nometric.s
+gaussian-nometric.s: CFLAGS += -DML=1 -DNOMETRIC=1
 gaussian-nometric.tst: CFLAGS += -DML=1 -DNOMETRIC=1
 
 gaussian-stvt.c: gaussian.c
 	ln -s gaussian.c gaussian-stvt.c 
 gaussian-stvt.tst: gaussian-stvt.s
 
+gaussian.s: CFLAGS += -DML=1
 gaussian.tst: CFLAGS += -DML=1
 
 parabola-ml.c: parabola.c
 	ln -s parabola.c parabola-ml.c 
-parabola-ml.tst: parabola-ml.s
+parabola-ml.s: CFLAGS += -DML=1
 parabola-ml.tst: CFLAGS += -DML=1
 
 seawall-ml.c: seawall.c
 	ln -s seawall.c seawall-ml.c 
-seawall-ml.tst: seawall.s
+seawall-ml.s: CFLAGS += -DML=1
 seawall-ml.tst: CFLAGS += -DML=1
 
 beach-ml.c: beach.c
 	ln -s beach.c beach-ml.c 
-beach-ml.tst: beach.s
+beach-ml.s: CFLAGS += -DML=1
 beach-ml.tst: CFLAGS += -DML=1
 
 conical-ml.c: conical.c
 	ln -s conical.c conical-ml.c 
-conical-ml.tst: conical.s
+conical-ml.s: CFLAGS += -DML=1
 conical-ml.tst: CFLAGS += -DML=1
 
 lonlat-ml.c: lonlat.c
 	ln -s lonlat.c lonlat-ml.c 
-lonlat-ml.tst: lonlat.s
+lonlat-ml.s: CFLAGS += -DML=1
 lonlat-ml.tst: CFLAGS += -DML=1
 
 ponds-ml.c: ponds.c
@@ -314,7 +315,7 @@ nonlinear.tst: nonlinear-ml.tst
 
 nonlinear-ml.c: nonlinear.c
 	ln -s nonlinear.c nonlinear-ml.c 
-nonlinear-ml.tst: nonlinear.s
+nonlinear-ml.s: CFLAGS += -DML=1
 nonlinear-ml.tst: CFLAGS += -DML=1
 
 ## MPI tests
@@ -347,7 +348,7 @@ mpi-reduce.tst:		CC = mpicc -D_MPI=3
 
 openmp-reduce.c: mpi-reduce.c
 	ln -s mpi-reduce.c openmp-reduce.c
-openmp-reduce.s: mpi-reduce.s
+openmp-reduce.s: CFLAGS += -fopenmp
 openmp-reduce.tst: CFLAGS += -fopenmp
 
 mpi-refine.tst:		CC = mpicc -D_MPI=4
@@ -368,7 +369,9 @@ mpi-interpu.tst:  CC = mpicc -D_MPI=5
 mpi-coarsen.tst:  CC = mpicc -D_MPI=2
 mpi-coarsen1.tst: CC = mpicc -D_MPI=5
 bump2Dp.tst:      CC = mpicc -D_MPI=55
+vortex.s:         CFLAGS = -DJACOBI=1
 vortex.tst:	  CC = mpicc -D_MPI=7 -DJACOBI=1
+axiadvection.s:   CFLAGS = -DJACOBI=1
 axiadvection.tst: CC = mpicc -D_MPI=7 -DJACOBI=1
 hf1.tst:	  CC = mpicc -D_MPI=7
 poiseuille-periodic.tst: CC = mpicc -D_MPI=4
@@ -436,7 +439,6 @@ balance7.tst: CC = mpicc -D_MPI=17
 mpi-grid.tst: CC = mpicc -D_MPI=4
 mpi-periodic-3D.c: periodic.c
 	ln -s periodic.c mpi-periodic-3D.c
-mpi-periodic-3D.s: periodic.s $(BASILISK)/grid/multigrid-mpi.h
 mpi-periodic-3D.tst: CC = mpicc -D_MPI=8
 mpi-periodic-3D.tst: CFLAGS += -grid=multigrid3D
 
@@ -485,7 +487,7 @@ gotm-tests: couette-gotm.tst entrainment.tst ows_papa.tst
 
 ows_papa-kpp.c: ows_papa.c
 	ln -s ows_papa.c ows_papa-kpp.c 
-ows_papa-kpp.tst: ows_papa.s
+ows_papa-kpp.s: CFLAGS += -DKPP=1
 ows_papa-kpp.tst: CFLAGS += -DKPP=1
 
 ows_papa.tst: ows_papa-kpp.tst
