@@ -43,3 +43,5 @@ libfb_osmesa.a: fb_osmesa.o
 
 libfb_glx.a: fb_glx.o OffscreenContextGLX.o fbo.o
 	ar cr $@ $^
+
+check:

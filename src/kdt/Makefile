@@ -17,3 +17,5 @@ kdtquery: kdtquery.c kdt.o kdt.h
 
 clean:
 	rm -f *.o
+
+check:

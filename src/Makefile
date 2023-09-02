@@ -5,7 +5,7 @@ export BASILISK = $(CURDIR)
 # these are not Basilisk programs
 EXCLUDE = qcc.c include.c postproc.c bview.c
 
-TOPTARGETS = all clean
+TOPTARGETS = all clean check
 
 SUBDIRS = darcsit ast kdt wsServer gl
 
