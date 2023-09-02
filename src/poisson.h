@@ -161,9 +161,9 @@ mgstats mg_solve (struct MGSolve p)
 
   mgstats s = {0};
   double sum = 0.;
+  scalar rhs = p.b[0];
   foreach (reduction(+:sum))
-    for (scalar s in p.b)
-      sum += s[];
+    sum += rhs[];
   s.sum = sum;
   s.nrelax = p.nrelax > 0 ? p.nrelax : 4;
   
@@ -313,7 +313,7 @@ static void relax (scalar * al, scalar * bl, int l, void * data)
       d += e*sq(Delta);
     }
     if (!d)
-      c[] = b[] = 0.;
+      c[] = 0., b[] = 0.;
     else
 #endif // EMBED
       c[] = n/d;
@@ -406,8 +406,10 @@ mgstats poisson (struct Poisson p)
 
   if (!p.alpha.x.i)
     p.alpha = unityf;
-  if (!p.lambda.i)
+  if (!p.lambda.i) {
+    const scalar zeroc[] = 0.; // fixme
     p.lambda = zeroc;
+  }
 
   /**
   We need $\alpha$ and $\lambda$ on all levels of the grid. */

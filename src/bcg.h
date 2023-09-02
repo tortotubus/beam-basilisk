@@ -79,8 +79,10 @@ void advection (struct Advection p)
   
   scalar * lsrc = p.src;
   if (!lsrc)
-    for (scalar s in p.tracers)
-      lsrc = list_append (lsrc, zeroc);
+    for (scalar s in p.tracers) {
+      const scalar zero[] = 0.;
+      lsrc = list_append (lsrc, zero);
+    }
   assert (list_len(p.tracers) == list_len(lsrc));
 
   scalar f, src;
