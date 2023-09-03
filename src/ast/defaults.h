@@ -20,10 +20,13 @@ typedef void PyObject;
 
 typedef void MPI_Datatype, MPI_Request, MPI_Comm, MPI_Op, MPI_Aint;
 typedef int MPI_Status;
+typedef long long MPI_Offset;
+typedef struct MPIR_Info *MPI_Info;
 
 /**
 ## From OpenGL */
 
+typedef int GLint, GLenum;
 typedef float GLfloat;
 typedef char GLubyte;
 
@@ -31,8 +34,8 @@ typedef char GLubyte;
 ## From standard C libraries */
 
 typedef int bool;
-typedef long ssize_t, size_t, clock_t;
-typedef int64_t, int32_t, uint32_t, uint16_t, uint64_t;
+typedef long ssize_t, size_t, clock_t, ptrdiff_t;
+typedef long int64_t, int32_t, uint32_t, uint16_t, uint64_t;
 typedef void va_list, FILE;
 typedef unsigned char uint8_t;
 typedef char int8_t;

@@ -113,7 +113,7 @@ script()
 locally()
 {
     echo \[$test.$ext\]
-    $BASILISK/qcc -autolink $CFLAGS -o $test/$test $src $LIBS -lm > $test/warn 2>&1 \
+    $BASILISK/qcc -autolink -disable-dimensions $CFLAGS -o $test/$test $src $LIBS -lm > $test/warn 2>&1 \
 	|| mv -f $test/warn $test/fail
     cd $test
     script
@@ -179,7 +179,7 @@ doplots()
 remotely()
 {
     rhost=$1
-    autolink=`$BASILISK/qcc -autolink -progress -source $CFLAGS $src`
+    autolink=`$BASILISK/qcc -autolink -progress -source -disable-dimensions $CFLAGS $src`
     chksum=`(cat $test.s && pwd && echo $test) | $GENSUM | cut -d' ' -f1`.$ext
     mkdir $test/$chksum
     cd $test

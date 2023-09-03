@@ -337,6 +337,16 @@ static void ast_print_internal (Ast * n, FILE * fp, int sym, File * file)
       fputs (r->before, fp);
       update_file_line (r->before, file);
     }
+#if 1
+    /** 
+    Ignore dimensioned constant expressions e.g. `1.23
+    [1,-1]`, `(2.*3 + 4.)[0,1]` etc. */
+    
+    if (n->sym == sym_array_access && n->child[2] &&
+	ast_evaluate_constant_expression (n->child[0]) < DBL_MAX)
+      ast_print_internal (n->child[0], fp, sym, file);
+    else
+#endif
     for (Ast ** c = n->child; *c; c++)
       ast_print_internal (*c, fp, sym, file);
     if (r && r->after) {
@@ -351,7 +361,7 @@ void ast_print (Ast * n, FILE * fp, int sym)
   ast_print_internal (n, fp, sym, &(File){0});
 }
 
-char * ast_str_append (Ast * n, char * s)
+char * ast_str_append (const Ast * n, char * s)
 {
   AstTerminal * t = ast_terminal (n);
   if (t) {

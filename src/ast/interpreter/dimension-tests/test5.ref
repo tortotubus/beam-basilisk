@@ -1,0 +1,19 @@
+-------------------
+#line 12 "dimension-tests/test5.c"
+p.a
+
+  
+#line 6 "dimension-tests/test5.c"
+double
+size: 17, flags: 0, pointer: 0, scope: 4, value: 0  + [dimension-tests/test5.c:24: '0']
+===================
+-------------------
+#line 13 "dimension-tests/test5.c"
+p.b
+
+  
+#line 7 "dimension-tests/test5.c"
+double
+size: 17, flags: 0, pointer: 0, scope: 4, value: 0  + [dimension-tests/test5.c:24: '0']
+===================
+5 constraints, 5 unknowns

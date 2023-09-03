@@ -169,6 +169,7 @@ postfix_initializer
 	
 array_access
         : postfix_expression '[' ']' /* Basilisk C extension */
+	| postfix_expression '[' '*' ']' /* Basilisk C extension */
         | postfix_expression '[' expression ']'
 	;
 	

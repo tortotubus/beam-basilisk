@@ -1,5 +1,6 @@
-all: check 3D-tests mpi-tests load-balancing curvature-tests axi-tests \
-	cadna-tests embed-tests multilayer-tests multilayer-stratified gotm-tests
+all: check 3D-tests mpi-tests load-balancing curvature-tests	\
+	axi-tests cadna-tests embed-tests multilayer-tests	\
+	multilayer-stratified gotm-tests dimensions-tests
 
 failed:
 	$(MAKE) -k `find . -name fail | sed -e 's|\./||g' -e 's|/fail|.tst|g'`
@@ -495,5 +496,12 @@ ows_papa.tst: ows_papa-kpp.tst
 # Stencils
 
 stencils.tst: CFLAGS += -DPRINTBOUNDARY=1
+
+# Dimensions
+
+dimensions-tests: bump2D.s capwave.s lid.s rising-axi.s		\
+	rising-reduced.s vortex.s sessile.s large.s lock.s	\
+	wind-driven-stvt.s shock.s starting.s layered.s 	\
+	stokes.s stokes-ns.s
 
 include ../Makefile.defs
