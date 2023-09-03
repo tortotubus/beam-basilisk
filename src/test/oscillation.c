@@ -113,7 +113,8 @@ int main() {
   vary the level of refinement. */
 
   f.sigma = 1.;
-  TOLERANCE = 1e-4;
+  L0 = 1.[0];
+  TOLERANCE = 1e-4 [*];
   remove ("error");
   remove ("laplace");
   for (LEVEL = 5; LEVEL <= 8; LEVEL++) {

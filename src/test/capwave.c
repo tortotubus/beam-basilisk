@@ -40,10 +40,10 @@ int main() {
   The domain is 2x2 to minimise finite-size effects. The surface
   tension is one and the viscosity is constant. */
 
-  L0 = 2.;
+  size (2. [1]);
   Y0 = -L0/2.;
   c.sigma = 1.;
-  TOLERANCE = 1e-6;
+  TOLERANCE = 1e-6 [*];
   const face vector muc[] = {0.0182571749236, 0.0182571749236};
   mu = muc;
 
@@ -51,7 +51,7 @@ int main() {
   We vary the resolution to check for convergence. */
 
   for (N = 16; N <= 128; N *= 2) {
-    se = ne = 0;
+    se = 0, ne = 0;
     run();
   }
 }
@@ -61,7 +61,8 @@ The initial condition is a small amplitude plane wave of wavelength
 unity. */
 
 event init (t = 0) {
-  fraction (c, y - 0.01*cos (2.*pi*x));
+  double k = 2., a = 0.01;
+  fraction (c, y - a*cos (k*pi*x));
 }
 
 /**
@@ -82,7 +83,7 @@ event amplitude (t += 3.04290519077e-3; t <= 2.2426211256) {
   (using height functions) and take the corresponding maximum. */
 
   scalar pos[];
-  position (c, pos, {0,1});
+  position (c, pos, {0,1 [0]});
   double max = statsf(pos).max;
 
   /**

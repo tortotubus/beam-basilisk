@@ -33,6 +33,7 @@ double exact_gradient (Point point, double xc, double yc, double zc)
 int main()
 {
   for (N = 32; N <= 256; N *= 2) {
+    size (1. [0]); // dimensionless space
     origin (-L0/2., -L0/2., -L0/2.);
     init_grid (N);
 
