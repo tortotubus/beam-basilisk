@@ -10,6 +10,7 @@ respecting the C99 grammar (with added macros).
 #include <stdlib.h>
 #include <assert.h>
 #include <string.h>
+#include <math.h>
 #include "ast.h"
 #include "symbols.h"
 
@@ -1111,6 +1112,262 @@ void ast_replace_child_same_symbol (Ast * parent, int index, Ast * replacement)
 }
 
 /**
+Evaluates a constant (numerical) expression. Return DBL_MAX if the
+expression is not a constant. */
+
+double ast_evaluate_constant_expression (const Ast * n)
+{
+  if (!n)
+    return DBL_MAX;
+  
+  switch (n->sym) {
+
+  case sym_I_CONSTANT: case sym_F_CONSTANT: case sym_ENUMERATION_CONSTANT:
+    return ast_terminal (n)->start ? atof (ast_terminal (n)->start) : 0.;
+
+  case sym_constant:
+    return ast_evaluate_constant_expression (n->child[0]);
+
+  case sym_expression:
+    return ast_evaluate_constant_expression (ast_child (n, sym_assignment_expression));
+    
+  case sym_expression_error:
+    return ast_evaluate_constant_expression (n->child[0]);
+    
+  case sym_primary_expression:
+    if (n->child[0]->sym == sym_constant)
+      return ast_evaluate_constant_expression (n->child[0]);
+    else if (n->child[1])
+      return ast_evaluate_constant_expression (n->child[1]);
+    break;
+    
+  case sym_assignment_expression:
+    if (!n->child[1])
+      return ast_evaluate_constant_expression (n->child[0]);
+    break;
+
+  case sym_postfix_expression:
+    if (n->child[0]->sym == sym_primary_expression ||
+	n->child[0]->sym == sym_function_call ||
+	n->child[0]->sym == sym_array_access)
+      return ast_evaluate_constant_expression (n->child[0]);
+    break;
+    
+  case sym_cast_expression:
+    if (n->child[0]->sym == sym_unary_expression)
+      return ast_evaluate_constant_expression (n->child[0]);
+    break;
+    
+  case sym_unary_expression:
+    if (n->child[0]->sym == sym_postfix_expression)
+      return ast_evaluate_constant_expression (n->child[0]);
+    if (n->child[0]->sym == sym_unary_operator &&
+	strchr ("+-", ast_terminal (n->child[0]->child[0])->start[0])) {
+      double v = ast_evaluate_constant_expression (n->child[1]);
+      return v < DBL_MAX ? (ast_terminal (n->child[0]->child[0])->start[0] == '+' ? 1. : - 1.)*v : DBL_MAX;
+    }
+    break;
+
+  case sym_conditional_expression: { // fixme not sure that this is correct
+    double cond = ast_evaluate_constant_expression (n->child[0]);
+    if (!n->child[1])
+      return cond;
+    if (cond == DBL_MAX)
+      return DBL_MAX;
+    if (cond)
+      return ast_evaluate_constant_expression (n->child[2]);
+    else
+      return ast_evaluate_constant_expression (n->child[4]);
+  }
+
+  case sym_logical_or_expression: {
+    double v = ast_evaluate_constant_expression (n->child[0]);
+    if (!n->child[1])
+      return v;
+    else {
+      double v1 = ast_evaluate_constant_expression (n->child[2]);
+      if (v < DBL_MAX && v1 < DBL_MAX)
+	return v || v1;
+    }
+    break;
+  }
+    
+  case sym_logical_and_expression: {
+    double v = ast_evaluate_constant_expression (n->child[0]);
+    if (!n->child[1])
+      return v;
+    else {
+      double v1 = ast_evaluate_constant_expression (n->child[2]);
+      if (v < DBL_MAX && v1 < DBL_MAX)
+	return v && v1;
+    }
+    break;
+  }
+    
+  case sym_inclusive_or_expression: {
+    double v = ast_evaluate_constant_expression (n->child[0]);
+    if (!n->child[1])
+      return v;
+    else {
+      double v1 = ast_evaluate_constant_expression (n->child[2]);
+      if (v < DBL_MAX && v1 < DBL_MAX)
+	return ((int) v) | ((int) v1);
+    }
+    break;
+  }
+    
+  case sym_exclusive_or_expression: {
+    double v = ast_evaluate_constant_expression (n->child[0]);
+    if (!n->child[1])
+      return v;
+    else {
+      double v1 = ast_evaluate_constant_expression (n->child[2]);
+      if (v < DBL_MAX && v1 < DBL_MAX)
+	return ((int) v) ^ ((int) v1);
+    }
+    break;
+  }
+    
+  case sym_and_expression: {
+    double v = ast_evaluate_constant_expression (n->child[0]);
+    if (!n->child[1])
+      return v;
+    else {
+      double v1 = ast_evaluate_constant_expression (n->child[2]);
+      if (v < DBL_MAX && v1 < DBL_MAX)
+	return ((int) v) & ((int) v1);
+    }
+    break;
+  }
+
+  case sym_equality_expression: {
+    double v = ast_evaluate_constant_expression (n->child[0]);
+    if (!n->child[1])
+      return v;
+    else {
+      double v1 = ast_evaluate_constant_expression (n->child[2]);
+      if (v < DBL_MAX && v1 < DBL_MAX) {
+	if (n->child[1]->sym == sym_EQ_OP)
+	  return v == v1;
+	else
+	  return v != v1;
+      }
+    }
+    break;
+  }
+    
+  case sym_relational_expression: {
+    double v = ast_evaluate_constant_expression (n->child[0]);
+    if (!n->child[1])
+      return v;
+    else if (v < DBL_MAX) {
+      double v1 = ast_evaluate_constant_expression (n->child[2]);
+      if (v1 < DBL_MAX) {
+	if (n->child[1]->sym == sym_LE_OP)
+	  return v <= v1;
+	else if (n->child[1]->sym == sym_GE_OP)
+	  return v >= v1;
+	else if (n->child[1]->sym == token_symbol('>'))
+	  return v > v1;
+	else if (n->child[1]->sym == token_symbol('<'))
+	  return v < v1;
+      }
+    }
+    break;
+  }
+
+  case sym_shift_expression: {
+    double v = ast_evaluate_constant_expression (n->child[0]);
+    if (!n->child[1])
+      return v;
+    else {
+      double v1 = ast_evaluate_constant_expression (n->child[2]);
+      if (v < DBL_MAX && v1 < DBL_MAX) {
+	if (n->child[1]->sym == sym_LEFT_OP)
+	  return ((int) v) << ((int) v1);
+	else
+	  return ((int) v) >> ((int) v1);
+      }
+    }
+    break;
+  }
+      
+  case sym_additive_expression: {
+    double v = ast_evaluate_constant_expression (n->child[0]);
+    if (!n->child[1])
+      return v;
+    else {
+      double v1 = ast_evaluate_constant_expression (n->child[2]);
+      if (v < DBL_MAX && v1 < DBL_MAX) {
+	if (n->child[1]->sym == token_symbol('+'))
+	  return v + v1;
+	else
+	  return v - v1;
+      }
+    }
+    break;
+  }
+    
+  case sym_multiplicative_expression: {
+    double v = ast_evaluate_constant_expression (n->child[0]);
+    if (!n->child[1])
+      return v;
+    else {
+      double v1 = ast_evaluate_constant_expression (n->child[2]);
+      if (v < DBL_MAX && v1 < DBL_MAX) {
+	if (n->child[1]->sym == token_symbol('*'))
+	  return v*v1;
+	if (n->child[1]->sym == token_symbol('/'))
+	  return v/v1;
+	else
+	  return ((int) v) % ((int) v1);
+      }
+    }
+    break;
+  }
+
+  case sym_array_access:
+    return ast_evaluate_constant_expression (n->child[0]);
+
+
+  case sym_function_call: {
+    Ast * name = ast_schema (n, sym_function_call,
+			     0, sym_postfix_expression,
+			     0, sym_primary_expression,
+			     0, sym_IDENTIFIER);
+    if (name && n->child[3]) {
+      struct {
+	const char * name;
+	double (* func) (double);
+      } funcs[] = {
+	{"fabs", fabs}, {"sqrt", sqrt}, {"exp", exp}, {"log", log}, {"log10", log10},
+	{"sin", sin}, {"cos", cos}, {"tan", tan},
+	{"asin", asin}, {"acos", acos}, {"atan", atan},
+	{"sinh", sinh}, {"cosh", cosh}, {"tanh", tanh},
+	{"asinh", sinh}, {"acosh", cosh}, {"atanh", tanh},
+	{NULL}
+      }, * i = funcs;
+      for (; i->name; i++)
+	if (!strcmp (ast_terminal (name)->start, i->name)) {
+	  double arg = ast_evaluate_constant_expression (n->child[2]);
+	  if (arg == DBL_MAX)
+	    return arg;
+	  return i->func (arg);
+	}
+    }    
+    break;
+  }
+
+  case sym_argument_expression_list:
+  case sym_argument_expression_list_item:
+    return ast_evaluate_constant_expression (n->child[0]);    
+    
+  }
+
+  return DBL_MAX;
+}
+
+/**
 ### (const) fields combinations */
 
 typedef struct {
@@ -1844,6 +2101,7 @@ static void global_boundaries_and_stencils (Ast * n, Stack * stack, void * data)
   ## Local boundary conditions */
     
   case sym_array_access: {
+
     Ast * assign = ast_ancestor (n, 3), * scope;
     if (assign->sym == sym_assignment_expression &&
 	(scope = function_scope (n, stack))) {
@@ -1919,23 +2177,22 @@ static void global_boundaries_and_stencils (Ast * n, Stack * stack, void * data)
       d->boundary = array;      
       Ast * boundary = boundary_function (expr, stack, data, before, ind);
       char * set = set_boundary (array, ind);
-      ast_after (ast_child (d->init_fields, token_symbol ('}')), "  ", set);
-      free (set);
-
       ast_replace_child (n->parent, 0, boundary);
       
       Ast * homogeneous = ast_copy (boundary);
       if (!homogeneize (homogeneous)) {
 	ast_destroy (homogeneous);
-	ast_after (ast_child (d->init_fields, token_symbol ('}')), ";\n");
+	str_append (set, ";\n");
       }
       else {
 	Ast * func = ast_find (homogeneous, sym_IDENTIFIER);
 	str_append (ast_terminal (func)->start, "_homogeneous");
+	str_append (set, "_homogeneous;\n");
 	ast_block_list_insert_after (n, homogeneous);
-	ast_after (ast_child (d->init_fields, token_symbol ('}')),
-		   "_homogeneous;\n");
       }
+      Ast * expr = ast_parse_expression (set, ast_get_root (n));
+      compound_append (d->last_events, NN(n, sym_statement, expr));
+      free (set);
     }
     break;
   }
@@ -1994,7 +2251,7 @@ static void global_boundaries_and_stencils (Ast * n, Stack * stack, void * data)
     }
     break;
   }
-
+  
   }
 }
 
@@ -2497,7 +2754,7 @@ static void translate (Ast * n, Stack * stack, void * data)
 	    str_append (init, ");");
 	    Ast * finit = ast_parse_expression (init, ast_get_root (n));
 	    free (init);
-	    ast_set_line (finit, ast_right_terminal (d->init_fields));
+	    ast_set_line (finit, ast_left_terminal (n->child[2]));
 	    compound_append (d->init_fields, NN(n, sym_statement, finit));
 	    
 	    str_prepend (src, typename, " s=");
@@ -3040,7 +3297,7 @@ static void translate (Ast * n, Stack * stack, void * data)
 	    if (rhs && (identifier = ast_is_identifier_expression (rhs)) &&
 		!strcmp (ast_terminal (identifier)->start, "end")) {
 	      free (ast_terminal (identifier)->start);
-	      ast_terminal (identifier)->start = strdup ("1234567890");
+	      ast_terminal (identifier)->start = strdup ("TEND_EVENT");
 	    }
 	    expr = ast_str_append (event_parameter, expr);
 	    str_append (expr, ")!=0;*ip=i;*tp=t;return ret;}");
@@ -4100,12 +4357,9 @@ Ast * ast_push_declarations (Ast * n, Stack * stack)
     return n;
 
   case sym_foreach_statement:
-    if (!ast_is_foreach_stencil (n)) {
-      stack_push (stack, &n);
-      declare_point_variables (stack);
-      return n;
-    }
-    return NULL;
+    stack_push (stack, &n);
+    declare_point_variables (stack);
+    return n;
 
   case sym_macro_statement: {
     Ast * identifier = ast_schema (n, sym_macro_statement,
@@ -4201,10 +4455,10 @@ void ast_traverse (Ast * n, Stack * stack,
 
 Called by [qcc](/src/qcc.c) to trigger the translation. */
 
-void endfor (FILE * fin, FILE * fout,
-	     const char * grid, int dimension,
-	     bool nolineno, bool progress, bool catch, bool parallel,
-	     FILE * swigfp, char * swigname)
+void * endfor (FILE * fin, FILE * fout,
+	       const char * grid, int dimension,
+	       bool nolineno, bool progress, bool catch, bool parallel,
+	       FILE * swigfp, char * swigname)
 {
   char * buffer = NULL;
   size_t len = 0, maxlen = 0;
@@ -4250,18 +4504,22 @@ void endfor (FILE * fin, FILE * fout,
   AstRoot * init = ast_parse_file (fp, root);
   fclose (fp);
   data.init_solver = ast_find ((Ast *) init, sym_function_definition);
+  assert (data.init_solver);
   str_prepend (ast_left_terminal (data.init_solver)->before, "\n");  
   ast_block_list_append (ast_find ((Ast *)root, sym_translation_unit),
 			 sym_external_declaration, data.init_solver);
   data.last_events = 
     ast_find (ast_find (data.init_solver, sym_compound_statement)->child[1],
 	      sym_compound_statement);
+  assert (data.last_events);
   data.init_fields =
     ast_find (ast_find (data.last_events, sym_compound_statement)->child[1],
 	      sym_compound_statement);
+  assert (data.init_fields);
   data.init_events =
     ast_find (ast_find (data.init_fields, sym_compound_statement)->child[1],
 	      sym_compound_statement);
+  assert (data.init_events);
   ast_destroy ((Ast *) init);
   stack_push (root->stack, &root);
   ast_traverse ((Ast *) root, root->stack,
@@ -4326,14 +4584,32 @@ void endfor (FILE * fin, FILE * fout,
     fclose (swigfp);
   }
   
-  free (data.constants);
-  Ast ** n;
-  while ((n = ((Ast **)stack_pop (root->stack))))
-    if ((*n)->sym == sym_macro_statement)
-      ast_destroy (*n);
+  CHECK ((Ast *) root, true);
 
-  ast_print ((Ast *) root, fout, 0);
+  free (data.constants);
   
-  ast_destroy ((Ast *) d);
+  ast_print ((Ast *) root, fout, 0);
+
+  ((Ast *)root)->parent = (Ast *) d;
+  return root;
+}
+
+void check_dimensions (AstRoot * root,
+		       bool nolineno,
+		       int run, FILE * dimensions, int finite, int redundant, int maxcalls)
+{
+  Ast * d = ((Ast *)root)->parent;
+  ((Ast *)root)->parent = NULL;
+  Ast * main = ast_parent (ast_identifier_declaration (root->stack, "main"),
+			   sym_function_definition);
+  if (main) {
+    if (dimensions != stdout)
+      ast_check_dimensions (root, main, run >= 0 ? run : 0,
+			    maxcalls, dimensions, finite, redundant, !nolineno);  
+    else if (run >= 0)
+      ast_run (root, main, run, maxcalls, NULL);
+  }
+
+  ast_destroy (d);
   ast_destroy ((Ast *) root);
 }

@@ -7,23 +7,34 @@ in [ast/README]().
 Usage:
 
 ~~~
-qcc -grid=[GRID] [OPTIONS] FILE.c
+qcc [OPTIONS] FILE.c
 ~~~
 
 A summary of the options/switches:
 
-* `-grid=[GRID]` : specifies the grid to use
+* `-grid=GRID` : specifies the grid to use
 * `-MD` : generates .d dependency file
 * `-tags` : generates .tags file
 * `-python` : generates python wrapper code
 * `-debug` : internal debugging
 * `-events` : displays a trace of events on standard error
 * `-catch` : catch floating point errors
-* `-source` : generate C99 source file (with an underscore prefix)
-* `-autolink` : use the 'autolink' pragma to link required libraries
+* `-source` : generates C99 source file (with an underscore prefix)
+* `-autolink` : uses the 'autolink' pragma to link required libraries
 * `-progress` : the running code will generate a 'progress' file
 * `-cadna` : support for CADNA
 * `-nolineno` : does not generate code containing code line numbers
+* `-run=INT` : runs the code with the interpreter with the verbosity 
+  level given by INT
+* `-dimensions[=FILE]` : outputs a summary of the dimensions in a file
+  which is the source file with a `.dims` extension if FILE == 'dims'
+  or the given FILE name. if FILE is not specified the dimensions are
+  written on stderr.
+* `-disable-dimensions` : do not check dimensional consistency
+* `-non-finite` : also outputs the dimensions of "non-finite" constants
+* `-redundant` : also outputs the dimensions of redundant constants
+* `-maxcalls=VAL` : maximum number of calls for the interpreter. The default 
+  is 10 millions. A negative value means no limit.
 
 All other options will be passed directly to the C compiler. */
 
@@ -41,6 +52,8 @@ int dimension = 2, bghosts = 0, layers = 0;
   
 int debug = 0, catch = 0, cadna = 0, nolineno = 0, events = 0, progress = 0;
 int parallel = 0;
+static FILE * dimensions = NULL;
+static int run = -1, finite = 1, redundant = 0, maxcalls = 10000000;
 char dir[] = ".qccXXXXXX";
 
 char * autolink = NULL;
@@ -92,18 +105,17 @@ FILE * dopen (const char * fname, const char * mode)
   return fout;
 }
 
-void compdir (FILE * fin, FILE * fout, FILE * swigfp, 
-	      char * swigname, char * grid)
+void * compdir (FILE * fin, FILE * fout, FILE * swigfp, 
+		char * swigname, char * grid)
 {
   FILE * fout1 = dopen ("_endfor.c", "w");
 
-  void endfor (FILE * fin, FILE * fout,
-	       const char * grid, int dimension,
-	       int nolineno, int progress, int catch, int parallel,
-	       FILE * swigfp, char * swigname);
-
-  endfor (fin, fout1, grid, dimension, nolineno, progress, catch, parallel,
-	  swigfp, swigname);
+  void * endfor (FILE * fin, FILE * fout,
+		 const char * grid, int dimension,
+		 int nolineno, int progress, int catch, int parallel,
+		 FILE * swigfp, char * swigname);
+  void * ast = endfor (fin, fout1, grid, dimension, nolineno, progress, catch, parallel,
+		       swigfp, swigname);
   fclose (fout1);
   
   fout1 = dopen ("_endfor.c", "r");
@@ -116,6 +128,8 @@ void compdir (FILE * fin, FILE * fout, FILE * swigfp,
 
   if (source && autolinks && autolink)
     printf ("%s\n", autolink);
+
+  return ast;
 }
 
 int main (int argc, char ** argv)
@@ -148,6 +162,33 @@ int main (int argc, char ** argv)
       autolinks = 1;
     else if (!strcmp (argv[i], "-progress"))
       progress = 1;
+    else if (!strncmp (argv[i], "-run=", 5))
+      run = atoi (argv[i] + 5);
+    else if (!strncmp (argv[i], "-dimensions", 11)) {
+      if (*(argv[i] + 11) == '=') {
+	if (!strcmp (argv[i] + 12, "dims"))
+	  dimensions = stdin;
+	else {
+	  dimensions = fopen (argv[i] + 12, "w");
+	  if (!dimensions) {
+	    perror (argv[i] + 12);
+	    exit (1);
+	  }
+	}
+      }
+      else
+	dimensions = stderr;
+    }
+    else if (!strcmp (argv[i], "-disable-dimensions"))
+      dimensions = stdout;
+    else if (!strcmp (argv[i], "-non-finite"))
+      finite = 0;
+    else if (!strcmp (argv[i], "-redundant"))
+      redundant = 1;
+    else if (!strncmp (argv[i], "-maxcalls", 9)) {
+      if (*(argv[i] + 9) == '=')
+	maxcalls = atoi (argv[i] + 10);
+    }
     else if (!strcmp (argv[i], "-Wall")) {
       char * s = strchr (command, ' ');
       if (s) {
@@ -183,12 +224,23 @@ int main (int argc, char ** argv)
       }
     }
     else if (argv[i][0] != '-' && 
-	     (tags || !strcmp (&argv[i][strlen(argv[i]) - 2], ".c"))) {
+	     (tags || !strcmp (argv[i] + strlen(argv[i]) - 2, ".c"))) {
       if (file) {
 	fprintf (stderr, "usage: qcc -grid=[GRID] [OPTIONS] FILE.c\n");
 	return 1;
       }
       file = argv[i];
+      if (dimensions == stdin) {
+	int len = strlen (file);
+	char name[len + 4];
+	strcpy (name, file);
+	strcpy (name + len - 2, ".dims");
+	dimensions = fopen (name, "w");
+	if (!dimensions) {
+	  perror (name);
+	  exit (1);
+	}
+      }
     }
     else if (!file) { 
       strcat (command, " ");
@@ -198,6 +250,11 @@ int main (int argc, char ** argv)
       strcat (command1, " ");
       strcat (command1, argv[i]);
     }
+  }
+  if (dimensions == stdin) {
+    fprintf (stderr, "qcc: error: -dimensions must be given "
+	     "before the .c source file name\n");
+    exit (1);
   }
   if (strstr (command, "-D_MPI"))
     parallel = 1;
@@ -234,6 +291,7 @@ int main (int argc, char ** argv)
     return 1;
   }
   atexit (exiting);
+  void * ast = NULL;
   if (file) {
     char * grid = NULL;
     int default_grid;
@@ -385,7 +443,7 @@ int main (int argc, char ** argv)
 	exit (1);
       }
 
-      compdir (fin, fout, swigfp, swigname, grid);
+      ast = compdir (fin, fout, swigfp, swigname, grid);
       int status = pclose (fin);
       fclose (fout);
       if (status == -1 ||
@@ -429,6 +487,7 @@ int main (int argc, char ** argv)
   else
     strcat (command, command1);
   /* compilation */
+  status = 0;
   if (!dep && !tags && !source) {
     if (autolinks && autolink)
       strcat (command, autolink);
@@ -439,8 +498,18 @@ int main (int argc, char ** argv)
 	(WIFSIGNALED (status) && (WTERMSIG (status) == SIGINT || 
 				  WTERMSIG (status) == SIGQUIT)))
       exit (1);
-    exit (WEXITSTATUS (status));
+    status = WEXITSTATUS (status);
   }
-  exit (0);
-  return 0;
+  if (ast) {
+    void check_dimensions (void * root,
+			   int nolineno,
+			   int run, FILE * dimensions, int finite, int redundant,
+			   int maxcalls);
+    if (status != 0)
+      run = -1, dimensions = stdout; // do not run or check dimensions in case of compilation error
+    check_dimensions (ast, nolineno,
+		      run, dimensions, finite, redundant, maxcalls);
+  }
+  exit (status);
+  return status;
 }

@@ -1,8 +1,24 @@
 CFLAGS += -I.. -DBASILISK=\"$(subst /ast,,$(CURDIR))\"
 
-libast.a: ast.o tokens.o basilisk.o translate.o allocator.o \
-	stack.o stencil.o check.o
-	ar cr $@ $^
+OBJECTS = ast.o tokens.o basilisk.o translate.o allocator.o \
+	faststack.o stencil.o check.o interpreter/interpreter.o
+
+TOPTARGETS = all clean check
+
+SUBDIRS = interpreter
+
+.PHONY: subdirs $(SUBDIRS) $(TOPTARGETS)
+
+all: subdirs libast.a
+
+subdirs: $(SUBDIRS)
+
+$(TOPTARGETS): $(SUBDIRS)
+$(SUBDIRS):
+	$(MAKE) -C $@ $(filter-out $(SUBDIRS),$(MAKECMDGOALS))
+
+libast.a: $(OBJECTS)
+	ar cr $@ $(OBJECTS)
 
 # Uncomment the recipe below if you need to re-generate basilisk.c
 
@@ -34,6 +50,8 @@ ast.o: ast.h parser.h symbols.h
 
 stack.o: stack.h
 
+faststack.o: stack.h symbols.h ast.h
+
 tokens.o: ast.h basilisk.c
 
 translate.o: ast.h symbols.h
@@ -53,4 +71,5 @@ qcc: qcc.c libast.a
 	$(CC) $(CFLAGS) -o $@ $^
 
 expr: expr.c ast.h libast.a
-	$(CC) $(CFLAGS) -o $@ $< -L. -last
+	$(CC) $(CFLAGS) -o $@ $< -L. -last -lm
+

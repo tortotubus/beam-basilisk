@@ -10,6 +10,7 @@ grammar-dependent functions.
 #include <stdio.h>
 #include <stdbool.h>
 #include <assert.h>
+#include <float.h>
 #include "allocator.h"
 #include "stack.h"
 
@@ -51,6 +52,7 @@ void      ast_identifier_print (Ast * identifier, FILE * fp);
 void      ast_stack_print      (Stack * stack, FILE * fp);
 const
 char *    ast_crop_before (const char * s);
+double    ast_evaluate_constant_expression (const Ast * n);
 
 static inline Ast * ast_last_child (const Ast * n)
 {
@@ -154,7 +156,7 @@ char * str_prepend_realloc (char * dst, ...);
 #define ast_after(n,...)  str_append(ast_right_terminal (n)->after, __VA_ARGS__)
 #define ast_terminal(n) ((n)->child ? NULL : (AstTerminal *)(n))
 #define ast_root(n) ((n)->parent ? NULL : (AstRoot *)(n))
-char *  ast_str_append (Ast * n, char * s);
+char *  ast_str_append (const Ast * n, char * s);
 
 static inline void ast_hide (AstTerminal * n)
 {
@@ -212,6 +214,12 @@ void  ast_traverse                 (Ast * n, Stack * stack,
 	  _list->child[0]) : NULL					\
        )
 
+#define foreach_item_r(list, symbol, arg)				\
+  while (list->child[0]->sym == list->sym)				\
+    list = list->child[0];						\
+  for (Ast * arg = ast_child (list, symbol); arg;			\
+       list = list->parent, arg = ast_child (list, symbol))
+
 Ast * ast_identifier_declaration (Stack * stack, const char * identifier);
 Ast * ast_identifier_declaration_from_to (Stack * stack, const char * identifier,
 					  const Ast * start, const Ast * end);
@@ -264,3 +272,14 @@ bool  ast_is_foreach_stencil (const Ast * n);
 bool  ast_is_stencil_function (Ast * n);
 Ast * ast_is_point_function (const Ast * declarator);
 Ast * ast_stencil (Ast * n, bool parallel, bool overflow, bool nowarning);
+
+/**
+## Interface for the generic C interpreter */
+
+void ast_run (AstRoot * root, Ast * n, int verbosity, int maxcalls, void * data);
+
+/**
+## Interface for dimensional analysis */
+
+void ast_check_dimensions (AstRoot * root, Ast * n, int verbosity, int maxcalls,
+			   FILE * dimensions, int finite, int redundant, int lineno);

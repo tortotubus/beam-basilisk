@@ -62,7 +62,7 @@
 [0,1]  /src/run.h:16: 't = 0.'
 [0,1]  lock.c:89: 'DT = 60 [0,1]'
 [0,1]  lock.c:125: 'tn = 0.'
-[0,1]  lock.c:182: '17.*3600'
+[0,1]  lock.c:182: '17*3600'
 [0,1]  lock.c:182: '3600'
 [0,-1]  /src/layered/diffusion.h:138: '0'
 [2]  /src/layered/rpe.h:81: 'v2 = 0.'

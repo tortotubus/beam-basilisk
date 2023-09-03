@@ -65,6 +65,7 @@ clean:
 		-o $*/$* $*.c $(LIBS) -lm
 	@rm -f $*/fail $*/warn
 	@OPENGLIBS="$(OPENGLIBS)" $(QCC) -autolink -nolineno $(STRIPFLAGS) 	\
+		-dimensions=dims -non-finite					\
 		$(subst -g ,,$(subst -O2 ,,$(CFLAGS))) 				\
 		$(subst .3D_,-grid=octree,$(findstring .3D_,$*_)) 		\
 		$< -o $@ $(LIBS) -lm 2> $*.log~ || 				\
@@ -79,6 +80,8 @@ clean:
 	@chmod -x $@
 	@test ! -s $*.log~ || ( mkdir -p $* && cat $*.log~ > $*/warn )
 	@rm -f $*.log~ $*/fail
+	@test ! -f $*.dims.ref || diff $*.dims $*.dims.ref || (rm -f $@ && exit 1)
+#	@rm -f $*.dims
 
 %.prof: %.c
 	$(QCC) -autolink $(subst -DTRASH=1,,$(CFLAGS)) -g -no-pie -pg $< -o $*/$* -lm
