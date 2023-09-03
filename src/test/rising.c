@@ -56,7 +56,8 @@ int main() {
   The domain will span $[0:2]\times[0:0.5]$ and will be resolved with
   $256\times 64$ grid points. */
 
-  size (2);
+  size (2 [1]);
+  DT = 1. [0,1];
   init_grid (1 << LEVEL);
   
   /**
@@ -67,14 +68,14 @@ int main() {
 #if CASE2
   rho2 = 1., mu2 = 0.1, f.sigma = 1.96;
 #else
-  rho2 = 100., mu2 = 1., f.sigma = 24.5;
+  rho2 = 100.[0], mu2 = 1., f.sigma = 24.5; // works also with rho2 = [-3,0,1]
 #endif
 
   /**
   We reduce the tolerance on the Poisson and viscous solvers to
   improve the accuracy. */
   
-  TOLERANCE = 1e-4;
+  TOLERANCE = 1e-4 [*];
 #if REDUCED
   G.x = -0.98;
   Z.x = 1.;

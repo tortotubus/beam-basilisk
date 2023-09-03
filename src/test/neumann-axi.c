@@ -48,6 +48,7 @@ int main()
   cm = cmv, fm = fmv;
 
   for (N = 32; N <= 512; N *= 2) {
+    size (1. [0]); // dimensionless space
     origin (-L0/2., 0.);
     init_grid (N);
 

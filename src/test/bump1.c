@@ -29,8 +29,9 @@ int main()
 
 event init (i = 0)
 {
+  double a = 200.;
   foreach()
-    h[] = 0.1 + exp(-200.*x*x);
+    h[] = 0.1 + exp(-a*x*x);
 }
 
 event logfile (t += 0.1; t <= 0.7) {

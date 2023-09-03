@@ -21,7 +21,7 @@ int main()
   
   stokes = true;
   DT = 2e-5;
-  TOLERANCE = HUGE;
+  TOLERANCE = HUGE [*];
   NITERMIN = 10;
   N = 32;
 

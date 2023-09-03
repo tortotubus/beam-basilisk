@@ -12,9 +12,14 @@ We need a field to store the variable bottom friction. */
 
 scalar lambda[];
 
+/**
+The constant inflow flow rate (m^2/s). */
+
+const double Q = 1.;
+
 int main() {
   X0 = 0.;
-  L0 = 21.;
+  L0 = 21. [1];
   G = 9.81;
   N = 256;
 
@@ -50,23 +55,17 @@ scalar hc[];
 event init (i = 0) {
   foreach() {
     zb[] = max(0., 0.2*(1. - 1./sq(5.75/2.)*sq(x - 10.)));
-    hc[] = h[]  = 0.6 - zb[];
+    hc[] = h[] = 0.6 - zb[];
   }
 
   /**
-  We call the *friction* event (below) to initialize the bottom
-  friction. */
-  
-  event ("friction");
-  
-  /**
   ## Boundary conditions on velocity
   
-  We impose a constant inflow of 1 m^2/s at the inlet and a Neumann
+  We impose a constant flow rate `Q` at the inlet and a Neumann
   condition at the outlet.*/
   
   for (vector u in ul) {
-    u.n[left] = dirichlet(h[left] ? 1./h[left] : 0.);
+    u.n[left] = dirichlet(h[left] ? Q/h[left] : 0.);
     u.n[right] = neumann(0.);
   }
 }
