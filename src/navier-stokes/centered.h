@@ -69,7 +69,7 @@ for which inertia is negligible compared to viscosity. */
 
 (const) face vector mu = zerof, a = zerof, alpha = unityf;
 (const) scalar rho = unity;
-mgstats mgp, mgpf, mgu;
+mgstats mgp = {0}, mgpf = {0}, mgu = {0};
 bool stokes = false;
 
 /**

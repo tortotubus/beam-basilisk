@@ -67,8 +67,11 @@ static void init_block_scalar (scalar sb, const char * name, const char * ext,
   all = list_append (all, sb);
 }
 
+@define interpreter_set_int(...)
+
 scalar new_block_scalar (const char * name, const char * ext, int block)
 {
+  interpreter_set_int (&block);
   int nvar = datasize/sizeof(double);
 
   scalar s = {0};
@@ -80,7 +83,7 @@ scalar new_block_scalar (const char * name, const char * ext, int block)
     if (n >= block) { // found n free slots
       for (sb.i = s.i, n = 0; n < block; n++, sb.i++)
 	init_block_scalar (sb, name, ext, n, block);
-      trash (((scalar []){s, {-1}}));
+      trash (((scalar []){s, {-1}})); // fixme: only trashes one block?
       return s;
     }
     s.i = sb.i + 1;
@@ -91,13 +94,13 @@ scalar new_block_scalar (const char * name, const char * ext, int block)
   assert (nvar + block <= _NVARMAX);
   qrealloc (_attribute, nvar + block, _Attributes);
   memset (&_attribute[nvar], 0, block*sizeof (_Attributes));
+  // allocate extra space on the grid
+  realloc_scalar (block*sizeof(double));
+  trash (((scalar []){s, {-1}})); // fixme: only trashes one block?
   for (int n = 0; n < block; n++, nvar++) {
     scalar sb = (scalar){nvar};
     init_block_scalar (sb, name, ext, n, block);
   }
-  // allocate extra space on the grid
-  realloc_scalar (block*sizeof(double));
-  trash (((scalar []){s, {-1}}));
   return s;
 }
 
@@ -1002,3 +1005,12 @@ void stencil_val_a (Point p, scalar s, int i, int j, int k, bool input,
     s.input = true;
   s.output = true;
 }
+
+/**
+Macros overloaded by the interpreter. */
+
+@define dimensional(...)
+#define show_dimension(...) show_dimension_internal (__VA_ARGS__ + 10293847566574839201.)
+@define show_dimension_internal(...)
+@define display_value(...)
+@define interpreter_verbosity(...)

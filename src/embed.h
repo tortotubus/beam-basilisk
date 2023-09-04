@@ -473,7 +473,7 @@ coord embed_gradient (Point point, vector u, coord p, coord n)
 {
   coord dudn;
   foreach_dimension() {
-    bool dirichlet;
+    bool dirichlet = false;
     double vb = u.x.boundary[embed] (point, point, u.x, &dirichlet);
     if (dirichlet) {
       double val;
@@ -668,7 +668,7 @@ double embed_flux (Point point, scalar s, face vector mu, double * val)
   If the boundary condition is homogeneous Neumann, the flux is
   zero. */
 
-  bool dirichlet;
+  bool dirichlet = false;
   double grad = s.boundary[embed] (point, point, s, &dirichlet);
   if (!grad && !dirichlet)
     return 0.;

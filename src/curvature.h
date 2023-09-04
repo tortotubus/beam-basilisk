@@ -222,13 +222,13 @@ static double height_curvature (Point point, scalar c, vector h)
   if (kappa != nodata) {
     
     /**
-     We limit the maximum curvature to $1/\Delta$. */
-	
+    We limit the maximum curvature to $1/\Delta$. */
+
     if (fabs(kappa) > 1./Delta)
       kappa = sign(kappa)/Delta;
     
     /**
-     We add the axisymmetric curvature if necessary. */
+    We add the axisymmetric curvature if necessary. */
       
 #if AXI
     double nr, r = y, hx;
