@@ -491,3 +491,10 @@ int events (bool action)
   inext = 1;
   return 1;
 }
+
+void interpreter_set_int (int * i)
+{
+  char * flags = i;
+  flags += sizeof(int) - 1;
+  *flags = 0;
+}
