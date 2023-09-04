@@ -2874,7 +2874,7 @@ Value * ast_run_node (Ast * n, Stack * stack)
 	  kh_foreach (d->nonlocals, l, data, {
 	      Value * v = (Value *) data;
 	      if ((value_flags (v) & unset) ||
-		  memcmp ((char *)l, data + sizeof (Value), v->size)) {
+		  memcmp ((char *)l, data + sizeof (Value), v->size - has_flags(v)*sizeof(Flags))) {
 		
 		/**
 		We swap the current value and the value saved in the
@@ -2901,7 +2901,7 @@ Value * ast_run_node (Ast * n, Stack * stack)
 	char * data;
 	kh_foreach (d->nonlocals, l, data, {
 	    Value * v = (Value *) data;
-	    if (!v->data.p || memcmp ((char *)l, data + sizeof (Value), v->size)) {
+	    if (!v->data.p || memcmp ((char *)l, data + sizeof (Value), v->size - has_flags(v)*sizeof(Flags))) {
 	      if (!v->data.p) {
 		v->data.p = (char *) l;
 		if (ast_choose_hook) {	
