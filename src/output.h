@@ -585,8 +585,8 @@ trace
 void output_ppm (struct OutputPPM p)
 {
   // default values
-  if (p.n == 0) p.n = N;
-  if (p.min == 0 && p.max == 0) {
+  if (!p.n) p.n = N;
+  if (!p.min && !p.max) {
     stats s = statsf (p.f);
     if (p.spread < 0.)
       p.min = s.min, p.max = s.max;
@@ -595,8 +595,8 @@ void output_ppm (struct OutputPPM p)
       p.min = avg - spread; p.max = avg + spread;
     }
   }
-  if (p.box[0][0] == 0. && p.box[0][1] == 0. && 
-      p.box[1][0] == 0. && p.box[1][1] == 0.) {
+  if (!p.box[0][0] && !p.box[0][1] && 
+      !p.box[1][0] && !p.box[1][1]) {
     p.box[0][0] = X0;      p.box[0][1] = Y0;
     p.box[1][0] = X0 + L0; p.box[1][1] = Y0 + L0;
   }
@@ -1228,7 +1228,7 @@ bool restore (struct Dump p)
     return false;
   assert (fp);
 
-  struct DumpHeader header;  
+  struct DumpHeader header = {0};
   if (fread (&header, sizeof(header), 1, fp) < 1) {
     fprintf (ferr, "restore(): error: expecting header\n");
     exit (1);

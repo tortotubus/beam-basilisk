@@ -198,7 +198,7 @@ event metric (i = 0) {
   }
   face vector fmv = fm;
   foreach_face()
-    fmv.x[] = max(y, 1e-20);
+    fmv.x[] = max(y, 1./HUGE);
   fm.t[top] = dirichlet(y);
   fm.t[bottom] = dirichlet(y);
   

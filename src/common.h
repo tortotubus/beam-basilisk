@@ -43,8 +43,8 @@ static int mpi_rank, mpi_npe;
 #endif // _cplusplus
 
 #define pi 3.14159265358979
-@undef HUGE
-@define HUGE ((double)1e30)
+#undef HUGE
+#define HUGE 1e30
 #define nodata HUGE
 @define _NVARMAX 65536
 @define is_constant(v) ((v).i >= _NVARMAX)
