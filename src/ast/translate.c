@@ -992,11 +992,15 @@ void maybeconstfield (Ast * n, Stack * stack,
       maybeconstfield (*c, stack, func, data);  
 }
 
-static Ast * is_point_point (const Ast * identifier)
+Ast * ast_is_point_point (const Ast * n)
 {
-  if (identifier->parent->parent->sym == sym_direct_declarator &&
+  Ast * identifier = ast_schema (n, sym_IDENTIFIER);
+  if (!identifier)
+    identifier = ast_schema (n, sym_generic_identifier,
+			     0, sym_IDENTIFIER);
+  if (identifier && identifier->parent->parent->sym == sym_direct_declarator &&
       !strcmp (ast_terminal (identifier)->start, "point")) {    
-    const Ast * decl = identifier;
+    const Ast * decl = n;
     while (decl->sym != sym_declaration &&
 	   decl->sym != sym_parameter_declaration)
       decl = decl->parent;
@@ -3836,7 +3840,7 @@ static void macros (Ast * n, Stack * stack, void * data)
   ## Point point */
   
   case sym_IDENTIFIER: {
-    Ast * decl = is_point_point (n);
+    Ast * decl = ast_is_point_point (n);
     if (decl) {
       TranslateData * d = data;
       static const char * name[3] = {"ig", "jg", "kg"};
@@ -4324,7 +4328,7 @@ void declarations_from_struct_declarations (Ast * n)
       declarations_from_struct_declarations (*c);
 }
 
-void declare_point_variables (Stack * stack)
+static void declare_point_variables (Stack * stack)
 {
   Ast * list = ast_find (ast_parent (ast_identifier_declaration (stack, "_Variables"),
 				     sym_declaration),
@@ -4433,7 +4437,18 @@ Ast * ast_push_declarations (Ast * n, Stack * stack)
       return n;
     }
     return NULL;
-  }    
+  }
+
+  /**
+  ## Point point */
+
+  case sym_direct_declarator:
+    if (ast_schema (ast_is_point_point (ast_schema (n, sym_direct_declarator,
+						    0, sym_generic_identifier,
+						    0, sym_IDENTIFIER)),
+		    sym_declaration))
+      declare_point_variables (stack);
+    return NULL;
     
   }
 

@@ -2704,6 +2704,9 @@ Value * ast_run_node (Ast * n, Stack * stack)
       Ast * identifier = ast_identifier_declaration (stack, ast_terminal (n->child[0]->child[0])->start);
       if (identifier && has_value (identifier))
 	value = (Value *) identifier;
+      if (ast_schema (ast_is_point_point (n->child[0]), sym_declaration) &&
+	  strcmp (ast_terminal (n->child[0]->child[0])->file, "ast/interpreter/overload.h"))
+	init_point_variables (stack);
     }
     else
       value = run (ast_child (n, sym_declarator), stack);
@@ -3103,7 +3106,7 @@ static AstRoot * add_external_declarations (AstRoot * root, const char * file)
 
 void (* after_run) (Ast *, Stack *) = NULL;
 
-void ast_run (AstRoot * root, Ast * n, int verbosity, int maxcalls, void * user_data)
+int ast_run (AstRoot * root, Ast * n, int verbosity, int maxcalls, void * user_data)
 {
   Stack * stack = root->stack;
   StackData d = {
@@ -3144,6 +3147,7 @@ void ast_run (AstRoot * root, Ast * n, int verbosity, int maxcalls, void * user_
   kh_destroy (INT64, d.messages);
   ast_destroy (d.stencil);
   ast_destroy (d.end_stencil);
+  return d.maxcalls;
 }
 
 #include "dimension.c"

@@ -34,7 +34,7 @@ A summary of the options/switches:
 * `-non-finite` : also outputs the dimensions of "non-finite" constants
 * `-redundant` : also outputs the dimensions of redundant constants
 * `-maxcalls=VAL` : maximum number of calls for the interpreter. The default 
-  is 10 millions. A negative value means no limit.
+  is 15 millions. A negative value means no limit.
 
 All other options will be passed directly to the C compiler. */
 
@@ -53,7 +53,7 @@ int dimension = 2, bghosts = 0, layers = 0;
 int debug = 0, catch = 0, cadna = 0, nolineno = 0, events = 0, progress = 0;
 int parallel = 0;
 static FILE * dimensions = NULL;
-static int run = -1, finite = 1, redundant = 0, maxcalls = 10000000;
+static int run = -1, finite = 1, redundant = 0, maxcalls = 15000000;
 char dir[] = ".qccXXXXXX";
 
 char * autolink = NULL;

@@ -272,11 +272,12 @@ bool  ast_is_foreach_stencil (const Ast * n);
 bool  ast_is_stencil_function (Ast * n);
 Ast * ast_is_point_function (const Ast * declarator);
 Ast * ast_stencil (Ast * n, bool parallel, bool overflow, bool nowarning);
+Ast * ast_is_point_point (const Ast * identifier);
 
 /**
 ## Interface for the generic C interpreter */
 
-void ast_run (AstRoot * root, Ast * n, int verbosity, int maxcalls, void * data);
+int ast_run (AstRoot * root, Ast * n, int verbosity, int maxcalls, void * data);
 
 /**
 ## Interface for dimensional analysis */
