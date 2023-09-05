@@ -1879,25 +1879,12 @@ static void boundary_expr (Ast * n, Stack * stack, void * data)
   }
 }
 
-static char * str_append_maps (char * s, Stack * stack)
-{
-  Ast ** n;
-  for (int i = 0; (n = stack_index (stack, i)); i++)
-    if (*n && (*n)->sym == sym_macro_statement &&
-	(*n)->child[1]->child[2]) {
-      Ast * block_list = (*n)->child[1]->child[1];
-      AstTerminal * t = ast_left_terminal (block_list);
-      str_append (s, "\n#line ", ast_line (t), " \"", t->file, "\"");
-      s = ast_str_append (block_list, s);
-    }
-  return s;
-}
-
-static char * str_append_point_variables (char * s, Stack * stack)
-{
-  str_append (s, "POINT_VARIABLES;");
-  return str_append_maps (s, stack);
-}
+#define foreach_map(map)					\
+  Ast ** _m, * map;						\
+  for (int _i = 0; (_m = stack_index (stack, _i)); _i++)	\
+    if ((map = ast_schema (*_m, sym_macro_statement,		\
+			   1, sym_compound_statement,		\
+			   1, sym_block_item_list)))
 
 static Ast * boundary_function (Ast * expr, Stack * stack, TranslateData * d,
 				char * before, char * ind)
@@ -1916,8 +1903,15 @@ static Ast * boundary_function (Ast * expr, Stack * stack, TranslateData * d,
 		dir[i], ";",
 		"NOT_UNUSED(", index[i], "g);");
   assert (before);
-  src = str_append_point_variables (src, stack);
-  str_append (src, "return(", before, "_expr_);}}");
+  str_append (src, "POINT_VARIABLES;");
+  foreach_map (m) {
+    AstTerminal * t = ast_left_terminal (m);
+    str_append (src, "\n#line ", ast_line (t), " \"", t->file, "\"");
+    src = ast_str_append (m, src);
+  }
+  AstTerminal * t = ast_left_terminal (expr);
+  str_append (src, "\n#line ", ast_line (t), " \"", t->file, "\"\n",
+	      "return(", before, "_expr_);}}");
   free (before);
   Ast * boundary =
     ast_child (ast_parse_external_declaration (src, ast_get_root (expr)),
@@ -3554,12 +3548,10 @@ static void macros (Ast * n, Stack * stack, void * data)
       ast_terminal (n->child[0])->start = strdup ("foreach_face_generic");
     }
     else if (!ast_is_foreach_stencil (n)) { // maps for !foreach_face() loops
-      char * maps = str_append_maps (NULL, stack);
-      if (maps) {
-	Ast * statement = ast_child (n, sym_statement);
-	ast_before (statement, "{", maps);
-	ast_after (statement, "}");
-	free (maps);
+      foreach_map (m) {
+	Ast * list = ast_block_list_get_item (ast_child (n, sym_statement))->parent;
+	foreach_item (m, 1, item)
+	  ast_block_list_prepend (list, sym_block_item, ast_copy (item->child[0]));
       }
     }
     
@@ -3851,8 +3843,21 @@ static void macros (Ast * n, Stack * stack, void * data)
       for (int i = 0; i < d->dimension; i++)
 	ast_after (decl, "int ", name[i], "=0;"
 		   "NOT_UNUSED(", name[i], ");");
-      ast_right_terminal (decl)->after =
-	str_append_point_variables (ast_right_terminal (decl)->after, stack);
+      str_append (ast_right_terminal (decl)->after, "POINT_VARIABLES;");
+      if (decl->sym == sym_declaration) {
+	foreach_map (m) {
+	  Ast * list = ast_block_list_get_item (decl)->parent;
+	  foreach_item (m, 1, item)
+	    ast_block_list_append (list, sym_block_item, ast_copy (item->child[0]));
+	}
+      }
+      else {
+	Ast * list = ast_schema (decl->parent, sym_compound_statement,
+				 1, sym_block_item_list);
+	foreach_map (m)
+	  foreach_item (m, 1, item)
+	    ast_block_list_prepend (list, sym_block_item, ast_copy (item->child[0]));
+      }
     }
     break;
   }
@@ -4149,10 +4154,12 @@ static void macros (Ast * n, Stack * stack, void * data)
       if (!strcmp (t->start, "is_face_x") ||
 	  !strcmp (t->start, "is_face_y") ||
 	  !strcmp (t->start, "is_face_z")) {
-	char * maps = str_append_maps (NULL, stack);
-	if (maps) {
-	  ast_after (ast_child (n, sym_compound_statement)->child[0], maps);
-	  free (maps);
+	foreach_map (m) {
+	  Ast * list = ast_schema (n, sym_macro_statement,
+				   1, sym_compound_statement,
+				   1, sym_block_item_list);
+	  foreach_item (m, 1, item)
+	    ast_block_list_prepend (list, sym_block_item, ast_copy (item->child[0]));
 	}
 	ast_after (n, "end_", t->start, "()");
       }

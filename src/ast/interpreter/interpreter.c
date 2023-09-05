@@ -2981,7 +2981,8 @@ Value * ast_run_node (Ast * n, Stack * stack)
 
   case sym_foreach_statement:
     if (!ast_is_foreach_stencil (n)) {
-      init_point_variables (stack);
+      if (strcmp (ast_terminal (n->child[0])->start, "foreach_face_generic"))
+	init_point_variables (stack);
       default_check (stack, n);
     }
     else {
@@ -2991,6 +2992,18 @@ Value * ast_run_node (Ast * n, Stack * stack)
       run (d->end_stencil, stack);
     }
     break;
+
+  case sym_macro_statement: {
+    Ast * identifier = ast_schema (n, sym_macro_statement,
+				   0, sym_function_call,
+				   0, sym_postfix_expression,
+				   0, sym_primary_expression,
+				   0, sym_IDENTIFIER);
+    if (identifier && !strncmp (ast_terminal (identifier)->start, "is_face_", 8))
+      init_point_variables (stack);
+    value = default_check (stack, n);
+    break;
+  }
     
   default:
     value = default_check (stack, n);

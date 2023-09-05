@@ -115,7 +115,7 @@ typedef struct {
 typedef struct {
   Point point;
   double x, y, z;
-  double Delta;
+  double Delta, Delta_x, Delta_y, Delta_z;
   int level;
   ChildPos child;
 } _Variables;
@@ -135,6 +135,7 @@ void _init_point_variables (void)
 {
   Delta = L0;
   unset_double (&Delta);
+  Delta_x = Delta_y = Delta_z = Delta;
   x = X0 + Delta;
   y = Y0 + Delta;
   z = Z0 + Delta;
@@ -222,7 +223,8 @@ static void _end_stencil()
     for (int d = 0; d < nboundary; d++)
       foreach()
 	for (scalar s = listc[0], * i = listc; s.i >= 0; i++, s = *i)
-	  val(s,0,0,0) + _attribute[s.i].boundary[d] (point, point, s, NULL);
+	  if (_attribute[s.i].boundary[d] != periodic_bc)
+	    val(s,0,0,0) == _attribute[s.i].boundary[d] (point, point, s, NULL);
     for (scalar s = listc[0], * i = listc; s.i >= 0; i++, s = *i)
       _attribute[s.i].dirty = false;
     free (listc);
