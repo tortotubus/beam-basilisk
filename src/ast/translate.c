@@ -1029,7 +1029,8 @@ Ast * ast_is_point_point (const Ast * n)
 
 Ast * ast_is_point_function (const Ast * declarator)
 {
-  Ast * parameters = ast_find (declarator, sym_parameter_type_list);
+  Ast * parameters = ast_find (declarator, sym_parameter_type_list,
+			       0, sym_parameter_list);
   if (parameters)
     foreach_item (parameters, 2, param) {
       Ast * identifier = ast_find (param, sym_IDENTIFIER);
