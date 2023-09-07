@@ -525,19 +525,6 @@ savefig{SP}*[(]{SP}*['"][^'"]+['"] {
 
 %%
 
-static void revert (char * src, char * bak)
-{
-  if (src) {
-    if (bak) {
-      rename (bak, src);
-      free (bak);
-    }
-    else
-      remove (src);
-    free (src);
-  }
-}
-
 static char * append (char * s, char * s1)
 {
   if (s) {
