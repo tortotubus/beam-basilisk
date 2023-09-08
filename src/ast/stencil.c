@@ -747,11 +747,10 @@ static
 bool is_point_variable (const Ast * ref)
 {
   Ast * identifier =
-    ast_schema (ast_parent (ref, sym_external_declaration), sym_external_declaration,
-		0, sym_declaration,
-		1, sym_init_declarator_list,
-		0, sym_init_declarator,
-		0, sym_declarator,
+    ast_schema (ast_parent (ref, sym_function_definition), sym_function_definition,
+		0, sym_function_declaration,
+		1, sym_declarator,
+		0, sym_direct_declarator,
 		0, sym_direct_declarator,
 		0, sym_generic_identifier,
 		0, sym_IDENTIFIER);

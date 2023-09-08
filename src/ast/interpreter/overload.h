@@ -112,13 +112,13 @@ typedef struct {
   int x, y, z;
 } ChildPos;
 
-typedef struct {
+void _Variables() {
   Point point;
   double x, y, z;
   double Delta, Delta_x, Delta_y, Delta_z;
   int level;
   ChildPos child;
-} _Variables;
+}
 
 enum {
   unset = 1 << 0
