@@ -712,23 +712,23 @@ embedded boundaries. The distinction between the two cases is based on
 whether the `dirichlet` parameter is passed to the boundary function
 (using the `data` parameter). */
 
-@undef neumann
-@def neumann(expr)   (data ? embed_area_center (point, &x, &y, &z),
-		      *((bool *)data) = false, (expr) :
-		      Delta*(expr) + val(_s,0,0,0))
+@undef _neumann
+@def _neumann(expr, ...)   (data ? embed_area_center (point, &x, &y, &z),
+			    *((bool *)data) = false, (expr) :
+			    Delta*(expr) + val(_s,0,0,0))
 @
-@undef neumann_homogeneous
-@def neumann_homogeneous() (data ? *((bool *)data) = false, (0) :
-			    val(_s,0,0,0))
+@undef _neumann_homogeneous
+@def _neumann_homogeneous(...) (data ? *((bool *)data) = false, (0) :
+				val(_s,0,0,0))
 @
-@undef dirichlet
-@def dirichlet(expr) (data ? embed_area_center (point, &x, &y, &z),
-		      *((bool *)data) = true, (expr) :
-		      2.*(expr) - val(_s,0,0,0))
+@undef _dirichlet
+@def _dirichlet(expr, ...) (data ? embed_area_center (point, &x, &y, &z),
+			    *((bool *)data) = true, (expr) :
+			    2.*(expr) - val(_s,0,0,0))
 @
-@undef dirichlet_homogeneous
-@def dirichlet_homogeneous() (data ? *((bool *)data) = true, (0) :
-			      - val(_s,0,0,0))
+@undef _dirichlet_homogeneous
+@def _dirichlet_homogeneous(...) (data ? *((bool *)data) = true, (0) :
+				  - val(_s,0,0,0))
 @
 
 /**

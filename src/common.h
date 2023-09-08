@@ -949,12 +949,12 @@ int nboundary = 2*dimension;
 
 #define none -1
 
-@define dirichlet(expr)                 (2.*(expr) - val(_s,0,0,0))
-@define dirichlet_homogeneous()         (- val(_s,0,0,0))
-@define dirichlet_face(expr)            (expr)
-@define dirichlet_face_homogeneous()    (0.)
-@define neumann(expr)                   (Delta*(expr) + val(_s,0,0,0))
-@define neumann_homogeneous()           (val(_s,0,0,0))
+@define _dirichlet(expr, ...)             (2.*(expr) - val(_s,0,0,0))
+@define _dirichlet_homogeneous(...)       (- val(_s,0,0,0))
+@define _dirichlet_face(expr,...)         (expr)
+@define _dirichlet_face_homogeneous(...)  (0.)
+@define _neumann(expr,...)                (Delta*(expr) + val(_s,0,0,0))
+@define _neumann_homogeneous(...)         (val(_s,0,0,0))
 
 double  * _constant = NULL;
 size_t datasize = 0;
@@ -1450,3 +1450,7 @@ void display (struct _display p)
 #endif
 
 #include "grid/stencils.h"
+
+#define dirichlet(expr)                 _dirichlet(expr, point, neighbor, _s, data)
+#define dirichlet_face(expr)            _dirichlet_face(expr, point, neighbor, _s, data)
+#define neumann(expr)                   _neumann(expr, point, neighbor, _s, data)

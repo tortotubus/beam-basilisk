@@ -168,10 +168,51 @@ void reset (void * alist, double val)
       *(p + s->i) = 0.; // fixme: should be val
 }
 
-static double dirichlet (double val) { return val; }
-static double dirichlet_homogeneous() { return 0.; }
-static double neumann() { return 0.; }
-static double neumann_homogeneous() { return 0.; }
+static double _dirichlet (double expr, Point point, Point neighbor, scalar _s, void * data)
+{ //  interpreter_verbosity (4);
+  if (data) {
+    *((bool *)data) = true;
+    return expr;
+  }
+  return 2.*expr - val(_s,0,0,0);
+}
+
+static double _dirichlet_homogeneous (double expr, Point point, Point neighbor, scalar _s, void * data)
+{ //  interpreter_verbosity (4);
+  if (data) {
+    *((bool *)data) = true;
+    return 0;
+  }
+  return - val(_s,0,0,0);
+}
+
+static double _dirichlet_face (double expr, Point point, Point neighbor, scalar _s, void * data)
+{
+  return expr;
+}
+
+static double _dirichlet_face_homogeneous (double expr, Point point, Point neighbor, scalar _s, void * data)
+{
+  return 0.;
+}
+
+static double _neumann (double expr, Point point, Point neighbor, scalar _s, void * data)
+{ //  interpreter_verbosity (4);
+  if (data) {
+    *((bool *)data) = false;
+    return expr;
+  }
+  return Delta*expr + val(_s,0,0,0);
+}
+
+static double _neumann_homogeneous (double expr, Point point, Point neighbor, scalar _s, void * data)
+{ //  interpreter_verbosity (4);
+  if (data) {
+    *((bool *)data) = false;
+    return 0;
+  }
+  return val(_s,0,0,0);
+}
 
 static const int o_stencil = -2;
 
@@ -452,6 +493,11 @@ double noise() { return 0. [0]; }
 
 void dimensional (int a) {}
 void show_dimension_internal (double a) {}
+
+/**
+## Emulations of macros in <math.h> */
+
+const double M_PI = 3.14159265358979 [0];
 
 /**
 ## Events 
