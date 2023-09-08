@@ -1,11 +1,18 @@
 /**
-# Check that unchanged values are not "unset" by undefined conditions. */
+# Checks that logical operations are correctly unset
+
+This is a bit tricky because of "partial evaluation". */
 
 int main()
 {
-  int a, b[1] = {-1}, c = -1;
-  if (a) // this is an undefined condition....
-    b[0] = -1, c = -1;  // but this does change the values of b[0] or c...
-  display_value (b[0]); // so this should not be "unset"...
-  display_value (c); // and neither should this...
+  int b = 1, a;
+  display_value (b && a);
+  display_value (b || a);
+  display_value (a && b);
+  display_value (a || b);
+  b = 0;
+  display_value (b && a);
+  display_value (b || a);
+  display_value (a && b);
+  display_value (a || b);
 }

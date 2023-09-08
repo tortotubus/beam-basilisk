@@ -8,6 +8,12 @@ check: $(subst .c,.tst,$(wildcard test*.c)) \
 	test15.vtst test16.vtst test20.vtst \
 	$(subst .c,.dtst,$(wildcard dimension-tests/test*.c))
 
+refs:
+	for f in dimension-tests/test*.c; do 				\
+		$(QCC) -source -dimensions -run=1 $$f 2>&1 | 		\
+                sed "s|$(BASILISK)||g" > `echo $$f | sed 's/\.c/.ref/'`; \
+	done
+
 %.tst: %.c %.ref $(QCC)
 	$(QCC) -source -run=1 $< 2>&1 | sed "s|$(BASILISK)||g" > $@
 	-rm -f _$<

@@ -637,17 +637,7 @@ Value * assign (Ast * n, Value * dst, Value * src, Stack * stack)
     return message (NULL, n, "assignment between incompatible types\n", error_verbosity, stack);
   if (!(value_flags (src) & unset))
     value_unset_flags (dst, unset);
-#if 1
-  if (!(value_flags (dst) & unset) &&
-      n->sym == sym_init_declarator &&
-      ast_find (ast_parent (n, sym_declaration), sym_type_qualifier,
-		0, sym_CONST)) {
-    // ast_print (ast_parent (n, sym_declaration), stderr, 0);
-    set_constant_expression (dst);
-  }
-  else
-#endif
-    value_unset_flags (dst, constant_expression);
+  value_unset_flags (dst, constant_expression);
   return ast_assign_hook ? ast_assign_hook (n, dst, src, stack) : dst;
 }
 
@@ -1149,7 +1139,7 @@ Value * binary_operation (Ast * n, Stack * stack)
     if (set) {								\
       Value * value;							\
       if (n->sym == sym_assignment_expression)				\
-	value = ast_binary_operation_hook (n, stack, a, b, a), value_set_write (a, stack); \
+	value_set_write (a, stack), value = ast_binary_operation_hook (n, stack, a, b, a); \
       else {								\
 	value = new_value (stack, n, (Ast *) &ast_##type, 0);		\
 	if (is_constant_expression (a) && is_constant_expression (b))	\
@@ -2877,7 +2867,7 @@ Value * ast_run_node (Ast * n, Stack * stack)
 	  kh_foreach (d->nonlocals, l, data, {
 	      Value * v = (Value *) data;
 	      if ((value_flags (v) & unset) ||
-		  memcmp ((char *)l, data + sizeof (Value), v->size - has_flags(v)*sizeof(Flags))) {
+		  memcmp ((char *)l, data + sizeof (Value), v->size)) {
 		
 		/**
 		We swap the current value and the value saved in the
@@ -2904,35 +2894,33 @@ Value * ast_run_node (Ast * n, Stack * stack)
 	char * data;
 	kh_foreach (d->nonlocals, l, data, {
 	    Value * v = (Value *) data;
-	    if (!v->data.p || memcmp ((char *)l, data + sizeof (Value), v->size - has_flags(v)*sizeof(Flags))) {
-	      if (!v->data.p) {
+	    if (!v->data.p || memcmp ((char *)l, data + sizeof (Value), v->size)) {
+	      if (!v->data.p)
 		v->data.p = (char *) l;
-		if (ast_choose_hook) {	
+	      if (ast_choose_hook) {
 
-		  /**
-		  The value has been modified by the 'if' branch, we
-		  need to choose between the 'if' and 'else'
-		  values. */
+		/**
+		The value has been modified by the 'if' or 'else 'branch, we
+		need to choose a value. */
 
-		  Value ifvalue = *v;
-		  ifvalue.data.p = data + sizeof (Value);
+		Value ifvalue = *v;
+		ifvalue.data.p = data + sizeof (Value);
 #if 0
-		  if (stack_verbosity (stack) > 1) {
-		    fprintf (stderr, "if branch value\n");
-		    display_value (&ifvalue);
-		    fprintf (stderr, "else branch value\n");
-		    display_value (v);
-		  }
-#endif		  
-		  if (ast_choose_hook (n, stack, &ifvalue, v) != v)
-		    memcpy (v->data.p, ifvalue.data.p, v->size);
-#if 0
-		  if (stack_verbosity (stack) > 1) {
-		    fprintf (stderr, "chosen value\n");
-		    display_value (v);
-		  }
-#endif
+		if (stack_verbosity (stack) > 1) {
+		  fprintf (stderr, "if branch value\n");
+		  display_value (&ifvalue);
+		  fprintf (stderr, "else branch value\n");
+		  display_value (v);
 		}
+#endif		  
+		if (ast_choose_hook (n, stack, &ifvalue, v) != v)
+		  memcpy (v->data.p, ifvalue.data.p, v->size);
+#if 0
+		if (stack_verbosity (stack) > 1) {
+		  fprintf (stderr, "chosen value\n");
+		  display_value (v);
+		}
+#endif
 	      }
 
 	      unset_value (v, stack);
@@ -3065,12 +3053,6 @@ void * push (Stack * stack, void * p)
   if (n->sym == sym_IDENTIFIER) {
     Value * v = identifier_value (n, stack);
     if (v) {
-#if 0
-      if (ast_terminal (n)->line == 1321) {
-	ast_stack_print (stack, stderr);
-	abort();
-      }
-#endif
 #if 0
       ast_print (n, stdout, 0);
       display_value (v);
