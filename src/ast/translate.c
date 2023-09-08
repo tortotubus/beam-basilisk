@@ -1754,15 +1754,10 @@ static int homogeneize (Ast * n)
   if (n->sym == sym_function_call) {
     Ast * identifier = ast_function_call_identifier (n);
     if (identifier &&
-	(!strcmp (ast_terminal (identifier)->start, "neumann") ||
-	 !strcmp (ast_terminal (identifier)->start, "dirichlet") ||
-	 !strcmp (ast_terminal (identifier)->start, "dirichlet_face"))) {
+	(!strcmp (ast_terminal (identifier)->start, "_neumann") ||
+	 !strcmp (ast_terminal (identifier)->start, "_dirichlet") ||
+	 !strcmp (ast_terminal (identifier)->start, "_dirichlet_face"))) {
       str_append (ast_terminal (identifier)->start, "_homogeneous");
-      if (n->child[3]) {
-	ast_destroy (n->child[2]);
-	n->child[2] = n->child[3];
-	n->child[3] = NULL;
-      }
       nh = 1;
     }
   }
@@ -1869,7 +1864,7 @@ static void boundary_expr (Ast * n, Stack * stack, void * data)
     if (member && !strcmp (ast_terminal(member)->start, "x")) {
       Ast * identifier = ast_function_call_identifier (n);
       if (identifier &&
-	  !strcmp (ast_terminal (identifier)->start, "dirichlet")) {
+	  !strcmp (ast_terminal (identifier)->start, "_dirichlet")) {
 	const char * typename =
 	  ast_typedef_name (ast_expression_type
 			    (d->boundary->child[0]->child[0],
