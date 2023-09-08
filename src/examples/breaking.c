@@ -30,11 +30,9 @@ gravity wave and $\lambda$ its wavelength. */
 
 double ak = 0.33;
 double RE = 40000.;
+double k_ = 2.*pi, h_ = 0.5, g_ = 1.;
 
-#define k_  (2.*pi)
-#define h_   0.5
-#define g_   1.
-#define T0  (k_/sqrt(g_*k_))
+#define T0  (k_*L0/sqrt(g_*k_))
 
 /**
 The domain is periodic in $x$ and resolved using 256$^2$
@@ -80,9 +78,10 @@ event init (i = 0)
   distribution. */
   
   geometric_beta (1./3., true);
-  
+
+  double a = 0.25;
   foreach() {
-    zb[] = - 0.5 + sin(pi*y)/4.;
+    zb[] = - 0.5 + a*sin(k_/2.*y);
     double H = wave(x, 0) - zb[];
     double z = zb[];
     foreach_layer() {
