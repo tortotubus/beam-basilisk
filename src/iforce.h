@@ -30,8 +30,10 @@ necessary, we allocate a new vector field to store it. */
 event defaults (i = 0) {  
   if (is_constant(a.x)) {
     a = new face vector;
-    foreach_face()
+    foreach_face() {
       a.x[] = 0.;
+      dimensional (a.x[] == Delta/sq(DT));
+    }
   }
 }
 

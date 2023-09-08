@@ -171,6 +171,13 @@ event defaults (i = 0)
     s.embed_gradient = pressure_embed_gradient;
 #endif // EMBED
 #endif // TREE
+
+  /**
+  We set the dimensions of the velocity field. */
+
+  foreach()
+    foreach_dimension()
+      dimensional (u.x[] == Delta/t);
 }
 
 

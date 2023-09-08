@@ -852,7 +852,7 @@ Grid * grid = NULL;
 // coordinates of the lower-left corner of the box
 double X0 = 0., Y0 = 0., Z0 = 0.;
 // size of the box
-double L0 = 1.;
+double L0 = 1. [1];
 // number of grid points
 #if dimension <= 2
 int N = 64;
@@ -1250,7 +1250,7 @@ double timer_elapsed (timer t)
 	  (tvend.tv_usec - t.tv.tv_usec)/1e6);
 }
 
-// Constant fields
+// Constant fields // fixme: should be removed
 
 const face vector zerof[] = {0.,0.,0.};
 const face vector unityf[] = {1.,1.,1.};
@@ -1259,8 +1259,10 @@ const scalar zeroc[] = 0.;
 
 // Metric
 
-(const) face vector fm = unityf;
-(const) scalar cm = unity;
+const face vector unityf0[] = {1.[0],1.[0],1.[0]};
+const scalar unity0[] = 1.[0];
+(const) face vector fm = unityf0; // fixme: should just be fm = {1,1,1};
+(const) scalar cm = unity0; // fixme: should just be cm = 1.;
 
 // Embedded boundaries
 // these macros are overloaded in embed.h

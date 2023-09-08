@@ -5,7 +5,7 @@
 
 The default maximum timestep and CFL number. */
 
-double DT = 1e10, CFL = 0.5;
+double DT = HUGE [0,1], CFL = 0.5 [0];
 
 /**
 Performance statistics are stored in this structure. */
@@ -210,7 +210,7 @@ The $\theta$ global variable can be used to tune the limiting
 ($\theta=1$ gives minmod, the most dissipative limiter and $\theta=2$
 gives superbee, the least dissipative). */
 	  
-double theta = 1.3;
+double theta = 1.3 [0];
 
 double minmod2 (double s0, double s1, double s2)
 {

@@ -100,7 +100,7 @@ The maximum number of iterations is controlled by *NITERMAX* and the
 tolerance by *TOLERANCE* with the default values below. */
 
 int NITERMAX = 100, NITERMIN = 1;
-double TOLERANCE = 1e-3;
+double TOLERANCE = 1e-3 [*];
 
 /**
 Information about the convergence of the solver is returned in a structure. */
