@@ -26,5 +26,5 @@ int main()
     display_value (b);
   }
 
-
+  display_value (sq(4));
 }

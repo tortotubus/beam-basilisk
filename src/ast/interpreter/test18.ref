@@ -3,7 +3,6 @@ test18.c:12: sqrt (2  + [test18.c:9: 'a = 1'] + [test18.c:9: 'b = 2'])
 test18.c:13: pow (1.41421  + 0.5*[test18.c:9: 'a = 1'] + 0.5*[test18.c:9: 'b = 2'], 2  + [test18.c:13: '2'])
 test18.c:14: fabs (2  + [test18.c:9: 'a = 1'] + [test18.c:9: 'b = 2'])
 test18.c:15: sq (2  + [test18.c:9: 'a = 1'] + [test18.c:9: 'b = 2'])
-ast/interpreter/overload.h:463: x*x: 4  + 2*[test18.c:9: 'a = 1'] + 2*[test18.c:9: 'b = 2']
 test18.c:17: a *= g: 4  + 2*[test18.c:9: 'a = 1'] + 2*[test18.c:9: 'b = 2'] + [test18.c:16: 'a = 1.']
 test18.c:18: sin (1  + [test18.c:16: 'a = 1.'])
 test18.c:18: 'sin (a/g)': [test18.c:16: 'a = 1.'] = [0]

@@ -458,16 +458,6 @@ double min (double a, double b)
   return a < b ? a : b;
 }
 
-double sq (double x)
-{
-  return x*x;
-}
-
-double cube (double x)
-{
-  return x*x*x;
-}
-
 int sign (double x)
 {
   const int i = 1;
