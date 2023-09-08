@@ -1898,7 +1898,7 @@ static Ast * boundary_function (Ast * expr, Stack * stack, TranslateData * d,
   snprintf (ind, 19, "%d", d->nboundary++);
   str_append (src,
 	      "static double _boundary", ind,
-	      "(Point point,Point neighbor,scalar _s,void *data){{");
+	      "(Point point,Point neighbor,scalar _s,void *data){{"); // The double brackets are important
       
   char * index[] = {"i","j","k"}, * dir[] = {"x","y","z"};
   for (int i = 0; i < d->dimension; i++)
@@ -1909,21 +1909,22 @@ static Ast * boundary_function (Ast * expr, Stack * stack, TranslateData * d,
 		"NOT_UNUSED(", index[i], "g);");
   assert (before);
   str_append (src, "POINT_VARIABLES;");
-  foreach_map (m) {
-    AstTerminal * t = ast_left_terminal (m);
-    str_append (src, "\n#line ", ast_line (t), " \"", t->file, "\"");
-    src = ast_str_append (m, src);
-  }
-  AstTerminal * t = ast_left_terminal (expr);
-  str_append (src, "\n#line ", ast_line (t), " \"", t->file, "\"\n",
-	      "return(", before, "_expr_);}}");
+  str_append (src, "{return(", before, "_expr_);}}}");
   free (before);
   Ast * boundary =
     ast_child (ast_parse_external_declaration (src, ast_get_root (expr)),
 	       sym_function_definition);
+  ast_get_root (boundary)->alloc = ast_get_root (expr)->alloc;
   free (src);
   assert (expr->sym == sym_assignment_expression);
   ast_replace (boundary, "_expr_", expr);
+  ast_set_line (boundary, ast_left_terminal (expr));
+  Ast * compound = ast_find (ast_find (boundary, sym_compound_statement)->child[1], sym_compound_statement);
+  Ast * list = ast_schema (compound, sym_compound_statement,
+			   1, sym_block_item_list);
+  foreach_map (m)
+    foreach_item (m, 1, item)
+      ast_block_list_prepend (list, sym_block_item, ast_copy (item->child[0]));
   stack_push (stack, &expr);
   ast_traverse (expr, stack, boundary_expr, d);
   ast_pop_scope (stack, expr);
@@ -3327,6 +3328,7 @@ static void translate (Ast * n, Stack * stack, void * data)
 		  ast_file_line (t, d->nolineno), ",\"", t->start, "\"});\n");
       Ast * registration = NN(n, sym_statement,
 			      ast_parse_expression (reg, root));
+      ast_set_line (registration, t);
       if (last)
 	compound_append (d->last_events, registration);
       else
@@ -4296,8 +4298,7 @@ void ast_pop_scope (Stack * stack, Ast * scope)
 {
   if (!scope)
     return;
-  Ast * n;
-  while ((n = *((Ast **)stack_pop (stack))) != scope);
+  while (*((Ast **)stack_pop (stack)) != scope);
 }
 
 Ast * ast_push_function_definition (Stack * stack, Ast * declarator)
@@ -4313,30 +4314,17 @@ Ast * ast_push_function_definition (Stack * stack, Ast * declarator)
   return identifier;
 }
 
-static
-void declarations_from_struct_declarations (Ast * n)
-{
-  if (n->sym == sym_struct_declaration)
-    n->sym = sym_declaration;
-  else if (n->sym == sym_struct_declarator_list)
-    n->sym = sym_init_declarator_list;
-  else if (n->sym == sym_struct_declarator)
-    n->sym = sym_init_declarator;
-  else if (n->sym == sym_specifier_qualifier_list)
-    n->sym = sym_declaration_specifiers;
-  if (n->child)
-    for (Ast ** c = n->child; *c; c++)
-      declarations_from_struct_declarations (*c);
-}
-
 static void declare_point_variables (Stack * stack)
 {
   Ast * list = ast_find (ast_parent (ast_identifier_declaration (stack, "_Variables"),
-				     sym_declaration),
-			 sym_struct_declaration_list);
-  declarations_from_struct_declarations (list);
-  foreach_item (list, 1, declaration)
+				     sym_function_definition),
+			 sym_block_item_list);
+  assert (list);
+  foreach_item (list, 1, item) {
+    Ast * declaration = ast_schema (item, sym_block_item,
+				    0, sym_declaration);
     ast_push_declaration (stack, declaration);
+  }
 }
 
 Ast * ast_push_declarations (Ast * n, Stack * stack)
@@ -4478,6 +4466,13 @@ void ast_traverse (Ast * n, Stack * stack,
 
 Called by [qcc](/src/qcc.c) to trigger the translation. */
 
+static void checks (AstRoot * root, AstRoot * d, TranslateData * data)
+{
+  CHECK ((Ast *) root, true);
+  CHECK ((Ast *) d, true);
+  CHECK (data->init_solver, true);
+}
+
 void * endfor (FILE * fin, FILE * fout,
 	       const char * grid, int dimension,
 	       bool nolineno, bool progress, bool catch, bool parallel,
@@ -4544,20 +4539,23 @@ void * endfor (FILE * fin, FILE * fout,
 	      sym_compound_statement);
   assert (data.init_events);
   ast_destroy ((Ast *) init);
+
   stack_push (root->stack, &root);
   ast_traverse ((Ast *) root, root->stack,
 		global_boundaries_and_stencils, &data);
   ast_pop_scope (root->stack, (Ast *) root);
-  CHECK ((Ast *) root, true);
+  checks (root, d, &data);
+
   stack_push (root->stack, &root);
   ast_traverse ((Ast *) root, root->stack, translate, &data);
   ast_pop_scope (root->stack, (Ast *) root);
-  CHECK ((Ast *) root, true);
+  checks (root, d, &data);
+
   stack_push (root->stack, &root);
   ast_traverse ((Ast *) root, root->stack, macros, &data);
   ast_pop_scope (root->stack, (Ast *) root);
-  CHECK ((Ast *) root, true);
-  
+  checks (root, d, &data);
+
   if (data.fields_index) {
     Ast * call_init_solver = ast_find (data.init_solver, sym_function_call);
     char n[10];
@@ -4606,9 +4604,9 @@ void * endfor (FILE * fin, FILE * fout,
     }
     fclose (swigfp);
   }
-  
-  CHECK ((Ast *) root, true);
 
+  checks (root, d, &data);
+  
   free (data.constants);
   
   ast_print ((Ast *) root, fout, 0);

@@ -63,8 +63,8 @@ void point;
 int BGHOSTS, o_stencil;
 double HUGE;
 
-typedef struct {
+void _Variables() {
   double x, y, z;
   double Delta;
   int level;
-} _Variables;
+}
