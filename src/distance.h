@@ -59,7 +59,7 @@ coord * input_stl (FILE * fp)
     i = nf;
     while (i > 0) {
       float x = 0, y = 0, z = 0;
-      dimensional ((x == L0, y == L0, z == L0));
+      dimensional ((x == Delta, y == Delta, z == Delta));
       unsigned j;
       uint16_t attbytecount;
 

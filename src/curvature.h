@@ -544,7 +544,7 @@ trace
 cstats curvature (struct Curvature p)
 {
   scalar c = p.c, kappa = p.kappa;
-  double sigma = p.sigma ? p.sigma : 1.;
+  double sigma = p.sigma ? p.sigma : 1.[0];
   int sh = 0, sf = 0, sa = 0, sc = 0;
   vector ch = c.height, h = automatic (ch);
   if (!ch.x.i)

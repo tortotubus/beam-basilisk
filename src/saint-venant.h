@@ -403,8 +403,11 @@ into account user-defined field initialisations. */
 
 event init (i = 0)
 {
-  foreach()
+  foreach() {
     eta[] = zb[] + h[];
+    dimensional (h[] == Delta);
+    dimensional (u.x[] == Delta/DT);
+  }
 }
 
 /**

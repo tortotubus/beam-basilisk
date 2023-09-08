@@ -126,7 +126,7 @@ event defaults (i = 0)
   
   CFL = 1./(2.*dimension);
   if (CFL_H == 1e40)
-    CFL_H = 0.5;  
+    CFL_H = 0.5 [0];
   
   u = new vector[nl];
   reset ({u}, 0.);
@@ -162,6 +162,7 @@ event init (i = 0)
     eta[] = zb[];
     foreach_layer()
       eta[] += h[];
+    dimensional (h[] == Delta);
   }
 }
 
@@ -481,7 +482,7 @@ on the faces of each layer. The slope of the layer interfaces
 $\mathbf{{\nabla}} z_{k+1/2}$ in the second-term is bounded by
 `max_slope` (by default 30 degrees). */
 
-double max_slope = 0.577350269189626; // = tan(30.*pi/180.)
+double max_slope = 0.577350269189626 [0]; // = tan(30.*pi/180.)
 #define slope_limited(dz) (fabs(dz) < max_slope ? (dz) :	\
 			   ((dz) > 0. ? max_slope : - max_slope))
 
