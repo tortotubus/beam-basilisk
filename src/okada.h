@@ -77,6 +77,11 @@ static void okada_rectangular_source (const double U[3],
   double p = y*cosd + d*sind;
   double q = y*sind - d*cosd;
 
+  /**
+  There seems to be a problem with dimensions here. `x`, `p`, and `q`
+  should be the dimensionless coordinates, not the dimensional
+  ones... See also [tsunami.c](/src/examples/tsunami.c). */
+  
   u[0] = u[1] = u[2] = 0.;
   rectangular_source (U, cosd, sind, mulambda, d,
 		      x, p, q,

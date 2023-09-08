@@ -181,7 +181,7 @@ event init (i = 0)
     i.e. until the deformations are resolved properly. */
   
     fault (x = 94.57, y = 3.83,
-	   depth = 11.4857e3,
+	   depth = 11.4857e3, // fixme: this should be a length, but okada.h does not seem to be dimensionally consistent!!
 	   strike = 323, dip = 12, rake = 90,
 	   length = 220e3, width = 130e3,
 	   U = 18,
