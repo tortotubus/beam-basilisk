@@ -128,7 +128,7 @@ vector u;
 int main()
 {
   // Earth radius in metres
-  Radius = 6371220.;
+  Radius = 6371220. [1];
   // the domain is 73 degrees squared
   size (73.);
   // centered on 142,38 longitude,latitude
@@ -280,10 +280,11 @@ event init (i = 0)
 /**
 ## Quadratic bottom friction */
 
-event friction (i++)
+event viscous_term (i++)
 {
+  double C_f = 1e-4;
   foreach() {
-    double a = h[] < dry ? HUGE : 1. + 1e-4*dt*norm(u)/h[];
+    double a = h[] < dry ? HUGE : 1. + C_f*dt*norm(u)/h[];
     foreach_dimension()
       u.x[] /= a;
     if (h[] > dry && h[] + zb[] > etamax[])
