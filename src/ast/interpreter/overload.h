@@ -515,8 +515,12 @@ int events (bool action)
     return 0;
   }
   dimensional (t == DT);
-  for (Event * ev = Events; !ev->last; ev++)
+  for (Event * ev = Events; !ev->last; ev++) {
     init_event (ev);
+    if (ev->arrayt)
+      for (double * at = ev->arrayt; *at >= 0; at++)
+	*at == t;
+  }
   for (Event * ev = Events; !ev->last; ev++)
     if (ev->i != END_EVENT)
       for (Event * e = ev; e; e = e->next) {
