@@ -2141,6 +2141,13 @@ Value * internal_functions (Ast * call, Ast * identifier, Ast ** parameters, boo
   }
   else if (!strcmp (name, "interpreter_verbosity"))
     ((StackData *)stack_get_data (stack))->verbosity = value_data (run (parameters[0], stack), int);
+  else if (!strcmp (name, "reset_field_value")) {
+    Value * params[] = { run (parameters[0], stack), run (parameters[1], stack), run (parameters[2], stack) };
+    char * field = value_data (params[0], char *);
+    memcpy (field, params[2]->data.p, params[2]->size);
+    *((Flags *)(field + params[2]->size - sizeof (Flags))) |= unset;
+    return ast_internal_functions_hook (call, identifier, params, stack, NULL);
+  }
   else {
     struct {
       const char * name;
@@ -2466,8 +2473,7 @@ Value * ast_run_node (Ast * n, Stack * stack)
 		}
 		fputs (")\n", stderr);
 	      }
-	      if (ast_terminal (identifier)->file && // fixme: file should never be NULL
-		  !strcmp (ast_terminal (identifier)->start, "display_value")) {
+	      if (!strcmp (ast_terminal (identifier)->start, "display_value")) {
 		assert (narg == 1);
 		display_value (v[0]);
 		return NULL;
@@ -2497,8 +2503,7 @@ Value * ast_run_node (Ast * n, Stack * stack)
 	      // fixme: deal with ellipsis....
 	    }
 	  }
-	  if (ast_terminal (identifier)->file && // fixme: file should never be NULL
-	      !strcmp (ast_terminal (identifier)->file, "ast/interpreter/internal.h")) {
+	  if (!strcmp (ast_terminal (identifier)->file, "ast/interpreter/internal.h")) {
 	    Ast ** parameters = function_parameters (identifier);
 	    value = internal_functions (n, identifier, parameters, constant_arguments, stack);
 	    free (parameters);

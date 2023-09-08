@@ -165,11 +165,11 @@ void reset (void * alist, double val)
   double * p = igrid->d;
   if (alist)
     for (scalar * s = alist; s->i >= 0; s++)
-      *(p + s->i) = 0.; // fixme: should be val
+      reset_field_value (p + s->i, _attribute[s->i].name, 0.);
 }
 
 static double _dirichlet (double expr, Point point, Point neighbor, scalar _s, void * data)
-{ //  interpreter_verbosity (4);
+{
   if (data) {
     *((bool *)data) = true;
     return expr;
@@ -178,7 +178,7 @@ static double _dirichlet (double expr, Point point, Point neighbor, scalar _s, v
 }
 
 static double _dirichlet_homogeneous (double expr, Point point, Point neighbor, scalar _s, void * data)
-{ //  interpreter_verbosity (4);
+{
   if (data) {
     *((bool *)data) = true;
     return 0;
@@ -197,7 +197,7 @@ static double _dirichlet_face_homogeneous (double expr, Point point, Point neigh
 }
 
 static double _neumann (double expr, Point point, Point neighbor, scalar _s, void * data)
-{ //  interpreter_verbosity (4);
+{
   if (data) {
     *((bool *)data) = false;
     return expr;
@@ -206,7 +206,7 @@ static double _neumann (double expr, Point point, Point neighbor, scalar _s, voi
 }
 
 static double _neumann_homogeneous (double expr, Point point, Point neighbor, scalar _s, void * data)
-{ //  interpreter_verbosity (4);
+{
   if (data) {
     *((bool *)data) = false;
     return 0;

@@ -38,3 +38,4 @@ double pow (double x, double y) {}
 
 void interpreter_verbosity (int verbosity) {}
 void display_value (void * value) {}
+void reset_field_value (double * field, const char * name, double val) {}
