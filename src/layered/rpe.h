@@ -124,7 +124,7 @@ double area_z2 (Zarea * a, double z1, double dv, double * Az)
   double zm = z1, z2 = z1 + 10.*(a->max - a->min);
   double vol = area_integral (a, z1, z2, Az);
   assert (vol > dv);
-  while (fabs (z2 - zm) > 1e-12) {
+  while (fabs (z2 - zm) > dry) {
     double z = (zm + z2)/2.;
     vol = area_integral (a, z1, z, Az);
     if (vol > dv) z2 = z;
