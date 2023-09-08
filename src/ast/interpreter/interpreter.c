@@ -1874,6 +1874,9 @@ void * static_realloc (void * ptr, size_t size, Stack * stack)
   return p;
 }
 
+static double sq (double x) { return x*x; }
+static double cube (double x) { return x*x*x; }
+
 static
 Value * internal_functions (Ast * call, Ast * identifier, Ast ** parameters, bool constant_arguments, Stack * stack)
 {
@@ -2158,6 +2161,7 @@ Value * internal_functions (Ast * call, Ast * identifier, Ast ** parameters, boo
       {"asin", asin}, {"acos", acos}, {"atan", atan},
       {"sinh", sinh}, {"cosh", cosh}, {"tanh", tanh},
       {"asinh", sinh}, {"acosh", cosh}, {"atanh", tanh},
+      {"sq", sq}, {"cube", cube},
       {NULL}
     }, * i = funcs;
     for (; i->name; i++)

@@ -53,8 +53,9 @@ create a field *hc* to check convergence on *h*. */
 scalar hc[];
 
 event init (i = 0) {
+  double a = 0.2, b = 5.75/2.;
   foreach() {
-    zb[] = max(0., 0.2*(1. - 1./sq(5.75/2.)*sq(x - 10.)));
+    zb[] = max(0., a*(1.[0] - sq((x - 10.)/b)));
     hc[] = h[] = 0.6 - zb[];
   }
 

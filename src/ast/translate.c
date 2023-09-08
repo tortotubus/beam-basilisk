@@ -1116,6 +1116,9 @@ void ast_replace_child_same_symbol (Ast * parent, int index, Ast * replacement)
   ast_replace_child (parent, index, replacement);
 }
 
+static double sq (double x) { return x*x; }
+static double cube (double x) { return x*x*x; }
+
 /**
 Evaluates a constant (numerical) expression. Return DBL_MAX if the
 expression is not a constant. */
@@ -1350,6 +1353,7 @@ double ast_evaluate_constant_expression (const Ast * n)
 	{"asin", asin}, {"acos", acos}, {"atan", atan},
 	{"sinh", sinh}, {"cosh", cosh}, {"tanh", tanh},
 	{"asinh", sinh}, {"acosh", cosh}, {"atanh", tanh},
+	{"sq", sq}, {"cube", cube},
 	{NULL}
       }, * i = funcs;
       for (; i->name; i++)
