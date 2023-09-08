@@ -100,4 +100,4 @@ a
 double
 size: 17, flags: 1, pointer: 0, scope: 3, value: 0 (unset) [0]
 ===================
-5 constraints, 5 unknowns
+6 constraints, 6 unknowns

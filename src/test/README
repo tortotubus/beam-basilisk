@@ -327,3 +327,26 @@ make -k -j8
 where *-k* tells *make* not to stop at the first error and *-j8* uses
 parallel processing (assuming you have at least 8 cores on your
 system).
+
+## Testing dimensional analysis
+
+[Dimensional analysis](/src/ast/interpreter/dimension.c) can be tested
+using reference files with a `.dims.ref` extension. The default
+Makefile will then compile the corresponding `.c` file using the
+`-dimensions` option to generate a `.dims` file which will be compared
+(using `diff`) to the reference file.
+
+A simple way to generate a new reference file for e.g. `test.c` is to do
+
+~~~bash
+touch test.dims.ref
+make test.s
+~~~
+
+The `make test.s` command will fail (since the reference file is empty)
+and one can then copy the generated `.dims` file as the new reference
+file (after checking that it is correct!) i.e.
+
+~~~bash
+cp test.dims test.dims.ref
+~~~

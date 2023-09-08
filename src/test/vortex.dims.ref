@@ -1,4 +1,4 @@
-5674 constraints, 5674 unknowns
+5663 constraints, 5663 unknowns
 [0]  /src/grid/multigrid-common.h:28: 'sum = 0.'
 [0]  /src/navier-stokes/centered.h:129: 'CFL = 0.8'
 [0]  /src/navier-stokes/centered.h:287: '1.'
@@ -69,7 +69,7 @@
 [0,-2]  /src/grid/multigrid-common.h:28: 'sum = 0.'
 [0,-2]  /src/poisson.h:163: 'sum = 0.'
 [0,-2]  /src/poisson.h:351: 'maxres = 0.'
-[1,-1]  ast/interpreter/overload.h:167: '*(p + s->i) = 0.'
+[1,-1]  ast/interpreter/overload.h:168: '*(p + s->i) = 0.'
 [1,-1]  /src/poisson.h:487: 'div[] = 0.'
 [1,-1]  vortex.c:18: '0.'
 [1,-1]  vortex.c:19: '0.'
@@ -84,10 +84,9 @@
 [2,-1]  vortex.c:44: '0'
 [2,-1]  vortex.c:45: '0'
 [2,-1]  vortex.c:57: 'psi[] = 0.'
-[1,-2]  ast/interpreter/overload.h:167: '*(p + s->i) = 0.'
+[1,-2]  ast/interpreter/overload.h:168: '*(p + s->i) = 0.'
 [1,-2]  /src/common.h:1255: '0.'
 [1,-2]  /src/common.h:1255: '0.'
-[2,-2]  ast/interpreter/overload.h:167: '*(p + s->i) = 0.'
-[2,-2]  ast/interpreter/overload.h:172: '0.'
+[2,-2]  ast/interpreter/overload.h:168: '*(p + s->i) = 0.'
 [2,-2]  /src/poisson.h:58: 's[] = 0.'
 [2,-2]  /src/utils.h:162: 'sum2 = 0.'

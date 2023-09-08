@@ -1,13 +1,13 @@
 test10.c:9: interpreter_verbosity (4): !
 test10.c:11: val ({...}, 0  + [test10.c:11: '0'], 0  + [test10.c:11: '0'], 0  + [test10.c:11: '0'])
-ast/interpreter/overload.h:148: 1024: 1024  + [ast/interpreter/overload.h:148: '1024']
-ast/interpreter/overload.h:340: igrid->d + s.i*sizeof(double): 0xaddress
-ast/interpreter/overload.h:340: (double *)(igrid->d + s.i*sizeof(double)): 0xaddress
+ast/interpreter/overload.h:149: 1024: 1024  + [ast/interpreter/overload.h:149: '1024']
+ast/interpreter/overload.h:342: igrid->d + s.i*sizeof(double): 0xaddress
+ast/interpreter/overload.h:342: (double *)(igrid->d + s.i*sizeof(double)): 0xaddress
 test10.c:11: max (0  + [test10.c:11: '0'], 0 (unset) [0])
-ast/interpreter/overload.h:410: 'a > b': [test10.c:11: '0'] = [0]
-ast/interpreter/overload.h:410: warning (interpreter): undefined condition 'a > b'
-ast/interpreter/overload.h:410: a: 0  + [test10.c:11: '0']
-ast/interpreter/overload.h:410: a > b ? a : b: 0 (unset) [0]
+ast/interpreter/overload.h:412: 'a > b': [test10.c:11: '0'] = [0]
+ast/interpreter/overload.h:412: warning (interpreter): undefined condition 'a > b'
+ast/interpreter/overload.h:412: a: 0  + [test10.c:11: '0']
+ast/interpreter/overload.h:412: a > b ? a : b: 0 (unset) [0]
 test10.c:11: max(0,val(s,0,0,0)) > 0: 0 (unset)
 test10.c:11: warning (interpreter): undefined condition 'max(0,val(s,0,0,0)) > 0'
 test10.c:14: q: 1  + [test10.c:12: 'q = 1']

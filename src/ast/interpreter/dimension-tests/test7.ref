@@ -14,12 +14,13 @@ minmod2 (a, b, c)
 ast_double
 size: 17, flags: 1, pointer: 0, scope: 4, value: 0 (unset)  + [/src/utils.h:227: '0.']
 ===================
-16 constraints, 16 unknowns
-The following finite constants have dimension [1]
-  dimension-tests/test7.c:9: 'a = 1.[1]'
-  dimension-tests/test7.c:9: 'b = 2.[1]'
-  dimension-tests/test7.c:9: 'c = 3.[1]'
-The following finite constants have dimension [2]
-  dimension-tests/test7.c:15: 'a = 1.[2]'
-  dimension-tests/test7.c:15: 'b = 2.[2]'
-  dimension-tests/test7.c:15: 'c = 3.[2]'
+17 constraints, 17 unknowns
+Dimensions of finite constants
+  [1]
+    dimension-tests/test7.c:9: 'a = 1.[1]'
+    dimension-tests/test7.c:9: 'b = 2.[1]'
+    dimension-tests/test7.c:9: 'c = 3.[1]'
+  [2]
+    dimension-tests/test7.c:15: 'a = 1.[2]'
+    dimension-tests/test7.c:15: 'b = 2.[2]'
+    dimension-tests/test7.c:15: 'c = 3.[2]'

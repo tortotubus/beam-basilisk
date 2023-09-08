@@ -14,4 +14,4 @@ _attribute[1].freed
 int
 size: 5, flags: 0, pointer: 0, scope: 0, value: 1
 ===================
-5 constraints, 5 unknowns
+6 constraints, 6 unknowns
