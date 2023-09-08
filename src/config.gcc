@@ -11,7 +11,7 @@ CC99 = $(CC) $(C99_FLAGS) -D_GNU_SOURCE=1 -pedantic  -Wno-unused-result \
 STRIPFLAGS = -s
 
 # other useful (non-standard) flags
-CFLAGS += -g -Wall -Wno-unused-function -pipe -D_FORTIFY_SOURCE=2
+CFLAGS += -g -Wall -pipe -D_FORTIFY_SOURCE=2
 
 # if you have valgrind, otherwise comment this out
 VALGRIND = valgrind -q --tool=memcheck --suppressions=$(BASILISK)/openmpi.supp \
