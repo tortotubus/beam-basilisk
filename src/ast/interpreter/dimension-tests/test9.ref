@@ -14,4 +14,4 @@ size: 17, flags: 2, pointer: 0, scope: 2, value: 1  + [dimension-tests/test9.c:9
 ast_long
 size: 17, flags: 2, pointer: 0, scope: 2, value: 1  + [dimension-tests/test9.c:11: '1']
 ===================
-5 constraints, 5 unknowns
+6 constraints, 6 unknowns

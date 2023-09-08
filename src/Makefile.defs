@@ -73,7 +73,7 @@ clean:
 	 echo "qcc -autolink $(CFLAGS) -o $*/$* $*.c $(LIBS) -lm" > $*/fail &&	\
 	 cat $*.log~ >> $*/fail &&						\
 	 echo "make: *** [$*.s] Error 1" >> $*/fail &&				\
-	 rm -f $*.*tst &&							\
+	 rm -f $@ $*.*tst &&							\
 	 $(GENSUM) $*.c > $*/fail.tst &&					\
 	 cat $*/fail 2> /dev/stderr &&						\
 	 exit 1)
