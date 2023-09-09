@@ -273,15 +273,21 @@ struct yy_buffer_state
 #define YY_CURRENT_BUFFER_LVALUE yyg->yy_buffer_stack[yyg->yy_buffer_stack_top]
 
 static void yyrestart ( FILE *input_file , yyscan_t yyscanner );
+
 static YY_BUFFER_STATE yy_create_buffer ( FILE *file, int size , yyscan_t yyscanner );
 static void yy_delete_buffer ( YY_BUFFER_STATE b , yyscan_t yyscanner );
 static void yy_flush_buffer ( YY_BUFFER_STATE b , yyscan_t yyscanner );
+
 static void yypop_buffer_state ( yyscan_t yyscanner );
 
 static void yyensure_buffer_stack ( yyscan_t yyscanner );
 static void yy_load_buffer_state ( yyscan_t yyscanner );
 static void yy_init_buffer ( YY_BUFFER_STATE b, FILE *file , yyscan_t yyscanner );
 #define YY_FLUSH_BUFFER yy_flush_buffer( YY_CURRENT_BUFFER , yyscanner)
+
+
+
+
 
 static void *yyalloc ( yy_size_t , yyscan_t yyscanner );
 static void *yyrealloc ( void *, yy_size_t , yyscan_t yyscanner );
@@ -784,6 +790,8 @@ struct yyguts_t
 
 static int yy_init_globals ( yyscan_t yyscanner );
 
+
+
 static int yylex_init_extra ( YY_EXTRA_TYPE user_defined, yyscan_t* scanner);
 
 /* Accessor methods to globals.
@@ -791,11 +799,33 @@ static int yylex_init_extra ( YY_EXTRA_TYPE user_defined, yyscan_t* scanner);
 
 static int yylex_destroy ( yyscan_t yyscanner );
 
+
+
 static void yyset_debug ( int debug_flag , yyscan_t yyscanner );
+
+
 
 static void yyset_extra ( YY_EXTRA_TYPE user_defined , yyscan_t yyscanner );
 
+
+
+
+
+
+
 static void yyset_out  ( FILE * _out_str , yyscan_t yyscanner );
+
+
+
+
+
+
+
+
+
+
+
+
 
 /* Macros after this point can all be overridden by user definitions in
  * section 1.
@@ -807,6 +837,12 @@ extern "C" int yywrap ( yyscan_t yyscanner );
 #else
 extern int yywrap ( yyscan_t yyscanner );
 #endif
+#endif
+
+#ifndef YY_NO_UNPUT
+    
+    static void yyunput ( int c, char *buf_ptr  , yyscan_t yyscanner);
+    
 #endif
 
 #ifndef yytext_ptr
@@ -1824,6 +1860,48 @@ static int yy_get_next_buffer (yyscan_t yyscanner)
 	return yy_is_jam ? 0 : yy_current_state;
 }
 
+#ifndef YY_NO_UNPUT
+
+    static void yyunput (int c, char * yy_bp , yyscan_t yyscanner)
+{
+	char *yy_cp;
+    struct yyguts_t * yyg = (struct yyguts_t*)yyscanner;
+
+    yy_cp = yyg->yy_c_buf_p;
+
+	/* undo effects of setting up yytext */
+	*yy_cp = yyg->yy_hold_char;
+
+	if ( yy_cp < YY_CURRENT_BUFFER_LVALUE->yy_ch_buf + 2 )
+		{ /* need to shift things up to make room */
+		/* +2 for EOB chars. */
+		int number_to_move = yyg->yy_n_chars + 2;
+		char *dest = &YY_CURRENT_BUFFER_LVALUE->yy_ch_buf[
+					YY_CURRENT_BUFFER_LVALUE->yy_buf_size + 2];
+		char *source =
+				&YY_CURRENT_BUFFER_LVALUE->yy_ch_buf[number_to_move];
+
+		while ( source > YY_CURRENT_BUFFER_LVALUE->yy_ch_buf )
+			*--dest = *--source;
+
+		yy_cp += (int) (dest - source);
+		yy_bp += (int) (dest - source);
+		YY_CURRENT_BUFFER_LVALUE->yy_n_chars =
+			yyg->yy_n_chars = (int) YY_CURRENT_BUFFER_LVALUE->yy_buf_size;
+
+		if ( yy_cp < YY_CURRENT_BUFFER_LVALUE->yy_ch_buf + 2 )
+			YY_FATAL_ERROR( "flex scanner push-back overflow" );
+		}
+
+	*--yy_cp = (char) c;
+
+	yyg->yytext_ptr = yy_bp;
+	yyg->yy_hold_char = *yy_cp;
+	yyg->yy_c_buf_p = yy_cp;
+}
+
+#endif
+
 #ifndef YY_NO_INPUT
 #ifdef __cplusplus
     static int yyinput (yyscan_t yyscanner)
@@ -1919,6 +1997,42 @@ static void yyrestart  (FILE * input_file , yyscan_t yyscanner)
 	yy_init_buffer( YY_CURRENT_BUFFER, input_file , yyscanner);
 	yy_load_buffer_state( yyscanner );
 }
+
+/** Switch to a different input buffer.
+ * @param new_buffer The new input buffer.
+ * @param yyscanner The scanner object.
+ */
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 static void yy_load_buffer_state  (yyscan_t yyscanner)
 {
@@ -2036,6 +2150,39 @@ static void yy_flush_buffer (YY_BUFFER_STATE  b , yyscan_t yyscanner)
 		yy_load_buffer_state( yyscanner );
 }
 
+/** Pushes the new state onto the stack. The new state becomes
+ *  the current state. This function will allocate the stack
+ *  if necessary.
+ *  @param new_buffer The new state.
+ *  @param yyscanner The scanner object.
+ */
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 /** Removes and deletes the top of the stack, if present.
  *  The next element becomes the new top.
  *  @param yyscanner The scanner object.
@@ -2104,6 +2251,92 @@ static void yyensure_buffer_stack (yyscan_t yyscanner)
 	}
 }
 
+/** Setup the input buffer state to scan directly from a user-specified character buffer.
+ * @param base the character buffer
+ * @param size the size in bytes of the character buffer
+ * @param yyscanner The scanner object.
+ * @return the newly allocated buffer state object.
+ */
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+/** Setup the input buffer state to scan a string. The next call to yylex() will
+ * scan from a @e copy of @a str.
+ * @param yystr a NUL-terminated string to scan
+ * @param yyscanner The scanner object.
+ * @return the newly allocated buffer state object.
+ * @note If you want to scan bytes that may contain NUL values, then use
+ *       yy_scan_bytes() instead.
+ */
+
+
+
+
+
+
+/** Setup the input buffer state to scan the given bytes. The next call to yylex() will
+ * scan from a @e copy of @a bytes.
+ * @param yybytes the byte buffer to scan
+ * @param _yybytes_len the number of bytes in the buffer pointed to by @a bytes.
+ * @param yyscanner The scanner object.
+ * @return the newly allocated buffer state object.
+ */
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 #ifndef YY_EXIT_FAILURE
 #define YY_EXIT_FAILURE 2
 #endif
@@ -2135,6 +2368,78 @@ static void yynoreturn yy_fatal_error (const char* msg , yyscan_t yyscanner)
 
 /* Accessor  methods (get/set functions) to struct members. */
 
+/** Get the user-defined data for this scanner.
+ * @param yyscanner The scanner object.
+ */
+
+
+
+
+
+
+/** Get the current line number.
+ * @param yyscanner The scanner object.
+ */
+
+
+
+
+
+
+
+
+
+
+/** Get the current column number.
+ * @param yyscanner The scanner object.
+ */
+
+
+
+
+
+
+
+
+
+
+/** Get the input stream.
+ * @param yyscanner The scanner object.
+ */
+
+
+
+
+
+
+/** Get the output stream.
+ * @param yyscanner The scanner object.
+ */
+
+
+
+
+
+
+/** Get the length of the current token.
+ * @param yyscanner The scanner object.
+ */
+
+
+
+
+
+
+/** Get the current token.
+ * @param yyscanner The scanner object.
+ */
+
+
+
+
+
+
+
 /** Set the user-defined data. This data is never touched by the scanner.
  * @param user_defined The data to be associated with this scanner.
  * @param yyscanner The scanner object.
@@ -2145,11 +2450,59 @@ static void yyset_extra (YY_EXTRA_TYPE  user_defined , yyscan_t yyscanner)
     yyextra = user_defined ;
 }
 
+/** Set the current line number.
+ * @param _line_number line number
+ * @param yyscanner The scanner object.
+ */
+
+
+
+
+
+
+
+
+
+
+
+/** Set the current column.
+ * @param _column_no column number
+ * @param yyscanner The scanner object.
+ */
+
+
+
+
+
+
+
+
+
+
+
+/** Set the input stream. This does not discard the current
+ * input buffer.
+ * @param _in_str A readable stream.
+ * @param yyscanner The scanner object.
+ * @see yy_switch_to_buffer
+ */
+
+
+
+
+
+
 static void yyset_out (FILE *  _out_str , yyscan_t yyscanner)
 {
     struct yyguts_t * yyg = (struct yyguts_t*)yyscanner;
     yyout = _out_str ;
 }
+
+
+
+
+
+
 
 static void yyset_debug (int  _bdebug , yyscan_t yyscanner)
 {
@@ -2160,6 +2513,30 @@ static void yyset_debug (int  _bdebug , yyscan_t yyscanner)
 /* Accessor methods for yylval and yylloc */
 
 /* User-visible API */
+
+/* yylex_init is special because it creates the scanner itself, so it is
+ * the ONLY reentrant function that doesn't take the scanner as the last argument.
+ * That's why we explicitly handle the declaration, instead of using our macros.
+ */
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 /* yylex_init_extra has the same functionality as yylex_init, but follows the
  * convention of taking the scanner as the last argument. Note however, that
@@ -2325,19 +2702,6 @@ static void yyfree (void * ptr , yyscan_t yyscanner)
 #define YYTABLES_NAME "yytables"
 
 #line 526 "literate-c.lex"
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 static char * append (char * s, char * s1)
