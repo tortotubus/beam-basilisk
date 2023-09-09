@@ -273,11 +273,11 @@ struct yy_buffer_state
 #define YY_CURRENT_BUFFER_LVALUE yyg->yy_buffer_stack[yyg->yy_buffer_stack_top]
 
 static void yyrestart ( FILE *input_file , yyscan_t yyscanner );
-static void yy_switch_to_buffer ( YY_BUFFER_STATE new_buffer , yyscan_t yyscanner );
+
 static YY_BUFFER_STATE yy_create_buffer ( FILE *file, int size , yyscan_t yyscanner );
 static void yy_delete_buffer ( YY_BUFFER_STATE b , yyscan_t yyscanner );
 static void yy_flush_buffer ( YY_BUFFER_STATE b , yyscan_t yyscanner );
-static void yypush_buffer_state ( YY_BUFFER_STATE new_buffer , yyscan_t yyscanner );
+
 static void yypop_buffer_state ( yyscan_t yyscanner );
 
 static void yyensure_buffer_stack ( yyscan_t yyscanner );
@@ -285,9 +285,9 @@ static void yy_load_buffer_state ( yyscan_t yyscanner );
 static void yy_init_buffer ( YY_BUFFER_STATE b, FILE *file , yyscan_t yyscanner );
 #define YY_FLUSH_BUFFER yy_flush_buffer( YY_CURRENT_BUFFER , yyscanner)
 
-static YY_BUFFER_STATE yy_scan_buffer ( char *base, yy_size_t size , yyscan_t yyscanner );
-static YY_BUFFER_STATE yy_scan_string ( const char *yy_str , yyscan_t yyscanner );
-static YY_BUFFER_STATE yy_scan_bytes ( const char *bytes, int len , yyscan_t yyscanner );
+
+
+
 
 static void *yyalloc ( yy_size_t , yyscan_t yyscanner );
 static void *yyrealloc ( void *, yy_size_t , yyscan_t yyscanner );
@@ -778,7 +778,7 @@ struct yyguts_t
 
 static int yy_init_globals ( yyscan_t yyscanner );
 
-static int yylex_init (yyscan_t* scanner);
+
 
 static int yylex_init_extra ( YY_EXTRA_TYPE user_defined, yyscan_t* scanner);
 
@@ -787,7 +787,7 @@ static int yylex_init_extra ( YY_EXTRA_TYPE user_defined, yyscan_t* scanner);
 
 static int yylex_destroy ( yyscan_t yyscanner );
 
-static int yyget_debug ( yyscan_t yyscanner );
+
 
 static void yyset_debug ( int debug_flag , yyscan_t yyscanner );
 
@@ -795,25 +795,25 @@ static YY_EXTRA_TYPE yyget_extra ( yyscan_t yyscanner );
 
 static void yyset_extra ( YY_EXTRA_TYPE user_defined , yyscan_t yyscanner );
 
-static FILE *yyget_in ( yyscan_t yyscanner );
+
 
 static void yyset_in  ( FILE * _in_str , yyscan_t yyscanner );
 
-static FILE *yyget_out ( yyscan_t yyscanner );
+
 
 static void yyset_out  ( FILE * _out_str , yyscan_t yyscanner );
 
-static int yyget_leng ( yyscan_t yyscanner );
 
-static char *yyget_text ( yyscan_t yyscanner );
 
-static int yyget_lineno ( yyscan_t yyscanner );
 
-static void yyset_lineno ( int _line_number , yyscan_t yyscanner );
 
-static int yyget_column  ( yyscan_t yyscanner );
 
-static void yyset_column ( int _column_no , yyscan_t yyscanner );
+
+
+
+
+
+
 
 /* Macros after this point can all be overridden by user definitions in
  * section 1.
@@ -1821,37 +1821,37 @@ static void yyrestart  (FILE * input_file , yyscan_t yyscanner)
  * @param new_buffer The new input buffer.
  * @param yyscanner The scanner object.
  */
-static void yy_switch_to_buffer  (YY_BUFFER_STATE  new_buffer , yyscan_t yyscanner)
-{
-    struct yyguts_t * yyg = (struct yyguts_t*)yyscanner;
 
-	/* TODO. We should be able to replace this entire function body
-	 * with
-	 *		yypop_buffer_state();
-	 *		yypush_buffer_state(new_buffer);
-     */
-	yyensure_buffer_stack (yyscanner);
-	if ( YY_CURRENT_BUFFER == new_buffer )
-		return;
 
-	if ( YY_CURRENT_BUFFER )
-		{
-		/* Flush out information for old buffer. */
-		*yyg->yy_c_buf_p = yyg->yy_hold_char;
-		YY_CURRENT_BUFFER_LVALUE->yy_buf_pos = yyg->yy_c_buf_p;
-		YY_CURRENT_BUFFER_LVALUE->yy_n_chars = yyg->yy_n_chars;
-		}
 
-	YY_CURRENT_BUFFER_LVALUE = new_buffer;
-	yy_load_buffer_state( yyscanner );
 
-	/* We don't actually know whether we did this switch during
-	 * EOF (yywrap()) processing, but the only time this flag
-	 * is looked at is after yywrap() is called, so it's safe
-	 * to go ahead and always set it.
-	 */
-	yyg->yy_did_buffer_switch_on_eof = 1;
-}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 static void yy_load_buffer_state  (yyscan_t yyscanner)
 {
@@ -1975,32 +1975,32 @@ static void yy_flush_buffer (YY_BUFFER_STATE  b , yyscan_t yyscanner)
  *  @param new_buffer The new state.
  *  @param yyscanner The scanner object.
  */
-static void yypush_buffer_state (YY_BUFFER_STATE new_buffer , yyscan_t yyscanner)
-{
-    struct yyguts_t * yyg = (struct yyguts_t*)yyscanner;
-	if (new_buffer == NULL)
-		return;
 
-	yyensure_buffer_stack(yyscanner);
 
-	/* This block is copied from yy_switch_to_buffer. */
-	if ( YY_CURRENT_BUFFER )
-		{
-		/* Flush out information for old buffer. */
-		*yyg->yy_c_buf_p = yyg->yy_hold_char;
-		YY_CURRENT_BUFFER_LVALUE->yy_buf_pos = yyg->yy_c_buf_p;
-		YY_CURRENT_BUFFER_LVALUE->yy_n_chars = yyg->yy_n_chars;
-		}
 
-	/* Only push if top exists. Otherwise, replace top. */
-	if (YY_CURRENT_BUFFER)
-		yyg->yy_buffer_stack_top++;
-	YY_CURRENT_BUFFER_LVALUE = new_buffer;
 
-	/* copied from yy_switch_to_buffer. */
-	yy_load_buffer_state( yyscanner );
-	yyg->yy_did_buffer_switch_on_eof = 1;
-}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 /** Removes and deletes the top of the stack, if present.
  *  The next element becomes the new top.
@@ -2076,34 +2076,34 @@ static void yyensure_buffer_stack (yyscan_t yyscanner)
  * @param yyscanner The scanner object.
  * @return the newly allocated buffer state object.
  */
-static YY_BUFFER_STATE yy_scan_buffer  (char * base, yy_size_t  size , yyscan_t yyscanner)
-{
-	YY_BUFFER_STATE b;
-    
-	if ( size < 2 ||
-	     base[size-2] != YY_END_OF_BUFFER_CHAR ||
-	     base[size-1] != YY_END_OF_BUFFER_CHAR )
-		/* They forgot to leave room for the EOB's. */
-		return NULL;
 
-	b = (YY_BUFFER_STATE) yyalloc( sizeof( struct yy_buffer_state ) , yyscanner );
-	if ( ! b )
-		YY_FATAL_ERROR( "out of dynamic memory in yy_scan_buffer()" );
 
-	b->yy_buf_size = (int) (size - 2);	/* "- 2" to take care of EOB's */
-	b->yy_buf_pos = b->yy_ch_buf = base;
-	b->yy_is_our_buffer = 0;
-	b->yy_input_file = NULL;
-	b->yy_n_chars = b->yy_buf_size;
-	b->yy_is_interactive = 0;
-	b->yy_at_bol = 1;
-	b->yy_fill_buffer = 0;
-	b->yy_buffer_status = YY_BUFFER_NEW;
 
-	yy_switch_to_buffer( b , yyscanner );
 
-	return b;
-}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 /** Setup the input buffer state to scan a string. The next call to yylex() will
  * scan from a @e copy of @a str.
@@ -2113,11 +2113,11 @@ static YY_BUFFER_STATE yy_scan_buffer  (char * base, yy_size_t  size , yyscan_t 
  * @note If you want to scan bytes that may contain NUL values, then use
  *       yy_scan_bytes() instead.
  */
-static YY_BUFFER_STATE yy_scan_string (const char * yystr , yyscan_t yyscanner)
-{
-    
-	return yy_scan_bytes( yystr, (int) strlen(yystr) , yyscanner);
-}
+
+
+
+
+
 
 /** Setup the input buffer state to scan the given bytes. The next call to yylex() will
  * scan from a @e copy of @a bytes.
@@ -2126,35 +2126,35 @@ static YY_BUFFER_STATE yy_scan_string (const char * yystr , yyscan_t yyscanner)
  * @param yyscanner The scanner object.
  * @return the newly allocated buffer state object.
  */
-static YY_BUFFER_STATE yy_scan_bytes  (const char * yybytes, int  _yybytes_len , yyscan_t yyscanner)
-{
-	YY_BUFFER_STATE b;
-	char *buf;
-	yy_size_t n;
-	int i;
-    
-	/* Get memory for full buffer, including space for trailing EOB's. */
-	n = (yy_size_t) (_yybytes_len + 2);
-	buf = (char *) yyalloc( n , yyscanner );
-	if ( ! buf )
-		YY_FATAL_ERROR( "out of dynamic memory in yy_scan_bytes()" );
 
-	for ( i = 0; i < _yybytes_len; ++i )
-		buf[i] = yybytes[i];
 
-	buf[_yybytes_len] = buf[_yybytes_len+1] = YY_END_OF_BUFFER_CHAR;
 
-	b = yy_scan_buffer( buf, n , yyscanner);
-	if ( ! b )
-		YY_FATAL_ERROR( "bad buffer in yy_scan_bytes()" );
 
-	/* It's okay to grow etc. this buffer, and we should throw it
-	 * away when we're done.
-	 */
-	b->yy_is_our_buffer = 1;
 
-	return b;
-}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 #ifndef YY_EXIT_FAILURE
 #define YY_EXIT_FAILURE 2
@@ -2199,65 +2199,65 @@ static YY_EXTRA_TYPE yyget_extra  (yyscan_t yyscanner)
 /** Get the current line number.
  * @param yyscanner The scanner object.
  */
-static int yyget_lineno  (yyscan_t yyscanner)
-{
-    struct yyguts_t * yyg = (struct yyguts_t*)yyscanner;
 
-        if (! YY_CURRENT_BUFFER)
-            return 0;
-    
-    return yylineno;
-}
+
+
+
+
+
+
+
+
 
 /** Get the current column number.
  * @param yyscanner The scanner object.
  */
-static int yyget_column  (yyscan_t yyscanner)
-{
-    struct yyguts_t * yyg = (struct yyguts_t*)yyscanner;
 
-        if (! YY_CURRENT_BUFFER)
-            return 0;
-    
-    return yycolumn;
-}
+
+
+
+
+
+
+
+
 
 /** Get the input stream.
  * @param yyscanner The scanner object.
  */
-static FILE *yyget_in  (yyscan_t yyscanner)
-{
-    struct yyguts_t * yyg = (struct yyguts_t*)yyscanner;
-    return yyin;
-}
+
+
+
+
+
 
 /** Get the output stream.
  * @param yyscanner The scanner object.
  */
-static FILE *yyget_out  (yyscan_t yyscanner)
-{
-    struct yyguts_t * yyg = (struct yyguts_t*)yyscanner;
-    return yyout;
-}
+
+
+
+
+
 
 /** Get the length of the current token.
  * @param yyscanner The scanner object.
  */
-static int yyget_leng  (yyscan_t yyscanner)
-{
-    struct yyguts_t * yyg = (struct yyguts_t*)yyscanner;
-    return yyleng;
-}
+
+
+
+
+
 
 /** Get the current token.
  * @param yyscanner The scanner object.
  */
 
-static char *yyget_text  (yyscan_t yyscanner)
-{
-    struct yyguts_t * yyg = (struct yyguts_t*)yyscanner;
-    return yytext;
-}
+
+
+
+
+
 
 /** Set the user-defined data. This data is never touched by the scanner.
  * @param user_defined The data to be associated with this scanner.
@@ -2273,31 +2273,31 @@ static void yyset_extra (YY_EXTRA_TYPE  user_defined , yyscan_t yyscanner)
  * @param _line_number line number
  * @param yyscanner The scanner object.
  */
-static void yyset_lineno (int  _line_number , yyscan_t yyscanner)
-{
-    struct yyguts_t * yyg = (struct yyguts_t*)yyscanner;
 
-        /* lineno is only valid if an input buffer exists. */
-        if (! YY_CURRENT_BUFFER )
-           YY_FATAL_ERROR( "yyset_lineno called with no buffer" );
-    
-    yylineno = _line_number;
-}
+
+
+
+
+
+
+
+
+
 
 /** Set the current column.
  * @param _column_no column number
  * @param yyscanner The scanner object.
  */
-static void yyset_column (int  _column_no , yyscan_t yyscanner)
-{
-    struct yyguts_t * yyg = (struct yyguts_t*)yyscanner;
 
-        /* column is only valid if an input buffer exists. */
-        if (! YY_CURRENT_BUFFER )
-           YY_FATAL_ERROR( "yyset_column called with no buffer" );
-    
-    yycolumn = _column_no;
-}
+
+
+
+
+
+
+
+
+
 
 /** Set the input stream. This does not discard the current
  * input buffer.
@@ -2317,11 +2317,11 @@ static void yyset_out (FILE *  _out_str , yyscan_t yyscanner)
     yyout = _out_str ;
 }
 
-static int yyget_debug  (yyscan_t yyscanner)
-{
-    struct yyguts_t * yyg = (struct yyguts_t*)yyscanner;
-    return yy_flex_debug;
-}
+
+
+
+
+
 
 static void yyset_debug (int  _bdebug , yyscan_t yyscanner)
 {
@@ -2337,25 +2337,25 @@ static void yyset_debug (int  _bdebug , yyscan_t yyscanner)
  * the ONLY reentrant function that doesn't take the scanner as the last argument.
  * That's why we explicitly handle the declaration, instead of using our macros.
  */
-static int yylex_init(yyscan_t* ptr_yy_globals)
-{
-    if (ptr_yy_globals == NULL){
-        errno = EINVAL;
-        return 1;
-    }
 
-    *ptr_yy_globals = (yyscan_t) yyalloc ( sizeof( struct yyguts_t ), NULL );
 
-    if (*ptr_yy_globals == NULL){
-        errno = ENOMEM;
-        return 1;
-    }
 
-    /* By setting to 0xAA, we expose bugs in yy_init_globals. Leave at 0x00 for releases. */
-    memset(*ptr_yy_globals,0x00,sizeof(struct yyguts_t));
 
-    return yy_init_globals ( *ptr_yy_globals );
-}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 /* yylex_init_extra has the same functionality as yylex_init, but follows the
  * convention of taking the scanner as the last argument. Note however, that
