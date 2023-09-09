@@ -502,6 +502,6 @@ stencils.tst: CFLAGS += -DPRINTBOUNDARY=1
 dimensions-tests: bump2D.s capwave.s lid.s rising-axi.s		\
 	rising-reduced.s vortex.s sessile.s large.s lock.s	\
 	wind-driven-stvt.s shock.s starting.s layered.s 	\
-	stokes.s stokes-ns.s lonlat.s
+	stokes.s stokes-ns.s lonlat.s overflow.s
 
 include ../Makefile.defs
