@@ -9,24 +9,32 @@ check: $(subst .c,.tst,$(wildcard test*.c)) \
 	$(subst .c,.dtst,$(wildcard dimension-tests/test*.c))
 
 refs:
+	for f in test*.c; do 						\
+		$(QCC) $(FLAGS) -source -run=1 $$f 2>&1 | 		\
+                sed "s|$(BASILISK)||g" > `echo $$f | sed 's/\.c/.ref/'`; \
+	done
+
+drefs:
 	for f in dimension-tests/test*.c; do 				\
-		$(QCC) -source -dimensions -run=1 $$f 2>&1 | 		\
+		$(QCC) $(FLAGS) -source -dimensions -run=1 $$f 2>&1 | 	\
                 sed "s|$(BASILISK)||g" > `echo $$f | sed 's/\.c/.ref/'`; \
 	done
 
 %.tst: %.c %.ref $(QCC)
-	$(QCC) -source -run=1 $< 2>&1 | sed "s|$(BASILISK)||g" > $@
+	$(QCC) $(FLAGS) -source -run=1 $< 2>&1 | sed "s|$(BASILISK)||g" > $@
 	-rm -f _$<
 	diff $@ $*.ref || (rm -f $@ && exit 1)
 
 %.dtst: %.c %.ref $(QCC)
-	$(QCC) -source -dimensions -run=1 $< 2>&1 | sed "s|$(BASILISK)||g" > $@
+	$(QCC) $(FLAGS) -source -dimensions -run=1 $< 2>&1 | sed "s|$(BASILISK)||g" > $@
 	diff $@ $*.ref || (rm -f $@ && exit 1)
 
 %.vtst: %.c %.ref $(QCC)
-	valgrind -q $(QCC) -source -run=1 $< 2>&1 | sed "s|$(BASILISK)||g" > $@
+	valgrind -q $(QCC) $(FLAGS) -source -run=1 $< 2>&1 | sed "s|$(BASILISK)||g" > $@
 	-rm -f _$<
 	diff $@ $*.ref || (rm -f $@ && exit 1)
 
 clean:
-	rm -f *.o *.a *.*tst
+	rm -f *.o *.a *.*tst dimension-tests/*.*tst
+
+dimension-tests/test20.dtst: FLAGS += -non-finite
