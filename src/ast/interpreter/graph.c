@@ -90,13 +90,23 @@ void add_edge (Node * a, Node * b, float c)
 
 static Key * matrix_key (const System * s, int i, int j)
 {
-  Constraint * r = s->r + i;
-  if (!r->d->c)
+  Dimension ** r = s->r + i;
+  if (!r[0]->c)
     return NULL;
-  for (Key ** c = r->d->c; c[0]; c++)
-    if (c[0]->j == j)
-      return c[0];
+  foreach_key (r[0], c)
+    if (c->j == j)
+      return c;
   return NULL;
+}
+
+static
+int leftmost (const Dimension * d)
+{
+  int left = INT_MAX;
+  for (Key ** c = d->c; c[0]; c++)
+    if (c[0]->j < left)
+      left = c[0]->j;
+  return left;
 }
 
 Graph * system_to_graph (const System * s)
@@ -104,16 +114,18 @@ Graph * system_to_graph (const System * s)
   Graph * g = malloc (sizeof (Graph));
   g->hash = kh_init (GRAPH);
   int n = 0;
-  for (Constraint * i = s->r; i->d; i++, n++)
-    if (i->d->c) {
-      int left = leftmost (i->d);
+  foreach_constraint (s, i) {
+    if (i->c) {
+      int left = leftmost (i);
       Key * kleft = matrix_key (s, n, left);
       float coef = - matrix (s, n, left);
       Node * node = get_node (g, kleft);
-      for (Key ** c = i->d->c; c[0]; c++)
-	if (c[0]->j != left)
-	  add_edge (get_node (g, c[0]), node, matrix (s, n, c[0]->j)/coef);
+      foreach_key (i, c)
+	if (c->j != left)
+	  add_edge (get_node (g, c), node, matrix (s, n, c->j)/coef);
     }
+    n++;
+  }
   return g;
 }
 
