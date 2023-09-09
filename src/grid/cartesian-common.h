@@ -54,7 +54,7 @@ static void init_block_scalar (scalar sb, const char * name, const char * ext,
 {
   char bname[strlen(name) + strlen(ext) + 10];
   if (n == 0) {
-    sprintf (bname, "%s%s", name, ext);
+    strcat (strcpy (bname, name), ext);
     sb.block = block;
     init_scalar (sb, bname);
     baseblock = list_append (baseblock, sb);
@@ -184,10 +184,10 @@ vector new_block_face_vector (const char * name, int block)
 tensor new_tensor (const char * name)
 {
   char cname[strlen(name) + 3];
-  struct { char * x, * y, * z; } ext = {"%s.x", "%s.y", "%s.z"};
+  struct { char * x, * y, * z; } ext = {".x", ".y", ".z"};
   tensor t;
   foreach_dimension() {
-    sprintf (cname, ext.x, name);
+    strcat (strcpy (cname, name), ext.x);
     t.x = new_vector (cname);
   }
   init_tensor (t, NULL);
@@ -197,22 +197,22 @@ tensor new_tensor (const char * name)
 tensor new_symmetric_tensor (const char * name)
 {
   char cname[strlen(name) + 5];
-  struct { char * x, * y, * z; } ext = {"%s.x.x", "%s.y.y", "%s.z.z"};
+  struct { char * x, * y, * z; } ext = {".x.x", ".y.y", ".z.z"};
   tensor t;
   foreach_dimension() {
-    sprintf (cname, ext.x, name);
+    strcat (strcpy (cname, name), ext.x);
     t.x.x = new_scalar(cname);
   }
   #if dimension > 1
-    sprintf (cname, "%s.x.y", name);
+    strcat (strcpy (cname, name), "x.y");
     t.x.y = new_scalar(cname);
     t.y.x = t.x.y;
   #endif
   #if dimension > 2
-    sprintf (cname, "%s.x.z", name);
+    strcat (strcpy (cname, name), "x.z");
     t.x.z = new_scalar(cname);
     t.z.x = t.x.z;
-    sprintf (cname, "%s.y.z", name);
+    strcat (strcpy (cname, name), "y.z");
     t.y.z = new_scalar(cname);
     t.z.y = t.y.z;
   #endif
@@ -534,7 +534,7 @@ vector cartesian_init_vector (vector v, const char * name)
   foreach_dimension() {
     if (name) {
       char cname[strlen(name) + 3];
-      sprintf (cname, "%s%s", name, ext.x);
+      strcat (strcpy (cname, name), ext.x);
       init_scalar (v.x, cname);
     }
     else
@@ -566,7 +566,7 @@ tensor cartesian_init_tensor (tensor t, const char * name)
   foreach_dimension() {
     if (name) {
       char cname[strlen(name) + 3];
-      sprintf (cname, "%s%s", name, ext.x);
+      strcat (strcpy (cname, name), ext.x);
       init_vector (t.x, cname);
     }
     else

@@ -367,7 +367,13 @@ void display_value (const Value * v)
   fputc ('\n', stderr);
   if (v->pointer && (v->pointer > 1 || v->type->sym != sym_function_definition)) {
     Pointer p = value_data (v, Pointer);
-    fprintf (stderr, "p: %p, start: %p, size: %d, scope: %d\n", p.p, p.start, p.size, p.pscope);
+    fprintf (stderr, "p: %p, start: %p, size: %d, scope: %d\nchars: '", p.p, p.start, p.size, p.pscope);
+    int maxchars = 80;
+    for (char * s = p.p; s < p.start + p.size && maxchars; s++, maxchars--)
+      fputc (*s, stderr);
+    if (!maxchars)
+      fputs ("...", stderr);
+    fputs ("'\n", stderr);
   }
   if (v->dimension) {
     fputs ("dimensions:", stderr);
