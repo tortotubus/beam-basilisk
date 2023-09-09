@@ -2567,7 +2567,9 @@ Value * ast_run_node (Ast * n, Stack * stack)
   case sym_array_access:
     if (n->child[2]) {
       Value * a = run (n->child[0], stack);
-      if (!a) return undefined (scope, n->child[0], stack);	
+      if (!a) return undefined (scope, n->child[0], stack);
+      if (!a->pointer && is_constant_expression (a)) // skips dimensions e.g. 3.1456 [3,-1]
+	return a;
       Value * i = run (n->child[2], stack);
       if (!i) return undefined (scope, n->child[2], stack);
       bool error = false;
