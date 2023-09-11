@@ -4614,22 +4614,25 @@ void * endfor (FILE * fin, FILE * fout,
   return root;
 }
 
-void check_dimensions (AstRoot * root,
+bool check_dimensions (AstRoot * root,
 		       bool nolineno,
-		       int run, FILE * dimensions, int finite, int redundant, int maxcalls)
+		       int run, FILE * dimensions,
+		       int finite, int redundant, int warn, int maxcalls)
 {
   Ast * d = ((Ast *)root)->parent;
   ((Ast *)root)->parent = NULL;
   Ast * main = ast_parent (ast_identifier_declaration (root->stack, "main"),
 			   sym_function_definition);
+  bool ret = true;
   if (main) {
     if (dimensions != stdout)
-      ast_check_dimensions (root, main, run >= 0 ? run : 0,
-			    maxcalls, dimensions, finite, redundant, !nolineno);  
+      ret = ast_check_dimensions (root, main, run >= 0 ? run : 0,
+				  maxcalls, dimensions, finite, redundant, !nolineno, warn);  
     else if (run >= 0)
       ast_run (root, main, run, maxcalls, NULL);
   }
 
   ast_destroy (d);
   ast_destroy ((Ast *) root);
+  return ret;
 }

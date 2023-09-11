@@ -72,7 +72,7 @@ struct _System {
   Key ** index;
   int m, n;
   FILE * output;
-  int redundant, finite, lineno;
+  int redundant, finite, lineno, warn;
   bool dimensionless;
 };
   
@@ -668,25 +668,27 @@ double dependent_dimensions (Dimension * da, Dimension * db)
 }
 
 static
-void not_homogeneous (Ast * n, Value * va, Value * vb)
+void * not_homogeneous (Ast * n, Value * va, Value * vb, Stack * stack)
 {
   AstTerminal * t = ast_left_terminal (n);
-  fprintf (stderr, "%s:%d: error: '", t->file, t->line);
+  System * s = interpreter_get_data (stack);
+  const char * msg = s->warn ? "warning" : "error";
+  fprintf (stderr, "%s:%d: %s: '", t->file, t->line, msg);
   print_simplified_expression (ast_crop_before (ast_str_append (n, NULL)), stderr);
   fputs ("' is not an homogeneous expression\n", stderr);
   t = ast_left_terminal ((Ast *)va);
-  fprintf (stderr, "%s:%d: error: '", t->file, t->line);
+  fprintf (stderr, "%s:%d: %s: '", t->file, t->line, msg);
   print_simplified_expression (ast_crop_before (ast_str_append ((Ast *)va, NULL)), stderr);
   fputs ("' has dimensions", stderr);
   value_print_dimension (va, true, LINENO, stderr);
   fputs ("\n", stderr);
   t = ast_left_terminal ((Ast *)vb);
-  fprintf (stderr, "%s:%d: error: '", t->file, t->line);
+  fprintf (stderr, "%s:%d: %s: '", t->file, t->line, msg);
   print_simplified_expression (ast_crop_before (ast_str_append ((Ast *)vb, NULL)), stderr);
   fputs ("' has dimensions", stderr);
   value_print_dimension (vb, true, LINENO, stderr);
   fputs ("\n", stderr);
-  exit (1);  
+  return NULL;
 }
 
 /**
@@ -942,12 +944,12 @@ bool remove_dimensionless_subsystems (System * s)
   return found;
 }
 
-static void system_pivot (System * s)
+static bool system_pivot (System * s)
 {
   system_index (s);
   
   if (!s->m)
-    return;  
+    return true;
   
   /** 
   Gaussian elimination, algorithm directly adapted from
@@ -994,11 +996,11 @@ static void system_pivot (System * s)
 	  /* If l.h.s. is zero and r.h.s. is not zero the system does not have a solution */
 	  if (!d->c && d->a) {
 	    AstTerminal * t = ast_left_terminal (s->r[h]->origin);
-	    fprintf (stderr, "%s:%d: error: the dimensional constraints below are not compatible\n",
-		     t->file, t->line);
+	    fprintf (stderr, "%s:%d: %s: the dimensional constraints below are not compatible\n",
+		     t->file, t->line, s->warn ? "warning" : "error");
 	    constraint_print (s->r[h], stderr, CARRIAGE | LINENO);
 	    constraint_print (r, stderr, CARRIAGE | LINENO);
-	    exit (1);
+	    return false;
 	  }
 	  *(s->r + i) = d;
 	}
@@ -1025,6 +1027,7 @@ static void system_pivot (System * s)
       break;
     }
   }
+  return true;
 }
 
 static
@@ -1051,14 +1054,15 @@ Key ** system_unconstrained (const System * s)
   return unconstrained;
 }
 
-static void system_solve (System * s)
+static bool system_solve (System * s)
 {
 #if WRITE_GRAPH  
   system_write_graph (s, "dimensions0.dot");
   { FILE * fp = fopen ("system0", "w"); system_print (s, fp), fclose (fp); }
 #endif
   
-  system_pivot (s);
+  if (!system_pivot (s))
+    return false;
   
   DEBUG (fprintf (stderr, "@@ %d unknowns, %d constraints\n", s->n, s->m));
   if (s->m) {
@@ -1091,6 +1095,8 @@ static void system_solve (System * s)
 
   if (s->output)
     fprintf (s->output, "%d constraints, %d unknowns\n", s->m, s->n);
+
+  return true;
 }
 
 /**
@@ -1158,11 +1164,11 @@ Dimension * homogeneous_dimensions (Ast * n, Value * va, Value * vb, Stack * sta
   int nt = unique_unknowns (da, db);
   if (!nt) {
     if (dimensions (da) != dimensions (db))
-      not_homogeneous (n, va, vb);
+      return not_homogeneous (n, va, vb, stack);
     else if (da && da->a)
       for (double * i = da->a, * j = db->a; *i < END; i++, j++)
 	if (*i != *j)
-	  not_homogeneous (n, va, vb);
+	  return not_homogeneous (n, va, vb, stack);
     return da ? da : db;
   }
 
@@ -1172,7 +1178,7 @@ Dimension * homogeneous_dimensions (Ast * n, Value * va, Value * vb, Stack * sta
   
   Dimension * constraint = dimensions_multiply (n, stack_static_alloc (stack), da, db, -1.);
   if (!constraint->c && constraint->a)
-    not_homogeneous (n, va, vb);
+    return not_homogeneous (n, va, vb, stack);
   add_constraint (interpreter_get_data (stack), constraint, stack);
   
   /**
@@ -1211,6 +1217,11 @@ bool is_finite (const Value * v)
   return false;
 }
 
+static void dimension_error (Stack * stack)
+{
+  ((StackData *)stack_get_data (stack))->maxcalls = -1;
+}
+
 static
 Value * dimension_binary_operation (Ast * n, Stack * stack, Value * a, Value * b, Value * value)
 {
@@ -1228,16 +1239,18 @@ Value * dimension_binary_operation (Ast * n, Stack * stack, Value * a, Value * b
   if (op == token_symbol('+') || op == token_symbol('-') ||
       ast_schema (n->child[1], sym_assignment_operator, 0, sym_ADD_ASSIGN) ||
       ast_schema (n->child[1], sym_assignment_operator, 0, sym_SUB_ASSIGN)) {
-    if (can_assign_dimension (value))
-      value_dimension (value) = homogeneous_dimensions (n, a, b, stack);
+    if (can_assign_dimension (value) &&
+	!(value_dimension (value) = homogeneous_dimensions (n, a, b, stack)))
+      dimension_error (stack);
   }
   else if (mul) {
     if (can_assign_dimension (value))
       value_dimension (value) = dimensions_multiply (n, stack_static_alloc (stack),
 						     get_dimension (a, stack), get_dimension (b, stack), mul);
   }
-  else if (can_have_dimension (a) && can_have_dimension (b))
-    homogeneous_dimensions (n, a, b, stack);
+  else if (can_have_dimension (a) && can_have_dimension (b) &&
+	   !homogeneous_dimensions (n, a, b, stack))
+    dimension_error (stack);
   return value;
 }
 
@@ -1273,14 +1286,14 @@ Dimension * dimension_pow (Ast * origin, Stack * stack, Dimension * d, double e)
 }
 
 static
-void print_params (Ast * call, Value ** params)
+void print_params (Ast * call, Value ** params, const char * msg)
 {
   Ast * list = call->child[2];
   int i = 0;
   foreach_item_r (list, sym_argument_expression_list_item, arg) {
     AstTerminal * t = ast_left_terminal (arg);
-    fprintf (stderr, "%s:%d: error: '%s' has dimensions",
-	     t->file, t->line, ast_crop_before (ast_str_append (arg, NULL)));
+    fprintf (stderr, "%s:%d: %s: '%s' has dimensions",
+	     t->file, t->line, msg, ast_crop_before (ast_str_append (arg, NULL)));
     value_print_dimension (params[i++], true, LINENO, stderr);
     fputc ('\n', stderr);
   }
@@ -1302,10 +1315,13 @@ Value * dimension_internal_functions (Ast * call, Ast * identifier, Value ** par
 						  get_dimension (params[1], stack), -1.);
     if (constraint && constraint->a && !constraint->b) {
       AstTerminal * t = ast_left_terminal (call);
-      fprintf (stderr, "%s:%d: error: the arguments of 'atan2' must have the same dimensions\n",
-	       t->file, t->line);
-      print_params (call, params);
-      exit (1);
+      System * s = interpreter_get_data (stack);
+      const char * msg = s->warn ? "warning" : "error";
+      fprintf (stderr, "%s:%d: %s: the arguments of 'atan2' must have the same dimensions\n",
+	       t->file, t->line, msg);
+      print_params (call, params, msg);
+      dimension_error (stack);
+      return value;
     }
     add_constraint (interpreter_get_data (stack), constraint, stack);
     value_dimension (value) = dimension_zero (stack_static_alloc (stack), call);
@@ -1342,10 +1358,13 @@ Value * dimension_internal_functions (Ast * call, Ast * identifier, Value ** par
 	Dimension * constraint = get_dimension (params[0], stack);
 	if (constraint && constraint->a && !constraint->b) {
 	  AstTerminal * t = ast_left_terminal (call);
-	  fprintf (stderr, "%s:%d: error: the argument of '%s' must be dimensionless\n",
-		   t->file, t->line, ast_crop_before (ast_str_append (call, NULL)));
-	  print_params (call, params);
-	  exit (1);
+	  System * s = interpreter_get_data (stack);
+	  const char * msg = s->warn ? "warning" : "error";
+	  fprintf (stderr, "%s:%d: %s: the argument of '%s' must be dimensionless\n",
+		   t->file, t->line, msg, ast_crop_before (ast_str_append (call, NULL)));
+	  print_params (call, params, msg);
+	  dimension_error (stack);
+	  return value;
 	}
 	constraint->origin = call;
 	add_constraint (interpreter_get_data (stack), constraint, stack);
@@ -1501,13 +1520,19 @@ bool is_finite_constant (const Key * c)
 static
 void dimension_after_run (Ast * n, Stack * stack)
 {
+  if (((StackData *)stack_get_data (stack))->maxcalls < 0)
+    return;
   System * s = interpreter_get_data (stack);
   s->alloc = stack_alloc (stack);
   if (!s->output) {
-    system_pivot (s);
+    if (!system_pivot (s))
+      ((StackData *)stack_get_data (stack))->maxcalls = -1;
     return;
   }
-  system_solve (s);
+  if (!system_solve (s)) {
+    ((StackData *)stack_get_data (stack))->maxcalls = -1;
+    return;
+  }
   int u = 0;
   foreach_constraint (s, r) {
     u++;
@@ -1606,8 +1631,9 @@ void dimension_after_run (Ast * n, Stack * stack)
     }
 }
 
-void ast_check_dimensions (AstRoot * root, Ast * n, int verbosity, int maxcalls,
-			   FILE * dimensions, int finite, int redundant, int lineno)
+bool ast_check_dimensions (AstRoot * root, Ast * n, int verbosity, int maxcalls,
+			   FILE * dimensions, int finite, int redundant, int lineno,
+			   int warn)
 {
   ast_type_size = dimension_type_size;
   run = dimension_run;
@@ -1622,6 +1648,7 @@ void ast_check_dimensions (AstRoot * root, Ast * n, int verbosity, int maxcalls,
   system->finite = finite;
   system->redundant = redundant;
   system->lineno = lineno;
+  system->warn = warn;
   int remainingcalls = ast_run (root, n, verbosity, maxcalls, system);
   if (!remainingcalls && dimensions) {
     AstTerminal * t = ast_left_terminal (n);
@@ -1629,4 +1656,5 @@ void ast_check_dimensions (AstRoot * root, Ast * n, int verbosity, int maxcalls,
 	     t->file, t->line, maxcalls);
   }
   system_destroy (system);
+  return remainingcalls >= 0;
 }

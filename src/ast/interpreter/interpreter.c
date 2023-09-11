@@ -2265,7 +2265,7 @@ Value * ast_run_node (Ast * n, Stack * stack)
 {
   if (!n)
     return NULL;
-  if (!((StackData *)stack_get_data (stack))->maxcalls)
+  if (((StackData *)stack_get_data (stack))->maxcalls <= 0)
     return message (NULL, n, "reached maximum number of interpreter calls\n", warning_verbosity, stack);
   ((StackData *)stack_get_data (stack))->maxcalls--;
   Value * value = NULL;

@@ -282,5 +282,5 @@ int ast_run (AstRoot * root, Ast * n, int verbosity, int maxcalls, void * data);
 /**
 ## Interface for dimensional analysis */
 
-void ast_check_dimensions (AstRoot * root, Ast * n, int verbosity, int maxcalls,
-			   FILE * dimensions, int finite, int redundant, int lineno);
+bool ast_check_dimensions (AstRoot * root, Ast * n, int verbosity, int maxcalls,
+			   FILE * dimensions, int finite, int redundant, int lineno, int warn);
