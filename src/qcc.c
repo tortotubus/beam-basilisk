@@ -33,6 +33,7 @@ A summary of the options/switches:
 * `-disable-dimensions` : do not check dimensional consistency
 * `-non-finite` : also outputs the dimensions of "non-finite" constants
 * `-redundant` : also outputs the dimensions of redundant constants
+* `-Wdimensions` : only warns on dimensional errors
 * `-maxcalls=VAL` : maximum number of calls for the interpreter. The default 
   is 15 millions. A negative value means no limit.
 
@@ -53,7 +54,7 @@ int dimension = 2, bghosts = 0, layers = 0;
 int debug = 0, catch = 0, cadna = 0, nolineno = 0, events = 0, progress = 0;
 int parallel = 0;
 static FILE * dimensions = NULL;
-static int run = -1, finite = 1, redundant = 0, maxcalls = 15000000;
+static int run = -1, finite = 1, redundant = 0, warn = 0, maxcalls = 15000000;
 char dir[] = ".qccXXXXXX";
 
 char * autolink = NULL;
@@ -185,6 +186,8 @@ int main (int argc, char ** argv)
       finite = 0;
     else if (!strcmp (argv[i], "-redundant"))
       redundant = 1;
+    else if (!strcmp (argv[i], "-Wdimensions"))
+      warn = 1;
     else if (!strncmp (argv[i], "-maxcalls", 9)) {
       if (*(argv[i] + 9) == '=')
 	maxcalls = atoi (argv[i] + 10);
@@ -500,16 +503,17 @@ int main (int argc, char ** argv)
       exit (1);
     status = WEXITSTATUS (status);
   }
-  if (ast) {
-    void check_dimensions (void * root,
-			   int nolineno,
-			   int run, FILE * dimensions, int finite, int redundant,
-			   int maxcalls);
-    if (status != 0)
-      run = -1, dimensions = stdout; // do not run or check dimensions in case of compilation error
-    check_dimensions (ast, nolineno,
-		      run, dimensions, finite, redundant, maxcalls);
-  }
+  int check_dimensions (void * root,
+			int nolineno,
+			int run, FILE * dimensions, int finite, int redundant,
+			int warn,
+			int maxcalls);
+  if (ast &&
+      status == 0 &&
+      !check_dimensions (ast, nolineno,
+			 run, dimensions, finite, redundant, warn, maxcalls) &&
+      !warn)
+    status = 2; // dimensional error
   exit (status);
   return status;
 }
