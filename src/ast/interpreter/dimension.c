@@ -1,40 +1,181 @@
 /**
 # Dimensional analysis 
 
-Constants in multiplicative expressions have dimension zero.
+This file contains the code implementing dimensional analysis in
+Basilisk.
 
-Be careful with
+We will assume in what follows that the reader is familiar with the
+basic concepts of dimensional analysis and of the conventions used to
+represent dimensions within Basilisk. These are introduced in the
+[Dimension tutorial](/Tutorial.dimensions).
 
-a = b = 0
+## Introduction
 
-Be careful with branches (see dimension-tests/test19.c)
+The primary goal of the following code is to check that all
+(arithmetic) operations done by a program written in Basilisk C are
+dimensionally consistent.
 
-Use const double rather than macros
+Interestingly, while dimensional consistency is clearly a cornerstone
+of physics, there does not seem to be a widely used language which
+ensure this consistency at the programming level. The code below is an
+attempt to fill this gap, at least in the context of code written with
+Basilisk.
 
-show_dimension (expression);
+A reasonably simple way to impose this consistency would be to
+associate different types to arithmetic variables, depending on their
+dimensions. For example instead of writing
 
-dimensional (expression);
+~~~c
+double L = 10, T = 4, H = 30, G = 9.81, U = L/T + sqrt(G*H);
+~~~
 
-[*] means "any dimension"
+one would write
 
-special role of size() and DT
+~~~c
+Length L = 10, H = 30;
+Time T = 4;
+Acceleration G = 9.81;
+Speed U = L/T + sqrt(G*H);
+~~~
 
-example: make space and time dimensionless => 
-size (1 [0]);
-DT = HUGE [0];
+the compiler would then be able to check that operations (such as the
+addition above) only happen between compatible types (i.e. Speed in
+the example).
 
-ints are dimensionless, but not longs
+An important drawback of this approach (which has been used in the
+past) is that it obviously requires major code rewriting, as well as
+important constraints on the way code is written. In particular, all
+dimensions must be known and correctly imposed beforehand: writing
+code which is "dimension-independent" is not possible anymore.
 
-careful with constant fields... (need to be allocated locally)
+It also seems obvious that associating dimensions with variables (via
+their types or otherwise) is not the most general approach. Dimensions
+(and units) should be associated with numerical values (i.e. with the
+content of variables). One could for example design CPU chips which
+would carry out operations on floating point numbers with associated
+dimensions. This chip could then return errors (i.e. a "Floating point
+exception") in the case of operations done on values with incompatible
+dimensions. Building a new special-purpose chip is clearly not a very
+practical solution however. Furthermore this approach would still
+require specifying the dimensions of every numerical value used as
+input to the program, which could also be quite cumbersome.
 
-dimensionless constants are only listed for .c files (when -non-finite
-is not specified)
+The approach taken here, called "Dimensional Inference", also relies
+on associating dimensions with values (and not variables or types) and
+has been known since at least the work of [Wand and O'Keefe,
+1991](#wand1991). The principle is simple:
 
-Delta must be used for dimensioning length (in case of mappings)
+1) collect all "dimensional constraints" i.e. relationships necessary
+to impose consistency when performing a given arithmetic operation. By
+definition, these constraints will always involve the dimensions of
+the input constants.
+
+2) this collection of constraints linearly relates the dimensions of
+all the numerical constants used in the program i.e. they form a
+linear system of equations.
+
+3) try to solve this system. There are three main cases: a) if the
+system does not have a solution, then there is a dimensional
+inconsistency somewhere. b) if the system has more than one solution
+it requires additional constraints (i.e. directly setting the
+dimensions of more input constants). c) if the system has a solution
+then the dimensions of all input constants can be uniquely determined.
+
+A major advantage of this approach is that the dimensions of most
+constants can usually be "inferred" from the explicit specifications
+of only a few input constants. Minimal code modification is thus
+necessary to ensure full dimensional consistency.
+
+## References
+
+~~~bib
+@inproceedings{wand1991,
+  title={Automatic Dimensional Inference.},
+  author={Wand, Mitchell and O'Keefe, Patrick},
+  booktitle={Computational Logic-Essays in Honor of Alan Robinson},
+  pages={479--483},
+  year={1991},
+  organization={Citeseer}
+}
+
+@article{sandberg2003,
+  title={Automatic dimensional consistency checking for 
+         simulation specifications},
+  author={Sandberg, Mikael and Persson, Daniel and Lisper, Bj{\"o}rn},
+  journal={Group},
+  volume={1},
+  number={2},
+  pages={M1},
+  year={2003}
+}
+
+@inproceedings{farrimond2007,
+  title={Dimensional Inference Using Symbol Lives},
+  author={Farrimond, Brian and Collins, John},
+  booktitle={SETP},
+  pages={152--159},
+  year={2007}
+}
+~~~
+
+## Implementation
+
+The primary reason for associating dimensions with types is that this
+allows for "static analysis" of dimensional consistency i.e. the
+compiler can check the consistency directly. When dimensions are
+associated with values, the only way to ensure consistency is to "run"
+the code ("dynamic analysis"), at least partially, and check that the
+operations performed involve values which are dimensionally
+consistent.
+
+To do so, the implementation below uses the
+[interpreter](interpreter.c) to "run" the code being analysed. Of
+course running the full code within an interpreter just to check for
+consistency would be too expensive, so a simplified version of the
+code is run. The major simplifications are: the mesh contains a single
+grid point and the number of times loops are iterated is limited. This
+includes of course the number of timesteps which are performed. This
+"run" is performed at compilation time and usually completes in a
+reasonable amount of time, compared to the total compilation time.
+
+During this runtime phase, all arithmetic operations involving types
+to which dimensions can be associated (essentially floating point
+numbers, see below for details) are intercepted and the corresponding
+dimensional constraints are added to the linear system. Some obvious
+dimensional errors can also be detected directly within this first
+pass of analysis.
+
+A potential problem with the simplifications above is that they may
+miss some branches which will be taken when the full code is run. For
+example, an upwind scheme may take a branch which will depend on the
+sign of the value of a field. If a single grid point is used, this
+field will have a single value and only one of the branches will be
+taken. If this happens, dimensional analysis will not be
+exhaustive. To avoid this, the interpreter implements a sophisticated
+scheme where values can be specified as "unset" i.e. having an
+undefined value. If a condition depends on such an "unset" value, the
+interpreter makes sure to take both branches and to properly propagate
+"unset" values through their chains of dependencies.
+
+Note that this approach imposes some constraints on the dimensions of
+values defined within conditional branches.
+
+More details on implementation are given in the documentation
+associated with each section of the code below.
 
 ## Dimension tests
 
-*/
+Test cases for dimensional analysis are in
+`/src/ast/interpreter/dimension-tests/test*.c` they are run when doing
+
+~~~bash
+cd src/ast/interpreter/
+make check
+~~~
+
+They also include some documentation of various "corner cases".
+
+# Data structures */
 
 #if 0
 # define DEBUG(...) (__VA_ARGS__)
@@ -66,6 +207,9 @@ struct _Dimension {
   System * s;
 };
 
+/**
+The system of dimensional constraints. */
+
 struct _System {
   Dimension ** r;
   Allocator * alloc;
@@ -75,11 +219,15 @@ struct _System {
   int redundant, finite, lineno, warn;
   bool dimensionless;
 };
-  
+
+/**
+A special value for [*]. */
+
 static
 Dimension * const dimension_any = (Dimension *) 128;
 
-#define END 1e10
+/**
+# Outputs */
 
 const char * ast_file_crop (const char * file)
 {
@@ -231,6 +379,8 @@ void print_key_label (const Key * c, char sep, FILE * fp, int flags)
 
 #define foreach_key(a, b) if (a->c) for (Key ** _p = a->c, * b = *_p; b; b = *++_p)
 
+#define END 1e10
+
 static
 void dimension_print (const Dimension * d, FILE * fp, double coef, int flags)
 {
@@ -269,6 +419,9 @@ void dimension_print (const Dimension * d, FILE * fp, double coef, int flags)
     }
   }
 }
+
+/**
+# Various utility functions */
 
 static inline
 bool can_have_dimension (const Value * v) {
@@ -692,7 +845,7 @@ void * not_homogeneous (Ast * n, Value * va, Value * vb, Stack * stack)
 }
 
 /**
-## System of dimensional constraints */
+# System of dimensional constraints */
 
 static
 System * system_new()
@@ -953,7 +1106,7 @@ static bool system_pivot (System * s)
   
   /** 
   Gaussian elimination, algorithm directly adapted from
-  [https://en.wikipedia.org/wiki/Gaussian_elimination#Pseudocode]. */ 
+  [wikipedia](https://en.wikipedia.org/wiki/Gaussian_elimination#Pseudocode). */ 
 
   int h = 0; /* Initialization of the pivot row */
   int k = 0; /* Initialization of the pivot column */
@@ -1100,7 +1253,7 @@ static bool system_solve (System * s)
 }
 
 /**
-## Dimension hooks to the interpreter */
+# Dimension hooks to the interpreter */
 
 static
 Value * dimension_run (Ast * n, Stack * stack)
@@ -1630,6 +1783,25 @@ void dimension_after_run (Ast * n, Stack * stack)
       r->c[0]->label = NULL;
     }
 }
+
+/**
+# Interface
+
+This function performs dimensional analysis and returns `true` if the
+code defined by `root` and `n` is dimensionally correct and `false`
+otherwise. The parameters are:
+
+* `verbosity` : verbosity level for the interpreter (1 to 4).
+* `maxcalls` : maximum number of calls or instructions interpreted.
+* `dimensions` : where to output a summary of the dimensions of constants.
+* `finite` : if `true` only "finite" constants (i.e. constants
+*            different from "zero" or "infinity") are displayed.
+* `redundant` : if `true` all constants are listed, even repeated ones.
+* `lineno` : if `true` a different output format is used.
+* `warn` : if `true` the code will only warn on dimensional errors.
+
+See also [interpreter.c]().
+*/
 
 bool ast_check_dimensions (AstRoot * root, Ast * n, int verbosity, int maxcalls,
 			   FILE * dimensions, int finite, int redundant, int lineno,
