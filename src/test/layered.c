@@ -17,12 +17,17 @@ The constant inflow flow rate (m^2/s). */
 
 const double Q = 1.;
 
+/**
+The outlet water level. */
+
+const double Ho = 0.6;
+
 int main() {
   X0 = 0.;
   L0 = 21. [1];
   G = 9.81;
   N = 256;
-
+  
   /**
   The viscosity is set to $\nu = 0.01 m^2/s$ and the bottom friction
   is variable. */
@@ -41,8 +46,8 @@ int main() {
 /**
 We impose the outlet water level. */
 
-h[right]   = dirichlet(0.6);
-eta[right] = dirichlet(0.6);
+h[right]   = dirichlet (Ho);
+eta[right] = dirichlet (Ho);
 
 /**
 ## Initialisation
@@ -56,7 +61,7 @@ event init (i = 0) {
   double a = 0.2, b = 5.75/2.;
   foreach() {
     zb[] = max(0., a*(1.[0] - sq((x - 10.)/b)));
-    hc[] = h[] = 0.6 - zb[];
+    hc[] = h[] = Ho - zb[];
   }
 
   /**
