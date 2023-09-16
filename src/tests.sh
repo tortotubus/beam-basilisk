@@ -66,7 +66,8 @@ echo "updating Makefile.tests"
     singleline < Makefile | 		                   \
 	grep '^check:' | tr ' ' '\n' |                     \
 	sed -n 's/[ 	]*\([a-zA-Z_0-9-]*\..tst\)[ 	]*/\1/p' |  \
-	sed 's/\(.*\)\..tst/	\1.c \\/g'
+	sed 's/\(.*\)\..tst/	\1.c \\/g' | \
+	sed 's/.*$(wildcard//g'
     singleline < Makefile | 		                   \
 	grep -v '^check:' | grep '^[^.]*:.*' | tr ' ' '\n' |     \
 	sed -n 's/[ 	]*\([a-zA-Z_0-9-]*\.tst\)[ 	]*/\1/p' |    \
