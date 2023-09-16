@@ -15,8 +15,8 @@ The main files are:
 * `test*.c` and `test*.ref`: the source code and reference files for the
   test suite. These should be run using the [Makefile]() and:
   
-  ~~~bash
-  make check
-  ~~~
+    ~~~bash
+    make check
+    ~~~
 
 The interpreter is used in particular for [dimensional analysis](dimension.c).
