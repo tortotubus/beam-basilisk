@@ -201,7 +201,7 @@ remotely()
     case "$CFLAGS" in
 	*-cadna*) PCC="\$CADNACC" ;;
     esac
-    PCFLAGS=`echo $CFLAGS | sed -e 's/-grid=[^-]*//' -e 's/-cadna//' -e 's/-progress//'`
+    PCFLAGS=`echo $CFLAGS | sed -e 's/-grid=[^-]*//' -e 's/-cadna//' -e 's/-progress//' -e 's/-Wdimensions//'`
     NCORES=`echo $EXEC | awk 'BEGIN{ np = 1 }{
       if ($1 == "mpirun") np = $3; }END{ print np;}'`
     case "$CFLAGS" in
