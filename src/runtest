@@ -113,8 +113,8 @@ script()
 locally()
 {
     echo \[$test.$ext\]
-    $BASILISK/qcc -autolink -disable-dimensions $CFLAGS -o $test/$test $src $LIBS -lm > $test/warn 2>&1 \
-	|| mv -f $test/warn $test/fail
+    $BASILISK/qcc -autolink -disable-dimensions $CFLAGS -o $test/$test $src $LIBS -lm > $test/log 2>&1 \
+	|| mv -f $test/log $test/fail
     cd $test
     script
     cd ..
@@ -227,11 +227,9 @@ run_untrusted()
   return \$status
 }
 
-$PCC $PCFLAGS -I\$HOME/include -o $chksum $src -L\$HOME/lib $LIBS $autolink -lm > warn 2>&1 || mv -f warn fail
+$PCC $PCFLAGS -I\$HOME/include -o $chksum $src -L\$HOME/lib $LIBS $autolink -lm > log 2>&1 || mv -f log fail
 rm -f $src
 if ! test -f fail; then
-  test -s warn || rm -f warn
-
   pass=true
   if test -n "$EXEC" -o -z "`which gdb`"; then
     if ! run_untrusted "$TIMEOUT $EXEC ./$chksum 2> $log > $out"; then
