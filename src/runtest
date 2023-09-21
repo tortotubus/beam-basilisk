@@ -53,7 +53,6 @@ script()
     if test -f fail; then
 	return 1
     fi
-    cat warn
     test -s warn || rm -f warn
 
     pass=true

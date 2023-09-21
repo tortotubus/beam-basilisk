@@ -14,7 +14,7 @@ STRIPFLAGS = -s
 CFLAGS += -g -Wall -pipe -D_FORTIFY_SOURCE=2
 
 # if you have valgrind, otherwise comment this out
-VALGRIND = valgrind -q --tool=memcheck --suppressions=$(BASILISK)/openmpi.supp \
+VALGRIND = valgrind -q --tool=memcheck --suppressions=$(HOME)/basilisk/src/openmpi.supp \
 	--leak-check=full
 
 # if gnuplot supports pngcairo, otherwise comment this out

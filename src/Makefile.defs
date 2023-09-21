@@ -78,7 +78,7 @@ clean:
 	 cat $*/fail 2> /dev/stderr &&						\
 	 exit 1)
 	@chmod -x $@
-	@test ! -s $*.log~ || ( mkdir -p $* && cat $*.log~ > $*/warn )
+	@test ! -s $*.log~ || ( mkdir -p $* && cat $*.log~ > $*/warn && cat $*/warn 2> /dev/stderr )
 	@rm -f $*.log~ $*/fail
 	@test ! -f $*.dims.ref || diff $*.dims $*.dims.ref || (rm -f $@ && exit 1)
 #	@rm -f $*.dims
