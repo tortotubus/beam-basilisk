@@ -1283,6 +1283,59 @@ Value * constant_value (Ast * n, Stack * stack)
   return NULL;
 }
 
+static Ast * get_array_dimensions (Ast * direct_declarator, int symbol, Dimensions * d, int nd, Stack * stack)
+{
+  assert (d->dimension == NULL);
+  d->dimension = allocate (stack_alloc (stack), (nd + 1)*sizeof (int));
+  d->dimension[nd] = -1;
+  nd = 0;
+  while (ast_schema (direct_declarator->parent, symbol,
+		     0, token_symbol ('[')) ||
+	 ast_schema (direct_declarator->parent, symbol,
+		     1, token_symbol ('['))) {
+    Ast * nelem = ast_schema (direct_declarator->parent, symbol,
+			      0, token_symbol ('[')) ?
+      ast_schema (direct_declarator->parent, symbol,
+		  1, sym_assignment_expression) :
+      ast_schema (direct_declarator->parent, symbol,
+		  2, sym_assignment_expression);
+    Value * s;
+    if (nelem) {
+      s = run (nelem, stack);
+      if (!s)
+	return message (NULL, nelem, "undefined array size '%s'\n", warning_verbosity, stack);
+      if (value_flags (s) & unset)
+	return message (NULL, nelem, "array size '%s' not set\n", warning_verbosity, stack);
+    }
+    else if (ast_schema (direct_declarator->parent, symbol,
+			 1, token_symbol (']')) ||
+	     ast_schema (direct_declarator->parent, symbol,
+			 2, token_symbol (']')))
+      s = NULL;
+    else
+      // fixme: more complex size syntaxes not handled
+      return not_implemented (NULL, direct_declarator, stack);
+    if (s) {
+      bool error = false;
+      d->dimension[nd] = value_int (s, &error, stack);
+      d->size *= d->dimension[nd];
+      if (error)
+	return NULL;
+    }
+    else {
+      if (nd != 0)
+	return message (NULL, direct_declarator,
+			"only the first dimension of a multidimensional array can be undefined\n",
+			1, stack);
+      d->dimension[0] = 0;
+      d->size = -1;
+    }
+    nd++;
+    direct_declarator = direct_declarator->parent;
+  }
+  return direct_declarator;
+}
+
 static
 Ast * direct_declarator_type (Ast * direct_declarator, Dimensions * d, Stack * stack)
 {
@@ -1304,48 +1357,8 @@ Ast * direct_declarator_type (Ast * direct_declarator, Dimensions * d, Stack * s
       nd++;
       array = array->parent;
     }
-    if (nd) {
-      assert (d->dimension == NULL);
-      d->dimension = allocate (stack_alloc (stack), (nd + 1)*sizeof (int));
-      d->dimension[nd] = -1;
-      nd = 0;
-      while (ast_schema (direct_declarator->parent, sym_direct_declarator,
-			 1, token_symbol ('['))) {
-	Ast * nelem = ast_schema (direct_declarator->parent, sym_direct_declarator,
-				  2, sym_assignment_expression);
-	Value * s;
-	if (nelem) {
-	  s = run (nelem, stack);
-	  if (!s)
-	    return message (NULL, nelem, "undefined array size '%s'\n", warning_verbosity, stack);
-	  if (value_flags (s) & unset)
-	    return message (NULL, nelem, "array size '%s' not set\n", warning_verbosity, stack);
-	}
-	else if (ast_schema (direct_declarator->parent, sym_direct_declarator,
-			     2, token_symbol (']')))
-	  s = NULL;
-	else
-	  // fixme: more complex size syntaxes not handled
-	  return not_implemented (NULL, direct_declarator, stack);
-	if (s) {
-	  bool error = false;
-	  d->dimension[nd] = value_int (s, &error, stack);
-	  d->size *= d->dimension[nd];
-	  if (error)
-	    return NULL;
-	}
-	else {
-	  if (nd != 0)
-	    return message (NULL, direct_declarator,
-			    "only the first dimension of a multidimensional array can be undefined\n",
-			    1, stack);
-	  d->dimension[0] = 0;
-	  d->size = -1;
-	}
-	nd++;
-	direct_declarator = direct_declarator->parent;
-      }
-    }
+    if (nd && !(direct_declarator = get_array_dimensions (direct_declarator, sym_direct_declarator, d, nd, stack)))
+      return NULL;
   }
 
   Ast * pointer = ast_schema (direct_declarator->parent, sym_declarator);
@@ -1605,76 +1618,117 @@ void print_function_call (Ast * n, FILE * fp, Stack * stack)
     fputs ("()", fp);
 }
 
+static int multisize (Ast * list)
+{
+  int size = 0;
+  foreach_item (list, 2, i) {
+    Ast * list = ast_schema (i, sym_initializer,
+			     1, sym_initializer_list);
+    if (list)
+      size += multisize (list);
+    else
+      size++;
+  }
+  return size;
+}
+
+static bool allocate_array (Stack * stack, Value * value, Ast * initializer)
+{
+  if (value->pointer && !value_data (value, void *)) {
+    int size = multisize (initializer->child[1]);
+    int pointer = value->pointer;
+    if (value->dimension) {
+      assert (value->dimension[0] == 0);
+      value->dimension[0] = size;
+      size = 1;
+      for (int * i = value->dimension; *i >= 0; i++)
+	pointer--, size *= *i;
+      assert (size > 0);
+      pointer++;
+    }
+    value_data (value, Pointer) = stack_allocate (stack, size*type_size (pointer - 1, value->type, stack));
+    value_unset_flags (value, unset);
+#if 0
+    if (stack_verbosity (stack) > error_verbosity) {
+      fprintf (stderr, "--- Array allocation ---\n");
+      display_value (value);
+      fprintf (stderr, "--- End Array allocation ---\n");
+    }
+#endif
+    return true;
+  }
+  return false;
+}
+
+static
+void initialize (Stack * stack, Ast * n, Value * value, Ast * initializer);
+
+static
+int initialize_struct_member (Stack * stack, Value * value, int index, Ast * initializer)
+{
+  int cindex = ast_child_index (initializer);
+  if (cindex == 0 || cindex == 2) {
+    Value * v = struct_member_value ((Ast *)value, value, NULL, index, stack);
+    if (!v) {
+      message (NULL, initializer, "too many elements in initializer?\n", error_verbosity, stack);
+      return index + 1;
+    }
+    initialize (stack, initializer, v, initializer);
+  }
+  else { // designation
+    Ast * designation = ast_child (initializer->parent, sym_designation);
+    // fixme: this only handles simple designators i.e. '.identifier = ...'
+    Ast * designator = ast_find (designation, sym_IDENTIFIER);
+    if (!designator)
+      designator = ast_find (designation, sym_TYPEDEF_NAME);
+    Value * v = struct_member_value (designator, value, designator, -1, stack);
+    if (!v) {
+      message (NULL, designator, "unknown structure member '%s'\n", error_verbosity, stack);
+      return index + 1;
+    }
+    initialize (stack, designator, v, initializer);
+  }
+  return index + 1;
+}
+
 static
 void initialize (Stack * stack, Ast * n, Value * value, Ast * initializer)
 {
   if (!value)
     return;
 #if 0
-  if (stack_verbosity (stack) > 1) {
+  if (stack_verbosity (stack) > error_verbosity) {
     ast_print_tree (n, stderr, 0, 0, -1);
     display_value (value);
   }
 #endif
   if (initializer && initializer->child[0]->sym == sym_assignment_expression)
     assign (n, value, run (initializer->child[0], stack), stack);
-  else if (value->pointer ||
-	   value->type->sym == sym_struct_or_union_specifier) {
-    int index = 0, size = 0;
+  else if (value->pointer) {
+    int index = 0;
     if (initializer) {
-      Ast * list = initializer->child[1], * list1 = list;
-      foreach_item_r (list1, sym_initializer, j) size++;
+      allocate_array (stack, value, initializer);
+      Ast * list = initializer->child[1];
       foreach_item_r (list, sym_initializer, j) {
 	int cindex = ast_child_index (j);
 	if (cindex == 0 || cindex == 2) {
-	  Value * v;
-	  if (value->pointer) {
-	    if (!value_data (value, void *)) {
-	      int pointer = value->pointer;
-	      if (value->dimension) {
-		assert (value->dimension[0] == 0);
-		value->dimension[0] = size;
-		size = 1;
-		for (int * i = value->dimension; *i >= 0; i++)
-		  pointer--, size *= *i;
-		assert (size > 0);
-		pointer++;
-	      }
-	      value_data (value, Pointer) = stack_allocate (stack, size*type_size (pointer - 1, value->type, stack));
-	      value_unset_flags (value, unset);
-#if 0
-	      if (stack_verbosity (stack) > warning_verbosity) {
-		fprintf (stderr, "--- Array allocation ---\n");
-		display_value (value);
-		fprintf (stderr, "--- End Array allocation ---\n");
-	      }
-#endif
-	    }
-	    v = array_member_value ((Ast *)value, value, index, false, stack);
-	  }
-	  else
-	    v = struct_member_value ((Ast *)value, value, NULL, index, stack);
+	  Value * v = array_member_value ((Ast *)value, value, index, false, stack);
 	  if (!v) {
 	    message (NULL, n, "too many elements in initializer?\n", error_verbosity, stack);
 	    return;
 	  }
 	  initialize (stack, j, v, j);
 	}
-	else { // designation
-	  Ast * designation = ast_child (j->parent, sym_designation);
-	  // fixme: this only handles simple designators i.e. '.identifier = ...'
-	  Ast * designator = ast_find (designation, sym_IDENTIFIER);
-	  if (!designator)
-	    designator = ast_find (designation, sym_TYPEDEF_NAME);
-	  Value * v = struct_member_value (designator, value, designator, -1, stack);
-	  if (!v) {
-	    message (NULL, designator, "unknown structure member '%s'\n", error_verbosity, stack);
-	    return;
-	  }
-	  initialize (stack, designator, v, j);
-	}
 	index++;
       }
+    }
+  }
+  else if (value->type->sym == sym_struct_or_union_specifier) {
+    int index = 0;
+    if (initializer) {
+      Ast * list = initializer->child[1];
+      foreach_item_r (list, sym_initializer, initializer)
+	index = initialize_struct_member (stack, value, index, initializer);
     }
 
     /**
@@ -1683,7 +1737,7 @@ void initialize (Stack * stack, Ast * n, Value * value, Ast * initializer)
     Value * v;
     int verbosity = stack_verbosity (stack);
     ((StackData *)stack_get_data (stack))->verbosity = 0;
-    while (!value->pointer && (v = struct_member_value ((Ast *)value, value, NULL, index, stack))) {
+    while ((v = struct_member_value ((Ast *)value, value, NULL, index, stack))) {
       ((StackData *)stack_get_data (stack))->verbosity = verbosity;
       initialize (stack, n, v, NULL);
       ((StackData *)stack_get_data (stack))->verbosity = 0;
@@ -1704,35 +1758,22 @@ void initialize (Stack * stack, Ast * n, Value * value, Ast * initializer)
 }
 
 static
-Value * identifier_value (Ast * n, Stack * stack)
+Value * value_from_type (Ast * n, Ast * type, Dimensions * d, Ast * initializer, Stack * stack)
 {
-  Dimensions d = { .size = 1 };
-  Ast * type = identifier_type (n, &d, stack);
-  if (!type)
-    return message (NULL, n, "could not find type of '%s'\n", warning_verbosity, stack);
 
-  if (type->sym == sym_IDENTIFIER) {
-    type = ast_identifier_declaration (stack, ast_terminal (type)->start);
-    if (!type || ast_ancestor (type, 2)->sym != sym_struct_or_union_specifier)
-      return message (NULL, n, "could not find type of '%s'\n", warning_verbosity, stack);
-    type = ast_ancestor (type, 2);
-  }
-
-  Ast * initializer = ast_child (ast_parent (n, sym_init_declarator), sym_initializer);
-  
   /**
   Array allocation. */
 
   Value * v;
-  if (d.dimension) {
-    assert (d.dimension[0] >= 0);
-    d.size *= type_size (d.pointer, type, stack);
-    for (int * i = d.dimension; *i >= 0; i++)
-      d.pointer++; 
-    v = new_value (stack, n, type, d.pointer);
-    v->dimension = d.dimension;
-    if (d.size > 0)
-      value_data (v, Pointer) = stack_allocate (stack, d.size);
+  if (d->dimension) {
+    assert (d->dimension[0] >= 0);
+    d->size *= type_size (d->pointer, type, stack);
+    for (int * i = d->dimension; *i >= 0; i++)
+      d->pointer++; 
+    v = new_value (stack, n, type, d->pointer);
+    v->dimension = d->dimension;
+    if (d->size > 0)
+      value_data (v, Pointer) = stack_allocate (stack, d->size);
     else
       value_set_flags (v, unset);
   }
@@ -1740,9 +1781,9 @@ Value * identifier_value (Ast * n, Stack * stack)
   /**
   Standard allocation. */
   
-  else { 
-    v = new_value (stack, n, type, d.pointer);
-    if (type->sym == sym_function_definition && d.pointer == 1)
+  else {
+    v = new_value (stack, n, type, d->pointer);
+    if (type->sym == sym_function_definition && d->pointer == 1)
       value_data (v, Ast *) = n;
     else if (type == (Ast *) &ast_enum) {
       Ast * enumerator = ast_parent (n, sym_enumerator);
@@ -1771,6 +1812,24 @@ Value * identifier_value (Ast * n, Stack * stack)
     initialize (stack, initializer->parent, v, initializer);
   
   return v;
+}
+
+static
+Value * identifier_value (Ast * n, Stack * stack)
+{
+  Dimensions d = { .size = 1 };
+  Ast * type = identifier_type (n, &d, stack);
+  if (!type)
+    return message (NULL, n, "could not find type of '%s'\n", warning_verbosity, stack);
+
+  if (type->sym == sym_IDENTIFIER) {
+    type = ast_identifier_declaration (stack, ast_terminal (type)->start);
+    if (!type || ast_ancestor (type, 2)->sym != sym_struct_or_union_specifier)
+      return message (NULL, n, "could not find type of '%s'\n", warning_verbosity, stack);
+    type = ast_ancestor (type, 2);
+  }
+
+  return value_from_type (n, type, &d, ast_child (ast_parent (n, sym_init_declarator), sym_initializer), stack);
 }
 
 static
@@ -2351,16 +2410,29 @@ Value * ast_run_node (Ast * n, Stack * stack)
 					 1, sym_type_name,
 					 0, sym_specifier_qualifier_list), sym_types);
       assert (type);
-      int pointer = 0;
+      type = base_type (type->child[0], NULL, stack);
+      
+      Dimensions d = { .size = 1 };
       Ast * declarator = ast_schema (n, sym_postfix_expression,
 				     1, sym_type_name,
 				     1, sym_abstract_declarator);
-      if (ast_child (declarator, sym_pointer))
-	pointer++;
-      if (ast_child (declarator, sym_direct_abstract_declarator))
-	pointer++;
-      value = new_value (stack, n, base_type (type->child[0], NULL, stack), pointer);
-      initialize (stack, n, value, ast_child (n, sym_postfix_initializer));
+      // fixme: this is not very general, see also direct_declarator_type()
+      for (Ast * c = ast_child (declarator, sym_pointer); c; c = ast_child (c, sym_pointer))
+	d.pointer++;
+      
+      declarator = ast_child (declarator, sym_direct_abstract_declarator);
+      
+      if (declarator) {
+	int nd = 1;
+	Ast * array = declarator;
+	while (array->child[1]->sym == token_symbol ('['))
+	  array = array->child[0], nd++;
+	if (array->child[0]->sym == token_symbol ('[') &&
+	    !get_array_dimensions (array->child[0], sym_direct_abstract_declarator, &d, nd, stack))
+	  return NULL;
+      }
+      
+      value = value_from_type (n, type, &d, ast_child (n, sym_postfix_initializer), stack);
     }
     break;
 
