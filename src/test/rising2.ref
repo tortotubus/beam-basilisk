@@ -1,5 +1,5 @@
 WARNING: convergence for p not reached after 100 iterations
-  res: 1285.46 sum: -1.94365e-10 nrelax: 73
+  res: 1285.46 sum: -1.94365e-10 nrelax: 73 tolerance: 11.2993
 0.59375 0.288698
 0.593346 0.289062
 
