@@ -290,10 +290,9 @@ struct Cleanup {
 };
 
 trace
-int fractions_cleanup (struct Cleanup p)
+int fractions_cleanup (scalar c, face vector s,
+		       double smin = 0., bool opposite = false)
 {
-  scalar c = p.c;
-  face vector s = p.s;
   
   /**
   Since both surface and volume fractions are altered, iterations are
@@ -308,7 +307,7 @@ int fractions_cleanup (struct Cleanup p)
     Face fractions of empty cells must be zero. */
    
     foreach_face()
-      if (s.x[] && ((!c[] || !c[-1]) || s.x[] < p.smin))
+      if (s.x[] && ((!c[] || !c[-1]) || s.x[] < smin))
 	s.x[] = 0.;
 
     changed = 0;
@@ -328,7 +327,7 @@ int fractions_cleanup (struct Cleanup p)
 	  [projecting](navier-stokes/centered.h#approximate-projection)
 	  the velocity field. */
 
-	  if (p.opposite && s.x[] == 0. && s.x[1] == 0.)
+	  if (opposite && s.x[] == 0. && s.x[1] == 0.)
 	    c[] = 0., changed++;
 	}
 

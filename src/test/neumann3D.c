@@ -151,8 +151,7 @@ int main()
 
     timer t = timer_start();
     mgstats s = poisson (a, b, alpha = fs,
-			 embed_flux =
-			 a.boundary[embed] != symmetry ? embed_flux : NULL,
+			 flux = a.boundary[embed] != symmetry ? embed_flux : NULL,
 			 tolerance = 1e-6);
     double dt = timer_elapsed (t);
     printf ("%d %g %d %d\n", N, dt, s.i, s.nrelax);

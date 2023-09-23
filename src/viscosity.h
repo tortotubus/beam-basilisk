@@ -1,12 +1,9 @@
 #include "poisson.h"
 
 struct Viscosity {
-  vector u;
   face vector mu;
   scalar rho;
   double dt;
-  int nrelax;
-  scalar * res;
 };
 
 #if AXI
@@ -162,26 +159,26 @@ static double residual_viscosity (scalar * a, scalar * b, scalar * resl,
 #undef lambda
 
 trace
-mgstats viscosity (struct Viscosity p)
+mgstats viscosity (vector u, face vector mu, scalar rho, double dt,
+		   int nrelax = 4, scalar * res = NULL)
 {
-  vector u = p.u, r[];
+  vector r[];
   foreach()
     foreach_dimension()
       r.x[] = u.x[];
 
-  face vector mu = p.mu;
-  scalar rho = p.rho;
   restriction ({mu,rho});
-  
+  struct Viscosity p = { mu, rho, dt };
   return mg_solve ((scalar *){u}, (scalar *){r},
-		   residual_viscosity, relax_viscosity, &p, p.nrelax, p.res);
+		   residual_viscosity, relax_viscosity, &p, nrelax, res);
 }
 
 trace
-mgstats viscosity_explicit (struct Viscosity p)
+mgstats viscosity_explicit (vector u, face vector mu, scalar rho, double dt)
 {
-  vector u = p.u, r[];
+  vector r[];
   mgstats mg = {0};
+  struct Viscosity p = { mu, rho, dt };
   mg.resb = residual_viscosity ((scalar *){u}, (scalar *){u}, (scalar *){r}, &p);
   foreach()
     foreach_dimension()

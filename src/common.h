@@ -924,10 +924,8 @@ void normalize (coord * n)
     n->x /= norm;
 }
 
-struct _origin { double x, y, z; };
-
-void origin (struct _origin p) {
-  X0 = p.x; Y0 = p.y; Z0 = p.z;
+void origin (double x = 0., double y = 0., double z = 0.) {
+  X0 = x; Y0 = y; Z0 = z;
 }
 
 void size (double L) {
@@ -1416,32 +1414,27 @@ void free_solver_func_add (free_solver_func func)
 
 static char * display_defaults = NULL;
 
-struct _display {
-  const char * commands;
-  bool overwrite;
-};
-
 static void free_display_defaults() {
   free (display_defaults);
 }
 
-void display (struct _display p)
+void display (const char * commands, bool overwrite = false)
 {
   if (display_defaults == NULL)
     free_solver_func_add (free_display_defaults);
-  if (p.overwrite) {
+  if (overwrite) {
     free (display_defaults);
-    display_defaults = malloc (strlen(p.commands) + 2);
+    display_defaults = malloc (strlen(commands) + 2);
     strcpy (display_defaults, "@");
-    strcat (display_defaults, p.commands);
+    strcat (display_defaults, commands);
   }
   else {
     if (!display_defaults)
       display_defaults = strdup ("@");
     display_defaults =
       realloc (display_defaults,
-	       strlen(display_defaults) + strlen(p.commands) + 1);
-    strcat (display_defaults, p.commands);
+	       strlen(display_defaults) + strlen(commands) + 1);
+    strcat (display_defaults, commands);
   }
 }
 

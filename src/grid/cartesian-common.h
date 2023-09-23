@@ -592,28 +592,21 @@ tensor cartesian_init_tensor (tensor t, const char * name)
   return t;
 }
 
-struct OutputCells {
-  FILE * fp;
-  coord c;
-  double size;
-};
-
-void output_cells (struct OutputCells p)
+void output_cells (FILE * fp = stdout, coord c = {0}, double size = 0.)
 {
-  if (!p.fp) p.fp = stdout;
   foreach() {
     bool inside = true;
     coord o = {x,y,z};
     foreach_dimension()
-      if (inside && p.size > 0. &&
-	  (o.x > p.c.x + p.size || o.x < p.c.x - p.size))
+      if (inside && size > 0. &&
+	  (o.x > c.x + size || o.x < c.x - size))
 	inside = false;
     if (inside) {
       Delta /= 2.;
 #if dimension == 1
-      fprintf (p.fp, "%g 0\n%g 0\n\n", x - Delta, x + Delta);
+      fprintf (fp, "%g 0\n%g 0\n\n", x - Delta, x + Delta);
 #elif dimension == 2
-      fprintf (p.fp, "%g %g\n%g %g\n%g %g\n%g %g\n%g %g\n\n",
+      fprintf (fp, "%g %g\n%g %g\n%g %g\n%g %g\n%g %g\n\n",
 	       x - Delta, y - Delta,
 	       x - Delta, y + Delta,
 	       x + Delta, y + Delta,
@@ -621,21 +614,21 @@ void output_cells (struct OutputCells p)
 	       x - Delta, y - Delta);
 #else // dimension == 3
       for (int i = -1; i <= 1; i += 2) {
-	fprintf (p.fp, "%g %g %g\n%g %g %g\n%g %g %g\n%g %g %g\n%g %g %g\n\n",
+	fprintf (fp, "%g %g %g\n%g %g %g\n%g %g %g\n%g %g %g\n%g %g %g\n\n",
 		 x - Delta, y - Delta, z + i*Delta,
 		 x - Delta, y + Delta, z + i*Delta,
 		 x + Delta, y + Delta, z + i*Delta,
 		 x + Delta, y - Delta, z + i*Delta,
 		 x - Delta, y - Delta, z + i*Delta);
 	for (int j = -1; j <= 1; j += 2)
-	  fprintf (p.fp, "%g %g %g\n%g %g %g\n\n",
+	  fprintf (fp, "%g %g %g\n%g %g %g\n\n",
 		   x + i*Delta, y + j*Delta, z - Delta,
 		   x + i*Delta, y + j*Delta, z + Delta);
       }
 #endif
     }
   }
-  fflush (p.fp);
+  fflush (fp);
 }
 
 #if TREE && _MPI
@@ -781,33 +774,28 @@ tensor init_symmetric_tensor (tensor t, const char * name)
 {
   return init_tensor (t, name);
 }
-  
-struct _interpolate {
-  scalar v;
-  double x, y, z;
-};
 
-static double interpolate_linear (Point point, struct _interpolate p)
+static double interpolate_linear (Point point, scalar v,
+				  double xp = 0., double yp = 0., double zp = 0.)
 {
-  scalar v = p.v;
 #if dimension == 1
-  x = (p.x - x)/Delta - v.d.x/2.;
+  x = (xp - x)/Delta - v.d.x/2.;
   int i = sign(x);
   x = fabs(x);
   /* linear interpolation */
   return v[]*(1. - x) + v[i]*x;
 #elif dimension == 2
-  x = (p.x - x)/Delta - v.d.x/2.;
-  y = (p.y - y)/Delta - v.d.y/2.;
+  x = (xp - x)/Delta - v.d.x/2.;
+  y = (yp - y)/Delta - v.d.y/2.;
   int i = sign(x), j = sign(y);
   x = fabs(x); y = fabs(y);
   /* bilinear interpolation */
   return ((v[]*(1. - x) + v[i]*x)*(1. - y) + 
 	  (v[0,j]*(1. - x) + v[i,j]*x)*y);
 #else // dimension == 3
-  x = (p.x - x)/Delta - v.d.x/2.;
-  y = (p.y - y)/Delta - v.d.y/2.;
-  z = (p.z - z)/Delta - v.d.z/2.;
+  x = (xp - x)/Delta - v.d.x/2.;
+  y = (yp - y)/Delta - v.d.y/2.;
+  z = (zp - z)/Delta - v.d.z/2.;
   int i = sign(x), j = sign(y), k = sign(z);
   x = fabs(x); y = fabs(y); z = fabs(z);
   /* trilinear interpolation */
@@ -819,18 +807,18 @@ static double interpolate_linear (Point point, struct _interpolate p)
 }
 
 trace
-double interpolate (struct _interpolate p)
+double interpolate (scalar v, double xp = 0., double yp = 0., double zp = 0.)
 {
-  scalar v = p.v;
   boundary ({v});
-  Point point = locate (p.x, p.y, p.z);
+  Point point = locate (xp, yp, zp);
   if (point.level < 0)
     return nodata;
-  return interpolate_linear (point, p);
+  return interpolate_linear (point, v, xp, yp, zp);
 }
 
 trace
-void interpolate_array (scalar * list, coord * a, int n, double * v, bool linear)
+void interpolate_array (scalar * list, coord * a, int n, double * v,
+			bool linear = false)
 {
   boundary (list);
   int j = 0;
@@ -839,8 +827,7 @@ void interpolate_array (scalar * list, coord * a, int n, double * v, bool linear
     if (point.level >= 0) {
       for (scalar s in list)
 	v[j++] = !linear ? s[] :
-	  interpolate_linear (point,
-			      (struct _interpolate){s, a[i].x, a[i].y, a[i].z});
+	  interpolate_linear (point, s, a[i].x, a[i].y, a[i].z);
     }
     else
       for (scalar s in list)

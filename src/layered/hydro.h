@@ -662,12 +662,9 @@ double segment_flux (coord segment[2], double * flux, scalar h, vector u)
       coord a = p[i];
       foreach_layer()
 	flux[point.l] += dl/2.*
-	interpolate_linear (point, (struct _interpolate)
-			    {h, a.x, a.y, 0.})*
-	(m.x*interpolate_linear (point, (struct _interpolate)
-				 {u.x, a.x, a.y, 0.}) +
-	 m.y*interpolate_linear (point, (struct _interpolate)
-				 {u.y, a.x, a.y, 0.}));
+	interpolate_linear (point, h, a.x, a.y, 0.)*
+	(m.x*interpolate_linear (point, u.x, a.x, a.y, 0.) +
+	 m.y*interpolate_linear (point, u.y, a.x, a.y, 0.));
     }
   }
   // reduction
