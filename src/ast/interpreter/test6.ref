@@ -1,17 +1,10 @@
-test6.c:18: interpreter_verbosity (4): !
-test6.c:5: 3: 3  + [test6.c:5: '3']
-test6.c:5: 3: 3  + [test6.c:5: '3']
-test6.c:19: bidule ({...})
-test6.c:5: 3: 3  + [test6.c:5: '3']
-test6.c:5: 3: 3  + [test6.c:5: '3']
-test6.c:5: 3: 3  + [test6.c:5: '3']
-test6.c:5: 3: 3  + [test6.c:5: '3']
-test6.c:10: 0: 0  + [test6.c:10: '0']
-test6.c:10: p.fc[0]: 1  + [test6.c:19: '1']
-test6.c:5: 3: 3  + [test6.c:5: '3']
-test6.c:11: 1: 1  + [test6.c:11: '1']
-test6.c:11: p.fc[1]: 2  + [test6.c:19: '2']
-test6.c:5: 3: 3  + [test6.c:5: '3']
-test6.c:12: 2: 2  + [test6.c:12: '2']
-test6.c:12: p.fc[2]: 3  + [test6.c:19: '3']
-test6.c:19: bidule ((struct _bidule){.fc = {1,2,3}}): !
+test6.c:14: interpreter_verbosity (4): !
+test6.c:15: bidule (0xaddress)
+test6.c:4: 3: 3  + [test6.c:4: '3']
+test6.c:6: 0: 0  + [test6.c:6: '0']
+test6.c:6: fc[0]: 1  + [test6.c:15: '1']
+test6.c:7: 1: 1  + [test6.c:7: '1']
+test6.c:7: fc[1]: 2  + [test6.c:15: '2']
+test6.c:8: 2: 2  + [test6.c:8: '2']
+test6.c:8: fc[2]: 3  + [test6.c:15: '3']
+test6.c:15: bidule ((float[3]) {1,2,3}): !

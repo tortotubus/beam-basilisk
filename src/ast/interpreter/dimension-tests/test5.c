@@ -1,27 +1,16 @@
 /**
-Check that (all) the zeros of structures have dimensions of the
-zeros in the calling function. */
+Check the dimensions of implicit zeros in structures. */ 
 
 struct Func {
-  double a;
-  double b;
+  double a; // explicit (1)
+  double b; // implicit (0)
 };
-
-void func (struct Func p)
-{
-  display_value (p.a);
-  display_value (p.b);
-}
 
 int main()
 {
   { interpreter_verbosity (2);
-#if 0
     struct Func p = {1};
     display_value (p.a);
     display_value (p.b);
-#else
-    func();
-#endif
   }
 }

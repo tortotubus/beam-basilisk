@@ -20,16 +20,16 @@ drefs:
                 sed "s|$(BASILISK)||g" > `echo $$f | sed 's/\.c/.ref/'`; \
 	done
 
-%.tst: %.c %.ref $(QCC)
+%.tst: %.c %.ref $(QCC) declarations.h  internal.h  overload.h
 	$(QCC) $(FLAGS) -source -run=1 $< 2>&1 | sed "s|$(BASILISK)||g" > $@
 	-rm -f _$<
 	diff $@ $*.ref || (rm -f $@ && exit 1)
 
-%.dtst: %.c %.ref $(QCC)
+%.dtst: %.c %.ref $(QCC) declarations.h  internal.h  overload.h
 	$(QCC) $(FLAGS) -source -dimensions -run=1 $< 2>&1 | sed "s|$(BASILISK)||g" > $@
 	diff $@ $*.ref || (rm -f $@ && exit 1)
 
-%.vtst: %.c %.ref $(QCC)
+%.vtst: %.c %.ref $(QCC) declarations.h  internal.h  overload.h
 	valgrind -q $(QCC) $(FLAGS) -source -run=1 $< 2>&1 | sed "s|$(BASILISK)||g" > $@
 	-rm -f _$<
 	diff $@ $*.ref || (rm -f $@ && exit 1)

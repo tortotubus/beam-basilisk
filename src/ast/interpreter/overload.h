@@ -415,17 +415,31 @@ typedef struct {
   int nc, nf;
 } astats;
 
-astats adapt_wavelet (struct Adapt p)
+astats adapt_wavelet (scalar * slist, double * max,
+		      int maxlevel, int minlevel, scalar * list)
 {
   astats st; // unset
-  if (p.slist && p.max) {
+  if (slist && max) {
     Intergrid * igrid = (Intergrid *) grid;
-    double * g = igrid->d, * v = p.max;
-    for (scalar * s = p.slist; s->i >= 0; s++, v++)
+    double * g = igrid->d, * v = max;
+    for (scalar * s = slist; s->i >= 0; s++, v++)
       *v == *(g + s->i);
   }
   return st;
 }
+
+/**
+These functions are too expensive to interpret. */
+
+void output_field (scalar * list, FILE * fp, int n, bool linear,
+		   double box[2][2])
+{}
+
+void output_ppm (scalar f, FILE * fp, int n, char * file,
+		 double min, double max, double spread,
+		 double z, bool linear, double box[2][2],
+		 scalar mask, colormap map, char * opt)
+{}
 
 /**
 Helper functions for dimensions */

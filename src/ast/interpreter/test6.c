@@ -1,15 +1,11 @@
 /**
-Check optional parameters in function calls. */
+Check named parameters in function calls. */
 
-struct _bidule {
-  float fc[3];
-};
-
-void bidule (struct _bidule p)
+void bidule (float fc[3])
 {
-  p.fc[0];
-  p.fc[1];
-  p.fc[2];
+  fc[0];
+  fc[1];
+  fc[2];
 }
 
 int main()
