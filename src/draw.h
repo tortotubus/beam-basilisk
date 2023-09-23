@@ -405,8 +405,8 @@ static void end_draw_lines()
 }
 
 static inline double interp (Point point, coord p, scalar col) {
-  struct _interpolate _r = { col, x + p.x*Delta, y + p.y*Delta, z + p.z*Delta };
-  return interpolate_linear (point, _r);
+  return interpolate_linear (point, col,
+			     x + p.x*Delta, y + p.y*Delta, z + p.z*Delta);
 }
 
 static double evaluate_expression (Point point, Node * n)

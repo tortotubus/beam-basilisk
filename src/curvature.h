@@ -522,10 +522,9 @@ interface defined by the volume fraction *c*. It uses a combination of
 the methods above: statistics on the number of curvatures computed
 which each method is returned in a *cstats* data structure. 
 
-If *sigma* is different from zero the curvature is multiplied by *sigma*.
+The curvature is multiplied by *sigma* (default is one).
 
-If *add* is *true*, the curvature (optionally multiplied by *sigma*)
-is added to field *kappa*. */
+If *add* is *true*, the curvature is added to field *kappa*. */
 
 typedef struct {
   int h; // number of standard HF curvatures
@@ -541,10 +540,9 @@ struct Curvature {
 };
 
 trace
-cstats curvature (struct Curvature p)
+cstats curvature (scalar c, scalar kappa,
+		  double sigma = 1.[0], bool add = false)
 {
-  scalar c = p.c, kappa = p.kappa;
-  double sigma = p.sigma ? p.sigma : 1.[0];
   int sh = 0, sf = 0, sa = 0, sc = 0;
   vector ch = c.height, h = automatic (ch);
   if (!ch.x.i)
@@ -620,7 +618,7 @@ cstats curvature (struct Curvature p)
     
     if (kf == nodata)
       kappa[] = nodata;
-    else if (p.add)
+    else if (add)
       kappa[] += sigma*kf;
     else
       kappa[] = sigma*kf;      
@@ -714,16 +712,9 @@ with $\mathbf{x}$ the position of the interface defined by $f$.
 
 If *add* is *true*, the position is added to *pos*. */
 
-struct Position {
-  scalar f, pos;
-  coord G, Z;
-  bool add;
-};
-
-void position (struct Position p)
+void position (scalar f, scalar pos,
+	       coord G = {0}, coord Z = {0}, bool add = false)
 {
-  scalar f = p.f, pos = p.pos;
-  coord * G = &p.G, * Z = &p.Z;
 
   /**
   On trees we set the prolongation and restriction functions for
@@ -739,7 +730,7 @@ void position (struct Position p)
     heights (f, h);
   foreach() {
     if (interfacial (point, f)) {
-      double hp = height_position (point, f, h, G, Z);
+      double hp = height_position (point, f, h, &G, &Z);
       if (hp == nodata) {
 
 	/**
@@ -751,9 +742,9 @@ void position (struct Position p)
 	plane_area_center (n, alpha, &c);
 	hp = 0.;
 	foreach_dimension()
-	  hp += (o.x + Delta*c.x - Z->x)*G->x;
+	  hp += (o.x + Delta*c.x - Z.x)*G.x;
       }
-      if (p.add)
+      if (add)
 	pos[] += hp;
       else
 	pos[] = hp;

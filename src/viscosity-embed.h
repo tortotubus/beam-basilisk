@@ -31,12 +31,9 @@ $\lambda_i$ is a possible extra term due to the metric. */
 #include "poisson.h"
 
 struct Viscosity {
-  vector u;
   face vector mu;
   scalar rho;
   double dt;
-  int nrelax;
-  scalar * res;
   double (* embed_flux) (Point, scalar, vector, double *);
 };
 
@@ -151,21 +148,20 @@ static double residual_diffusion (scalar * a, scalar * b, scalar * resl,
 double TOLERANCE_MU = 0.; // default to TOLERANCE
 
 trace
-mgstats viscosity (struct Viscosity p)
+mgstats viscosity (vector u, face vector mu, scalar rho, double dt,
+		   int nrelax = 4, scalar * res = NULL)
 {
-  vector u = p.u, r[];
-  scalar rho = p.rho;
+  vector r[];
   foreach()
     foreach_dimension()
       r.x[] = rho[]*u.x[];
 
-  face vector mu = p.mu;
   restriction ({mu, rho});
-
+  struct Viscosity p = { mu, rho, dt };
   p.embed_flux = u.x.boundary[embed] != antisymmetry ? embed_flux : NULL;
   return mg_solve ((scalar *){u}, (scalar *){r},
-		   residual_diffusion, relax_diffusion, &p, p.nrelax, p.res,
+		   residual_diffusion, relax_diffusion, &p, nrelax, res,
 		   minlevel = 1, // fixme: because of root level
                                   // BGHOSTS = 2 bug on trees
-		   tolerance = TOLERANCE_MU);
+		   tolerance = TOLERANCE_MU ? TOLERANCE_MU : TOLERANCE);
 }
