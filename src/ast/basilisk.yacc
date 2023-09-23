@@ -510,6 +510,7 @@ parameter_list
 
 parameter_declaration
 	: declaration_specifiers declarator
+	| declaration_specifiers declarator '=' initializer /* Basilisk C extension */
 	| declaration_specifiers abstract_declarator
 	| declaration_specifiers
 	;

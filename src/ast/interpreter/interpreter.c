@@ -1618,24 +1618,12 @@ void print_function_call (Ast * n, FILE * fp, Stack * stack)
     fputs ("()", fp);
 }
 
-static int multisize (Ast * list)
-{
-  int size = 0;
-  foreach_item (list, 2, i) {
-    Ast * list = ast_schema (i, sym_initializer,
-			     1, sym_initializer_list);
-    if (list)
-      size += multisize (list);
-    else
-      size++;
-  }
-  return size;
-}
-
 static bool allocate_array (Stack * stack, Value * value, Ast * initializer)
 {
   if (value->pointer && !value_data (value, void *)) {
-    int size = multisize (initializer->child[1]);
+    int size = 0;
+    Ast * list = initializer->child[1];
+    foreach_item (list, 2, i) size++;
     int pointer = value->pointer;
     if (value->dimension) {
       assert (value->dimension[0] == 0);

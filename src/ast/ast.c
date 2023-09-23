@@ -345,6 +345,15 @@ static void ast_print_internal (Ast * n, FILE * fp, int sym, File * file)
     if (n->sym == sym_array_access && n->child[2] &&
 	ast_evaluate_constant_expression (n->child[0]) < DBL_MAX)
       ast_print_internal (n->child[0], fp, sym, file);
+
+    /**
+    Ignore the values of optional parameters. */
+
+    else if (ast_schema (n, sym_parameter_declaration,
+			 3, sym_initializer))
+      for (int i = 0; i < 2; i++)
+	ast_print_internal (n->child[i], fp, sym, file);
+    
     else
       for (Ast ** c = n->child; *c; c++)
 	ast_print_internal (*c, fp, sym, file);
