@@ -162,7 +162,7 @@ Colormaps are arrays of (127) red, green, blue triplets. */
 
 #define NCMAP 127
 
-typedef void (* colormap) (double cmap[NCMAP][3]);
+typedef void (* Colormap) (double cmap[NCMAP][3]);
 
 void jet (double cmap[NCMAP][3])
 {
@@ -272,12 +272,12 @@ returns the red/green/blue triplet corresponding to *val*. */
 
 typedef struct {
   unsigned char r, g, b;
-} color;
+} Color;
 
-color colormap_color (double cmap[NCMAP][3], 
+Color colormap_color (double cmap[NCMAP][3], 
 		      double val, double min, double max)
 {
-  color c;
+  Color c;
   if (val == nodata) {
     c.r = c.g = c.b = 0; // nodata is black
     return c;
@@ -557,7 +557,7 @@ void output_ppm (scalar f,
 		 bool linear = false,
 		 double box[2][2] = {{X0, Y0}, {X0 + L0, Y0 + L0}},
 		 scalar mask = {-1},
-		 colormap map = jet,
+		 Colormap map = jet,
 		 char * opt = NULL)
 {
   // default values
@@ -583,7 +583,7 @@ void output_ppm (scalar f,
   int ny = (box[1][1] - box[0][1])/Delta;
   if (ny % 2) ny++;
   
-  color ** ppm = (color **) matrix_new (ny, n, sizeof(color));
+  Color ** ppm = (Color **) matrix_new (ny, n, sizeof(Color));
   double cmap[NCMAP][3];
   (* map) (cmap);
   OMP_PARALLEL() {
@@ -628,7 +628,7 @@ void output_ppm (scalar f,
       fp = open_image (file, opt);
     
     fprintf (fp, "P6\n%u %u 255\n", n, ny);
-    fwrite (((void **) ppm)[0], sizeof(color), ny*n, fp);
+    fwrite (((void **) ppm)[0], sizeof(Color), ny*n, fp);
     
     if (file)
       close_image (file, fp);
