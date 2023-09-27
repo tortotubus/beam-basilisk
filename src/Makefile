@@ -39,9 +39,6 @@ include.o: include.c
 draw_get.h: draw.h params.awk
 	awk -f params.awk < draw.h > draw_get.h
 
-draw_json.h: draw.h json.awk
-	awk -f json.awk < draw.h > draw_json.h
-
 # Uncomment the recipes below if you need to re-generate include.c or
 # postproc.c
 
@@ -51,10 +48,10 @@ draw_json.h: draw.h json.awk
 # postproc.c: postproc.lex
 #	flex -P post -o postproc.c postproc.lex
 
-bview2D: qcc bview.c draw_get.h draw_json.h
+bview2D: qcc bview.c draw_get.h
 	./qcc $(CFLAGS) -autolink bview.c -o bview2D -lfb_tiny -lm
 
-bview3D: qcc bview.c draw_get.h draw_json.h
+bview3D: qcc bview.c draw_get.h
 	./qcc $(CFLAGS) -autolink -grid=octree bview.c -o bview3D -lfb_tiny -lm
 
 alltags:
