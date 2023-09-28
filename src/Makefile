@@ -36,8 +36,11 @@ qcc: qcc.c include.o postproc.o ast/libast.a config
 include.o: include.c
 	$(CC) $(CFLAGS) -DLIBDIR=\"`pwd`\" -c include.c
 
-draw_get.h: draw.h params.awk
-	awk -f params.awk < draw.h > draw_get.h
+# uncomment the recipe below if you need to regenerate draw_get.h
+# and draw_json.h
+
+# draw_get.h: draw.h params.awk
+#	awk -f params.awk < draw.h > draw_get.h
 
 # Uncomment the recipes below if you need to re-generate include.c or
 # postproc.c
