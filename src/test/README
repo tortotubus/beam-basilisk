@@ -185,6 +185,7 @@ Note that only the documented test cases appear in the list below
 * [Kuramoto--Sivashinsky equation](kuramoto.c)
 * [Convergence of the Runge--Kutta solvers](runge-kutta.c)
 * [Segment traversal](segment.c)
+* [Redistancing of a perturbed distance field](redistance-ellipse.c)
 
 ## Unmaintained
 

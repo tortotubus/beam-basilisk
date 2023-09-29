@@ -5,9 +5,10 @@
   [reaction--diffusion](diffusion.h), [1D arterial
   flow](test/artery1D.c)
 * [Geoffroy Kirstetter](/sandbox/geoffroy/README): [flow rates for
-  multiple rivers](test/multiriverinflow.c)
+  multiple rivers](test/multiriverinflow.c)  
 * [Pierre-Yves Lagrée](/sandbox/M1EMN/README): [SAG equation](test/sag.c)
 * Emily Lane: GRD export
+* [Alexandre Limare](/sandbox/alimare/README): [Redistancing of a distance field](redistance.h)
 * Jose Lopez-Herrera: [Electrohydrodynamics](README#electrohydrodynamics), 
   [Viscoelasticity](README#viscoelasticity)
 * [John MacFarlane](https://johnmacfarlane.net/) CSS stylesheets and
