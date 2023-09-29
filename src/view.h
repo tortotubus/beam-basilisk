@@ -184,7 +184,7 @@ bview * bview_new()
   p->bg[0] = 0.3; p->bg[1] = 0.4; p->bg[2] = 0.6;
 #endif
   p->res = 1.;
-  p->lc = 0.001;
+  p->lc = 0.004;
 
   p->samples = 4;
   p->width = 600*p->samples, p->height = 600*p->samples;

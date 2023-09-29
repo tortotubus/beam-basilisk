@@ -55,6 +55,7 @@ static int mpi_rank, mpi_npe;
 @define sq(x) ((x)*(x))
 @define cube(x) ((x)*(x)*(x))
 @define sign(x) ((x) > 0 ? 1 : -1)
+@define sign2(x) ((x) > 0 ? 1 : (x) < 0 ? -1 : 0)
 @define noise() (1. - 2.*rand()/(double)RAND_MAX)
 @define clamp(x,a,b) ((x) < (a) ? (a) : (x) > (b) ? (b) : (x))
 #define swap(type,a,b) do { type __tmp = a; a = b; b = __tmp; } while(0)
