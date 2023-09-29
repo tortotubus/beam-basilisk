@@ -533,12 +533,6 @@ typedef struct {
   int c; // number of centroids fit curvatures
 } cstats;
 
-struct Curvature {
-  scalar c, kappa;
-  double sigma;
-  bool add;
-};
-
 trace
 cstats curvature (scalar c, scalar kappa,
 		  double sigma = 1.[0], bool add = false)
