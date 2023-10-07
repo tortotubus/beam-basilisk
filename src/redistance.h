@@ -69,12 +69,14 @@ static inline double minmod3 (double a, double b)
   return fabs(a) < fabs(b) ? a : b;
 }
 
+#define BGHOSTS 2
+
 foreach_dimension()
 static inline double weno_diff_x (Point point, scalar s, int i)
 {
   double s1 = (s[2*i] + s[] - 2*s[i])/Delta; 
   double s2 = (s[1] + s[-1] - 2*s[])/Delta;
-  return i*((s[i] - s[])/Delta -minmod3(s1, s2)/2.);
+  return i*((s[i] - s[])/Delta - minmod3(s1, s2)/2.);
 }
 
 /**
@@ -186,10 +188,11 @@ double forward_euler (scalar dist, scalar temp, scalar dist0, double dt)
     foreach_dimension()
       if (dist0[-1]*dist0[] < 0 || dist0[1]*dist0[] < 0)
 	interfacial = true;
+    
     if (!interfacial) {
 
       /**
-      Far from the interface, we use simply the Hamiltonian defined earlier. */
+      Far from the interface, we simply use the Hamiltonian defined earlier. */
       
       double delt = sign2(dist0[])*(hamiltonian (point, dist0, gra[0], gra[1]) - 1.);
       dist[] -= dt*delt;
@@ -219,8 +222,8 @@ double forward_euler (scalar dist, scalar temp, scalar dist0, double dt)
       double size = HUGE;
       foreach_dimension()
 	for (int i = 0; i < 2; i++)
-	  if (dist0[]*dist0[1 - 2*i] < 0.) {   
-	    double dx = Delta*root_x (point, dist0, 1e-10, 1 - 2*i);
+	  if (dist0[]*dist0[1 - 2*i] < 0.) {
+	    double dx = Delta*root_x (point, dist0, 1./HUGE, 1 - 2*i);
 	    if (dx != 0.) {
 	      double sxx1 = temp[2 - 4*i] + temp[] - 2.*temp[1 - 2*i];
 	      double sxx2 = temp[1] + temp[-1] - 2.*temp[];
@@ -246,19 +249,17 @@ restrictive one with regards to the CFL condition
 $$
 \Delta t = \Delta/2.
 $$
-The default number of iterations is 6 times, which is sufficient to
-have the first 3 neighbor cells to the 0-level-set properly
-redistanced. */
+*/
 
-int redistance (scalar dist,
-		double dt = L0/(1 << grid->maxdepth)/2.,
-		int it_max = 6)
+trace
+int redistance (scalar dist, int imax = 1,
+		double dt = L0/(1 << grid->maxdepth)/2.)
 {
 
   /**
-  Convergence is attained is residual is below $dt\times 10^{-6}$ */  
+  Convergence is reached if residual is below $dt\times 10^{-6}$ */
 
-  double eps = dt*1.e-6;
+  double eps = dt*1e-6;
 
   /**
   We create `dist0[]` which will be a copy of the initial level-set function
@@ -274,8 +275,7 @@ int redistance (scalar dist,
 
   One can choose between Runge Kutta 2 and Forward Euler temporal integration. */
   
-  for (int i = 1; i <= it_max; i++) {
-    double res = 0;
+  for (int i = 1; i <= imax; i++) {
 
     /**
     ## RK3
@@ -338,19 +338,20 @@ int redistance (scalar dist,
     \widetilde{\phi}^{n+1} = \widetilde{\phi}^{n} + \dfrac{2}{3}\widetilde{\phi}^{n+3/2}
     $$
     */
-    
+
+    double res = 0;
     foreach (reduction(max:res)) {
       res = max(res, 2./3.*fabs(dist[] - temp2[]));
       dist[] = (dist[] + 2.*temp2[])/3.;
     }
-    
+
     /**
     Iterations are stopped when $L_1 = \text{max}(|\phi_i^{n+1}-\phi_i^n|) < \epsilon$ */
 
     if (res < eps)
       return i;
   }
-  return it_max;
+  return imax;
 }
 
 /**

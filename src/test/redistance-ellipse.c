@@ -84,7 +84,6 @@ theoretically 0, we show that we have also a $3^{rd}$ convergence.
 ~~~
 */
 
-#define BGHOSTS 2
 #include "distance_point_ellipse.h"
 #include "redistance.h"
 #include "view.h"
@@ -126,7 +125,7 @@ int main()
       save ("start.png");
     }
       
-    int nbit = redistance (dist, it_max = 1 << (MAXLEVEL + 1));
+    int nbit = redistance (dist, imax = 1 << (MAXLEVEL + 1));
     
     if (MAXLEVEL == 8) {
       squares ("dist", map = cool_warm, min = -2, max = 2);
