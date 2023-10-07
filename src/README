@@ -185,7 +185,21 @@ $$
 \phi\mathbf{n}\delta_s
 $$
     + [Surface tension](tension.h)
+$$
+\sigma\kappa\mathbf{n}\delta_s
+$$
     + [Reduced gravity](reduced.h)
+$$
+[\rho]\mathbf{g}\cdot\mathbf{x}\mathbf{n}\delta_s
+$$
+    + [Surface tension (integral formulation)](integral.h)
+$$
+\sigma^{x x}_i = \left[ \gamma \frac{t^x}{\Delta} +
+   \left\{\begin{array}{ll}
+     s^x  (p_{j - 1} - p_j) & \text{if } s^x < 1 / 2\\
+     (s^x - 1)  (p_j - p_{j + 1}) & \text{otherwise}
+   \end{array}\right. \right]_i
+$$
 * [Reaction--Diffusion](diffusion.h)
 $$ 
 \theta\partial_tf = \nabla\cdot(D\nabla f) + \beta f + r
