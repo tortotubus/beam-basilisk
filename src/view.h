@@ -628,12 +628,9 @@ bool process_line (char * line)
 {
   if (line[0] == '\0')
     return true;
-  char * buf = strdup (line);
   char * s = mystrtok (remove_blanks (line), "(");
-  if (!s) {
-    free (buf);
+  if (!s)
     return true;
-  }
 
   if (!strcmp (s, "restore")) {
     char * file = NULL;
@@ -684,92 +681,14 @@ bool process_line (char * line)
     if (file)
       load (file = file);
   }
-#if 1
+
   /**
   The [draw_get.h]() file is generated automatically by [params.awk]()
   and contains parsing commands for the functions defined in
   [draw.h](). */
 
   #include "draw_get.h"
-#else
-  else if (!strcmp (s, "cells")) {
-    struct _cells p = {{0}};
-    if (!_cells_get (&p) || !cells (p))
-      return false;
-  }
 
-  else if (!strcmp (s, "vectors")) {
-    struct _vectors p = {0};
-    if (!_vectors_get (&p) || !vectors (p))
-      return false;
-  }
-        
-  else if (!strcmp (s, "draw_vof")) {
-    struct _draw_vof p = {0};
-    if (!_draw_vof_get (&p) || !draw_vof (p))
-      return false;
-  }
-    
-  else if (!strcmp (s, "isoline")) {
-    struct _isoline p = {0};
-    if (!_isoline_get (&p) || !isoline (p))
-      return false;
-  }
-    
-  else if (!strcmp (s, "squares")) {
-    struct _squares p = {0};
-    if (!_squares_get (&p) || !squares (p))
-      return false;
-  }
-  
-  else if (!strcmp (s, "begin_translate")) {
-    struct _translate p = {0};
-    _translate_get (&p);
-    begin_translate (p);
-  }
-
-  else if (!strcmp (s, "begin_mirror")) {
-    struct _mirror p = {{0}};
-    _mirror_get (&p);
-    begin_mirror (p);
-  }
-
-  else if (!strcmp (s, "squares")) {
-    struct _squares p = {0};
-    if (!_squares_get (&p) || !squares (p))
-      return false;
-  }
-    
-  else if (!strcmp (s, "isosurface")) {
-    struct _isosurface p = {0};
-    if (!_isosurface_get (&p) || !isosurface (p))
-      return false;
-  }
-    
-  else if (!strcmp (s, "draw_string")) {
-    struct _draw_string p = {0};
-    if (!_draw_string_get (&p) || !draw_string (p))
-      return false;
-  }
-
-  else if (!strcmp (s, "labels")) {
-    struct _labels p = {0};
-    if (!_labels_get (&p) || !labels (p))
-      return false;
-  }
-  
-  else if (!strcmp (s, "box")) {
-    struct _box p = {0};
-    if (!_box_get (&p) || !box (p))
-      return false;
-  }
-
-  else if (!strcmp (s, "view")) {
-    struct _view_set p = {0};
-    _view_set_get (&p);
-    view (p);
-  }
-#endif
   else if (!strcmp (s, "end_mirror"))
     end_mirror();
   
@@ -782,7 +701,6 @@ bool process_line (char * line)
   else if (s[0] != '\n' && s[0] != '\0')
     fprintf (ferr, "load(): syntax error: '%s'\n", s);
 
-  free (buf);
   return true;
 }
 
