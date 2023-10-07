@@ -912,6 +912,11 @@ bool isoline (char * phi,
   if (!color) color = phi;
   colorize_args();
   scalar fphi = col, fiso[];
+  if (!is_vertex_scalar (col)) {
+    fphi = new vertex scalar;
+    foreach_vertex()
+      fphi[] = (col[] + col[-1] + col[0,-1] + col[-1,-1])/4.;
+  }
   face vector siso[];
   if (n < 2) {
     fractions (fphi, fiso, siso, val);
@@ -926,7 +931,9 @@ bool isoline (char * phi,
 		linear, map, fc, lc, lw, expr);      
     }
   }
-  if (expr) delete({col});
+  if (!is_vertex_scalar (col))
+    delete ({fphi});
+  if (expr) delete ({col});
 #else // dimension == 3
   assert (false);
 #endif // dimension == 3
