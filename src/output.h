@@ -795,6 +795,7 @@ void output_gfs (FILE * fp = NULL,
 #if MULTIGRID_MPI
   not_mpi_compatible();
 #endif // !MULTIGRID_MPI
+  FILE * sfp = fp;
   if (file == NULL) {
     long pid = getpid();
     MPI_Bcast (&pid, 1, MPI_LONG, 0, MPI_COMM_WORLD);
@@ -950,14 +951,14 @@ void output_gfs (FILE * fp = NULL,
   if (file == NULL) {
     MPI_Barrier (MPI_COMM_WORLD);
     if (pid() == 0) {
-      if (fp == NULL)
-	fp = stdout;
+      if (sfp == NULL)
+	sfp = stdout;
       fp = fopen (fname, "r");
       size_t l;
       unsigned char buffer[8192];
       while ((l = fread (buffer, 1, 8192, fp)) > 0)
-	fwrite (buffer, 1, l, fp);
-      fflush (fp);
+	fwrite (buffer, 1, l, sfp);
+      fflush (sfp);
       remove (fname);
     }
     free (fname);
