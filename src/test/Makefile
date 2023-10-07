@@ -163,10 +163,30 @@ rising2.c: rising.c
 rising2.s: CFLAGS += -DCASE2=1
 rising2.tst: CFLAGS += -DCASE2=1
 
+rising2-levelset.c: rising.c
+	ln -s rising.c rising2-levelset.c
+rising2-levelset.s: CFLAGS += -DCASE2=1 -DLEVELSET=1
+rising2-levelset.tst: CFLAGS += -DCASE2=1 -DLEVELSET=1
+
+rising2-clsvof.c: rising.c
+	ln -s rising.c rising2-clsvof.c
+rising2-clsvof.s: CFLAGS += -DCASE2=1 -DLEVELSET=1 -DCLSVOF=1
+rising2-clsvof.tst: CFLAGS += -DCASE2=1 -DLEVELSET=1 -DCLSVOF=1
+
 rising-reduced.c: rising.c
 	ln -s rising.c rising-reduced.c
 rising-reduced.s: CFLAGS += -DREDUCED=1
 rising-reduced.tst: CFLAGS += -DREDUCED=1
+
+rising-levelset.c: rising.c
+	ln -s rising.c rising-levelset.c
+rising-levelset.s: CFLAGS += -DLEVELSET=1
+rising-levelset.tst: CFLAGS += -DLEVELSET=1
+
+rising-clsvof.c: rising.c
+	ln -s rising.c rising-clsvof.c
+rising-clsvof.s: CFLAGS += -DLEVELSET=1 -DCLSVOF=1
+rising-clsvof.tst: CFLAGS += -DLEVELSET=1 -DCLSVOF=1
 
 reversed.tst: reversed.ctst
 
