@@ -480,6 +480,12 @@ int sign (double x)
   return x > 0 ? i : - i;
 }
 
+int sign2 (double x)
+{
+  const int i = 1;
+  return x > 0 ? i : x < 0 ? - i : 0;
+}
+
 double clamp (double x, double a, double b)
 {
   return x < a ? a : x > b ? b : x;

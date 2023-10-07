@@ -204,6 +204,14 @@ $$
 \frac{\partial\mathbf{u}}{\partial t} = L(\mathbf{u}, t)
 $$
 * [Signed distance field](distance.h)
+* [Redistancing of a distance field](redistance.h)
+$$
+\left\{\begin{array}{ll}
+\phi_t + \text{sign}(\phi^{0}) \left(\left| \nabla \phi\right| - 1 \right) = 0\\ 
+\phi(x,0) = \phi^0(x)
+\end{array}
+\right.
+$$
 * [Okada fault model](okada.h)
 * [Hessenberg systems](hessenberg.h)
 * [Community Ocean Vertical Mixing (CVMix) interface](cvmix/cvmix.h)
