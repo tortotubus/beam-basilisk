@@ -3018,204 +3018,208 @@ static void translate (Ast * n, Stack * stack, void * data)
 
       Ast * type = ast_identifier_declaration (stack, t->start);
       if (type) {
-	while (type->sym != sym_declaration &&
-	       type->sym != sym_function_definition)
+	while (type->sym != sym_declarator)
 	  type = type->parent;
-	assert (type);
-	Ast * parameters = ast_find (type, sym_parameter_list);
+	if (!ast_schema (type, sym_declarator,
+			 0, sym_pointer)) { // exclude function pointers
+	  while (type->sym != sym_declaration &&
+		 type->sym != sym_function_definition)
+	    type = type->parent;
+	  Ast * parameters = ast_find (type, sym_parameter_list);
 	
-	/**
-        Obsolete optional arguments syntax using 'struct ...' parameters. */
+	  /**
+	  Obsolete optional arguments syntax using 'struct ...' parameters. */
 
-	Ast * struct_name = obsolete_function_declaration (type);
-	if (struct_name) {
-	  Ast * arguments = ast_find (n, sym_argument_expression_list);
-	  if (!arguments) {
-	    Ast * expr = ast_parse_expression ("func((struct Name){0});",
-					       ast_get_root (n));
-	    Ast * list = ast_find (expr, sym_argument_expression_list);
-	    AstTerminal * t = ast_terminal (ast_find (list, sym_IDENTIFIER));
-	    free (t->start);
-	    t->start = strdup (ast_terminal (struct_name)->start);
-	    ast_set_line (list, ast_terminal (n->child[1]));
-	    ast_new_children (n, n->child[0], n->child[1],
-			      ast_placeholder,
-			      n->child[2]);
-	    ast_replace_child (n, 2, list);
-	    ast_destroy (expr);
-	  }
-	  else {
-	    Ast * struct_arg = arguments->child[1] ? NULL :
-	      ast_is_identifier_expression (arguments->child[0]->child[0]);
-	    if (struct_arg) {
-	      Ast * type =
-		ast_identifier_declaration (stack,
-					    ast_terminal (struct_arg)->start);
-	      while (type &&
-		     type->sym != sym_declaration &&
-		     type->sym != sym_parameter_declaration)
-		type = type->parent;
-	      Ast * struct_namep = 
-		ast_get_struct_name (ast_child (type,
-						sym_declaration_specifiers));
-	      if (!struct_namep ||
-		  strcmp (ast_terminal (struct_namep)->start,
-			  ast_terminal (struct_name)->start))
-		struct_arg = NULL;
-	    }
-	    if (!struct_arg) {
-	      Ast * expr = ast_parse_expression ("func((struct Name){a});",
+	  Ast * struct_name = obsolete_function_declaration (type);
+	  if (struct_name) {
+	    Ast * arguments = ast_find (n, sym_argument_expression_list);
+	    if (!arguments) {
+	      Ast * expr = ast_parse_expression ("func((struct Name){0});",
 						 ast_get_root (n));
 	      Ast * list = ast_find (expr, sym_argument_expression_list);
 	      AstTerminal * t = ast_terminal (ast_find (list, sym_IDENTIFIER));
 	      free (t->start);
 	      t->start = strdup (ast_terminal (struct_name)->start);
-	      Ast * initializer_list = ast_initializer_list (arguments);
-	      ast_replace (list, "a", initializer_list);
+	      ast_set_line (list, ast_terminal (n->child[1]));
+	      ast_new_children (n, n->child[0], n->child[1],
+				ast_placeholder,
+				n->child[2]);
 	      ast_replace_child (n, 2, list);
-	      if (initializer_list->child[1] &&
-		  initializer_list->child[1]->sym == token_symbol (',') &&
-		  !initializer_list->child[2]) {
-		Ast * postfix = initializer_list->parent;
-		assert (postfix->sym == sym_postfix_initializer &&
-			postfix->child[2]->sym == token_symbol ('}'));
-		ast_new_children (postfix,
-				  postfix->child[0],
-				  initializer_list->child[0],
-				  initializer_list->child[1],
-				  postfix->child[2]);
-	      }
 	      ast_destroy (expr);
 	    }
-	  }
-	}
-	
-	/**
-	Check for optional or named function call arguments. */
-	  
-	else if (ast_find (parameters, sym_parameter_declaration,
-			   3, sym_initializer) ||
-		 ast_find (n, sym_argument_expression_list_item,
-			   0, sym_assignment_expression,
-			   1, sym_assignment_operator)) {
-	  parameters = ast_copy (parameters);
-	  Ast * parameters1 = parameters;
-	  while (parameters && parameters->child[0]->sym == parameters->sym)
-	    parameters = parameters->child[0];
-	  Ast * arguments = ast_schema (n, sym_function_call,
-					2, sym_argument_expression_list);
-	  if (arguments) {
-	    foreach_item_r (arguments, sym_argument_expression_list_item, argument) {
-	      Ast * identifier = ast_schema (argument, sym_argument_expression_list_item,
-					     0, sym_assignment_expression,
-					     1, sym_assignment_operator) ?
-		ast_schema (argument, sym_argument_expression_list_item,
-			    0, sym_assignment_expression,
-			    0, sym_unary_expression,
-			    0, sym_postfix_expression,
-			    0, sym_primary_expression,
-			    0, sym_IDENTIFIER) : NULL;
-	      Ast * parameter;
-	      if (identifier) {
-		parameter = NULL;
-		foreach_item (parameters1, 2, i) {
-		  Ast * id = ast_find (i, sym_direct_declarator,
-				       0, sym_generic_identifier,
-				       0, sym_IDENTIFIER);
-		  if (!strcmp (ast_terminal (identifier)->start, ast_terminal (id)->start)) {
-		    parameter = i;
-		    break;
-		  }
-		}
-		if (!parameter) {
-		  AstTerminal * t = ast_terminal (identifier);
-		  fprintf (stderr, "%s:%d: error: unknown function parameter '%s'\n",
-			   t->file, t->line, t->start);
-		  exit (1);
-		}
-		argument = ast_schema (argument, sym_argument_expression_list_item,
-				       0, sym_assignment_expression)->child[2];
-	      }
-	      else {
-		parameter = ast_child (parameters, sym_parameter_declaration);
-		parameters = parameters->parent;
-		argument = argument->child[0];
-	      }
-	      assert (parameter);
-	      if (ast_schema (parameter, sym_parameter_declaration,
-			      3, sym_initializer))
-		ast_set_child (parameter->child[3], 0, argument);
-	      else if (ast_schema (parameter, sym_parameter_declaration,
-				   1, sym_declarator))
-		ast_new_children (parameter,
-				  parameter->child[0],
-				  parameter->child[1],
-				  NCA(n, "="),
-				  NN(n, sym_initializer,
-				     argument));
-	      else
-		assert (false); // not implemented
-	      Ast * comma = ast_schema (parameter->parent, sym_parameter_list,
-					1, token_symbol (','));
-	      if (comma) {
-		AstTerminal * t = ast_terminal (comma), * ta = ast_left_terminal (argument);
-		t->file = ta->file, t->line = ta->line;
-	      }
-	    }
-	  }
-	  foreach_item (parameters1, 2, parameter) {
-	    Ast * initializer = ast_schema (parameter, sym_parameter_declaration,
-					    3, sym_initializer);
-	    if (!initializer) {
-	      Ast * id = ast_find (parameter, sym_direct_declarator,
-				   0, sym_generic_identifier,
-				   0, sym_IDENTIFIER);
-	      AstTerminal * t = ast_left_terminal (n);
-	      fprintf (stderr, "%s:%d: error: missing compulsory parameter '%s' in function call\n",
-		       t->file, t->line, ast_terminal (id)->start);
-	      exit (1);
-	    }
-	    Ast * assign = ast_schema (initializer, sym_initializer,
-				       0, sym_assignment_expression);
-	    if (assign)
-	      ast_new_children (parameter, assign);
 	    else {
-	      if (ast_schema (initializer, sym_initializer,
-			      0, sym_postfix_initializer))
-		initializer = initializer->child[0];
-	      else
-		assert (ast_schema (initializer, sym_initializer,
-				    1, sym_initializer_list));
-	      initializer->sym = sym_postfix_initializer;
-	      Ast * type_specifier = ast_find (parameter, sym_declaration_specifiers,
-					       0, sym_type_specifier);
-	      Ast * declarator = ast_schema (parameter, sym_parameter_declaration,
-					     1, sym_declarator);
-	      Ast * abstract = abstract_declarator_from_declarator (declarator);
-	      assert (type_specifier);
-	      AstTerminal * ob = NCA(parameter, "("), * cb = NCA(parameter, ")");
-	      Ast * type_name = abstract ?
-		NN(n, sym_type_name,
-		   NN(n, sym_specifier_qualifier_list,
-		      type_specifier),
-		   abstract) :
-		NN(n, sym_type_name,
-		   NN(n, sym_specifier_qualifier_list,
-		      type_specifier));
-	      ast_new_children (parameter, ast_attach
-				(ast_new_unary_expression (parameter),				 
-				 NN(n, sym_postfix_expression,
-				    ob, type_name, cb,
-				    initializer)));
+	      Ast * struct_arg = arguments->child[1] ? NULL :
+		ast_is_identifier_expression (arguments->child[0]->child[0]);
+	      if (struct_arg) {
+		Ast * type =
+		  ast_identifier_declaration (stack,
+					      ast_terminal (struct_arg)->start);
+		while (type &&
+		       type->sym != sym_declaration &&
+		       type->sym != sym_parameter_declaration)
+		  type = type->parent;
+		Ast * struct_namep = 
+		  ast_get_struct_name (ast_child (type,
+						  sym_declaration_specifiers));
+		if (!struct_namep ||
+		    strcmp (ast_terminal (struct_namep)->start,
+			    ast_terminal (struct_name)->start))
+		  struct_arg = NULL;
+	      }
+	      if (!struct_arg) {
+		Ast * expr = ast_parse_expression ("func((struct Name){a});",
+						   ast_get_root (n));
+		Ast * list = ast_find (expr, sym_argument_expression_list);
+		AstTerminal * t = ast_terminal (ast_find (list, sym_IDENTIFIER));
+		free (t->start);
+		t->start = strdup (ast_terminal (struct_name)->start);
+		Ast * initializer_list = ast_initializer_list (arguments);
+		ast_replace (list, "a", initializer_list);
+		ast_replace_child (n, 2, list);
+		if (initializer_list->child[1] &&
+		    initializer_list->child[1]->sym == token_symbol (',') &&
+		    !initializer_list->child[2]) {
+		  Ast * postfix = initializer_list->parent;
+		  assert (postfix->sym == sym_postfix_initializer &&
+			  postfix->child[2]->sym == token_symbol ('}'));
+		  ast_new_children (postfix,
+				    postfix->child[0],
+				    initializer_list->child[0],
+				    initializer_list->child[1],
+				    postfix->child[2]);
+		}
+		ast_destroy (expr);
+	      }
 	    }
-	    parameter->sym = sym_argument_expression_list_item;
-	    parameter->parent->sym = sym_argument_expression_list;
 	  }
-	  if (n->child[3])
-	    ast_set_child (n, 2, parameters1);
-	  else
-	    ast_new_children (n, n->child[0], n->child[1], parameters1, n->child[2]);
-	}	  
+	
+	  /**
+	  Check for optional or named function call arguments. */
+	  
+	  else if (ast_find (parameters, sym_parameter_declaration,
+			     3, sym_initializer) ||
+		   ast_find (n, sym_argument_expression_list_item,
+			     0, sym_assignment_expression,
+			     1, sym_assignment_operator)) {
+	    parameters = ast_copy (parameters);
+	    Ast * parameters1 = parameters;
+	    while (parameters && parameters->child[0]->sym == parameters->sym)
+	      parameters = parameters->child[0];
+	    Ast * arguments = ast_schema (n, sym_function_call,
+					  2, sym_argument_expression_list);
+	    if (arguments) {
+	      foreach_item_r (arguments, sym_argument_expression_list_item, argument) {
+		Ast * identifier = ast_schema (argument, sym_argument_expression_list_item,
+					       0, sym_assignment_expression,
+					       1, sym_assignment_operator) ?
+		  ast_schema (argument, sym_argument_expression_list_item,
+			      0, sym_assignment_expression,
+			      0, sym_unary_expression,
+			      0, sym_postfix_expression,
+			      0, sym_primary_expression,
+			      0, sym_IDENTIFIER) : NULL;
+		Ast * parameter;
+		if (identifier) {
+		  parameter = NULL;
+		  foreach_item (parameters1, 2, i) {
+		    Ast * id = ast_find (i, sym_direct_declarator,
+					 0, sym_generic_identifier,
+					 0, sym_IDENTIFIER);
+		    if (!strcmp (ast_terminal (identifier)->start, ast_terminal (id)->start)) {
+		      parameter = i;
+		      break;
+		    }
+		  }
+		  if (!parameter) {
+		    AstTerminal * t = ast_terminal (identifier);
+		    fprintf (stderr, "%s:%d: error: unknown function parameter '%s'\n",
+			     t->file, t->line, t->start);
+		    exit (1);
+		  }
+		  argument = ast_schema (argument, sym_argument_expression_list_item,
+					 0, sym_assignment_expression)->child[2];
+		}
+		else {
+		  parameter = ast_child (parameters, sym_parameter_declaration);
+		  parameters = parameters->parent;
+		  argument = argument->child[0];
+		}
+		assert (parameter);
+		if (ast_schema (parameter, sym_parameter_declaration,
+				3, sym_initializer))
+		  ast_set_child (parameter->child[3], 0, argument);
+		else if (ast_schema (parameter, sym_parameter_declaration,
+				     1, sym_declarator))
+		  ast_new_children (parameter,
+				    parameter->child[0],
+				    parameter->child[1],
+				    NCA(n, "="),
+				    NN(n, sym_initializer,
+				       argument));
+		else
+		  assert (false); // not implemented
+		Ast * comma = ast_schema (parameter->parent, sym_parameter_list,
+					  1, token_symbol (','));
+		if (comma) {
+		  AstTerminal * t = ast_terminal (comma), * ta = ast_left_terminal (argument);
+		  t->file = ta->file, t->line = ta->line;
+		}
+	      }
+	    }
+	    foreach_item (parameters1, 2, parameter) {
+	      Ast * initializer = ast_schema (parameter, sym_parameter_declaration,
+					      3, sym_initializer);
+	      if (!initializer) {
+		Ast * id = ast_find (parameter, sym_direct_declarator,
+				     0, sym_generic_identifier,
+				     0, sym_IDENTIFIER);
+		AstTerminal * t = ast_left_terminal (n);
+		fprintf (stderr, "%s:%d: error: missing compulsory parameter '%s' in function call\n",
+			 t->file, t->line, ast_terminal (id)->start);
+		exit (1);
+	      }
+	      Ast * assign = ast_schema (initializer, sym_initializer,
+					 0, sym_assignment_expression);
+	      if (assign)
+		ast_new_children (parameter, assign);
+	      else {
+		if (ast_schema (initializer, sym_initializer,
+				0, sym_postfix_initializer))
+		  initializer = initializer->child[0];
+		else
+		  assert (ast_schema (initializer, sym_initializer,
+				      1, sym_initializer_list));
+		initializer->sym = sym_postfix_initializer;
+		Ast * type_specifier = ast_find (parameter, sym_declaration_specifiers,
+						 0, sym_type_specifier);
+		Ast * declarator = ast_schema (parameter, sym_parameter_declaration,
+					       1, sym_declarator);
+		Ast * abstract = abstract_declarator_from_declarator (declarator);
+		assert (type_specifier);
+		AstTerminal * ob = NCA(parameter, "("), * cb = NCA(parameter, ")");
+		Ast * type_name = abstract ?
+		  NN(n, sym_type_name,
+		     NN(n, sym_specifier_qualifier_list,
+			type_specifier),
+		     abstract) :
+		  NN(n, sym_type_name,
+		     NN(n, sym_specifier_qualifier_list,
+			type_specifier));
+		ast_new_children (parameter, ast_attach
+				  (ast_new_unary_expression (parameter),				 
+				   NN(n, sym_postfix_expression,
+				      ob, type_name, cb,
+				      initializer)));
+	      }
+	      parameter->sym = sym_argument_expression_list_item;
+	      parameter->parent->sym = sym_argument_expression_list;
+	    }
+	    if (n->child[3])
+	      ast_set_child (n, 2, parameters1);
+	    else
+	      ast_new_children (n, n->child[0], n->child[1], parameters1, n->child[2]);
+	  }	  
+	}
       }
     }
     break;
