@@ -497,6 +497,13 @@ ows_papa.tst: ows_papa-kpp.tst
 
 stencils.tst: CFLAGS += -DPRINTBOUNDARY=1
 
+# CLSVOF
+
+capwave-clsvof.c: capwave.c
+	ln -s capwave.c capwave-clsvof.c 
+capwave-clsvof.s: CFLAGS += -DCLSVOF=1
+capwave-clsvof.tst: CFLAGS += -DCLSVOF=1
+
 # Dimensions
 
 dimensions-tests: bump2D.s capwave.s lid.s rising-axi.s		\
