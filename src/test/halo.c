@@ -28,9 +28,6 @@ int main (int argc, char ** argv)
   
   /* initial coarsening */
 
-  double toto;
-  toto;
-  
   while (adapt_wavelet ({h}, (double []){1e-2}, 5).nc);
 
   for (int l = 0; l < depth(); l++)
