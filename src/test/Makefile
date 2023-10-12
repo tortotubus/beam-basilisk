@@ -158,6 +158,11 @@ rising-axi-momentum.c: rising.c
 rising-axi-momentum.s: CFLAGS += -DAXIS=1 -DMOMENTUM=1
 rising-axi-momentum.tst: CFLAGS += -DAXIS=1 -DMOMENTUM=1
 
+rising-axi-clsvof.c: rising.c
+	ln -s rising.c rising-axi-clsvof.c
+rising-axi-clsvof.s: CFLAGS += -DAXIS=1 -DLEVELSET=1 -DCLSVOF=1
+rising-axi-clsvof.tst: CFLAGS += -DAXIS=1 -DLEVELSET=1 -DCLSVOF=1
+
 rising2.c: rising.c
 	ln -s rising.c rising2.c
 rising2.s: CFLAGS += -DCASE2=1

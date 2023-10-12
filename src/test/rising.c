@@ -53,14 +53,6 @@ u.t[right] = dirichlet(0);
 u.t[left]  = dirichlet(0);
 #endif
 
-/**
-We make sure there is no flow through the top and bottom boundary,
-otherwise the compatibility condition for the Poisson equation can be
-violated. */
-
-uf.n[bottom] = 0.;
-uf.n[top] = 0.;
-
 int main() {
 
   /**
@@ -88,7 +80,7 @@ int main() {
   #else
   const scalar sigma[] = 24.5;
   #endif
-  d.sigma = sigma;
+  d.sigmaf = sigma;
 #else // !LEVELSET
   #if CASE2
   f.sigma = 1.96;
@@ -229,6 +221,7 @@ plot [][0:0.4]'../c1g3l4s.txt' u 2:($1-0.5) w l t 'MooNMD', \
               '../rising-levelset/log' u 1:2 w l t 'Basilisk (levelset)', \
               '../rising-clsvof/log' u 1:2 w l t 'Basilisk (CLSVOF)', \
               '../rising-axi/log' u 1:2 w l t 'Basilisk (axisymmetric)', \
+              '../rising-axi-clsvof/log' u 1:2 w l t 'Basilisk (axi + CLSVOF)', \
               '../rising-axi-momentum/log' u 1:2 w l t 'Basilisk (axi + momentum)'
 ~~~
 
@@ -256,6 +249,7 @@ plot [0:3][0:]'../c1g3l4.txt' u 1:5 w l t 'MooNMD', \
               '../rising-levelset/out' u 1:5 w l t 'Basilisk (levelset)', \
               '../rising-clsvof/out' u 1:5 w l t 'Basilisk (CLSVOF)',     \
               '../rising-axi/out' u 1:5 w l t 'Basilisk (axisymmetric)',  \
+              '../rising-axi-clsvof/out' u 1:5 w l t 'Basilisk (axi + CLSVOF)',  \
               '../rising-axi-momentum/out' u 1:5 w l t 'Basilisk (axi + momentum)'
 ~~~
 
@@ -269,6 +263,7 @@ plot [0:3]'out' u 1:2 w l t 'Basilisk', \
           '../rising-levelset/out' u 1:2 w l t 'Basilisk (levelset)',   \
 	  '../rising-clsvof/out' u 1:2 w l t 'Basilisk (CLSVOF)',	\
 	  '../rising-axi/out' u 1:2 w l t 'Basilisk (axisymmetric)',	\
+	  '../rising-axi-clsvof/out' u 1:2 w l t 'Basilisk (axi + CLSVOF)',	\
 	  '../rising-axi-momentum/out' u 1:2 w l t 'Basilisk (axi + momentum)'
 ~~~
 
