@@ -93,6 +93,7 @@ Note that only the documented test cases appear in the list below
 * [Rising bubble](rising.c)
 * [Sessile drop](sessile.c)
 * [3D Sessile drop](sessile3D.c)
+* [Marangoni-induced translation due to a temperature gradient](marangoni.c)
 
 ## General orthogonal coordinates
 
