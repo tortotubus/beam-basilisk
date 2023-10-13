@@ -50,7 +50,7 @@ int main() {
   Y0 = -L0/2.;
 #if CLSVOF
   const scalar sigma[] = 1.;
-  d.sigma = sigma;
+  d.sigmaf = sigma;
 #else
   f.sigma = 1.;
 #endif
