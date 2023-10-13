@@ -999,6 +999,10 @@ bool vectors (char * u, double scale = 1, float lc[3] = {0}, float lw = 1.)
     char name[80];
     sprintf (name, "%s.%c", u, index.x);
     fu.x = lookup_field (name);
+    if (fu.x.i < 0) {
+      fprintf (stderr, "vectors(): no field named '%s'\n", name);
+      return false;
+    }
   }
   bview * view = draw();
   float res = view->res;
