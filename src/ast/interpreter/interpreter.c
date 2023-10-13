@@ -2266,7 +2266,6 @@ Stack * save_locals (Stack * stack)
 	  (*i)->sym == sym_external_declaration)
 	break;
     }
-  assert (i && *i);
   return locals;
 }
 
@@ -3184,9 +3183,8 @@ int ast_run (AstRoot * root, Ast * n, int verbosity, int maxcalls, void * user_d
   stack_push (stack, &root);
   if (n) {
     AstRoot * interpreter = add_external_declarations (root, BASILISK "/ast/interpreter/declarations.h");
-    run_external_declarations ((Ast *) root, stack);
-    // fixme: merge the two files below?
     AstRoot * internal = add_external_declarations (root, BASILISK "/ast/interpreter/internal.h");
+    run_external_declarations ((Ast *) root, stack);
     AstRoot * overload = add_external_declarations (root, BASILISK "/ast/interpreter/overload.h");
     run (n, stack);
     if (after_run)
