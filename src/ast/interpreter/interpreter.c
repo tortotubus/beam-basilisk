@@ -637,7 +637,8 @@ Value * assign (Ast * n, Value * dst, Value * src, Stack * stack)
   else if (dst->pointer && src->type->sym == sym_LONG)
     value_data (dst, void *) = (void *)value_data (src, long);
   else if (dst->type->sym == sym_struct_or_union_specifier &&
-	   src->type == (Ast *)&ast_int && value_data (src, int) == 0)
+	   ((src->type == (Ast *)&ast_int && value_data (src, int) == 0) ||
+	    (src->type == (Ast *)&ast_long && value_data (src, long) == 0)))
     memset (dst->data.p, 0, dst->size);
   else
     return message (NULL, n, "assignment between incompatible types\n", error_verbosity, stack);
