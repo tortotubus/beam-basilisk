@@ -1,7 +1,8 @@
 /**
 # Integral formulation for surface tension
 
-See [Al Saud et al., 2018](alsaud2018) for details.
+See [Al Saud et al., 2018](#alsaud2018) and [Popinet & Zaleski,
+1999](#popinet1999) for details.
 
 The surface tension field $\sigma$ will be associated to each levelset
 tracer. This is done easily by adding the following [field
@@ -10,7 +11,7 @@ attributes](/Basilisk C#field-attributes). */
 extern scalar * tracers;
 
 attribute {
-  scalar sigma;
+  scalar sigmaf;
 }
 
 /**
@@ -44,8 +45,8 @@ event stability (i++)
 {
   double sigma = 0.;
   for (scalar d in tracers)
-    if (is_constant (d.sigma))
-      sigma += constant (d.sigma);
+    if (is_constant (d.sigmaf))
+      sigma += constant (d.sigmaf);
   double sigmamax = sigma;
   
   /**
@@ -66,8 +67,8 @@ event stability (i++)
 
       double sigmai = sigma;
       for (scalar d in tracers)
-	if (!is_constant (d.sigma) && fabs(d[]) < 2.*Delta) {
-	  scalar sigmaf = d.sigma;
+	if (!is_constant (d.sigmaf) && fabs(d[]) < 2.*Delta) {
+	  scalar sigmaf = d.sigmaf;
 	  sigmai += sigmaf[];
 	}
       if (sigmai > sigmamax)
@@ -82,8 +83,6 @@ event stability (i++)
   }
 }
 
-#define CURVATURE 0 // set to 1 (resp. 2) to use curvature (resp. linear) interpolation of curvature
-
 /**
 ## Curvature
 
@@ -92,6 +91,8 @@ $$
 \kappa = \frac{d^2_xd_{yy} - 2d_xd_yd_{xy} + d^2_yd_{xx}}{|\nabla d|^3}
 $$
 */
+
+#define CURVATURE 1 // set to 1 (resp. 2) to use curvature (resp. linear) interpolation of curvature
 
 #if CURVATURE
 static inline double distance_curvature (Point point, scalar d)
@@ -104,7 +105,7 @@ static inline double distance_curvature (Point point, scalar d)
   double dn = sqrt(sq(dx) + sq(dy)) + 1e-30;
   return (sq(dx)*dyy - 2.*dx*dy*dxy + sq(dy)*dxx)/cube(dn)/Delta;
 }
-#endif
+#endif // CURVATURE
 
 /**
 ## Surface tension term
@@ -112,6 +113,10 @@ static inline double distance_curvature (Point point, scalar d)
 The calculation of the acceleration is done by this event, overloaded
 from [its definition](navier-stokes/centered.h#acceleration-term) in
 the centered Navier--Stokes solver. */
+
+#if AXI
+# include "fractions.h"
+#endif
 
 event acceleration (i++)
 {
@@ -121,8 +126,8 @@ event acceleration (i++)
   function *d*. */
 
   for (scalar d in tracers)
-    if (d.sigma.i) {
-      (const) scalar sigma = d.sigma;
+    if (d.sigmaf.i) {
+      (const) scalar sigma = d.sigmaf;
       
 #if CURVATURE == 2
       /**
@@ -131,7 +136,7 @@ event acceleration (i++)
       scalar kappa[];
       foreach()
 	kappa[] = distance_curvature (point, d);
-#endif
+#endif // CURVATURE == 2
       
       /**
       We allocate the surface tension stress tensor "manually",
@@ -160,9 +165,18 @@ event acceleration (i++)
 	      double ki = distance_curvature (point, d);
 #endif
 	      S.y.y[] += sigmai*(fabs(nx)/Delta - sign(d[])*ki*(0.5 - xi));
-#else
+#else // CURVATURE == 0
+
+	      /**
+	      Here we use the pressure jump instead of the curvature.
+	      See Appendix A of [Al Saud et al.,
+	      2018](#alsaud2018). The noise induced by pressure jumps
+	      can be problematic for some cases however, for example
+	      for [Marangoni translation](test/marangoni.c) at small
+	      capillary numbers Ca. */
+
 	      S.y.y[] += sigmai*fabs(nx)/Delta + (p[] - p[i])*(0.5 - xi);
-#endif
+#endif // CURVATURE == 0
 	    }
         }
 
@@ -184,11 +198,40 @@ event acceleration (i++)
 
       /**
       Finally, we add the divergence of the surface tension tensor to
-      the acceleration. */
-      
+      the acceleration and the axisymmetric term if necessary. */
+
       face vector av = a;
-      foreach_face()
-	av.x[] += alpha.x[]/(fm.x[] + SEPS)*(S.x.x[] - S.x.x[-1] + S.x.y[0,1] - S.x.y[])/Delta;      
+      foreach_face() {
+	av.x[] += alpha.x[]/(fm.x[] + SEPS)*(S.x.x[] - S.x.x[-1] + S.x.y[0,1] - S.x.y[])/Delta;
+
+	/**
+	### Axisymmetric term
+	
+	The axisymmetric acceleration is computed using the volumetric
+	surface tension formulation as
+	$$
+	\frac{1}{\rho}\sigma\kappa_\theta\mathbf{n}\delta_s
+	$$
+	with the principal axisymmetric curvature given by
+	$$
+	\kappa_\theta = \frac{n^r}{r}
+	$$
+	and using the approximation
+	$$
+	\mathbf{n}\delta_s\approx\mathbf{\nabla}f
+	$$
+	with $f$ the volume fraction. */
+
+#if AXI
+	coord n;
+	n.x = (d[] - d[-1])/Delta;
+	n.y = (d[0,1] + d[-1,1] - d[0,-1] - d[-1,-1])/(4.*Delta);
+	double nr = ((double *)&n)[1]; // to avoid .y -> .x rotation
+	extern scalar f;
+	av.x[] -= alpha.x[]/sq(fm.x[] + SEPS)*(sigma[] + sigma[-1])/2.*nr*(f[] - f[-1])/Delta;
+#endif // AXI
+
+      }
     }
 }
 
@@ -197,6 +240,16 @@ event acceleration (i++)
 
 ~~~bib
 @hal{alsaud2018, hal-01706565}
+
+@article{popinet1999,
+  title={A front-tracking algorithm for accurate representation of surface tension},
+  author={S. Popinet and S. Zaleski},
+  journal={International Journal for Numerical Methods in Fluids},
+  volume={30},
+  number={6},
+  pages={775--793},
+  year={1999},
+  publisher={Wiley Online Library}
+}
 ~~~
 */
-
