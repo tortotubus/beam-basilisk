@@ -385,7 +385,7 @@ double * val (scalar s, int i, int j, int k)
   return (double *)(igrid->d + s.i*sizeof(double));
 }
 
-Point locate (struct _locate p)
+Point locate (double xp, double yp, double zp)
 {
   Point point; // unset
   return point;
