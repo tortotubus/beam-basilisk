@@ -65,7 +65,7 @@ event properties (i++)
   /**
   The redistancing operation itself is quite expensive. */
   
-  redistance (d, imax = 5, dt = L0/(1 << grid->maxdepth));
+  redistance (d, imax = 2, dt = L0/(1 << grid->maxdepth));
 }
 
 /**
