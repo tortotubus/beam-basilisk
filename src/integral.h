@@ -223,12 +223,12 @@ event acceleration (i++)
 	with $f$ the volume fraction. */
 
 #if AXI
-	coord n;
-	n.x = (d[] - d[-1])/Delta;
-	n.y = (d[0,1] + d[-1,1] - d[0,-1] - d[-1,-1])/(4.*Delta);
-	double nr = ((double *)&n)[1]; // to avoid .y -> .x rotation
+	coord n = {
+	  (d[] - d[-1])/Delta,
+	  (d[0,1] + d[-1,1] - d[0,-1] - d[-1,-1])/(4.*Delta)
+	};
 	extern scalar f;
-	av.x[] -= alpha.x[]/sq(fm.x[] + SEPS)*(sigma[] + sigma[-1])/2.*nr*(f[] - f[-1])/Delta;
+	av.x[] -= alpha.x[]/sq(fm.x[] + SEPS)*(sigma[] + sigma[-1])/2.*n.y*(f[] - f[-1])/Delta;
 #endif // AXI
 
       }
