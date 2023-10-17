@@ -59,8 +59,7 @@ x^+ = \text{max}(0, x)\\
 x^- = \text{min}(0, x)\\
 $$
 
-We use a minmod limiter and a second-order WENO approximation for the
-derivatives. */
+We use a minmod limiter. */
 
 static inline double minmod3 (double a, double b)
 {
@@ -71,135 +70,53 @@ static inline double minmod3 (double a, double b)
 
 #define BGHOSTS 2
 
-foreach_dimension()
-static inline double weno_diff_x (Point point, scalar s, int i)
-{
-  double s1 = (s[2*i] + s[] - 2*s[i])/Delta; 
-  double s2 = (s[1] + s[-1] - 2*s[])/Delta;
-  return i*((s[i] - s[])/Delta - minmod3(s1, s2)/2.);
-}
-
 /**
-## Precalculation of the inputs of the Hamiltonian
+## Time derivative
 
-$$
-D^+\phi_{ij} = \dfrac{\phi_{i+1,j} - \phi_{ij}}{\Delta x} - \dfrac{\Delta}
-{2}\text{minmod}(D_{xx}\phi_{ij},D_{xx}\phi_{i+1,j})
-$$
-$$
-D^-\phi_{ij} = \dfrac{\phi_{i,j} - \phi_{i-1,j}}{\Delta x} - \dfrac{\Delta}
-{2}\text{minmod}(D_{xx}\phi_{ij},D_{xx}\phi{i-1,j})
-$$
-where
-$$
-D_{xx}\phi_{ij} = \dfrac{\phi_{i-1,j} - 2\phi_{ij} + \phi_{i+1,j}}{\Delta x^2}
-$$
-*/
+This function fills *dphi* with $\partial_t\phi$ .*/
 
 static
-void prehamiltonian (Point point, coord  * grapl, coord * gramin, scalar s)
+void dphidt (scalar phi, scalar dphi, scalar phi0, double cfl)
 {
-  foreach_dimension() {
-    grapl->x  = weno_diff_x (point, s,  1);
-    gramin->x = weno_diff_x (point, s, -1);
-  }
-}
-
-/**
-## Godunov Hamiltonian
-
-$$
-H_G(a,b,c,d) = \left\{ \begin{array}{ll}
-\sqrt{\text{max}((a^-)^2,(b^+)^2 + (c^-)^2,(d^+)^2)} \text { when } \text{sign}(\phi^0_{ij})
-\geq 0\\
-\sqrt{\text{max}((a^+)^2,(b^-)^2 + (c^+)^2,(d^-)^2)} \text { when } \text{sign}(\phi^0_{ij}) < 0
-\end{array}
-\right.
-$$
-*/
-
-static
-double hamiltonian (Point point, scalar s0, coord grapl, coord gramin)
-{
-  double hamil = 0;
-  if (s0[] > 0)
-    foreach_dimension() {
-      double a = min(0., grapl.x); 
-      double b = max(0., gramin.x);
-      hamil += max(sq(a), sq(b));
-    }
-  else
-    foreach_dimension() {
-      double a = max(0., grapl.x);
-      double b = min(0., gramin.x);
-      hamil += max(sq(a), sq(b));
-    }
-  return sqrt(hamil);
-}
-
-/**
-## Root extraction for the subcell fix near the interface
-
-$$
-\Delta x^+ = \left\{ \begin{array}{ll}
-\Delta x \cdot \left( \dfrac{\phi^0_{i,j}-\phi^0_{i+1,j} -
-\text{sgn}(\phi^0_{i,j}-\phi^0_{i+1,j})\sqrt{D}}{}\right) 
-\text{ if } \left| \phi^0_{xx}\right| >\epsilon \\
-\Delta x \cdot \dfrac{\phi^0_{ij}}{\phi^0_{i,j}-\phi^0_{i+1,j}} \text{ else.}\\
-\end{array}
-\right.
-$$
-with
-$$
-\phi_{xx}^0 = \text{minmod}(\phi^0_{i-1,j}-2\phi^0_{ij}+\phi^0_{i+1,j}, 
-                     \phi^0_{i,j}-2\phi^0_{i+1j}+\phi^0_{i+2,j}) \\
-D = \left( \phi^0_{xx}/2  - \phi_{ij}^0 - \phi_{i+1,j} \right)^2  - 4\phi_{ij}^0\phi_{i+1,j}^0
-$$
-For the $\Delta x^-$ calculation, replace all the $+$ subscript by $-$, this
-is dealt with properly with the `dir` variable in the following function. */
-
-foreach_dimension()
-static inline double root_x (Point point, scalar s, double eps, int dir)
-{
-  double phixx = minmod3 (s[2*dir] + s[] - 2*s[dir], s[1] + s[-1] - 2*s[]);
-  if (fabs(phixx) > eps) {
-    double D = sq(phixx/2. - s[] - s[dir]) - 4.*s[]*s[dir];
-    return 1/2. + (s[] - s[dir] - sign2(s[] - s[dir])*sqrt(D))/phixx;
-  }
-  else
-    return s[]/(s[]- s[dir]);
-}
-
-/**
-## Forward Euler Integration
-
-Simple Euler integration for the redistance() function. */
-
-static
-double forward_euler (scalar dist, scalar temp, scalar dist0, double dt)
-{
-  double res = 0.;
-  foreach (reduction(max:res)) {
-
+  foreach() {
+    double dt = cfl*Delta;
+    
+    /**
+    We first calculate the inputs of the Hamiltonian
+    $$
+    D^+\phi_{ij} = \dfrac{\phi_{i+1,j} - \phi_{ij}}{\Delta x} - \dfrac{\Delta}
+    {2}\text{minmod}(D_{xx}\phi_{ij},D_{xx}\phi_{i+1,j})
+    $$
+    $$
+    D^-\phi_{ij} = \dfrac{\phi_{i,j} - \phi_{i-1,j}}{\Delta x} - \dfrac{\Delta}
+    {2}\text{minmod}(D_{xx}\phi_{ij},D_{xx}\phi{i-1,j})
+    $$
+    where
+    $$
+    D_{xx}\phi_{ij} = \dfrac{\phi_{i-1,j} - 2\phi_{ij} + \phi_{i+1,j}}{\Delta x^2}
+    $$
+    */
+    
     coord gra[2];
-    prehamiltonian (point, &gra[0], &gra[1], temp);
+    for (int i = 0, j = 1; i < 2; j = 1 - 2*++i)
+      foreach_dimension() {
+	double s1 = (phi[2*j] + phi[] - 2.*phi[j])/Delta; 
+	double s2 = (phi[1] + phi[-1] - 2.*phi[])/Delta;
+	gra[i].x = j*((phi[j] - phi[])/Delta - minmod3(s1, s2)/2.);
+      }
 
+    /**
+    We check for interfacial cells. */
+    
     bool interfacial = false;
     foreach_dimension()
-      if (dist0[-1]*dist0[] < 0 || dist0[1]*dist0[] < 0)
+      if (phi0[-1]*phi0[] < 0 || phi0[1]*phi0[] < 0)
 	interfacial = true;
     
-    if (!interfacial) {
-
-      /**
-      Far from the interface, we simply use the Hamiltonian defined earlier. */
+    dphi[] = - sign2(phi0[]);
+    
+    if (interfacial) {
       
-      double delt = sign2(dist0[])*(hamiltonian (point, dist0, gra[0], gra[1]) - 1.);
-      dist[] -= dt*delt;
-      res = max (res, fabs(delt));
-    }
-    else {
-
       /**
       Near the interface, *i.e.* for cells where
       $$
@@ -221,134 +138,151 @@ double forward_euler (scalar dist, scalar temp, scalar dist0, double dt)
       
       double size = HUGE;
       foreach_dimension()
-	for (int i = 0; i < 2; i++)
-	  if (dist0[]*dist0[1 - 2*i] < 0.) {
-	    double dx = Delta*root_x (point, dist0, 1./HUGE, 1 - 2*i);
+	for (int i = 0, j = 1; i < 2; j = 1 - 2*++i)
+	  if (phi0[]*phi0[j] < 0.) {
+
+	    /**
+	    We compute the subcell fix near the interface.
+
+	    $$
+	    \Delta x^+ = \left\{ \begin{array}{ll}
+	    \Delta x \cdot \left( \dfrac{\phi^0_{i,j}-\phi^0_{i+1,j} -
+	    \text{sgn}(\phi^0_{i,j}-\phi^0_{i+1,j})\sqrt{D}}{}\right) 
+	    \text{ if } \left| \phi^0_{xx}\right| >\epsilon \		\
+	    \Delta x \cdot \dfrac{\phi^0_{ij}}{\phi^0_{i,j}-\phi^0_{i+1,j}} \text{ else.}\ \
+	    \end{array}
+	    \right.
+	    $$
+	    with
+	    $$
+	    \phi_{xx}^0 = \text{minmod}(\phi^0_{i-1,j}-2\phi^0_{ij}+\phi^0_{i+1,j}, 
+	    \phi^0_{i,j}-2\phi^0_{i+1j}+\phi^0_{i+2,j}) \		\
+	    D = \left( \phi^0_{xx}/2  - \phi_{ij}^0 - \phi_{i+1,j} \right)^2 
+                - 4\phi_{ij}^0\phi_{i+1,j}^0
+	    $$
+	    For the $\Delta x^-$ calculation, replace all the $+$ subscript by $-$, this
+	    is dealt with properly with the `j` parameter below. */
+
+	    double dx = Delta;
+	    double phixx = minmod3 (phi0[2*j] + phi0[] - 2.*phi0[j],
+				    phi0[1] + phi0[-1] - 2.*phi0[]);
+	    if (fabs(phixx) > 1./HUGE) {
+	      double D = sq(phixx/2. - phi0[] - phi0[j]) - 4.*phi0[]*phi0[j];
+	      dx *= 1/2. + (phi0[] - phi0[j] - sign2(phi0[] - phi0[j])*sqrt(D))/phixx;
+	    }
+	    else
+	      dx *= phi0[]/(phi0[] - phi0[j]);
+	    
 	    if (dx != 0.) {
-	      double sxx1 = temp[2 - 4*i] + temp[] - 2.*temp[1 - 2*i];
-	      double sxx2 = temp[1] + temp[-1] - 2.*temp[];
-	      gra[i].x = (2*i - 1)*(temp[]/dx + dx*minmod3(sxx1, sxx2)/(2.*sq(Delta)));
+	      double sxx1 = phi[2 - 4*i] + phi[] - 2.*phi[1 - 2*i];
+	      double sxx2 = phi[1] + phi[-1] - 2.*phi[];
+	      gra[i].x = (2*i - 1)*(phi[]/dx + dx*minmod3(sxx1, sxx2)/(2.*sq(Delta)));
 	    }
 	    else 
 	      gra[i].x = 0.;
 	    size = min(size, dx);
 	  }
-      double delt = sign2(dist0[])*(hamiltonian (point, dist0, gra[0], gra[1]) - 1.);
-      dist[] -= min(dt, fabs(size)/2.)*delt;
-      res = max (res, fabs(delt));
+      dphi[] *= min(dt, fabs(size)/2.)/dt;
     }
+
+    /**
+    The Godunov Hamiltonian is
+    $$
+    H_G(a,b,c,d) = \left\{ \begin{array}{ll}
+    \sqrt{\text{max}((a^-)^2,(b^+)^2 + (c^-)^2,(d^+)^2)} \text { when } \text{sign}(\phi^0_{ij})
+    \geq 0\\
+    \sqrt{\text{max}((a^+)^2,(b^-)^2 + (c^+)^2,(d^-)^2)} \text { when } \text{sign}(\phi^0_{ij}) < 0
+    \end{array}
+    \right.
+    $$
+    */
+    
+    double H_G = 0;
+    if (phi0[] > 0)
+      foreach_dimension() {
+	double a = min(0., gra[0].x); 
+	double b = max(0., gra[1].x);
+	H_G += max(sq(a), sq(b));
+      }
+    else
+      foreach_dimension() {
+	double a = max(0., gra[0].x);
+	double b = min(0., gra[1].x);
+	H_G += max(sq(a), sq(b));
+      }
+    
+    dphi[] *= sqrt(H_G) - 1.;
   }
-  return res;
 }
 
 /**
-## The redistance() function
-
-In 2D, if no specific timestep is set up by the user, we take the most
-restrictive one with regards to the CFL condition 
-$$
-\Delta t = \Delta/2.
-$$
-*/
+## The redistance() function */
 
 trace
-int redistance (scalar dist, int imax = 1,
-		double dt = L0/(1 << grid->maxdepth)/2.)
+int redistance (scalar phi,
+		int imax = 1,       // The maximum number of iterations
+		double cfl = 0.5,   // The CFL number
+		int order = 3,      // The order of time integration
+		double eps = 1e-6,  // The maximum error on $|\nabla\phi| - 1$
+		double band = HUGE, // The width of the band in which to compute the error
+		scalar resf = {-1}) // The residual $|\nabla\phi| - 1$
 {
 
   /**
-  Convergence is reached if residual is below $dt\times 10^{-6}$ */
-
-  double eps = dt*1e-6;
-
-  /**
-  We create `dist0[]` which will be a copy of the initial level-set function
-  before the iterations and `temp[]` which will be $\phi^{n}$ used for the
-  iterations. */
+  We create `phi0[]`, a copy of the initial level-set function before
+  the iterations. */
   
-  scalar dist0[];
+  scalar phi0[];
   foreach()
-    dist0[] = dist[] ;
+    phi0[] = phi[] ;
 
   /**
-  Time integration iteration loop.
-
-  One can choose between Runge Kutta 2 and Forward Euler temporal integration. */
+  Time integration iteration loop. */
   
   for (int i = 1; i <= imax; i++) {
-
+    double maxres = 0.;
+    
     /**
-    ## RK3
+    We use either a RK2 scheme... */
 
-    We use a Runge Kutta 3 compact version taken from [Shu and Osher,
-    1988](#shu1988) made of 3 backward Euler steps.
-    
-    ### Step 1-2
-
-    $$
-    \frac{\widetilde{\phi}^{n+1}  - \phi^n}{\Delta t}  = \text{RHS}^n
-    $$
-    $$
-    \dfrac{\widetilde{\phi}^{n+2}  - \widetilde{\phi}^{n+1}}{\Delta t}  
-      = \widetilde{\text{RHS}}^{n+1} 
-    $$
-    with :
-    $$
-    \text{RHS} =  \text{sgn} (\phi_{ij}^0)\cdot \left[ H_G\left( D_x^+\phi_{ij}^n, 
-                D_x^-\phi_{ij}^n, D_y^+\phi_{ij}^n,
-		D_y^-\phi_{ij}^n \right)\right]
-    $$
-    */
-    
-    scalar temp[], temp1[], temp2[];
-    foreach() {
-      temp[] = dist[] ;
-      temp1[] = dist[] ;
+    if (order == 2) {
+      scalar tmp1[];
+      dphidt (phi, tmp1, phi0, cfl/2.);
+      foreach()
+	tmp1[] = phi[] + Delta*cfl/2.*tmp1[];
+      scalar tmp2[];
+      dphidt (tmp1, tmp2, phi0, cfl);
+      foreach (reduction(max:maxres)) {
+	double res = tmp2[];
+	if (resf.i >= 0) resf[] = res;
+	if (fabs (res) > maxres && fabs(phi0[]) < band*Delta) maxres = fabs (res);
+	phi[] += Delta*cfl*tmp2[];
+      }
     }
-    forward_euler (temp1, temp, dist0, dt);
-    foreach()
-      temp2[] = temp1[] ;
-    forward_euler (temp2, temp1, dist0, dt);
     
     /**
-    ### Intermediate value
-    $$
-    \widetilde{\phi}^{n+1/2} = 
-      \dfrac{3}{4}\widetilde{\phi}^{n} + \dfrac{1}{4}\widetilde{\phi}^{n+2}
-    $$
-    */
+    ... or a RK3 compact scheme from [Shu and Osher,
+    1988](#shu1988). */
     
-    foreach() {
-      temp1[] = (3.*dist[] + temp2[])/4.;
-      temp2[] = temp1[];
+    else {
+      scalar tmp1[];
+      dphidt (phi, tmp1, phi0, cfl);
+      foreach()
+	tmp1[] = phi[] + Delta*cfl*tmp1[];
+      scalar tmp2[];
+      dphidt (tmp1, tmp2, phi0, cfl);
+      foreach()
+	tmp1[] = (3.*phi[] + tmp1[] + Delta*cfl*tmp2[])/4.;
+      dphidt (tmp1, tmp2, phi0, cfl);
+      foreach (reduction(max:maxres)) {
+	double res = 2./3.*((phi[] - tmp1[])/(Delta*cfl) - tmp2[]);
+	if (resf.i >= 0) resf[] = res;
+	if (fabs (res) > maxres && fabs(phi0[]) < band*Delta) maxres = fabs (res);
+	phi[] = (phi[] + 2.*(tmp1[] + Delta*cfl*tmp2[]))/3.;
+      }
     }
-
-    /**
-    ### Step 3
-    $$
-    \widetilde{\phi}^{n+3/2} - \widetilde{\phi}^{n+1/2} = \widetilde{RHS}^{n+1/2}
-    $$
-    */
     
-    forward_euler (temp2, temp1, dist0, dt);
-    
-    /**
-    ### Final Value
-    $$
-    \widetilde{\phi}^{n+1} = \widetilde{\phi}^{n} + \dfrac{2}{3}\widetilde{\phi}^{n+3/2}
-    $$
-    */
-
-    double res = 0;
-    foreach (reduction(max:res)) {
-      res = max(res, 2./3.*fabs(dist[] - temp2[]));
-      dist[] = (dist[] + 2.*temp2[])/3.;
-    }
-
-    /**
-    Iterations are stopped when $L_1 = \text{max}(|\phi_i^{n+1}-\phi_i^n|) < \epsilon$ */
-
-    if (res < eps)
+    if (maxres < eps)
       return i;
   }
   return imax;
@@ -361,6 +295,7 @@ int redistance (scalar dist, int imax = 1,
 @Article{shu1988,
   author        = {Chi-Wang Shu and Stanley Osher},
   title         = {Efficient implementation of essentially non-oscillatory shock-capturing schemes},
+  journal       = {Journal of Computational Physics},
   year          = {1988},
   volume        = {77},
   pages         = {439-471},
@@ -381,6 +316,7 @@ int redistance (scalar dist, int imax = 1,
 @article{min2007,
   author        = {Chohong Min and Frédéric Gibou},
   title         = {A second order accurate level set method on non-graded adaptive cartesian grids},
+  journal       = {Journal of Computational Physics},
   year          = {2007},
   volume        = {225},
   pages         = {300-321},
@@ -391,6 +327,7 @@ int redistance (scalar dist, int imax = 1,
 @article{min2010,
   author        = {Chohong Min},
   title         = {On reinitializing level set functions},
+  journal       = {Journal of Computational Physics},
   year          = {2010},
   volume        = {229},
   pages         = {2764-2772},
