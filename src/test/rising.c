@@ -182,19 +182,6 @@ event interface (t = 3.) {
   output_facets (f, stderr);
 }
 
-/**
-If gfsview is installed on the system, we can also visualise the
-simulation as it proceeds. */
-
-#if 0
-event gfsview (i += 10) {
-  static FILE * fp = popen("gfsview2D rising.gfv", "w");
-  scalar vort[];
-  vorticity (u, vort);
-  output_gfs (fp);
-}
-#endif
-
 #if ADAPT
 event adapt (i++) {
   adapt_wavelet ({f,u}, (double[]){5e-4,1e-3,1e-3}, LEVEL);
