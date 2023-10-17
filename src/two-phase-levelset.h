@@ -49,7 +49,7 @@ The distance function is reinitialised at each timestep. */
 
 event properties (i++)
 {
-  redistance (d, imax = 5, dt = L0/(1 << grid->maxdepth));
+  redistance (d, imax = 3);
   levelset_to_vof (d, f);
 }
 
