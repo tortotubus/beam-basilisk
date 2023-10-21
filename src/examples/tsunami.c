@@ -147,7 +147,7 @@ int adapt() {
 
 We first specify the terrain database to use to reconstruct the
 topography $z_b$. This KDT database needs to be built beforehand. See the
-[*xyz2kdt* manual](http://gfs.sourceforge.net/wiki/index.php/Xyz2kdt)
+[*xyz2kdt* manual](http://gerris.dalembert.upmc.fr/xyz2kdt.html)
 for explanations on how to do this.
 
 We then consider two cases, either we restart from an existing
