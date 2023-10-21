@@ -183,15 +183,15 @@ data](https://en.wikipedia.org/wiki/Shuttle_Radar_Topography_Mission)
 for Japan.
 
 See the [*xyz2kdt*
-manual](http://gfs.sourceforge.net/wiki/index.php/Xyz2kdt) to generate
-the ETOPO2 database.
+manual](http://gerris.dalembert.upmc.fr/xyz2kdt.html) to generate the
+ETOPO2 database.
 
 The SRTM database can be generated using the following script (which
 will need to be adapted as the USGS often changes its website)
 
 ~~~bash
 # SRTM_resultExport.csv from http://edcsns17.cr.usgs.gov/NewEarthExplorer/
-# see also http://gfs.sourceforge.net/wiki/index.php/Xyz2kdt
+# see also http://gerris.dalembert.upmc.fr/xyz2kdt.html
 
 files=`awk 'BEGIN{FS="\"|,"}{ if ($2!="ENTITY_ID") print $2;}' < SRTM_resultExport.csv | \
     sed 's/SRTM3//g' | \

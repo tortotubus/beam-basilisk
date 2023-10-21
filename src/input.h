@@ -139,8 +139,8 @@ static int next_string (FILE * fp, const char * target)
 # *input_gfs()*: Gerris simulation format
 
 The function reads simulation data in the format used in
-[Gerris](http://gfs.sf.net) simulation files. This is the reciprocal
-function of [*output_gfs()*](output.h#output_gfs).
+[Gerris](http://gerris.dalembert.upmc.fr) simulation files. This is
+the reciprocal function of [*output_gfs()*](output.h#output_gfs).
 
 The arguments and their default values are:
 

@@ -378,7 +378,7 @@ event vof (i++)
   volume = {71},
   year = {2015},
   doi = {doi.org/10.1016/j.ijmultiphaseflow.2014.12.005},
-  url = {http://gfs.sf.net/papers/lopez2015.pdf}
+  url = {http://gerris.dalembert.upmc.fr/papers/lopez2015.pdf}
 }
 ~~~
 */
