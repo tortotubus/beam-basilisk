@@ -27,61 +27,9 @@ solver with VOF interface tracking and surface tension. */
 #else // standard centered Navier--Stokes solver
 
 # include "navier-stokes/centered.h"
-# include "vof.h"
+# define FILTERED 1
+# include "two-phase.h"
 # include "tension.h"
-
-/**
-The interface is represented by the volume fraction field *f*. */
-
-scalar f[], * interfaces = {f};
-
-/**
-The density inside the droplet is one and outside 10^-3^. */
-
-#define rho(f) (clamp(f,0.,1.)*(1. - 1e-3) + 1e-3)
-
-/**
-We have the option of using some "smearing" of the density jump. */
-
-#if 0
-#define cf f
-#else
-scalar cf[];
-#endif
-
-/**
-The density is variable. We allocate a new field to store its
-inverse. */
-
-face vector alphav[];
-
-/**
-The density is defined at each timestep via the *properties()* event
-declared by the Navier--Stokes solver. */
-
-event properties (i++) {
-
-  /**
-  When using smearing of the density jump, we initialise *cf* with the
-  vertex-average of *f*. */
-
-#ifndef cf
-  foreach()
-    cf[] = (4.*f[] + 
-	    2.*(f[0,1] + f[0,-1] + f[1,0] + f[-1,0]) +
-	    f[-1,-1] + f[1,-1] + f[1,1] + f[-1,1])/16.;
-#endif
-
-  /**
-  The inverse of the density $\alpha$ is then given by the
-  face-averaged value of *cf* and the arithmetic average of density
-  defined by *rho()*. */
-
-  foreach_face() {
-    double cm = (cf[] + cf[-1])/2.;
-    alphav.x[] = 1./rho(cm);
-  }
-}
 
 #endif // standard centered Navier--Stokes solver
 
@@ -101,11 +49,7 @@ int main() {
   /**
   The density is variable. */
 
-#if MOMENTUM
   rho1 = 1, rho2 = 1e-3;
-#else
-  alpha = alphav;
-#endif
   
   /**
   The surface tension is unity. Decreasing the tolerance on the
@@ -144,11 +88,6 @@ event init (i = 0) {
   We initialise the shape of the interface, a slightly elliptic droplet. */
 
   fraction (f, D/2.*(1. + 0.05*cos(2.*atan2(y,x))) - sqrt(sq(x) + sq(y)));
-
-#ifndef cf
-  foreach()
-    cf[] = f[];
-#endif
 }
 
 /**
@@ -160,7 +99,7 @@ event logfile (i++; t <= 1) {
 #if MOMENTUM
     ke += sq(Delta)*(sq(q.x[]) + sq(q.y[]))/rho[];
 #else
-    ke += sq(Delta)*(sq(u.x[]) + sq(u.y[]))*rho(cf[]);
+    ke += sq(Delta)*(sq(u.x[]) + sq(u.y[]))*rho(sf[]);
 #endif
   fprintf (fp, "%g %g %d\n", t, ke, mgp.i);
   fflush (fp);
