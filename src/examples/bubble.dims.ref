@@ -1,5 +1,6 @@
 1191 constraints, 1191 unknowns
 [0]  ast/interpreter/overload.h:168: 'f[] = 0.'
+[0]  ast/interpreter/overload.h:337: '*c = 0[0]'
 [0]  ast/interpreter/overload.h:480: '0'
 [0]  /src/grid/multigrid-common.h:28: 'sum = 0.'
 [0]  /src/grid/multigrid-common.h:429: 'size[] = 1'
