@@ -183,15 +183,53 @@ They also include some documentation of various "corner cases".
 # define DEBUG(...)
 #endif
 
+typedef struct _List List;
 typedef struct _Key Key;
 typedef struct _Dimension Dimension;
 typedef struct _System System;
 
+struct _List {
+  Dimension * d;
+  List * next;
+};
+
 struct _Key {
   Ast * parent;
   char * field, * label;
-  int j, refs;
+  int j, refs, used;
+  List * dimensions;
 };
+
+static
+void key_add_dimension (Key * k, Dimension * d)
+{
+  k->refs++;
+  if (!k->dimensions) {
+    k->dimensions = calloc (1, sizeof (List)); // fixme: memory leak
+    k->dimensions->d = d;
+    return;
+  }
+  List * l = k->dimensions;
+  while (l->next) l = l->next;
+  l->next = calloc (1, sizeof (List)); // fixme: memory leak
+  l->next->d = d;
+}
+
+static
+bool key_remove_dimension (Key * k, const Dimension * d)
+{
+  for (List * l = k->dimensions, * prev = NULL; l; prev = l, l = l->next)
+    if (l->d == d) {
+      if (!prev)
+	k->dimensions = l->next;
+      else
+	prev->next = l->next;
+      free (l);
+      k->refs--;
+      return true;
+    }
+  return false;
+}
 
 /**
 The dimension is
@@ -204,6 +242,7 @@ struct _Dimension {
   double * a, * b;
   Key ** c;
   const Ast * origin;
+  int row;
   System * s;
 };
 
@@ -643,7 +682,7 @@ Dimension * get_dimension (Value * v, Stack * stack)
 	dimension->b[0] = - 1.;
       }
       add_constraint (interpreter_get_data (stack), dimension, stack);
-      dimension->c[0]->refs = 0;
+      dimension->c[0]->used = 0;
       rhs->a = NULL;
       rhs->b = allocate (alloc, sizeof (double));
       rhs->b[0] = 1.;
@@ -775,51 +814,6 @@ Dimension * dimensions_multiply (const Ast * origin, Allocator * alloc,
   return dimension_simplify (dimension);
 }
 
-/**
-Returns 0. if the dimensions are independent, otherwise `db` is equal
-to `da` times the proportionality coefficient returned by the
-function. */
-
-static
-double dependent_dimensions (Dimension * da, Dimension * db)
-{
-  int na = dimensions (da);
-  if (na != dimensions (db))
-    return 0.;
-  
-  double v = 0.;
-  for (int i = 0; i < na; i++)
-    if (da->a[i]) {
-      double v1 = db->a[i]/da->a[i];
-      if (!v) v = v1;
-      else if (v1 != v)
-	return 0.;
-    }
-    else if (db->a[i])
-      return 0.;
-
-  na = unknowns (da);
-  if (na != unknowns (db))
-    return 0.;
-
-  for (int i = 0; i < na; i++) {
-    int j;
-    for (j = 0; j < na && db->c[j] != da->c[i]; j++);
-    if (j == na)
-      return 0.;
-    if (da->b[i]) {
-      double v1 = db->b[j]/da->b[i];
-      if (!v) v = v1;
-      else if (v1 != v)
-	return 0.;
-    }
-    else if (db->b[j])
-      return 0.;
-  }
-  
-  return v;
-}
-
 static
 void * not_homogeneous (Ast * n, Value * va, Value * vb, Stack * stack)
 {
@@ -901,20 +895,25 @@ static void constraint_print (Dimension * d, FILE * fp, int flags)
 void system_print (System * s, FILE * fp)
 {
   foreach_constraint (s, r)
-    constraint_print (r, fp, LINENO | INDEX);
+    constraint_print (r, fp, LINENO | INDEX | REFS);
 }
 
 static
-void system_append (System * s, Dimension * constraint)
+bool system_append (System * s, Dimension * constraint)
 {
   int n = 0;
-  foreach_constraint(s, r) n++;
+  foreach_constraint(s, r) {
+    if (r == constraint)
+      return false;
+    n++;
+  }
   s->r = realloc (s->r, (n + 2)*sizeof (Dimension *));
   s->r[n] = constraint;
   constraint->s = s;
   s->r[n + 1] = NULL;
   if (constraint->a)
     s->dimensionless = false;
+  return true;
 }
 
 static
@@ -922,15 +921,14 @@ void add_constraint (System * s, Dimension * constraint, Stack * stack)
 {
   if (!constraint || (!constraint->a && !constraint->b))
     return;
-
-  foreach_constraint (s, i)
-    if (dependent_dimensions (i, constraint))
-      return;
   if (stack_verbosity (stack) > 2)
     constraint_print (constraint, stderr, LINENO);
-  system_append (s, constraint);
-  foreach_key (constraint, c)
-    c->refs++;
+  if (system_append (s, constraint)) {
+    foreach_key (constraint, c) {
+      key_add_dimension (c, constraint);
+      c->used = 1;
+    }
+  }
 }
 
 static Dimension * row_replacement (Dimension * d, Dimension * with, Allocator * alloc)
@@ -947,22 +945,9 @@ static Dimension * row_replacement (Dimension * d, Dimension * with, Allocator *
   return dimensions_multiply (d->origin, alloc, d, with, - j[0]/with->b[0]);
 }
 
-static bool row_replace (Dimension * d, Dimension * with, Allocator * alloc)
+static inline
+double column (const Dimension * r, int j)
 {
-  Dimension * r = row_replacement (d, with, alloc);
-  if (!r)
-    return false;
-  assert (r->c || !r->a);
-  DEBUG (fprintf (stderr, "replacing "), constraint_print (with, stderr, LINENO | INDEX | NORIGIN),
-	 fprintf (stderr, "in        "), constraint_print (d, stderr, LINENO | INDEX | NORIGIN),
-	 fprintf (stderr, "gives     "), constraint_print (r, stderr, LINENO | INDEX | NORIGIN));
-  *d = *r;
-  return true;
-}
-
-static double matrix (const System * s, int i, int j)
-{
-  Dimension * r = *(s->r + i);
   if (!r->c)
     return 0.;
   double * b = r->b;
@@ -972,6 +957,12 @@ static double matrix (const System * s, int i, int j)
     b++;
   }
   return 0.;
+}
+
+static inline
+double matrix (const System * s, int i, int j)
+{
+  return column (s->r[i], j);
 }
 
 static
@@ -1004,8 +995,10 @@ void system_index (System * s)
   
   qsort (s->r, s->m, sizeof (Dimension *), compare_unknowns);
   
-  s->m = 0, s->n = 0;  
-  foreach_constraint (s, r)
+  s->m = 0, s->n = 0;
+  int row = 0;
+  foreach_constraint (s, r) {
+    r->row = row++;
     if (r->c || r->a) {
       s->m++;
       foreach_key (r, c)
@@ -1015,6 +1008,7 @@ void system_index (System * s)
 	  s->index[s->n - 1] = c;
 	}
     }
+  }
 }
 
 #define WRITE_GRAPH 0
@@ -1063,17 +1057,14 @@ void system_write_matrix (System * s, const char * name)
 #endif
 
 static
-void set_system (System * s, Dimension * j, System * sub)
+void set_system (Dimension * j, System * sub)
 {
-  system_append (sub, j);
-  foreach_key (j, c)
-    foreach_constraint (s, j)
-      if (!j->s)
-	foreach_key (j, d)
-	  if (d == c) {
-	    set_system (s, j, sub);
-	    break;
-	  }
+  if (system_append (sub, j)) {
+    foreach_key (j, c)
+      for (List * l = c->dimensions; l; l = l->next)
+	if (!l->d->s)
+	  set_system (l->d, sub);
+  }
 }
 
 static
@@ -1086,7 +1077,7 @@ bool remove_dimensionless_subsystems (System * s)
     if (!j->s && j->c && j->c[1]) {
       System * su = system_new();
       su->alloc = s->alloc;
-      set_system (s, j, su);
+      set_system (j, su);
       if (su->dimensionless) {
 	found = true;
 	foreach_constraint (su, j)
@@ -1097,10 +1088,16 @@ bool remove_dimensionless_subsystems (System * s)
   return found;
 }
 
+static inline
+void set_row (System * s, int row, Dimension * d)
+{
+  s->r[row] = d; d->row = row;
+}
+
 static bool system_pivot (System * s)
 {
   system_index (s);
-  
+
   if (!s->m)
     return true;
   
@@ -1134,29 +1131,38 @@ static bool system_pivot (System * s)
     else {
       /* swap rows(h, i_min) */
       Dimension * r = s->r[h];
-      s->r[h] = s->r[i_piv];
-      s->r[i_piv] = r;
+      set_row (s, h, s->r[i_piv]);
+      set_row (s, i_piv, r);
       /* Do for all rows below pivot: */
-      for (int i = h + 1; i < s->m; i++) {
-	double f = matrix (s, i, k)/piv;
-	/* Substract the scaled pivot row from the current row */
-	if (f) {
-	  Dimension * r = *(s->r + i);
-	  DEBUG (fprintf (stderr, "pivoting %d ", h), constraint_print (s->r[h], stderr, LINENO | INDEX | NORIGIN),
-		 fprintf (stderr, "         in "), constraint_print (r, stderr, LINENO | INDEX | NORIGIN));
-	  Dimension * d = dimensions_multiply (r->origin, s->alloc, r, s->r[h], - f);
-	  DEBUG (fprintf (stderr, "      gives "), constraint_print (d, stderr, LINENO | INDEX | NORIGIN));
-	  /* If l.h.s. is zero and r.h.s. is not zero the system does not have a solution */
-	  if (!d->c && d->a) {
-	    AstTerminal * t = ast_left_terminal (s->r[h]->origin);
-	    fprintf (stderr, "%s:%d: %s: the dimensional constraints below are not compatible\n",
-		     t->file, t->line, s->warn ? "warning" : "error");
-	    constraint_print (s->r[h], stderr, CARRIAGE | LINENO);
-	    constraint_print (r, stderr, CARRIAGE | LINENO);
-	    return false;
+      int nd = s->index[k]->refs;
+      if (nd > 1) {
+	Dimension * list[nd], ** i = list;
+	for (List * _l = s->index[k]->dimensions; _l; _l = _l->next)
+	  *i++ = _l->d;	
+	for (int j = 0; j < nd; j++)
+	  if (list[j]->row > h) {
+	    Dimension * r = list[j];
+	    double f = column (r, k)/piv;
+	    /* Substract the scaled pivot row from the current row */
+	    DEBUG (fprintf (stderr, "pivoting %d ", h), constraint_print (s->r[h], stderr, LINENO | INDEX | NORIGIN),
+		   fprintf (stderr, "         in "), constraint_print (r, stderr, LINENO | INDEX | NORIGIN));
+	    foreach_key(r, c)
+	      assert (key_remove_dimension (c, r));
+	    Dimension * d = dimensions_multiply (r->origin, s->alloc, r, s->r[h], - f);
+	    foreach_key(d, c)
+	      key_add_dimension (c, d);
+	    DEBUG (fprintf (stderr, "      gives "), constraint_print (d, stderr, LINENO | INDEX | NORIGIN));
+	    /* If l.h.s. is zero and r.h.s. is not zero the system does not have a solution */
+	    if (!d->c && d->a) {
+	      AstTerminal * t = ast_left_terminal (s->r[h]->origin);
+	      fprintf (stderr, "%s:%d: %s: the dimensional constraints below are not compatible\n",
+		       t->file, t->line, s->warn ? "warning" : "error");
+	      constraint_print (s->r[h], stderr, CARRIAGE | LINENO);
+	      constraint_print (r, stderr, CARRIAGE | LINENO);
+	      return false;
+	    }
+	    set_row (s, r->row, d);
 	  }
-	  *(s->r + i) = d;
-	}
       }
       /* Increase pivot row and column */
       h++, k++;
@@ -1180,6 +1186,7 @@ static bool system_pivot (System * s)
       break;
     }
   }
+
   return true;
 }
 
@@ -1219,23 +1226,32 @@ static bool system_solve (System * s)
   
   DEBUG (fprintf (stderr, "@@ %d unknowns, %d constraints\n", s->n, s->m));
   if (s->m) {
-    
-    //    system_write_graph (s, "dimensions1.dot");
+
+#if WRITE_GRAPH
     { FILE * fp = fopen ("system1", "w"); system_print (s, fp), fclose (fp); }
+#endif
     
     /**
     Backward substitution */
 
     for (Dimension ** i = s->r + s->m - 1; i >= s->r; i--)
-      if (unknowns (i[0]) == 1)
-	for (Dimension ** j = s->r; j < i; j++)
-	  row_replace (j[0], i[0], s->alloc);
-
+      if (unknowns (i[0]) == 1 && i[0]->c[0]->refs > 1)
+	for (Dimension ** j = s->r; j < i; j++) {
+	  Dimension * r = row_replacement (*j, *i, s->alloc);
+	  if (r) {
+	    assert (r->c || !r->a);
+	    DEBUG (fprintf (stderr, "replacing "), constraint_print (*i, stderr, LINENO | INDEX | NORIGIN),
+		   fprintf (stderr, "in        "), constraint_print (*j, stderr, LINENO | INDEX | NORIGIN),
+		   fprintf (stderr, "gives     "), constraint_print (r, stderr, LINENO | INDEX | NORIGIN));
+	    *j = r;
+	  }
+	}
+    
 #if WRITE_GRAPH    
     system_write_graph (s, "dimensions2.dot");
     { FILE * fp = fopen ("system2", "w"); system_print (s, fp), fclose (fp); }
 #endif
-    
+
     if (remove_dimensionless_subsystems (s))
       system_index (s);
 
@@ -1726,8 +1742,7 @@ void dimension_after_run (Ast * n, Stack * stack)
       // constraint_print (r, fp, LINENO | INDEX | NORIGIN);
       continue;
     }
-    if (r->c &&
-	r->c[0]->refs &&
+    if (r->c && r->c[0]->used &&
 	(!s->finite ||
 	 (is_finite_constant (r->c[0]) // only lists finite constants
 	  && (r->a || in_c_file (r->c[0]->parent)) // list dimensionless constants only in C files
