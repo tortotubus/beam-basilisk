@@ -3101,7 +3101,7 @@ static void translate (Ast * n, Stack * stack, void * data)
 		   ast_find (n, sym_argument_expression_list_item,
 			     0, sym_assignment_expression,
 			     1, sym_assignment_operator)) {
-	    parameters = ast_copy (parameters);
+	    parameters = ast_copy (parameters); // fixme: memory is leaking from here
 	    Ast * parameters1 = parameters;
 	    while (parameters && parameters->child[0]->sym == parameters->sym)
 	      parameters = parameters->child[0];
