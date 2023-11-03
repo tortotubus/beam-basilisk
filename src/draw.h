@@ -572,7 +572,12 @@ static scalar compile_expression (char * expr, bool * isexpr)
   									\
   if ((dimension > 2 || linear) &&					\
       !fc[0] && !fc[1] && !fc[2])					\
-    fc[0] = fc[1] = fc[2] = 1.;
+    fc[0] = fc[1] = fc[2] = 1.;						\
+									\
+  if (cbar)								\
+    colorbar (map, size, pos, label, lscale, min, max,			\
+	      horizontal, border, mid,					\
+	      lc, lw, fsize, format, levels);
 
 #define color_facet()							\
   if (color && (!linear || col.i < 0)) {				\
@@ -627,6 +632,166 @@ static void end_colorized() {
 #define colorize() colorized (fc, !VertexBuffer.color || !color,	\
 			      cmap, !VertexBuffer.color &&		\
 			      color && linear && col.i >= 0)
+
+/**
+# *colorbar()*: draws a colorbar.
+
+* *map*: the colormap.
+* *size*: the size.
+* *pos*: the relative screen position (default is lower-left corner).
+* *label*: a label.
+* *lscale*: the label scale factor.
+* *min*, *max*: the range.
+* *horizontal*: true for anb horizontal colorbar.
+* *border*: adds a border.
+* *mid*: adds a mid-value label.
+* *lc*: the line color.
+* *lw*: the line width.
+* *fsize*: another size.
+* *format*: how to format numbers.
+* *levels*: the number of subdivisions.
+
+Note that this cannot be used with [jview](jview/README) (yet) because
+it mixes surface and line rendering. */
+
+trace
+bool colorbar (Colormap map = jet, float size = 15, float pos[2] = {-.95, -.95},
+	       char * label = "", double lscale = 1, double min = -HUGE,
+	       double max = HUGE, bool horizontal = false, bool border = false,
+	       bool mid = false, float lc[3] = {0}, float lw = 3, float fsize = 50,
+	       char * format = "%g", int levels = 50)
+{
+  bview * view = draw();
+  glDisable (GL_LIGHTING);
+  glMatrixMode (GL_PROJECTION);
+  glPushMatrix();
+  glLoadIdentity();
+  glMatrixMode (GL_MODELVIEW);
+  glPushMatrix();
+  glLoadIdentity();
+  
+  float fheight = gl_StrokeHeight();
+  if (!size)
+    size = 15;
+  float width  = 2./size;
+  if (levels < 1) levels = 1;
+  float h = 0, height = 4*width, dh = height/levels;
+  glTranslatef (pos[0], pos[1], 0);
+  
+  // The colorbar itself
+  double cmap [NCMAP][3];
+  (* map) (cmap);
+  glBegin(GL_QUADS);
+  for (int i = 0; i < levels; i++) {
+    Color c = colormap_color (cmap, (float)i/(levels - 1), 0, 1);
+    glColor3f (c.r/255., c.g/255., c.b/255.);
+    if (horizontal) {
+      glVertex2d (h + dh, 0);
+      glVertex2d (h + dh, width);
+      glVertex2d (h, width);
+      glVertex2d (h, 0);
+    } else {
+      glVertex2d (0, h + dh);
+      glVertex2d (width, h + dh);
+      glVertex2d (width, h);
+      glVertex2d (0, h);
+    }
+    h += dh;
+    view->ni++;
+  }
+  glEnd();
+  glLineWidth (view->samples*(lw > 0. ? lw : 1.));
+  glColor3f (lc[0], lc[1], lc[2]);
+  
+  // A border around the color scale
+  if (border) {
+    glBegin (GL_LINE_LOOP);
+    glVertex2f (0, 0);
+    if (horizontal) {
+      glVertex2f (0, width);
+      glVertex2f (height, width);
+      glVertex2f (height, 0);
+    } else {
+      glVertex2f (width, 0);
+      glVertex2f (width, height);
+      glVertex2f (0, height);
+    }
+    glEnd();
+  }
+
+  // Min and max values when specified
+  float fwidth = gl_StrokeWidth ('1');
+  if (!fsize)
+    fsize = 20;
+  float hscale = 2./(fsize*fwidth), vscale = hscale*view->width/view->height;
+  char str[99];
+  glColor3f (lc[0], lc[1], lc[2]);
+  if (horizontal) 
+    glTranslatef (0, -(fheight/(view->height)), 0);
+  else 
+    glTranslatef (width, -(fheight/(3*view->height)), 0);
+  glScalef (hscale, vscale, 1.);
+  sprintf (str, format, min);
+  if (min > -HUGE) {
+    glPushMatrix();
+    if (horizontal) 
+      glTranslatef (-fwidth*(strlen(str) - 1)/2, 0, 0);
+    glScalef (lscale, lscale, 1.);
+    gl_StrokeString (str);
+    glPopMatrix();
+  }
+  if (horizontal)
+    glTranslatef (height/hscale,0, 0);
+  else
+    glTranslatef (0, height/vscale, 0);
+  sprintf (str, format, max);
+  if (max < HUGE) {
+    glPushMatrix();
+    if (horizontal)
+      glTranslatef (-fwidth*(strlen(str) - 1)/2, 0, 0);
+    glScalef (lscale, lscale, 1.);
+    gl_StrokeString (str);
+    glPopMatrix();
+  }
+  // Add central value
+  if (mid) {
+    sprintf (str, format, (min + max)/2);
+    glPushMatrix();
+    if (horizontal)
+      glTranslatef (-height/(2*hscale) - fwidth*(strlen(str) - 1)/2,0, 0);
+    else
+      glTranslatef (0, -height/(2*vscale), 0);
+    glScalef (lscale, lscale, 1.);
+    gl_StrokeString (str);
+    glPopMatrix();
+  }
+  // Add label
+  if (horizontal)
+    glTranslatef (-height/(2*hscale) - lscale*fwidth*(strlen(label) - 1)/2, width/vscale, 0);
+  else
+    glTranslatef (-width/hscale, 0, 0);
+  
+  glScalef (lscale, lscale, 1.);
+  glTranslatef (0, fheight, 0);
+  gl_StrokeString (label);
+  
+  glMatrixMode (GL_MODELVIEW);
+  glPopMatrix();
+  glMatrixMode (GL_PROJECTION);
+  glPopMatrix();  
+  return true;
+}
+
+/**
+Parameters for an (optional) [colorbar](#colorbar). */
+
+#define COLORBAR_PARAMS					\
+    bool cbar = false,					\
+    float size = 15, float pos[2] = {-.95, -.95},	\
+    char * label = "", double lscale = 1,		\
+    bool horizontal = false, bool border = false,	\
+    bool mid = false, float fsize = 50,  		\
+    char * format = "%g", int levels = 50
 
 /**
 The somewhat complicated function below checks whether an interface
@@ -726,7 +891,8 @@ bool draw_vof (char * c, char * s = NULL, bool edges = false,
 	       bool linear = false,
 	       Colormap map = jet,
 	       float fc[3] = {0}, float lc[3] = {0}, float lw = 1.,
-	       bool expr = false)
+	       bool expr = false,
+	       COLORBAR_PARAMS)
 {
   scalar d = lookup_field (c);
   if (d.i < 0) {
@@ -906,7 +1072,8 @@ bool isoline (char * phi,
 	      bool linear = false,
 	      Colormap map = jet,
 	      float fc[3] = {0}, float lc[3] = {0}, float lw = 1.,
-	      bool expr = false)
+	      bool expr = false,
+	      COLORBAR_PARAMS)
 {
 #if dimension == 2
   if (!color) color = phi;
@@ -1061,7 +1228,9 @@ bool squares (char * color,
 	      bool expr = false,
 	      
 	      coord n = {0,0,1},
-	      double alpha = 0)
+	      double alpha = 0,
+	      float lw = 1,
+	      COLORBAR_PARAMS)
 {
 #if dimension == 2
   scalar Z = {-1};
@@ -1346,7 +1515,8 @@ bool isosurface (char * f,
 		 bool linear = false,
 		 Colormap map = jet,
 		 float fc[3] = {0}, float lc[3] = {0}, float lw = 1,
-		 bool expr = false)
+		 bool expr = false,
+		 COLORBAR_PARAMS)
 {
 #if dimension > 2
   if (!f)
