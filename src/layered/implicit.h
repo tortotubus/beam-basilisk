@@ -162,8 +162,7 @@ event acceleration (i++)
   [relaxation function](nh.h#relax_nh) of the non-hydrostatic solver)
   need to be restricted to all levels. */
   
-  // fixme: what about fm?
-  restriction ({cm, zb, h, hf, alpha_eta});
+  restriction ({cm, fm, zb, h, hf, alpha_eta});
 
   /**
   The restriction function for $\eta$, which has been modified by the
