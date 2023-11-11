@@ -273,8 +273,8 @@ event init (i = 0)
 
   u.n[left]   = - radiation(0);
   u.n[right]  = + radiation(0);
-  u.t[bottom] = - radiation(0);
-  u.t[top]    = + radiation(0);
+  u.n[bottom] = - radiation(0);
+  u.n[top]    = + radiation(0);
 }
 
 /**
