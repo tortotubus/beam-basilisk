@@ -152,6 +152,19 @@ void mpi_boundary_refine  (scalar *);
 void mpi_boundary_coarsen (int, int);
 void mpi_boundary_update  (scalar *);
 
+static
+scalar * list_add_depend (scalar * list, scalar s)
+{
+  if (is_constant(s) || s.restriction == no_restriction)
+    return list;
+  for (scalar t in list)
+    if (t.i == s.i)
+      return list;
+  for (scalar d in s.depends)
+    list = list_add_depend (list, d);
+  return list_append (list, s);
+}
+
 typedef struct {
   int nc, nf;
 } astats;
@@ -186,8 +199,7 @@ astats adapt_wavelet (scalar * slist,       // list of scalars
   astats st = {0, 0};
   scalar * listc = NULL;
   for (scalar s in list)
-    if (!is_constant(s) && s.restriction != no_restriction)
-      listc = list_add (listc, s);
+    listc = list_add_depend (listc, s);
 
   // refinement
   if (minlevel < 1)
