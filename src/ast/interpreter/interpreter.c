@@ -341,6 +341,9 @@ void value_print (const Value * v, FILE * fp)
     case sym_LONG :   fprintf (fp, "%ld", value_data (v, long));    break;
     case sym_FLOAT :  fprintf (fp, "%g", value_data (v, float));  break;
     case sym_DOUBLE : fprintf (fp, "%g", value_data (v, double)); break;
+    case sym_SIGNED : fprintf (fp, "%d", value_data (v, signed)); break;
+    case sym_UNSIGNED : fprintf (fp, "%u", value_data (v, unsigned)); break;
+    case sym_BOOL :   fprintf (fp, "%d", value_data (v, bool));    break;
     case sym_struct_or_union_specifier : fputs ("{...}", fp); break;
     default:
       fputc ('e', fp);
