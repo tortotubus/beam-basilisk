@@ -1890,19 +1890,37 @@ typedef struct {
   size_t size;
 } FatPointer;
 
+/**
+Memory sizes above DYNAMIC_SIZE are allocated/freed using
+`malloc/free` rather than using static allocation. */
+
+#define DYNAMIC_SIZE (1024*1024)
+
 static
 void * static_malloc (size_t size, Stack * stack)
 {
   if (!size)
     return NULL;
-  StackData * d = stack_get_data (stack);
-  FatPointer * p = allocate (d->static_alloc, sizeof (FatPointer) + size);
+  FatPointer * p;
+  if (size > DYNAMIC_SIZE)
+    p = malloc (sizeof (FatPointer) + size);
+  else {
+    StackData * d = stack_get_data (stack);
+    p = allocate (d->static_alloc, sizeof (FatPointer) + size);
+  }
   p->size = size;
   return (void *) (((char *)p) + sizeof (FatPointer));
 }
 
 static
-void static_free (void * ptr, Stack * stack) {}
+void static_free (void * ptr, Stack * stack)
+{
+  if (ptr) {
+    FatPointer * p = (FatPointer *) (((char *)ptr) - sizeof (FatPointer));
+    if (p->size > DYNAMIC_SIZE)
+      free (p);
+  }
+}
 
 static
 void * static_calloc (size_t nmemb, size_t size, Stack * stack)
