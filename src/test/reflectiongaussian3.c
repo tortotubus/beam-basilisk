@@ -50,12 +50,6 @@ int main()
   f.gradient = zero;
 
   /**
-  We make everything dimensionless but this should be improved. */
-  
-  L0 = 1. [0];
-  DT = HUGE [0];
-
-  /**
   We perform a convergence study. */
 
   for (N = 256; N <= 1024; N *= 2)

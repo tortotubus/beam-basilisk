@@ -41,7 +41,7 @@ double rhoL, rhoR = 1.4;
 double pL, pR = 1.;
 double tend = 0.2;
 double uL, vL;
-double Ldomain = 4.26667;
+double Ldomain = 4.26667 [1];
 int LEVEL = 9;
 
 /**
