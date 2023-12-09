@@ -82,6 +82,24 @@ $$
 \partial_t p + \mathbf{u}\cdot\nabla p = -\rho c^2\nabla\cdot\mathbf{u}
 $$
 
+* [All Mach compressible two-phase flows](two-phase-compressible.h)
+
+$$
+\frac{\partial (f \rho_i)}{\partial t } + 
+\nabla \cdot (f \rho_i \mathbf{u}) = 0 
+$$
+$$
+\frac{\partial (\rho_i \mathbf{u})}{\partial t } + 
+\nabla \cdot ( \rho_i  \mathbf{u} \mathbf{u}) = 
+-\nabla p + \nabla \cdot \tau_i' 
+$$
+$$
+\frac{\partial [\rho_i (e_i + \mathbf{u}^2/2)]}{\partial t } 
++ \nabla \cdot [ \rho_i \mathbf{u} (e_i  + \mathbf{u}^2/2)] =
+-\nabla \cdot (\mathbf{u} p_i) + 
+\nabla \cdot \left( \tau'_i \mathbf{u} \right)
+$$
+
 ## Navier--Stokes
 * [Streamfunction--Vorticity formulation](navier-stokes/stream.h)
 $$
