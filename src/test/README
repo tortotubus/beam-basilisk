@@ -95,6 +95,10 @@ Note that only the documented test cases appear in the list below
 * [3D Sessile drop](sessile3D.c)
 * [Marangoni-induced translation due to a temperature gradient](marangoni.c)
 
+## Compressible two-phase flows
+
+* [Advection of two fluids at different pressures](discontinuity-advection.c)
+
 ## General orthogonal coordinates
 
 * [Circular dam break on a sphere](lonlat.c)
