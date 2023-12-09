@@ -1,9 +1,10 @@
 /**
 # Shock tube problem for a single ideal gas (strong shock wave)
 
-This test verifies that the method captures the correct propagation speed of shock waves propagating in an
-adiabatic perfect gas (with known polytropic coefficient $\gamma$) given the post-shocked (L) and pre-shocked conditions (R)
-
+This test verifies that the method captures the correct propagation
+speed of shock waves propagating in an adiabatic perfect gas (with
+known polytropic coefficient $\gamma$) given the post-shocked (L) and
+pre-shocked conditions (R).
 $$
 \left(\begin{array}{c}
     p_R\\
@@ -30,40 +31,49 @@ $$
     u_L
   \end{array}\right)  
 $$
-
 */
 
 #include "grid/multigrid.h"
 
-/** We use the two-phase flow formulation */
+/** 
+We use the two-phase flow formulation. */
+
 #include "two-phase-compressible.h"
 
-/** Parameters of the problem */
+/**
+Parameters of the problem. */
+
 double rhoR = 1.;
 double pL = 10., pR = 0.1;
 double tend = 1.;
 double rhoL, uL, gr, ushock;
 
-/** Boundary conditions: */
-p[left]    = dirichlet (pL);
+/**
+Boundary conditions: */
+
+p[left]     = dirichlet (pL);
 frho1[left] = dirichlet (rhoL);
-q.n[left]  = dirichlet (uL*rhoL);
+q.n[left]   = dirichlet (uL*rhoL);
 
-/** We obtain the post-shocked state using the Rankine-Hugoniot relations
-
+/**
+We obtain the post-shocked state using the Rankine-Hugoniot relations
 $$
 \rho_L = \rho_R \frac{\gamma_R \frac{p_L}{p_R} + 1}{\gamma_R + \frac{p_L}{p_R}}
 $$
 $$
-u_L = \frac{\sqrt{\gamma p_R/\rho_R}}{\gamma} \frac{\frac{p_L}{p_R} - 1}{\sqrt{\frac{\gamma + 1}{2 \gamma} \left(\frac{p_L}{p_R} - 1\right) + 1}}
+u_L = \frac{\sqrt{\gamma p_R/\rho_R}}{\gamma} \frac{\frac{p_L}{p_R} -
+1}{\sqrt{\frac{\gamma + 1}{2 \gamma} \left(\frac{p_L}{p_R} - 1\right)
++ 1}}
 $$
-  where $\gamma_R = \frac{\gamma + 1}{\gamma - 1}$
-  
-  */
-int main()
-{  
+where $\gamma_R = \frac{\gamma + 1}{\gamma - 1}$. */
 
-  /** The EOS for an adiabatic perfect gas is defined by its polytropic coefficient $\Gamma = \gamma = 1.4$ */
+int main()
+{
+
+  /**
+  The EOS for an adiabatic perfect gas is defined by its polytropic
+  coefficient $\Gamma = \gamma = 1.4$. */
+  
   gamma1 = 1.4;
 
   gr = (gamma1 + 1.)/(gamma1 - 1.);
@@ -72,21 +82,29 @@ int main()
 						     (pL/pR - 1.) + 1.);
   ushock = sqrt(gamma1*pR/rhoR)*sqrt((gamma1 + 1.)/2./gamma1*(pL/pR - 1.) + 1.);
   
-  /** Size of the domain: */
-  size (10. [0]); // fixme: this should work with dimensions
-  DT = HUGE [0];
-  origin (-L0/2., -L0/2.);
+  /**
+  Size of the domain: */
   
-  /** We use an upwind method for the tracer advection associated to the VOF tracer f*/
+  size (10. [1]);
+  origin (-L0/2.);
+  
+  /**
+  We use an upwind method for the tracer advection associated to the
+  VOF tracer f. */
+  
   f.gradient = zero; 
 
-  /** We perform a convergence study */
+  /**
+  We perform a convergence study. */
+  
   for (N = 256; N >= 32; N /= 2)
     run();
 }
 
- /** Variable initialization of the conservative variables: density, momentum and energy
-  The shock is initially placed at x=0 */
+/**
+Variable initialization of the conservative variables: density,
+momentum and energy The shock is initially placed at $x = 0$. */
+
 event init (i = 0)
 {   
   foreach() {
@@ -95,27 +113,33 @@ event init (i = 0)
     frho1[] = rhoR*(gr*p[]/pR + 1.)/(gr + p[]/pR);
     q.x[] = m*frho1[]*uL;
     q.y[] = 0.;
-    fE1[] = p[]/(gamma1 - 1.) + 0.5*pow(q.x[],2)/frho1[];
+    fE1[] = p[]/(gamma1 - 1.) + 0.5*sq(q.x[])/frho1[];
   }
 }
 
-/** At the end of each simulation we output the relative position of the shock
-with respect to the exact theoretical position together with the conservative variables and pressure
-to verify that the wave structure is not distorted by the numerical method 
-The theoretical shockwave speed is
-
-$u_{shock} = \sqrt{\gamma \frac{p_R}{\rho_R} \left( \frac{\gamma + 1}{2 \gamma} \left(\frac{p_L}{p_R} - 1 \right) + 1 \right)}$
-
+/**
+At the end of each simulation we output the relative position of the
+shock with respect to the exact theoretical position together with the
+conservative variables and pressure to verify that the wave structure
+is not distorted by the numerical method The theoretical shockwave
+speed is
+$$
+u_{shock} = \sqrt{\gamma \frac{p_R}{\rho_R} \left( \frac{\gamma + 1}{2
+\gamma} \left(\frac{p_L}{p_R} - 1 \right) + 1 \right)}
+$$
 */
 
 event endsim (t = tend)
 {
-  foreach () 
-    printf ("%i %g %g %g %g %g \n",
-	    N, (x - ushock*t)/(ushock*t), p[], frho1[], q.x[]/frho1[], fE1[]);
+  foreach()
+    if (y < Delta)
+      printf ("%i %g %g %g %g %g \n",
+	      N, (x - ushock*t)/(ushock*t), p[], frho1[], q.x[]/frho1[], fE1[]);
   printf ("\n");
 
-  /** We also compute the L_1 error norm to check convergence */
+  /**
+  We also compute the L_1 error norm to check convergence. */
+  
   double perr = 0., rhoerr = 0., uerr = 0., vol = 0.;
   foreach (reduction(+:vol) reduction(+:perr)
 	   reduction(+:rhoerr) reduction(+:uerr)) {
@@ -134,9 +158,8 @@ event endsim (t = tend)
   fprintf (stderr, "%i %g %g %g\n",
 	   N, perr/vol/pL, rhoerr/vol/rhoL, uerr/vol/uL);
 }
-    
-/**
 
+/**
 ~~~gnuplot Error convergence
 set xlabel 'N'
 set ylabel 'Average error'
@@ -171,5 +194,4 @@ p "out" u 2:5:(log($1)) not w lp palette pt 7
 set origin 0,0.75
 unset multiplot
 ~~~ 
-
 */
