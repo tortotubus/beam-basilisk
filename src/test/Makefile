@@ -344,6 +344,8 @@ nonlinear-ml.c: nonlinear.c
 nonlinear-ml.s: CFLAGS += -DML=1
 nonlinear-ml.tst: CFLAGS += -DML=1
 
+shockwave.tst: shockwave.ctst
+
 ## MPI tests
 
 # bump2Dp.tst crashes with -DDEBUGCOND=1 but works with -DDEBUGCOND=0

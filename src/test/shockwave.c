@@ -31,11 +31,7 @@ $$
     u_L
   \end{array}\right)  
 $$
-*/
 
-#include "grid/multigrid.h"
-
-/** 
 We use the two-phase flow formulation. */
 
 #include "two-phase-compressible.h"
@@ -118,6 +114,15 @@ event init (i = 0)
 }
 
 /**
+Grid adaptation. */
+
+#if TREE
+event adapt (i++) {
+  adapt_wavelet ((scalar *){p}, (double[]){0.01}, maxlevel = log(N)/log(2.));
+}
+#endif
+
+/**
 At the end of each simulation we output the relative position of the
 shock with respect to the exact theoretical position together with the
 conservative variables and pressure to verify that the wave structure
@@ -142,19 +147,20 @@ event endsim (t = tend)
   
   double perr = 0., rhoerr = 0., uerr = 0., vol = 0.;
   foreach (reduction(+:vol) reduction(+:perr)
-	   reduction(+:rhoerr) reduction(+:uerr)) {
-    vol += Delta;
-    if (x - ushock*tend <= 0.) {
-      perr += fabs(p[] - pL)*Delta;
-      rhoerr += fabs(frho1[] - rhoL)*Delta;
-      uerr += fabs(q.x[]/frho1[] - uL)*Delta;
+	   reduction(+:rhoerr) reduction(+:uerr))
+    if (y < Delta) {
+      vol += Delta;
+      if (x - ushock*tend <= 0.) {
+	perr += fabs(p[] - pL)*Delta;
+	rhoerr += fabs(frho1[] - rhoL)*Delta;
+	uerr += fabs(q.x[]/frho1[] - uL)*Delta;
+      }
+      else {
+	perr += fabs(p[] - pR)*Delta;
+	rhoerr += fabs(frho1[] - rhoR)*Delta;
+	uerr += fabs(q.x[]/frho1[])*Delta;
+      }
     }
-    else {
-      perr += fabs(p[] - pR)*Delta;
-      rhoerr += fabs(frho1[] - rhoR)*Delta;
-      uerr += fabs(q.x[]/frho1[])*Delta;
-    }
-  }  
   fprintf (stderr, "%i %g %g %g\n",
 	   N, perr/vol/pL, rhoerr/vol/rhoL, uerr/vol/uL);
 }
@@ -167,10 +173,13 @@ set log xy
 set xtics 16,2,512
 set xrange [16:512]
 set grid
-plot "log" u 1:2 t 'p' w p, "log" u 1:3 t 'rho' w p, \
-     "log" u 1:4 t 'u' w p, x**(-1.) t '1/x' w l lc 0
+set key bottom left
+plot "log" u 1:2 t 'p (adaptive)' w p, "log" u 1:3 t 'rho (adaptive)' w p, \
+     "log" u 1:4 t 'u (adaptive)' w p, \
+     "clog" u 1:2 t 'p (multigrid)' w p, "clog" u 1:3 t 'rho (multigrid)' w p,   \
+     "clog" u 1:4 t 'u (multigrid)' w p, x**(-1.) t '1/x' w l lc 0
 ~~~ 
- 
+
 ~~~gnuplot Velocity, density and pressure profiles
 reset
 set palette rgb 33,13,10;
