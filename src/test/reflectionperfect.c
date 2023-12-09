@@ -48,12 +48,6 @@ int main()
   
   f.gradient = zero; 
 
-  /**
-  We make everything dimensionless but this should be improved. */
-  
-  L0 = 1. [0];
-  DT = HUGE [0];
-  
   N = 512;
   run();
 }
