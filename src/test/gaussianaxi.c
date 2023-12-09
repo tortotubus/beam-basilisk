@@ -2,11 +2,11 @@
 # Propagation of an acoustic disturbance in a tube
 
 This test is the axisymmetric variant of the results presented in
-Section 4.1 in [Fuster and Popinet,
-2018](/src/references.bib#fuster2018). We quantify the dissipation
-properties of the all-Mach solver in the acoustic limit by simulating
-the propagation of a gaussian pulse of small amplitude.  The results
-can be compared with the results obtained with a classical [Riemann
+Section 4.1 in [Fuster and Popinet, 2018](#fuster2018). We quantify
+the dissipation properties of the all-Mach solver in the acoustic
+limit by simulating the propagation of a gaussian pulse of small
+amplitude.  The results can be compared with the results obtained with
+a classical [Riemann
 solver](http://basilisk.fr/sandbox/fuster/RiemannSolverExamples/gaussian.c). */
 
 #include "grid/multigrid.h"
@@ -94,4 +94,10 @@ set xrange[-3:3]
 set cblabel 'log10(CFL)'
 p "log" u 2:3:(log10($1)) not w lp pt 7 palette, 0.5*exp(-x*x) not w l lw 2 lc 0
 ~~~ 
+
+## References
+
+~~~bib
+@hal{fuster2018, hal-01845218}
+~~~
 */
