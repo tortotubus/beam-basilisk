@@ -98,6 +98,7 @@ Note that only the documented test cases appear in the list below
 ## Compressible two-phase flows
 
 * [Advection of two fluids at different pressures](discontinuity-advection.c)
+* [Double Mach reflection of a Mach 10 shock from a wall](inclined-shock.c)
 
 ## General orthogonal coordinates
 

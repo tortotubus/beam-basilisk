@@ -13,6 +13,7 @@ The isocontours below can be compared with Figure 4 of [Woodward
 $\Delta x = 1/120$.
 
 ~~~gnuplot
+set term svg enhanced size 640,280 font ",10"
 set xrange [0:3]
 set yrange [0:1]
 unset surface
@@ -22,9 +23,13 @@ set size ratio -1
 set contour base
 # set cntrlabel onecolor (for gnuplot >= 4.7)
 unset clabel
-set cntrparam levels incremental 1.731,(20.92-1.731)/30,20.92
+set cntrparam levels incremental 1.731,(20.92 - 1.731)/30,20.92
 splot 'rho.end' w l lt -1
 ~~~
+
+![Evolution of the density field](inclined-shock/rho.mp4)
+
+![Evolution of the level of refinement](inclined-shock/level.mp4)
 */
 
 #include "two-phase-compressible.h"
@@ -92,17 +97,19 @@ event init (i = 0)
 {   
   double Ms = 10., gr = (gamma1 +1.)/(gamma1 -1.);
 
-  // Pre-shocked state :
+  /** Pre-shocked state: */
+  
   double cR = sqrt(pR/rhoR*gamma1);   
    
-  // Post-shocked state :
+  /** Post-shocked state: */
+  
   pL = pR*(2.*gamma1*sq(Ms) - (gamma1 - 1.))/(gamma1 + 1.);
   double VL = Ms*cR*(1. - (((gamma1 - 1.)*sq(Ms) + 2.)/((gamma1 + 1.)*sq(Ms))));
   uL =  VL*sqrt(3.)/2.; // V*cos(30)
   vL = - VL/2.; // V*sin(30)
 
   scalar m[];
-  fraction (m, -sqrt(3.)*(x-(1./6.))+y);
+  fraction (m, -sqrt(3.)*(x - 1./6.) + y);
   
   rhoL = rhoR*(gr*pL/pR + 1.)/(gr + pL/pR);
 
@@ -119,7 +126,7 @@ event init (i = 0)
 }
 
 /**
-We test the grid adaptation. */
+## Grid adaptation */
 
 event adapt (i++) {
   adapt_wavelet ((scalar *){p}, (double[]){0.01}, maxlevel = LEVEL);
@@ -128,10 +135,16 @@ event adapt (i++) {
 /**
 ## Output */
 
-event logfile (i++) {
-  if (i == 0)
-    fprintf (ferr, "t dt grid->tn perf.t perf.speed\n");
-  fprintf (ferr, "%g %g %ld %g %g\n", t, dt, grid->tn, perf.t, perf.speed);
+event logfile (i++)
+{
+  if (i == 0) {
+    fprintf (stdout, "grid->tn perf.t perf.speed\n");
+    fprintf (stderr, "t dt pmax pmin rhomax rhomin\n");
+  }
+  fprintf (stdout, "%ld %g %g\n", grid->tn, perf.t, perf.speed);
+  stats sp = statsf(p), sr = statsf(rho);
+  fprintf (stderr, "%g %g %g %g %g %g\n", t, dt,
+	   sp.min, sp.max, sr.min, sr.max);
 }
 
 /**
@@ -139,51 +152,15 @@ event logfile (i++) {
 
 event movies (i += 5)
 {
-  static FILE * fp1 = popen ("ppm2mp4 rho.mp4", "w");
-  output_ppm (frho1, fp1, box = {{0.,0.},{3.,1.}},
+  output_ppm (frho1, file = "rho.mp4", box = {{0.,0.},{3.,1.}},
 	      linear = true, spread = -1, n = 512);
 
   scalar l[];
   foreach()
     l[] = level;
 
-  static FILE * fp2 = popen ("ppm2mp4 level.mp4", "w");
-  output_ppm (l, fp2, box = {{0.,0.},{3.,1.}},
+  output_ppm (l, file = "level.mp4", box = {{0.,0.},{3.,1.}},
 	      linear = false, min = 0, max = LEVEL, n = 512); 
-}
-
-/**
-![Evolution of the density field](InclinedShockBCG/rho.mp4)
-
-![Evolution of the level of refinement](InclinedShockBCG/level.mp4)
-
-We plot the evolution of iso-density contours. 
-
-![Evolution of iso-density contours](InclinedShockBCG/isovalue.gif)
-*/
-
-event isovalue (t += tend/20.; t <= tend)
-{
-  static FILE * fp = popen ("gnuplot", "w");
-  if (t == 0.)
-    fprintf (fp,
-	     "set term gif animate crop\n"
-	     "set output 'tmp.gif'\n"
-	     "set xrange [0:3]\n"
-	     "set yrange [0:1]\n"
-	     "unset surface\n"
-	     "set view map\n"
-	     "unset key\n"
-	     "set size ratio -1\n"
-	     "set contour base\n"
- 	     // "set cntrlabel onecolor\n"
- 	     "unset clabel\n"
-	     "set cntrparam levels incremental 1.731,(20.92-1.731)/30,20.92\n"
-	     );
-  fprintf (fp, "splot '-' w l lt -1\n");
-  output_field ({rho}, fp, n = 512, linear = true);
-  fputs ("e\n", fp);
-  fflush (fp);
 }
 
 event end (t = tend)
@@ -191,9 +168,6 @@ event end (t = tend)
   FILE * fp = fopen ("rho.end", "w");
   output_field ({rho}, fp, n = 512, linear = true);
   fclose (fp);
-
-  system ("gifsicle --optimize --delay 10 --loopcount=0 tmp.gif > isovalue.gif "
-	  "&& rm -f tmp.gif");
 }
 
 /**
