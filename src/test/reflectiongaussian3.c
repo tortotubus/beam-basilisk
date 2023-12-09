@@ -1,0 +1,93 @@
+/**
+# Transmission/reflection of a wave propagating across an interface between two fluids 
+
+In this test proposed by [Denner et al (JCP, 2018)](https://www.sciencedirect.com/science/article/pii/S0021999118302535)
+a linear wave propagating in an ideal gas is partially transmitted to another ideal gas with a different acoustic impedance. */
+
+#include "two-phase-compressible.h"
+
+/** Parameters of the problem */
+
+double tend = 0.1;
+double cflac = 0.25;
+double uper = 0.0001;
+double freq = 4000.;
+double uref = 347.8;
+double p0, rho20;
+
+//q.n[left]  = dirichlet(t < 0.5/freq ? uper*sin(2*M_PI*freq*t) : 0.);
+
+event stability (i++) {
+  double dt = 100.;
+  foreach ()
+    dt = min(dt,Delta/sqrt(gamma2*p0/rho20));
+  dtmax = dt*cflac;
+  DT = dt*cflac;
+}
+
+int main()
+{  
+  
+  /** The EOS for an adiabatic perfect gas is defined by its polytropic coefficient $\Gamma = \gamma = 1.4$ */
+
+  gamma1 = 1.4;
+  gamma2 = 1.667;
+  rho20  = 0.164/1.157;
+
+  p0 = 1./gamma1;
+  freq *= sqrt(gamma2/gamma1/rho20);
+  freq /= uref;
+  
+  /** We use an upwind method for the tracer advection associated to the VOF tracer f*/
+
+  f.gradient = zero; 
+
+  /** We perform a convergence study */
+
+  for (N = 256; N <= 1024; N *= 2)
+    run();
+}
+
+event init (i = 0)
+{   
+  mask( y > 0.01 ? top : none); 
+
+  foreach() {
+    double perturb = uper*exp(-pow((x-0.4)*freq,2));
+    f[] = ( x > 0.5);
+    p[] = p0 + perturb;
+    frho1[] = f[]*(1. + perturb);
+    frho2[] = (1. - f[])*rho20;
+    q.x[] = (frho1[] + frho2[])*perturb*sqrt(gamma2*p[]/rho20);
+    q.y[] = 0.;
+    fE1[] = f[]*p[]/(gamma1 - 1.) + 0.5*pow(q.x[]/(frho1[] + frho2[]),2)*frho1[];
+    fE2[] = (1.-f[])*p[]/(gamma2 - 1.) + 0.5*pow(q.x[]/(frho1[] + frho2[]),2)*frho2[];
+  }
+  boundary ((scalar *){q, frho1, frho2,p, fE1, fE2});
+}
+
+event endprint (t = tend) 
+{  
+  foreach () {
+    printf("%i %g %g \n", N, x, (p[]-p0));
+  }
+  printf("\n");
+
+}
+
+/**
+~~~gnuplot Reflected wave
+ZR=1.
+ZL=0.164/1.157*sqrt(1.667*1.157/0.164/1.4)
+set ylabel '{/Symbol D}p/{/Symbol D}p_0'
+set xlabel 'x'
+set cblabel '{/Symbol s}/{/Symbol D}x'
+set xrange[0.2:0.4]
+p "out" u 2:($3/0.0001):(0.1*$1) not w l palette, (ZR-ZL)/(ZR+ZL) t 'theory' w l lc 0
+~~~ 
+
+~~~gnuplot Transmitted wave
+set xrange[0.5:0.65]
+p "out" u 2:($3/0.0001):(0.1*$1) not w l palette, 1./(ZR+ZL)*2*ZR t 'theory' w l lc 0
+~~~ 
+*/
