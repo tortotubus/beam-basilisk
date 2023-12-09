@@ -99,6 +99,8 @@ Note that only the documented test cases appear in the list below
 
 * [Advection of two fluids at different pressures](discontinuity-advection.c)
 * [Double Mach reflection of a Mach 10 shock from a wall](inclined-shock.c)
+* [Zero reflection of a wave propagating across an interface between two fluids
+   with impedance matching](reflectionperfect.c)
 
 ## General orthogonal coordinates
 
