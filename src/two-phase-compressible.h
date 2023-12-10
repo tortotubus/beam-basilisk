@@ -235,7 +235,7 @@ event init (i = 0)
   event ("stability");
 
   /** 
-  For the associated tracers we use the advection scheme provided in
+  For the associated tracers we use the gradient defined by
   f.gradient. */
   
   for (scalar s in {frho1, frho2, fE1, fE2, q, q2})
@@ -301,7 +301,7 @@ event properties (i++)
     double invgammaavg = fc/(gamma1 - 1.) + (1. - fc)/(gamma2 - 1.);
     double PIGAMMAavg = (fc*PI1*gamma1/(gamma1 - 1.) +
 			 (1. - fc)*PI2*gamma2/(gamma2 - 1.));
-    ps[] = (fE1[] + fE2[] - Ek/(frho1[] + frho2[])/2. - PIGAMMAavg)/invgammaavg;
+    ps[] = (fE1[] + fE2[] - Ek/rhov[]/2. - PIGAMMAavg)/invgammaavg;
     
     /** 
     We also compute $\rho c^2$. */
@@ -413,9 +413,8 @@ event end_timestep (i++)
     }
     foreach_dimension ()
       q.x[] += dt*momentum/Delta;
-
+    energy *= dt/(Delta*cm[]);
     double fc = clamp(f[],0,1);
-    energy *= dt/Delta/cm[];
     fE1[] +=        fc*energy;
     fE2[] += (1. - fc)*energy;
   }
@@ -425,7 +424,7 @@ event end_timestep (i++)
   $\mathbf{q}$.*/
   
   vector u = q;
-  foreach() 
+  foreach()
     foreach_dimension() 
       u.x[] = q.x[]/(frho1[] + frho2[]);
 
@@ -434,49 +433,49 @@ event end_timestep (i++)
   the total energy is lacking. Since the face velocity has already the
   metric factor those in $\mu$ have been removed.*/
 
-  face vector tmpf[], pf = tmpf;
-  foreach_face()
-    pf.x[] = - (p[] + p[-1])/2.;
+  {
+    face vector pf[];
+    foreach_face()
+      pf.x[] = - (p[] + p[-1])/2.;
  
-  foreach () {
-    double energy = 0.; 
-    foreach_dimension()
-      energy += uf.x[1]*pf.x[1] - uf.x[]*pf.x[];
+    foreach () {
+      double energy = 0.; 
+      foreach_dimension()
+	energy += uf.x[1]*pf.x[1] - uf.x[]*pf.x[];
+      energy *= dt/(Delta*cm[]);
+      double fc = clamp(f[],0,1);
+      fE1[] += fc*energy;
+      fE2[] += (1. - fc)*energy;
+    }
+  }
 
-    double fc = clamp(f[],0,1);
-    fE1[] += fc*dt*energy/Delta/cm[];
-    fE2[] += (1-fc)*dt*energy/Delta/cm[];
-  }   
-
-  //alphav is now the deformation tensor 2e_ijk: fixme
-  
-  face vector eijk = tmpf;
-  foreach_dimension() {
-    foreach_face(x)
-      eijk.x[] = 2.*(u.x[] - u.x[-1])/Delta;
-    #if dimension > 1
+  {
+    face vector eijk[];
+    foreach_dimension() {
+      foreach_face(x)
+	eijk.x[] = 2.*(u.x[] - u.x[-1])/Delta;
+#if dimension > 1
       foreach_face(y)
         eijk.y[] = (u.x[] - u.x[0,-1] + 
 		    (u.y[1,-1] + u.y[1,0])/4. -
 		    (u.y[-1,-1] + u.y[-1,0])/4.)/Delta;
-    #endif
-    #if dimension > 2
+#endif
+#if dimension > 2
       foreach_face(z)
         eijk.z[] = (u.x[] - u.x[0,0,-1] + 
 		    (u.z[1,0,-1] + u.z[1,0,0])/4. -
 		    (u.z[-1,0,-1] + u.z[-1,0,0])/4.)/Delta;
-    #endif
-
-    foreach () {
-      double energy = 0.; 
-      foreach_dimension()
-        energy += uf.x[1]*eijk.x[1] - uf.x[]*eijk.x[];
-
-      double fc = clamp(f[],0,1);
-      energy *= dt/Delta/cm[];
-      fE1[] += fc*mu1*energy;
-      fE2[] += (1. - fc)*mu2*energy;
-    }   
+#endif
+      foreach () {
+	double energy = 0.; 
+	foreach_dimension()
+	  energy += uf.x[1]*eijk.x[1] - uf.x[]*eijk.x[];
+	energy *= dt/(Delta*cm[]);
+	double fc = clamp(f[],0,1);
+	fE1[] += fc*mu1*energy;
+	fE2[] += (1. - fc)*mu2*energy;
+      }   
+    }
   }
 
   /**
