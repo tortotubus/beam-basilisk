@@ -105,6 +105,7 @@ Note that only the documented test cases appear in the list below
   between two fluids](reflectiongaussian3.c)
 * [Propagation of an acoustic disturbance in a tube](gaussianaxi.c)
 * [Double Mach reflection of a Mach 10 shock from a wall](inclined-shock.c)
+* [Shape oscillation of an inviscid droplet](oscillation.c)
 
 ## General orthogonal coordinates
 
