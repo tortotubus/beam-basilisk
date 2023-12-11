@@ -128,14 +128,14 @@ lid-restore.tst: lid-restore.dump
 oscillation-compressible.c: oscillation.c
 	ln -s oscillation.c oscillation-compressible.c 
 oscillation-compressible.s: CFLAGS += -DCOMPRESSIBLE=1
-oscillation-compressible.ctst: CFLAGS += -DCOMPRESSIBLE=1
+oscillation-compressible.tst: CFLAGS += -DCOMPRESSIBLE=1
 
 oscillation-momentum.c: oscillation.c
 	ln -s oscillation.c oscillation-momentum.c 
 oscillation-momentum.s: CFLAGS += -DMOMENTUM=1
-oscillation-momentum.ctst: CFLAGS += -DMOMENTUM=1
+oscillation-momentum.tst: CFLAGS += -DMOMENTUM=1
 
-oscillation.tst: oscillation-momentum.ctst oscillation-compressible.ctst
+oscillation.tst: oscillation-momentum.tst oscillation-compressible.tst
 
 ponds-implicit.c: ponds.c
 	ln -s ponds.c ponds-implicit.c
