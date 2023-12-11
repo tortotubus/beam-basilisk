@@ -10,7 +10,7 @@ event end_timestep (i++)
 {
   if (f.sigma > 0.) {
     scalar skappa[];
-    curvature (f, skappa, f.sigma, add = false);
+    curvature (f, skappa, f.sigma);
 
     face vector pf[];
     foreach_face() {

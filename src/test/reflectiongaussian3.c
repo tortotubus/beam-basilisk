@@ -40,15 +40,8 @@ int main()
   rho20  = 0.164/1.157;
 
   p0 = 1./gamma1;
-  freq *= sqrt(gamma2/gamma1/rho20);
-  freq /= uref;
+  freq *= sqrt(gamma2/gamma1/rho20)/uref;
   
-  /** 
-  We use an upwind method for the tracer advection associated to the
-  VOF tracer f. */
-
-  f.gradient = zero;
-
   /**
   We perform a convergence study. */
 

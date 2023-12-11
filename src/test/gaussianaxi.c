@@ -52,12 +52,6 @@ int main()
   gamma1 = 1.4;
   
   /** 
-  We use an upwind method for the tracer advection associated to the
-  VOF tracer f. */
-  
-  f.gradient = zero; 
-
-  /** 
   We perform a convergence study. */
   
   N = 128;

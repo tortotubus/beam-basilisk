@@ -42,12 +42,6 @@ int main()
 
   p0 = 1./gamma1;
   
-  /** 
-  We use an upwind method for the tracer advection associated to the
-  VOF tracer f. */
-  
-  f.gradient = zero; 
-
   N = 512;
   run();
 }

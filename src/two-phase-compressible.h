@@ -50,8 +50,8 @@ $$
 \begin{aligned}
 \text{frho1} & = f \rho_1, \\
 \text{frho2} & = (1-f) \rho_2, \\
-\text{fE1} & = f \rho_1 e_1 + f \rho_1 \mathbf{u}^2, \\
-\text{fE2} & = (1-f) \rho_2 e_2 + (1-f) \rho_2 \mathbf{u}^2 
+\text{fE1} & = f \rho_1 e_1 + f \rho_1 \mathbf{u}^2/2, \\
+\text{fE2} & = (1-f) \rho_2 e_2 + (1-f) \rho_2 \mathbf{u}^2/2 
 \end{aligned}
 $$
 */
@@ -90,78 +90,32 @@ The volumetric viscosity uses arithmetic average by default. */
 /**
 ## Auxilliary fields
 
-Auxilliary fields need to be allocated. In particular the momentum of 
-the second phase $\text{q2} = \rho_2 u$  and the quantity $\rho c^2$. */
+Auxilliary fields need to be allocated. The quantity $\rho c^2$, the
+average density `rhov` and its inverse `alphav`. */
 
-vector q2[];
 scalar rhoc2v[];
-
-/**
-We need to allocate fields to store the average density `rhov` and its
-inverse `alphav`. */
-
 face vector alphav[];
 scalar rhov[];
 const face vector lambdav0[] = {0,0,0};
 (const) face vector lambdav = lambdav0;
 
-/** 
-## Refinement functions
-
-Naive refinement method */
 #if TREE
-void conservative_refine (Point point, scalar s)
-{
-  double cc = f[];
-  double scc = s[];
-  if (cc <= 0. || cc >= 1.)
-    refine_bilinear(point,s);
-  else {
+/**
+## Energy refinement function
 
-    /**
-    Otherwise, we reconstruct the interface in the parent cell. */
+The energy is refined from the refined pressures, momentum and
+densities, using the equation of state. */
 
-    coord n = mycs (point, f);
-    double alpha = plane_alpha (cc, n);
-
-    /**
-    And compute the volume fraction in the quadrant of the coarse cell
-    matching the fine cells. We use symmetries to simplify the
-    combinations. */
-
-    coord a, b;
-    foreach_dimension() {
-      a.x = 0.; b.x = 0.5;
-    }   
-        
-    foreach_child() {
-      coord nc; 
-      foreach_dimension()
-        nc.x = child.x*n.x;
-      double crefine = rectangle_fraction (nc, alpha, a, b); 
-      if (s.inverse)
-        s[] = scc/(1. - cc)*(1. - crefine);
-      else
-        s[] = scc/cc*crefine;
-    }   
-  }   
-}
-
-/** 
-The energy is refined from the refined pressures and densities,
-using the equation of state. */
-
-void fE_refine (Point point, scalar s)
+void fE_refine (Point point, scalar fE)
 {
   foreach_child() {
     double Ek = 0.;
     foreach_dimension()
       Ek += sq(q.x[]);
     Ek /= 2.*(frho1[] + frho2[]);
-    if (s.inverse)
-      s[] = ((p[] + gamma2*PI2)/(gamma2 - 1.) + Ek)*(1. - f[]);
-    else
-      s[] = ((p[] + gamma1*PI1)/(gamma1 - 1.) + Ek)*f[];
+    fE[] = fE.inverse ?
+      ((p[] + gamma2*PI2)/(gamma2 - 1.) + Ek)*(1. - f[]) :
+      ((p[] + gamma1*PI1)/(gamma1 - 1.) + Ek)*f[];
   }
 }
 #endif // TREE
@@ -192,23 +146,29 @@ event defaults (i = 0)
     p[] = 1.;
     f[] = 1.;
   }
-
-#if TREE
-  p.refine = p.prolongation = refine_bilinear;
-  for (scalar s in {frho1, frho2, q})
-    s.refine = s.prolongation = conservative_refine;
-  fE1.refine = fE1.prolongation = fE_refine;
-  fE2.refine = fE2.prolongation = fE_refine;
-#endif // TREE
   
   /** 
   We also initialize the list of tracers to be advected with the VOF
   function $f$ (or its complementary function). */
   
-  f.tracers = list_copy ({frho1, frho2, fE1, fE2, q, q2});
-  for (scalar s in {frho2, fE2, q2})
+  f.tracers = list_copy ({frho1, frho2, fE1, fE2});
+  for (scalar s in {frho2, fE2})
     s.inverse = true;
 
+  /**
+  We set limiting. */
+  
+  for (scalar s in {frho1, frho2, fE1, fE2, q}) {
+    s.gradient = minmod2;
+#if TREE
+    /**
+    On trees, we ensure that limiting is also applied to prolongation
+    and refinement. */
+
+    s.prolongation = s.refine = refine_linear;
+#endif
+  }
+  
   /**
   We add the interface and the density to the default display. */
 
@@ -223,7 +183,7 @@ event init (i = 0)
     uf.x[] = fm.x[]*(q.x[]/(frho1[] + frho2[]) + q.x[-1]/(frho1[-1] + frho2[-1]))/2.;
 
   /**
-  We update fluid properties. */
+  We update the fluid properties. */
 
   event ("properties");
 
@@ -237,36 +197,69 @@ event init (i = 0)
   /** 
   For the associated tracers we use the gradient defined by
   f.gradient. */
-  
-  for (scalar s in {frho1, frho2, fE1, fE2, q, q2})
-    s.gradient = f.gradient;  
+
+  if (f.gradient)
+    for (scalar s in {frho1, frho2, fE1, fE2, q})
+      s.gradient = f.gradient;  
 }
 
 /**
-## VOF advection of momentum
+## VOF advection of momentum 
 
-Before the VOF advection step we recover the momentum of each phase
-from the total momentum $\mathbf{q}$. */
+We overload the *vof()* event to transport consistently the volume
+fraction and the momentum of each phase. */
+
+static scalar * interfaces1 = NULL;
 
 event vof (i++)
 {
+
+  /**
+  We split the total momentum $q$ into its two components $q1$ and
+  $q2$ associated with $f$ and $1 - f$ respectively. */
+
+  vector q1 = q, q2[];
   foreach()
     foreach_dimension() {
       double u = q.x[]/(frho1[] + frho2[]);
-      q.x[]  = frho1[]*u;
+      q1.x[] = frho1[]*u;
       q2.x[] = frho2[]*u;
     }
-}
 
-/**
-After advection we compute the total momentum $\mathbf{q}$. */
+  /**
+  Momentum $q2$ is associated with $1 - f$, so we set the *inverse*
+  attribute to *true*. We use the same limiting for q1 and q2. */
 
-event tracer_advection (i++)
-{
-  foreach(){
+  foreach_dimension() {
+    q2.x.inverse = true;
+    q2.x.gradient = q1.x.gradient;
+  }
+
+#if TREE
+  /**
+  The refinement function is modified by *vof_advection()*. To be able
+  to restore it, we store its value. */
+  
+  void (* refine) (Point, scalar) = q1.x.refine;
+#endif
+  
+  /**
+  We associate the transport of $q1$ and $q2$ with $f$ and transport
+  all fields consistently using the VOF scheme. */
+
+  scalar * tracers = f.tracers;
+  f.tracers = list_concat (tracers, (scalar *){q1, q2});
+  vof_advection ({f}, i);
+  free (f.tracers);
+  f.tracers = tracers;
+  
+  /**
+  We recover the total momentum. */
+  
+  foreach() {
     foreach_dimension()
-      q.x[] += q2.x[];
-
+      q.x[] = q1.x[] + q2.x[];
+    
     /**
     We avoid negative densities and energies which may have been
     caused by round-off during VOF advection. */
@@ -280,6 +273,40 @@ event tracer_advection (i++)
       fE2[] = 0.;
     }
   }
+  
+#if TREE
+  /**
+  We restore the refinement function for the total momentum. */
+
+  for (scalar s in {q}) {
+    s.refine = s.prolongation = refine;
+    s.dirty = true;
+  }
+
+#if 0
+  /**
+  This is switched off by default for now as the standard refinement
+  in [/src/vof.h#vof_concentration_refine]() seems to work fine. */
+  
+  for (scalar s in {fE1,fE2}) {
+    s.refine = s.prolongation = fE_refine;
+    s.dirty = true;
+  }
+#endif
+#endif // TREE  
+
+  /**
+  We set the list of interfaces to NULL so that the default *vof()*
+  event does nothing (otherwise we would transport $f$ twice). */
+  
+  interfaces1 = interfaces, interfaces = NULL;  
+}
+
+/**
+We set the list of interfaces back to its default value. */
+
+event tracer_advection (i++) {
+  interfaces = interfaces1;
 }
 
 /**
@@ -357,7 +384,7 @@ where $\mathbf{I}$ is the unity tensor and $\lambda_v = \mu_v - 2/3
 
 event end_timestep (i++)
 {
-
+#if 0
   /**
   We first compute the divergence of the velocity at cell centers
   using the cell face velocity. Note that the face vector *uf*
@@ -403,11 +430,11 @@ event end_timestep (i++)
   $$
   Also $u_\theta = 0$. */ 
 
-  foreach () {
+  foreach() {
     double momentum = 0., energy = 0.;
     foreach_dimension() {
       double right = lambdav.x[1]*(divU[1]  + divU[])/2.;
-      double left = lambdav.x[] *(divU[-1] + divU[])/2.;
+      double left = lambdav.x[]*(divU[-1] + divU[])/2.;
       momentum += right - left;
       energy += uf.x[1]*right - uf.x[]*left;
     }
@@ -418,20 +445,11 @@ event end_timestep (i++)
     fE1[] +=        fc*energy;
     fE2[] += (1. - fc)*energy;
   }
-
-  /**
-  The velocity $\mathbf{u}$ is obtained from the updated momentum
-  $\mathbf{q}$.*/
+#endif
   
-  vector u = q;
-  foreach()
-    foreach_dimension() 
-      u.x[] = q.x[]/(frho1[] + frho2[]);
-
   /**
-  The contribution of the pressure and incompressible viscous term to
-  the total energy is lacking. Since the face velocity has already the
-  metric factor those in $\mu$ have been removed.*/
+  The contribution of the pressure to the energy of each phase is
+  lacking. */
 
   {
     face vector pf[];
@@ -448,21 +466,38 @@ event end_timestep (i++)
       fE2[] += (1. - fc)*energy;
     }
   }
+  
+  /**
+  This is the contribution of the incompressible viscous term. */
 
-  {
+  if (mu1 || mu2) {
+    
+    /**
+    The velocity $\mathbf{u}$ is first obtained from the updated
+    momentum $\mathbf{q}$. */
+    
+    vector u = q;
+    foreach()
+      foreach_dimension() 
+        u.x[] = q.x[]/(frho1[] + frho2[]);
+
+    /**
+    <div class="message">
+    Fixme: more comments are required here.</div> */
+    
     face vector eijk[];
     foreach_dimension() {
       foreach_face(x)
 	eijk.x[] = 2.*(u.x[] - u.x[-1])/Delta;
 #if dimension > 1
       foreach_face(y)
-        eijk.y[] = (u.x[] - u.x[0,-1] + 
+	eijk.y[] = (u.x[] - u.x[0,-1] + 
 		    (u.y[1,-1] + u.y[1,0])/4. -
 		    (u.y[-1,-1] + u.y[-1,0])/4.)/Delta;
 #endif
 #if dimension > 2
       foreach_face(z)
-        eijk.z[] = (u.x[] - u.x[0,0,-1] + 
+	eijk.z[] = (u.x[] - u.x[0,0,-1] + 
 		    (u.z[1,0,-1] + u.z[1,0,0])/4. -
 		    (u.z[-1,0,-1] + u.z[-1,0,0])/4.)/Delta;
 #endif
@@ -476,14 +511,14 @@ event end_timestep (i++)
 	fE2[] += (1. - fc)*mu2*energy;
       }   
     }
+
+    /**
+    Finally we recover momentum.*/
+
+    foreach()
+      foreach_dimension() 
+        q.x[] *= frho1[] + frho2[];
   }
-
-  /**
-  Finally we recover momentum.*/
-
-  foreach() 
-    foreach_dimension() 
-      q.x[] *= frho1[] + frho2[];
 }
 
 /**
