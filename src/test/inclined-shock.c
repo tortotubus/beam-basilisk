@@ -77,15 +77,7 @@ int main()
 {
   gamma1 = 1.4; 
   TOLERANCE = 1.e-6 [*];
-  
-  /**
-  We use the BCG with the minmod2 slope limiter. */
-  
-  f.gradient = minmod2;
-  theta = 1.3;
-
   size (Ldomain);
-  
   init_grid (1 << LEVEL);
   run();
 }
