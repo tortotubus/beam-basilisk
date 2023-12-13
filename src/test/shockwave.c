@@ -137,9 +137,8 @@ $$
 event endsim (t = tend)
 {
   foreach()
-    if (y < Delta)
-      printf ("%i %g %g %g %g %g \n",
-	      N, (x - ushock*t)/(ushock*t), p[], frho1[], q.x[]/frho1[], fE1[]);
+    printf ("%i %g %g %g %g %g \n",
+	    N, (x - ushock*t)/(ushock*t), p[], frho1[], q.x[]/frho1[], fE1[]);
   printf ("\n");
 
   /**
@@ -147,20 +146,19 @@ event endsim (t = tend)
   
   double perr = 0., rhoerr = 0., uerr = 0., vol = 0.;
   foreach (reduction(+:vol) reduction(+:perr)
-	   reduction(+:rhoerr) reduction(+:uerr))
-    if (y < Delta) {
-      vol += Delta;
-      if (x - ushock*tend <= 0.) {
-	perr += fabs(p[] - pL)*Delta;
-	rhoerr += fabs(frho1[] - rhoL)*Delta;
-	uerr += fabs(q.x[]/frho1[] - uL)*Delta;
-      }
-      else {
-	perr += fabs(p[] - pR)*Delta;
-	rhoerr += fabs(frho1[] - rhoR)*Delta;
-	uerr += fabs(q.x[]/frho1[])*Delta;
-      }
+	   reduction(+:rhoerr) reduction(+:uerr)) {
+    vol += Delta;
+    if (x - ushock*tend <= 0.) {
+      perr += fabs(p[] - pL)*Delta;
+      rhoerr += fabs(frho1[] - rhoL)*Delta;
+      uerr += fabs(q.x[]/frho1[] - uL)*Delta;
     }
+    else {
+      perr += fabs(p[] - pR)*Delta;
+      rhoerr += fabs(frho1[] - rhoR)*Delta;
+      uerr += fabs(q.x[]/frho1[])*Delta;
+    }
+  }
   fprintf (stderr, "%i %g %g %g\n",
 	   N, perr/vol/pL, rhoerr/vol/rhoL, uerr/vol/uL);
 }
@@ -174,10 +172,10 @@ set xtics 16,2,512
 set xrange [16:512]
 set grid
 set key bottom left
-plot "log" u 1:2 t 'p (adaptive)' w p, "log" u 1:3 t 'rho (adaptive)' w p, \
-     "log" u 1:4 t 'u (adaptive)' w p, \
-     "clog" u 1:2 t 'p (multigrid)' w p, "clog" u 1:3 t 'rho (multigrid)' w p,   \
-     "clog" u 1:4 t 'u (multigrid)' w p, x**(-1.) t '1/x' w l lc 0
+plot "log" u 1:2 t 'p (adaptive)' w p, "" u 1:3 t 'rho (adaptive)' w p, \
+     "" u 1:4 t 'u (adaptive)' w p, \
+     "clog" u 1:2 t 'p (multigrid)' w p, "" u 1:3 t 'rho (multigrid)' w p,   \
+     "" u 1:4 t 'u (multigrid)' w p, x**(-1.) t '1/x' w l lc 0
 ~~~ 
 
 ~~~gnuplot Velocity, density and pressure profiles

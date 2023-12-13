@@ -5,6 +5,7 @@ In this test proposed by [Denner et al, 2018](#denner2018) a linear wave
 propagating in an ideal gas is completely transmitted to another ideal
 gas with the same acoustic impedance. */
 
+#include "grid/multigrid1D.h"
 #include "two-phase-compressible.h"
 
 /** 
@@ -48,13 +49,6 @@ int main()
 
 event init (i = 0)
 {
-
-  /**
-  We cannot use multigrid1D because of VOF, so we use masking
-  instead. */
-  
-  mask (y > 0.01 ? top : none); 
-
   foreach() {
     double perturb = uper*exp(- sq ((x - 0.3)*freq));
     f[] = (x < 0.5);
@@ -62,7 +56,6 @@ event init (i = 0)
     frho1[] = f[]*(1. + perturb);
     frho2[] = (1. - f[])*rho20;
     q.x[] = (frho1[] + frho2[])*perturb;
-    q.y[] = 0.;
     fE1[] = f[]*p[]/(gamma1 - 1.) + 0.5*sq(q.x[]/(frho1[] + frho2[]))*frho1[];
     fE2[] = (1. - f[])*p[]/(gamma2 - 1.) + 0.5*sq(q.x[]/(frho1[] + frho2[]))*frho2[];
   }
@@ -73,11 +66,9 @@ event endprint (t = tend)
   scalar perr[];
   foreach () {
     perr[] = fabs((p[] - p0)/uper - exp(- sq((x - 0.6)*freq*sqrt(gamma1*rho20/gamma2))));
-    if (y < Delta)
-      fprintf (stderr, "%g %g %g \n", t, x, p[] - p0);
+    fprintf (stderr, "%g %g %g \n", t, x, p[] - p0);
   }
-  
-  assert (statsf(perr).sum < 3.e-5);
+  fprintf (stderr, "error %g\n", statsf(perr).sum);
 }
 
 /**

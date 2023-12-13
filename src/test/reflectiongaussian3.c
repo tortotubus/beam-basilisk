@@ -5,6 +5,7 @@ In this test proposed by [Denner et al. 2018](#denner2018) a linear
 wave propagating in an ideal gas is partially transmitted to another
 ideal gas with a different acoustic impedance. */
 
+#include "grid/multigrid1D.h"
 #include "two-phase-compressible.h"
 
 /** 
@@ -51,13 +52,6 @@ int main()
 
 event init (i = 0)
 {
-
-  /**
-  We cannot use multigrid1D because of VOF, so we use masking
-  instead. */
-  
-  mask( y > 0.01 ? top : none); 
-
   foreach() {
     double perturb = uper*exp(- sq((x - 0.4)*freq));
     f[] = (x > 0.5);
@@ -65,7 +59,6 @@ event init (i = 0)
     frho1[] = f[]*(1. + perturb);
     frho2[] = (1. - f[])*rho20;
     q.x[] = (frho1[] + frho2[])*perturb*sqrt(gamma2*p[]/rho20);
-    q.y[] = 0.;
     fE1[] = f[]*p[]/(gamma1 - 1.) + 0.5*sq(q.x[]/(frho1[] + frho2[]))*frho1[];
     fE2[] = (1. - f[])*p[]/(gamma2 - 1.) + 0.5*sq(q.x[]/(frho1[] + frho2[]))*frho2[];
   }
@@ -74,8 +67,7 @@ event init (i = 0)
 event endprint (t = tend) 
 {
   foreach()
-    if (y < Delta)
-      fprintf (stderr, "%i %g %g \n", N, x, p[] - p0);
+    fprintf (stderr, "%i %g %g \n", N, x, p[] - p0);
 }
 
 /**
