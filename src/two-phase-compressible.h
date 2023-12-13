@@ -50,8 +50,8 @@ $$
 \begin{aligned}
 \text{frho1} & = f \rho_1, \\
 \text{frho2} & = (1-f) \rho_2, \\
-\text{fE1} & = f \rho_1 e_1 + f \rho_1 \mathbf{u}^2/2, \\
-\text{fE2} & = (1-f) \rho_2 e_2 + (1-f) \rho_2 \mathbf{u}^2/2 
+\text{fE1} & = f \rho_1 (e_1 + \mathbf{u}^2/2), \\
+\text{fE2} & = (1-f) \rho_2 (e_2 + \mathbf{u}^2/2)
 \end{aligned}
 $$
 */
