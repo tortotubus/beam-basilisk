@@ -12,8 +12,7 @@ Scardovelli. */
 #include "geometry.h"
 #if dimension == 1
 coord mycs (Point point, scalar c) {
-  coord n = {1.};
-  return n;
+  return (coord){sign(c[-1] - c[1])};
 }
 #elif dimension == 2
 # include "myc2d.h"
@@ -122,6 +121,9 @@ trace
 void fractions (vertex scalar Phi, scalar c,
 		face vector s = {0}, double val = 0.)
 {
+#if dimension == 1
+  assert (false); // not implemented yet
+#else
   face vector as = automatic (s);
   
   /**
@@ -335,6 +337,7 @@ void fractions (vertex scalar Phi, scalar c,
     }
   }
 #endif // dimension == 3
+#endif // dimension != 1
 }
 
 /**
@@ -500,7 +503,9 @@ void output_facets (scalar c, FILE * fp = stdout, face vector s = {{-1}})
     if (c[] > 1e-6 && c[] < 1. - 1e-6) {
       coord n = facet_normal (point, c, s);
       double alpha = plane_alpha (c[], n);
-#if dimension == 2      
+#if dimension == 1
+      fprintf (fp, "%g\n", x + Delta*alpha/n.x);
+#elif dimension == 2
       coord segment[2];
       if (facets (n, alpha, segment) == 2)
 	fprintf (fp, "%g %g\n%g %g\n\n", 
