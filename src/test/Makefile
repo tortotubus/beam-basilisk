@@ -349,6 +349,8 @@ nonlinear-ml.c: nonlinear.c
 nonlinear-ml.s: CFLAGS += -DML=1
 nonlinear-ml.tst: CFLAGS += -DML=1
 
+shockwave.tst: CFLAGS += -grid=bitree
+shockwave.ctst: CFLAGS += -grid=multigrid1D
 shockwave.tst: shockwave.ctst
 
 ## MPI tests

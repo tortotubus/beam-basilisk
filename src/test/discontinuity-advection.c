@@ -17,7 +17,7 @@ uniform. During the advection step the energy is advected avoiding any
 diffusion and therefore both the provisional pressure and velocity are
 uniform and do not need to be corrected during the projection step. */
 
-#include "grid/multigrid.h"
+#include "grid/multigrid1D.h"
 #include "two-phase-compressible.h"
 
 /**
@@ -56,7 +56,6 @@ event init (i = 0)
     fE1[] = f[]*pL/(gamma1 - 1.) +  0.5*frho1[]*sq(u0);
     fE2[] = (1. - f[])*pR/(gamma2 - 1.) +  0.5*frho2[]*sq(u0);
     q.x[] = (frho1[] + frho2[])*u0;
-    q.y[] = 0.;
   }
 }
 
@@ -67,7 +66,7 @@ event outputdata (t = tend)
 {  
   scalar perr[], uerr[];
   
-  foreach () {  
+  foreach () {
     perr[] = fabs(p[] - 1./1.4);
     uerr[] = fabs(q.x[]/rho[] - 0.5);
 
@@ -75,9 +74,8 @@ event outputdata (t = tend)
     foreach_dimension()
       Ek += sq(q.x[]);
 
-    if (y == Delta/2.)
-      fprintf (stderr, "%g %g %g %g %g %g %g \n", x, t, p[], rho[], q.x[]/rho[], f[],
-	       (fE1[] + fE2[] - 0.5*Ek/rho[])/(f[]/(gamma1 - 1.) + (1. - f[])/(gamma2 - 1.)));
+    fprintf (stderr, "%g %g %g %g %g %g %g \n", x, t, p[], rho[], q.x[]/rho[], f[],
+	     (fE1[] + fE2[] - 0.5*Ek/rho[])/(f[]/(gamma1 - 1.) + (1. - f[])/(gamma2 - 1.)));
   }
 
   stats sp = statsf(perr), su = statsf(uerr);
