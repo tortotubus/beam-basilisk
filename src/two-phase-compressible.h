@@ -76,6 +76,7 @@ dynamic viscosity. */
 /**
 The volumetric viscosity uses arithmetic average by default. */
 
+//fixme: Include the term depending on $\nabla \cdot u$. It is tricky because this quantity can be very different upon the phase
 #ifndef lambdav
 # define lambdav(f)  (clamp(f,0,1)*(lambdav1 - lambdav2) + lambdav2)
 // # define lambdav(f)  (clamp(f,0.,1.)*(lambdav1 - lambdav2 - 2./3*(mu1 - mu2)) + lambdav2 - 2./3*mu2)
@@ -502,9 +503,12 @@ event end_timestep (i++)
         u.x[] = q.x[]/(frho1[] + frho2[]);
 
     /**
-    <div class="message">
-    Fixme: more comments are required here.</div> */
-    
+    We add the incompressible contribution of the $\nabla \cdot (u_i \tau'_i)$ term. Note that the compressible contribution,
+    which is typically small, is neglected.
+     */
+
+    //fixme: add the compressible contribution (careful, $\nabla \cdot u$ can be very different upon the phase 
+    //and also very different from the value defined for the mixture with an averaged velocity
     face vector eijk[];
     foreach_dimension() {
       foreach_face(x)
@@ -530,6 +534,8 @@ event end_timestep (i++)
 	fE1[] += fc*mu1*energy;
 	fE2[] += (1. - fc)*mu2*energy;
       }   
+
+      //fixme: Formally, we need to include a correction term due to the normal viscous stress jump (to be done)
     }
 
     /**
