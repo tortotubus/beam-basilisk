@@ -34,6 +34,7 @@ $$
 
 We use the two-phase flow formulation. */
 
+#include "EOS_Mie_Gruneisen.h"
 #include "two-phase-compressible.h"
 
 /**

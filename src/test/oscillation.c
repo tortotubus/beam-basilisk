@@ -26,6 +26,7 @@ solver with VOF interface tracking and surface tension. */
 
 #elif COMPRESSIBLE
 
+# include "EOS_Mie_Gruneisen.h"
 # include "two-phase-compressible.h"
 # include "tension-compressible.h"
 
@@ -121,6 +122,7 @@ event init (i = 0) {
   For compressible flows we initialize the densities, pressure and
   energies. */
   
+  //fixme: The initial condition for pressure/energy does not respect the Laplace pressure because the curvature is not constant
   double p0L = 1, p0 = p0L + f.sigma/D*2;
   foreach() {
     frho1[] = rho1*f[];
