@@ -54,8 +54,9 @@ $$
 scalar f[], * interfaces = {f};
 scalar frho1[], frho2[], fE1[], fE2[];
 
-/** 
- * Acoustic CFL number */
+/**
+The timestep can be limited by a CFL based on the speed of sound. */
+
 double CFLac = HUGE;
 
 /**
@@ -64,6 +65,14 @@ viscosity coefficients. */
 
 double mu1 = 0., mu2 = 0.;
 double lambdav1 = 0., lambdav2 = 0. ;
+
+/**
+These functions are provided by the Equation Of State. */
+
+extern double sound_speed (double f, double frho1, double frho2, double fe1, double fe2);
+extern double bulk_compressibility (double f, double p);
+extern double internal_energy (double f, double p);
+extern double average_pressure (double f, double frho1, double frho2, double fe1, double fe2);
 
 /**
 By default the Harmonic mean is used to compute the phase-averaged
@@ -76,7 +85,8 @@ dynamic viscosity. */
 /**
 The volumetric viscosity uses arithmetic average by default. */
 
-//fixme: Include the term depending on $\nabla \cdot u$. It is tricky because this quantity can be very different upon the phase
+// fixme: Include the term depending on $\nabla \cdot u$. It is tricky because this
+// quantity can be very different upon the phase
 #ifndef lambdav
 # define lambdav(f)  (clamp(f,0,1)*(lambdav1 - lambdav2) + lambdav2)
 // # define lambdav(f)  (clamp(f,0.,1.)*(lambdav1 - lambdav2 - 2./3*(mu1 - mu2)) + lambdav2 - 2./3*mu2)
@@ -95,13 +105,7 @@ const face vector lambdav0[] = {0,0,0};
 (const) face vector lambdav = lambdav0;
 
 /**
-## Time step restriction based on the speed of sound
-*/
-
-extern double speed_velocity(double f, double frho1, double frho2, double fe1, double fe2);
-extern double mixture_bulk_compressibility (double f, double p);
-extern double internal_energy (double f, double p);
-extern double averaged_pressure (double f, double frho1, double frho2, double fe1, double fe2);
+## Time step restriction based on the speed of sound */
 
 event stability(i++)
 {
@@ -112,13 +116,11 @@ event stability(i++)
       foreach_dimension()
      	Ek += sq(q.x[]);
       double fe1 = fE1[] - f[]*Ek/rho;
-      double fe2 = fE2[] - (1.-f[])*Ek/rho;
-      double cspeed = speed_velocity(f[], frho1[], frho2[], fe1, fe2);
-      double dtmaxac = CFLac*Delta/cspeed;
+      double fe2 = fE2[] - (1. - f[])*Ek/rho;
+      double dtmaxac = CFLac*Delta/sound_speed (f[], frho1[], frho2[], fe1, fe2);
       dtmax = min(dtmax, dtmaxac);
-    }   
+    }
 }
-
 
 #if TREE
 /**
@@ -134,8 +136,8 @@ void fE_refine (Point point, scalar fE)
       Ek += sq(q.x[]);
     Ek /= 2.*(frho1[] + frho2[]);
     fE[] = fE.inverse ?
-      (internal_energy(0., p[]) + Ek)*(1. - f[]) :
-      (internal_energy(1., p[]) + Ek)*f[];
+      (internal_energy (0., p[]) + Ek)*(1. - f[]) :
+      (internal_energy (1., p[]) + Ek)*f[];
   }
 }
 #endif // TREE
@@ -348,12 +350,12 @@ event properties (i++)
     double fe1 = fE1[] - fc*Ek/rhov[]/2.;
     double fe2 = fE2[] - (1.-fc)*Ek/rhov[]/2.;
 
-    ps[] = averaged_pressure(fc, frho1[], frho2[], fe1, fe2);
+    ps[] = average_pressure (fc, frho1[], frho2[], fe1, fe2);
 
     /** 
     We also compute $\rho c^2$. */
     
-    rhoc2v[] = mixture_bulk_compressibility(fc, p[]);
+    rhoc2v[] = bulk_compressibility (fc, p[]);
   }
   
   foreach_face() {
@@ -503,12 +505,13 @@ event end_timestep (i++)
         u.x[] = q.x[]/(frho1[] + frho2[]);
 
     /**
-    We add the incompressible contribution of the $\nabla \cdot (u_i \tau'_i)$ term. Note that the compressible contribution,
-    which is typically small, is neglected.
-     */
+    We add the incompressible contribution of the $\nabla \cdot (u_i
+    \tau'_i)$ term. Note that the compressible contribution, which is
+    typically small, is neglected. */
 
-    //fixme: add the compressible contribution (careful, $\nabla \cdot u$ can be very different upon the phase 
-    //and also very different from the value defined for the mixture with an averaged velocity
+    // fixme: add the compressible contribution (careful, $\nabla \cdot
+    // u$ can be very different upon the phase and also very different
+    // from the value defined for the mixture with an averaged velocity
     face vector eijk[];
     foreach_dimension() {
       foreach_face(x)
@@ -535,7 +538,8 @@ event end_timestep (i++)
 	fE2[] += (1. - fc)*mu2*energy;
       }   
 
-      //fixme: Formally, we need to include a correction term due to the normal viscous stress jump (to be done)
+      // fixme: Formally, we need to include a correction term due to
+      // the normal viscous stress jump (to be done)
     }
 
     /**
