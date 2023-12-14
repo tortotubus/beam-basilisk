@@ -51,7 +51,7 @@ event end_timestep (i++)
       double div = 0.;
       foreach_dimension()
       div += pf.x[1]*uf.x[1] - pf.x[]*uf.x[];
-      fE1[] -= f[]*div/Delta*dt/cm[];
+      fE1[] += f[]*div/Delta*dt/cm[];
     }
 
     foreach_face() {
