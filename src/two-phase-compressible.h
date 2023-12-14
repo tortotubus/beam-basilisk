@@ -22,13 +22,7 @@ an advection equation for the volume fraction $f$
 $$
 \frac{\partial f}{\partial t} + \mathbf{u} \cdot \nabla f = 0
 $$
-and an Equation Of State (EOS). Here we use the general EOS written in
-the
-[Mie--Gruneisen](https://en.wikipedia.org/wiki/Mie%E2%80%93Gr%C3%BCneisen_equation_of_state)
-form
-$$
-\rho_i e_i = \frac{p_i + \Gamma_i \Pi_i}{\Gamma_i - 1}
-$$
+and an Equation Of State (EOS) that needs to be defined. 
 
 The method is described in detail in [Fuster & Popinet,
 2018](#fuster2018) and relies on a time splitting technique were we
@@ -50,6 +44,7 @@ $$
 \begin{aligned}
 \text{frho1} & = f \rho_1, \\
 \text{frho2} & = (1-f) \rho_2, \\
+\text{q} & = f \rho_1 \mathbf{u} + (1-f) \rho_2 \mathbf{u}, \\
 \text{fE1} & = f \rho_1 (e_1 + \mathbf{u}^2/2), \\
 \text{fE2} & = (1-f) \rho_2 (e_2 + \mathbf{u}^2/2)
 \end{aligned}
@@ -59,10 +54,9 @@ $$
 scalar f[], * interfaces = {f};
 scalar frho1[], frho2[], fE1[], fE2[];
 
-/**
-The coefficients of the Mie-Gruneisen EOS for each phase. */
-
-double gamma1 = 1.4 [0], gamma2 = 1.4 [0], PI1 = 0., PI2 = 0.;
+/** 
+ * Acoustic CFL number */
+double CFLac = HUGE;
 
 /**
 The dynamic viscosities for each phase, as well as the volumetric
@@ -99,13 +93,38 @@ scalar rhov[];
 const face vector lambdav0[] = {0,0,0};
 (const) face vector lambdav = lambdav0;
 
+/**
+## Time step restriction based on the speed of sound
+*/
+
+extern double speed_velocity(double f, double frho1, double frho2, double fe1, double fe2);
+extern double mixture_bulk_compressibility (double f, double p);
+extern double internal_energy (double f, double p);
+extern double averaged_pressure (double f, double frho1, double frho2, double fe1, double fe2);
+
+event stability(i++)
+{
+  if (CFLac < HUGE)
+    foreach (reduction (min:dtmax)) {
+      double rho = frho1[] + frho2[];
+      double Ek = 0.;
+      foreach_dimension()
+     	Ek += sq(q.x[]);
+      double fe1 = fE1[] - f[]*Ek/rho;
+      double fe2 = fE2[] - (1.-f[])*Ek/rho;
+      double cspeed = speed_velocity(f[], frho1[], frho2[], fe1, fe2);
+      double dtmaxac = CFLac*Delta/cspeed;
+      dtmax = min(dtmax, dtmaxac);
+    }   
+}
+
+
 #if TREE
 /**
 ## Energy refinement function
 
 The energy is refined from the refined pressures, momentum and
 densities, using the equation of state. */
-
 void fE_refine (Point point, scalar fE)
 {
   foreach_child() {
@@ -114,8 +133,8 @@ void fE_refine (Point point, scalar fE)
       Ek += sq(q.x[]);
     Ek /= 2.*(frho1[] + frho2[]);
     fE[] = fE.inverse ?
-      ((p[] + gamma2*PI2)/(gamma2 - 1.) + Ek)*(1. - f[]) :
-      ((p[] + gamma1*PI1)/(gamma1 - 1.) + Ek)*f[];
+      (internal_energy(0., p[]) + Ek)*(1. - f[]) :
+      (internal_energy(1., p[]) + Ek)*f[];
   }
 }
 #endif // TREE
@@ -325,15 +344,15 @@ event properties (i++)
       Ek += sq(q.x[]);
 
     double fc = clamp (f[],0,1);
-    double invgammaavg = fc/(gamma1 - 1.) + (1. - fc)/(gamma2 - 1.);
-    double PIGAMMAavg = (fc*PI1*gamma1/(gamma1 - 1.) +
-			 (1. - fc)*PI2*gamma2/(gamma2 - 1.));
-    ps[] = (fE1[] + fE2[] - Ek/rhov[]/2. - PIGAMMAavg)/invgammaavg;
-    
+    double fe1 = fE1[] - fc*Ek/rhov[]/2.;
+    double fe2 = fE2[] - (1.-fc)*Ek/rhov[]/2.;
+
+    ps[] = averaged_pressure(fc, frho1[], frho2[], fe1, fe2);
+
     /** 
     We also compute $\rho c^2$. */
     
-    rhoc2v[] = (p[]*(invgammaavg + 1.) + PIGAMMAavg)/invgammaavg;
+    rhoc2v[] = mixture_bulk_compressibility(fc, p[]);
   }
   
   foreach_face() {
@@ -352,6 +371,7 @@ event properties (i++)
     We also compute the averaged density at the cell faces. */
     
     alphav.x[] = 2.*fm.x[]/(rhov[] + rhov[-1]);
+
   }
 
   /**

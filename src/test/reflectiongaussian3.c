@@ -6,32 +6,22 @@ wave propagating in an ideal gas is partially transmitted to another
 ideal gas with a different acoustic impedance. */
 
 #include "grid/multigrid1D.h"
+#include "EOS_Mie_Gruneisen.h"
 #include "two-phase-compressible.h"
 
 /** 
 Parameters of the problem. */
 
 double tend = 0.1;
-double cflac = 0.25;
 double uper = 0.0001;
 double freq = 4000.;
 double uref = 347.8;
-double p0, rho20;
-
-/**
-Fixme: `cflac` should be a parameter of two-phase-compressible.h. */
-
-event stability (i++)
-{
-  double dt = 100.;
-  foreach ()
-    dt = min(dt, Delta/sqrt(gamma2*p0/rho20));
-  dtmax = DT = dt*cflac;
-}
+double p0, rho20, rho10;
 
 int main()
 {  
   
+  CFLac = 0.25;
   /** 
   The EOS for an adiabatic perfect gas is defined by its polytropic
   coefficient $\Gamma = \gamma = 1.4$. */
@@ -39,6 +29,7 @@ int main()
   gamma1 = 1.4;
   gamma2 = 1.667;
   rho20  = 0.164/1.157;
+  rho10 = 1;;
 
   p0 = 1./gamma1;
   freq *= sqrt(gamma2/gamma1/rho20)/uref;
@@ -56,7 +47,7 @@ event init (i = 0)
     double perturb = uper*exp(- sq((x - 0.4)*freq));
     f[] = (x > 0.5);
     p[] = p0 + perturb;
-    frho1[] = f[]*(1. + perturb);
+    frho1[] = f[]*rho10*(1. + perturb);
     frho2[] = (1. - f[])*rho20;
     q.x[] = (frho1[] + frho2[])*perturb*sqrt(gamma2*p[]/rho20);
     fE1[] = f[]*p[]/(gamma1 - 1.) + 0.5*sq(q.x[]/(frho1[] + frho2[]))*frho1[];

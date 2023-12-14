@@ -15,24 +15,13 @@ solver](http://basilisk.fr/sandbox/fuster/RiemannSolverExamples/gaussian.c). */
 We use the two-phase flow formulation. */
 
 #include "axi.h"
+#include "EOS_Mie_Gruneisen.h"
 #include "two-phase-compressible.h"
 
 /**
 Parameters of the problem. */
 
 double tend = 3.;
-double cflac = 0.1;
-
-/**
-Fixme: `cflac` should be a parameter of two-phase-compressible.h. */
-
-event stability (i++)
-{
-  double dt = HUGE;
-  foreach ()
-    dt = min(dt, Delta/sqrt(gamma1));
-  dtmax = DT = dt*cflac;
-}
 
 int main()
 {  
@@ -55,7 +44,7 @@ int main()
   We perform a convergence study. */
   
   N = 128;
-  for (cflac = 0.01; cflac <= 100; cflac *= 5)
+  for (CFLac = 0.01; CFLac <= 100; CFLac *= 5)
     run();
 }
 
@@ -77,7 +66,7 @@ event endprint (t = tend)
   foreach ()
     if (y < Delta) {
       double xref = fabs(x) - tend*sqrt(gamma1);
-      fprintf (stderr, "%g %g %g \n", cflac, xref, (p[] - 1.)/1.e-3);
+      fprintf (stderr, "%g %g %g \n", CFLac, xref, (p[] - 1.)/1.e-3);
     }
   fprintf (stderr, "\n");
 }
