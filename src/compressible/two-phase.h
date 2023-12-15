@@ -565,4 +565,8 @@ event cleanup (i = end) {
 ~~~bib
 @hal{fuster2018, hal-01845218}
 ~~~
+
+## See also
+
+* [The Mie--Gruneisen Equation of State](Mie-Gruneisen.h)
 */

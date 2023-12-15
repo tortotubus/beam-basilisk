@@ -2,7 +2,7 @@
 # The Mie--Gruneisen Equation of State
 
 This EOS is typically used in combination with the
-[two-phase compressible solver](/src/two-phase-compressible.h).
+[two-phase compressible solver](/src/compressible/two-phase.h).
 
 The general form of the
 [Mie--Gruneisen](https://en.wikipedia.org/wiki/Mie%E2%80%93Gr%C3%BCneisen_equation_of_state)
@@ -31,7 +31,7 @@ double sound_speed (double f, double frho1, double frho2, double fe1, double fe2
   
   if (fc < 0.99999) {
     double p  = fe2/(1. - fc)*(gamma2 - 1.) - gamma2*PI2;
-    c2speed2 = (1.-fc)*gamma2*(p + PI2)/frho2;
+    c2speed2 = (1. - fc)*gamma2*(p + PI2)/frho2;
   }
 
   return sqrt (max (c2speed1, c2speed2));

@@ -6,8 +6,8 @@ wave propagating in an ideal gas is partially transmitted to another
 ideal gas with a different acoustic impedance. */
 
 #include "grid/multigrid1D.h"
-#include "EOS_Mie_Gruneisen.h"
-#include "two-phase-compressible.h"
+#include "compressible/Mie-Gruneisen.h"
+#include "compressible/two-phase.h"
 
 /** 
 Parameters of the problem. */

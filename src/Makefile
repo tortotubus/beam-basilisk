@@ -61,11 +61,13 @@ alltags:
 	cd navier-stokes && $(MAKE) tags
 	cd layered && $(MAKE) tags
 	cd ehd && $(MAKE) tags
+	cd compressible && $(MAKE) tags
 	cd examples && $(MAKE) tags
 	cd test && $(MAKE) tags
 	$(MAKE) tags
 	cd navier-stokes && $(MAKE) itags
 	cd layered && $(MAKE) itags
+	cd compressible && $(MAKE) itags
 	cd ehd && $(MAKE) itags
 	cd examples && $(MAKE) itags
 	cd test && $(MAKE) itags
