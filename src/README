@@ -82,7 +82,7 @@ $$
 \partial_t p + \mathbf{u}\cdot\nabla p = -\rho c^2\nabla\cdot\mathbf{u}
 $$
 
-* [All Mach compressible two-phase flows](two-phase-compressible.h)
+* [All Mach compressible two-phase flows](compressible/two-phase.h)
 
 $$
 \frac{\partial (f \rho_i)}{\partial t } + 

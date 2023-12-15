@@ -15,8 +15,8 @@ solver](http://basilisk.fr/sandbox/fuster/RiemannSolverExamples/gaussian.c). */
 We use the two-phase flow formulation. */
 
 #include "axi.h"
-#include "EOS_Mie_Gruneisen.h"
-#include "two-phase-compressible.h"
+#include "compressible/Mie-Gruneisen.h"
+#include "compressible/two-phase.h"
 
 /**
 Parameters of the problem. */

@@ -23,8 +23,6 @@ $$\nabla \cdot (u p_2) = \nabla \cdot (u p) - \nabla \cdot (u f \sigma \kappa) +
 
 In this module we only introduce the correction due to surface tension. */
 
-#include "tension.h"
-
 event end_timestep (i++)
 {
   if (f.sigma > 0.) {
