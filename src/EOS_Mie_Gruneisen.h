@@ -26,12 +26,12 @@ double sound_speed (double f, double frho1, double frho2, double fe1, double fe2
 
   if (fc > 0.00001) {
     double p  = fe1/fc*(gamma1 - 1.) - gamma1*PI1;
-    c2speed1 = gamma1*(p + PI1)/frho1;
+    c2speed1 = fc*gamma1*(p + PI1)/frho1;
   }
   
   if (fc < 0.99999) {
     double p  = fe2/(1. - fc)*(gamma2 - 1.) - gamma2*PI2;
-    c2speed2 = gamma2*(p + PI2)/frho2;
+    c2speed2 = (1.-fc)*gamma2*(p + PI2)/frho2;
   }
 
   return sqrt (max (c2speed1, c2speed2));
