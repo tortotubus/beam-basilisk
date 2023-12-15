@@ -34,8 +34,8 @@ $$
 
 We use the two-phase flow formulation. */
 
-#include "compressible/Mie-Gruneisen.h"
 #include "compressible/two-phase.h"
+#include "compressible/Mie-Gruneisen.h"
 
 /**
 Parameters of the problem. */
@@ -109,7 +109,6 @@ event init (i = 0)
     p[] = m*pL + (1. - m)*pR;
     frho1[] = rhoR*(gr*p[]/pR + 1.)/(gr + p[]/pR);
     q.x[] = m*frho1[]*uL;
-    q.y[] = 0.;
     fE1[] = p[]/(gamma1 - 1.) + 0.5*sq(q.x[])/frho1[];
   }
 }

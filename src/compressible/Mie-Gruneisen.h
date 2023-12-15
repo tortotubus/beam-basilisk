@@ -10,8 +10,10 @@ EOS can be written
 $$
 \rho_i e_i = \frac{p_i + \Gamma_i \Pi_i}{\Gamma_i - 1}
 $$
+with $\rho_i$, $e_i$ and $p_i$ the densities, internal energies and
+pressures of each phase.
 
-The coefficients of the Mie-Gruneisen EOS for each phase. */
+These are the coefficients of the Mie-Gruneisen EOS for each phase. */
 
 double gamma1 = 1.4 [0], gamma2 = 1.4 [0], PI1 = 0., PI2 = 0.;
 
@@ -19,19 +21,26 @@ double gamma1 = 1.4 [0], gamma2 = 1.4 [0], PI1 = 0., PI2 = 0.;
 The speed of sound: in mixture cells, this function returns the
 maximum between the speeds in both phases. */
 
-double sound_speed (double f, double frho1, double frho2, double fe1, double fe2)
+double sound_speed (Point point)
 {
-  double fc = clamp (f,0.,1.);
+  double fc = clamp (f[],0.,1.);
   double c2speed1 = 0., c2speed2 = 0.;
 
+  double Ek = 0.;
+  foreach_dimension()
+    Ek += sq(q.x[]);
+  Ek /= 2.*(frho1[] + frho2[]);
+  
   if (fc > 0.00001) {
+    double fe1 = fE1[] - fc*Ek;
     double p  = fe1/fc*(gamma1 - 1.) - gamma1*PI1;
-    c2speed1 = fc*gamma1*(p + PI1)/frho1;
+    c2speed1 = fc*gamma1*(p + PI1)/frho1[];
   }
   
   if (fc < 0.99999) {
+    double fe2 = fE2[] - (1. - fc)*Ek;
     double p  = fe2/(1. - fc)*(gamma2 - 1.) - gamma2*PI2;
-    c2speed2 = (1. - fc)*gamma2*(p + PI2)/frho2;
+    c2speed2 = (1. - fc)*gamma2*(p + PI2)/frho2[];
   }
 
   return sqrt (max (c2speed1, c2speed2));
@@ -40,29 +49,35 @@ double sound_speed (double f, double frho1, double frho2, double fe1, double fe2
 /**
 Average pressure: */
 
-double average_pressure (double fc, double frho1, double frho2, double fe1, double fe2)
+#define PIGAMMA	 double invgammaavg = fc/(gamma1 - 1.) + (1. - fc)/(gamma2 - 1.), \
+    PIGAMMAavg = fc*PI1*gamma1/(gamma1 - 1.) + (1. - fc)*PI2*gamma2/(gamma2 - 1.)
+
+double average_pressure (Point point)
 {
-  double invgammaavg = fc/(gamma1 - 1.) + (1. - fc)/(gamma2 - 1.);
-  double PIGAMMAavg = fc*PI1*gamma1/(gamma1 - 1.) + (1. - fc)*PI2*gamma2/(gamma2 - 1.); 
-  return (fe1 + fe2 - PIGAMMAavg)/invgammaavg;
+  double fc = clamp (f[],0.,1.);
+  PIGAMMA;
+  double Ek = 0.;
+  foreach_dimension()
+    Ek += sq(q.x[]);
+  Ek /= 2.*(frho1[] + frho2[]);
+  return (fE1[] + fE2[] - Ek - PIGAMMAavg)/invgammaavg;
 }
 
 /**
 Bulk compressibility of the mixture: */
 
-double bulk_compressibility (double fc, double p)
+double bulk_compressibility (Point point)
 {
-  double invgammaavg = fc/(gamma1 - 1.) + (1. - fc)/(gamma2 - 1.);
-  double PIGAMMAavg = fc*PI1*gamma1/(gamma1 - 1.) + (1. - fc)*PI2*gamma2/(gamma2 - 1.);
-  return (p*(invgammaavg + 1.) + PIGAMMAavg)/invgammaavg;
+  double fc = clamp (f[],0.,1.);
+  PIGAMMA;
+  return (p[]*(invgammaavg + 1.) + PIGAMMAavg)/invgammaavg;
 }
 
 /**
 Internal energy: */
 
-double internal_energy (double fc, double p)
+double internal_energy (Point point, double fc)
 {
-  double invgammaavg = fc/(gamma1 - 1.) + (1. - fc)/(gamma2 - 1.);
-  double PIGAMMAavg = fc*PI1*gamma1/(gamma1 - 1.) + (1. - fc)*PI2*gamma2/(gamma2 - 1.);
-  return p*invgammaavg + PIGAMMAavg;
+  PIGAMMA;
+  return p[]*invgammaavg + PIGAMMAavg;
 }

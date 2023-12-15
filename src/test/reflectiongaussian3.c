@@ -6,8 +6,8 @@ wave propagating in an ideal gas is partially transmitted to another
 ideal gas with a different acoustic impedance. */
 
 #include "grid/multigrid1D.h"
-#include "compressible/Mie-Gruneisen.h"
 #include "compressible/two-phase.h"
+#include "compressible/Mie-Gruneisen.h"
 
 /** 
 Parameters of the problem. */
@@ -58,7 +58,7 @@ event init (i = 0)
 event endprint (t = tend) 
 {
   foreach()
-    fprintf (stderr, "%i %g %g \n", N, x, p[] - p0);
+    fprintf (stderr, "%i %f %f\n", N, x, (p[] - p0)/1e-4);
 }
 
 /**
@@ -69,12 +69,12 @@ set ylabel '{/Symbol D}p/{/Symbol D}p_0'
 set xlabel 'x'
 set cblabel '{/Symbol s}/{/Symbol D}x'
 set xrange[0.2:0.4]
-p "log" u 2:($3/0.0001):(0.1*$1) not w l palette, (ZR-ZL)/(ZR+ZL) t 'theory' w l lc 0
+p "log" u 2:3:(0.1*$1) not w l palette, (ZR-ZL)/(ZR+ZL) t 'theory' w l lc 0
 ~~~ 
 
 ~~~gnuplot Transmitted wave
 set xrange[0.5:0.65]
-p "log" u 2:($3/0.0001):(0.1*$1) not w l palette, 1./(ZR+ZL)*2*ZR t 'theory' w l lc 0
+p "log" u 2:3:(0.1*$1) not w l palette, 1./(ZR+ZL)*2*ZR t 'theory' w l lc 0
 ~~~ 
 
 ## References

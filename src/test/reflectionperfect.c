@@ -6,8 +6,8 @@ propagating in an ideal gas is completely transmitted to another ideal
 gas with the same acoustic impedance. */
 
 #include "grid/multigrid1D.h"
-#include "compressible/Mie-Gruneisen.h"
 #include "compressible/two-phase.h"
+#include "compressible/Mie-Gruneisen.h"
 
 /** 
 Parameters of the problem. */

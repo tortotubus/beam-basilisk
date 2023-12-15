@@ -67,12 +67,13 @@ double mu1 = 0., mu2 = 0.;
 double lambdav1 = 0., lambdav2 = 0. ;
 
 /**
-These functions are provided by the Equation Of State. */
+These functions are provided by the Equation Of State. See for example
+[the Mie--Gruneisen Equation of State](Mie-Gruneisen.h). */
 
-extern double sound_speed (double f, double frho1, double frho2, double fe1, double fe2);
-extern double bulk_compressibility (double f, double p);
-extern double internal_energy (double f, double p);
-extern double average_pressure (double f, double frho1, double frho2, double fe1, double fe2);
+extern double sound_speed          (Point point);
+extern double average_pressure     (Point point);
+extern double bulk_compressibility (Point point);
+extern double internal_energy      (Point point, double fc);
 
 /**
 By default the Harmonic mean is used to compute the phase-averaged
@@ -111,14 +112,9 @@ event stability(i++)
 {
   if (CFLac < HUGE)
     foreach (reduction (min:dtmax)) {
-      double rho = frho1[] + frho2[];
-      double Ek = 0.;
-      foreach_dimension()
-     	Ek += sq(q.x[]);
-      double fe1 = fE1[] - f[]*Ek/rho;
-      double fe2 = fE2[] - (1. - f[])*Ek/rho;
-      double dtmaxac = CFLac*Delta/sound_speed (f[], frho1[], frho2[], fe1, fe2);
-      dtmax = min(dtmax, dtmaxac);
+      double dt = CFLac*Delta/sound_speed (point);
+      if (dt < dtmax)
+	dtmax = dt;
     }
 }
 
@@ -136,8 +132,8 @@ void fE_refine (Point point, scalar fE)
       Ek += sq(q.x[]);
     Ek /= 2.*(frho1[] + frho2[]);
     fE[] = fE.inverse ?
-      (internal_energy (0., p[]) + Ek)*(1. - f[]) :
-      (internal_energy (1., p[]) + Ek)*f[];
+      (internal_energy (point, 0.) + Ek)*(1. - f[]) :
+      (internal_energy (point, 1.) + Ek)*f[];
   }
 }
 #endif // TREE
@@ -341,21 +337,12 @@ event properties (i++)
 {
   foreach() {
     rhov[] = frho1[] + frho2[];
-    
-    double Ek = 0.;
-    foreach_dimension()
-      Ek += sq(q.x[]);
-
-    double fc = clamp (f[],0,1);
-    double fe1 = fE1[] - fc*Ek/rhov[]/2.;
-    double fe2 = fE2[] - (1.-fc)*Ek/rhov[]/2.;
-
-    ps[] = average_pressure (fc, frho1[], frho2[], fe1, fe2);
+    ps[] = average_pressure (point);
 
     /** 
     We also compute $\rho c^2$. */
     
-    rhoc2v[] = bulk_compressibility (fc, p[]);
+    rhoc2v[] = bulk_compressibility (point);
   }
   
   foreach_face() {
