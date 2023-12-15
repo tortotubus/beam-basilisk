@@ -33,41 +33,28 @@ event end_timestep (i++)
     Here we just introduce the correction due to the surface tension
     contribution to the pressure jump. */
     
-    face vector pf[];
-    foreach_face() {
-      if (f[1] + f[] > 0. && f[1] + f[] < 2.) {
-	if (f[1] > f[])
-	  pf.x[] = (1. - f[1])*skappa[1];
+    face vector upf[];
+    for (scalar fE in {fE1, fE2}) {
+      foreach_face() {
+	double fr = f[1], fl = f[];
+	if (!fE.inverse)
+	  fr = 1. - fr, fl = 1. - fl;
+	if (fr + fl > 0. && fr + fl < 2.) {
+	  if (fr > fl)
+	    upf.x[] = uf.x[]*fl*skappa[];
+	  else
+	    upf.x[] = uf.x[]*fr*skappa[1];
+	}
 	else
-	  pf.x[] = (1. - f[])*skappa[];
+	  upf.x[] = 0.;
       }
-      else
-	pf.x[] = 0.;
-    }
 
-    foreach() {
-      double div = 0.;
-      foreach_dimension()
-      div += pf.x[1]*uf.x[1] - pf.x[]*uf.x[];
-      fE1[] += f[]*div/Delta*dt/cm[];
-    }
-
-    foreach_face() {
-      if (f[1] + f[] > 0. && f[1] + f[] < 2.) {
-	if (f[1] > f[])
-	  pf.x[] = - f[]*skappa[];
-	else
-	  pf.x[] = - f[1]*skappa[1];
+      foreach() {
+	double div = 0.;
+	foreach_dimension()
+	  div += upf.x[1] - upf.x[];
+	fE[] -= (fE.inverse ? 1. - f[] : f[])*div/Delta*dt/cm[];
       }
-      else
-	pf.x[] = 0.;
-    }
-    
-    foreach() {
-      double div = 0.;
-      foreach_dimension()
-	div += pf.x[1]*uf.x[1] - pf.x[]*uf.x[];
-      fE2[] -= (1. - f[])*div/Delta*dt/cm[];
     }
   }
 }
