@@ -452,8 +452,8 @@ event end_timestep (i++)
       q.x[] += dt*momentum/Delta;
     energy *= dt/(Delta*cm[]);
     double fc = clamp(f[],0,1);
-    fE1[] +=        fc*energy;
-    fE2[] += (1. - fc)*energy;
+    fE1[] += energy*fc;
+    fE2[] += energy*(1. - fc);
   }
 #endif
   
@@ -462,18 +462,18 @@ event end_timestep (i++)
   lacking. */
 
   {
-    face vector pf[];
+    face vector upf[];
     foreach_face()
-      pf.x[] = - (p[] + p[-1])/2.;
+      upf.x[] = - uf.x[]*(p[] + p[-1])/2.;
  
     foreach () {
       double energy = 0.; 
       foreach_dimension()
-	energy += uf.x[1]*pf.x[1] - uf.x[]*pf.x[];
+	energy += upf.x[1] - upf.x[];
       energy *= dt/(Delta*cm[]);
       double fc = clamp(f[],0,1);
-      fE1[] += fc*energy;
-      fE2[] += (1. - fc)*energy;
+      fE1[] += energy*fc;
+      fE2[] += energy*(1. - fc);
     }
   }
   
@@ -499,30 +499,30 @@ event end_timestep (i++)
     // fixme: add the compressible contribution (careful, $\nabla \cdot
     // u$ can be very different upon the phase and also very different
     // from the value defined for the mixture with an averaged velocity
-    face vector eijk[];
+    face vector ueijk[];
     foreach_dimension() {
       foreach_face(x)
-	eijk.x[] = 2.*(u.x[] - u.x[-1])/Delta;
+	ueijk.x[] = 2.*uf.x[]*(u.x[] - u.x[-1])/Delta;
 #if dimension > 1
       foreach_face(y)
-	eijk.y[] = (u.x[] - u.x[0,-1] + 
-		    (u.y[1,-1] + u.y[1,0])/4. -
-		    (u.y[-1,-1] + u.y[-1,0])/4.)/Delta;
+	ueijk.y[] = uf.y[]*(u.x[] - u.x[0,-1] + 
+			    (u.y[1,-1] + u.y[1,0])/4. -
+			    (u.y[-1,-1] + u.y[-1,0])/4.)/Delta;
 #endif
 #if dimension > 2
       foreach_face(z)
-	eijk.z[] = (u.x[] - u.x[0,0,-1] + 
-		    (u.z[1,0,-1] + u.z[1,0,0])/4. -
-		    (u.z[-1,0,-1] + u.z[-1,0,0])/4.)/Delta;
+	ueijk.z[] = uf.z[]*(u.x[] - u.x[0,0,-1] + 
+			    (u.z[1,0,-1] + u.z[1,0,0])/4. -
+			    (u.z[-1,0,-1] + u.z[-1,0,0])/4.)/Delta;
 #endif
       foreach () {
 	double energy = 0.; 
 	foreach_dimension()
-	  energy += uf.x[1]*eijk.x[1] - uf.x[]*eijk.x[];
+	  energy += ueijk.x[1] - ueijk.x[];
 	energy *= dt/(Delta*cm[]);
 	double fc = clamp(f[],0,1);
-	fE1[] += fc*mu1*energy;
-	fE2[] += (1. - fc)*mu2*energy;
+	fE1[] += mu1*energy*fc;
+	fE2[] += mu2*energy*(1. - fc);
       }   
 
       // fixme: Formally, we need to include a correction term due to
