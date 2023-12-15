@@ -26,8 +26,8 @@ solver with VOF interface tracking and surface tension. */
 
 #elif COMPRESSIBLE
 
-# include "compressible/Mie-Gruneisen.h"
 # include "compressible/two-phase.h"
+# include "compressible/Mie-Gruneisen.h"
 # include "tension.h"
 # include "compressible/tension.h"
 

@@ -32,8 +32,8 @@ splot 'rho.end' w l lt -1
 ![Evolution of the level of refinement](inclined-shock/level.mp4)
 */
 
-#include "compressible/Mie-Gruneisen.h"
 #include "compressible/two-phase.h"
+#include "compressible/Mie-Gruneisen.h"
 
 /**
 Problem parameters */
