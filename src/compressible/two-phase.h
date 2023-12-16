@@ -108,13 +108,13 @@ const face vector lambdav0[] = {0,0,0};
 /**
 ## Time step restriction based on the speed of sound */
 
-event stability(i++)
+event stability (i++)
 {
   if (CFLac < HUGE)
     foreach (reduction (min:dtmax)) {
-      double dt = CFLac*Delta/sound_speed (point);
-      if (dt < dtmax)
-	dtmax = dt;
+      double c = sound_speed (point);
+      if (CFLac*Delta < c*dtmax)
+	dtmax = CFLac*Delta/c;
     }
 }
 
