@@ -18,8 +18,8 @@ diffusion and therefore both the provisional pressure and velocity are
 uniform and do not need to be corrected during the projection step. */
 
 #include "grid/multigrid1D.h"
-#include "EOS_Mie_Gruneisen.h"
-#include "two-phase-compressible.h"
+#include "compressible/two-phase.h"
+#include "compressible/Mie-Gruneisen.h"
 
 /**
 We set the problem parameters, size domain and boundary conditions. */
