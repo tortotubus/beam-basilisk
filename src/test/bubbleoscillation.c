@@ -91,6 +91,8 @@ event init (i = 0)
     frho1[] = f[]*rhoL;
     frho2[] = (1. - f[])*rhoG;
 
+    q.x[] = q.y[] = 0.;
+
     /** The initial liquid pressure field is approximated from the solution in the incompressible limit */
     double r = sqrt(sq(x) + sq(y));
     double pL = pinf*(1. - Rbub/r) + (pg0 - 2*f.sigma/Rbub)*Rbub/r;
@@ -98,11 +100,7 @@ event init (i = 0)
     fE1[] = f[]*(pL/(gamma1 - 1.) + PI1*gamma1/(gamma1 - 1.));
     fE2[] = (1. - f[])*pg0/(gamma2 - 1.);
 	
-    double invgammaavg = f[]/(gamma1 - 1.) + (1. - f[])/(gamma2 - 1.);
-    double PIGAMMAavg = (f[]*PI1*gamma1/(gamma1 - 1.) +
-			 (1. - f[])*PI2*gamma2/(gamma2 - 1.));
-	
-    p[] = (fE1[] + fE2[] - PIGAMMAavg)/invgammaavg;
+    p[] = average_pressure(point);
 
   }
 }
@@ -121,7 +119,7 @@ event logfile (i++)
   
    /**
     * The gas pressure is recovered from the energy */ 
-    pgas[] = (fE2[]- 0.5*Ek/(frho1[] + frho2[])*(1.-f[]))*(gamma2-1.);
+    pgas[] = average_pressure(point)*(1.-f[]);
 
     keliq[] = 0.5*(Ek/(frho1[] + frho2[]))*f[];
    
@@ -131,8 +129,8 @@ event logfile (i++)
 
   if (i == 0)
     fprintf (stderr,"# t volume statsf(keliq).sum statsf(pgas).sum/volume\n");
-  fprintf (stderr,"%10.9f %10.9f %10.9f %10.9f %i\n",
-	   t, volume, statsf(keliq).sum, statsf(pgas).sum/volume, grid->n);
+  fprintf (stderr,"%10.9f %10.9f %10.9f %10.9f %g\n",
+	   t, volume, statsf(keliq).sum, statsf(pgas).sum/volume, pow(2,MAXLEVEL)/L0);
 
 }
 
@@ -148,14 +146,14 @@ set xlabel 't'
 set ylabel 'R/R_0'
 set cblabel 'N'
 set key bottom
-plot "log" u 1:($2*3.)**(1./3.):(sqrt($5)) w lp palette t "Basilisk",\
+plot "log" u 1:($2*3.)**(1./3.):5 w lp palette t "Basilisk",\
 "RP.dat" u 1:3 w l lw 2 t 'Keller-Miksis'
 ~~~
 
 For adiabatic gas transformations $P_b V_b^{\gamma}$ should remain constant inside the bubble
 ~~~gnuplot Entropy errors
 set ylabel 'p V^{/Symbol g}'
-plot "log" u 1:(($2*3.)**(1.4)*$4):(sqrt($5)) not w l palette
+plot "log" u 1:(($2*3.)**(1.4)*$4):5 not w l palette
 ~~~
 
 */

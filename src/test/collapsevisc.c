@@ -98,6 +98,8 @@ event init (i = 0)
     frho1[] = f[]*rhoL;
     frho2[] = (1. - f[])*rhoG;
 
+    q.x[] = q.y[] = 0.;
+
     /** The initial liquid pressure field is approximated from the solution in the incompressible limit */
     double r = sqrt(sq(x) + sq(y));
     double pL = pinf*(1. - Rbub/r) + pg0*Rbub/r;
@@ -105,11 +107,7 @@ event init (i = 0)
     fE1[] = f[]*(pL/(gamma1 - 1.) + PI1*gamma1/(gamma1 - 1.));
     fE2[] = (1. - f[])*pg0/(gamma2 - 1.);
 	
-    double invgammaavg = f[]/(gamma1 - 1.) + (1. - f[])/(gamma2 - 1.);
-    double PIGAMMAavg = (f[]*PI1*gamma1/(gamma1 - 1.) +
-			 (1. - f[])*PI2*gamma2/(gamma2 - 1.));
-	
-    p[] = (fE1[] + fE2[] - PIGAMMAavg)/invgammaavg;
+    p[] = average_pressure(point);
 
   }
 }
@@ -128,7 +126,7 @@ event logfile (i++)
   
    /**
     * The gas pressure is recovered from the energy */ 
-    pgas[] = (fE2[]- 0.5*Ek/(frho1[] + frho2[])*(1.-f[]))*(gamma2-1.);
+    pgas[] = average_pressure(point)*(1.-f[]);
 
     keliq[] = 0.5*(Ek/(frho1[] + frho2[]))*f[];
    
