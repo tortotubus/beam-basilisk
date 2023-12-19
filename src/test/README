@@ -97,13 +97,15 @@ Note that only the documented test cases appear in the list below
 
 ## Compressible two-phase flows
 
-* [Advection of two fluids at different pressures](discontinuity-advection.c)
 * [Shock tube problem for a single ideal gas (strong shock wave)](shockwave.c)
+* [Advection of two fluids at different pressures](discontinuity-advection.c)
 * [Zero reflection of a wave propagating across an interface between two fluids
    with impedance matching](reflectionperfect.c)
 * [Transmission/reflection of a wave propagating across an interface
   between two fluids](reflectiongaussian3.c)
 * [Propagation of an acoustic disturbance in a tube](gaussianaxi.c)
+* [Small-amplitude oscillations of a compressible gas bubble due to surface tension](bubble.c)
+* [Rayleigh collapse of a compressible gas bubble](collapse.c)
 * [Double Mach reflection of a Mach 10 shock from a wall](inclined-shock.c)
 * [Shape oscillation of an inviscid droplet](oscillation.c)
 

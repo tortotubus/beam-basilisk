@@ -1,150 +1,124 @@
-#include "axi.h"
-#include "two-phase-compressible.h"
-#include "compressible-tension.h"
-#include "rayleigh-plesset.h"
+/**
+# Rayleigh collapse of a compressible gas bubble
 
-int MINLEVEL = 6;
-int MAXLEVEL = 10;
-double CFLac = 1;
+A gas bubble at lower pressure collapses in a viscous fluid in the
+absence of surface tension forces.
 
-double rhoL = 1., rhoG = 0.001;
-double pg0;
-double p0 = 1./10.;
-double pinf = 1.;
-double tend = 1.5;
+The fluids are either viscous or inviscid and we compare the evolution
+of the radius with the [Rayleigh-Plesset](#brennen2014) and
+[Keller-Miksis](#keller1980) models.
 
-double Rbub = 1.;
-double lambda = 100.;
-double Reynolds = 10000.*0.1;
-double Web = 100./72.*1000.*0.1;
+See also section 4.2.4 of [Fuster & Popinet,
+2018](/src/compressible/two-phase.h#fuster2018).
 
-scalar keliq[];
+## Results for an inviscid fluid
 
-uf.n[right] = neumann(0.);
-p[right]    = dirichlet(pinf);
-q.n[right]  = neumann(0.);
-f[right]    = dirichlet(1);
-fE1[right]  = neumann(0.);
+~~~gnuplot Bubble radius as a function of time
+set xlabel 't'
+set ylabel 'R/R_0'
+set key bottom
+plot "../collapse-inviscid/log" u 1:($2*3.)**(1./3.) every 4 w p pt 6 t "Basilisk", \
+     "RPinviscid.dat" u 1:2 w l lw 2 t 'Rayleigh-Plesset',			    \
+     "" u 1:3 w l lw 2 t 'Keller-Miksis'
+~~~
 
-uf.n[top] = neumann(0.);
-p[top]    = dirichlet(pinf);
-q.n[top]  = neumann(0.);
-f[top]    = dirichlet(1.);
-fE1[top]  = neumann(0.);
+For adiabatic gas transformations $P_b V_b^{\gamma}$ should remain
+constant inside the bubble.
 
-uf.n[bottom] = 0.;
-uf.t[bottom] = dirichlet(0.);
+~~~gnuplot Entropy errors
+set ylabel 'p V^{/Symbol g}'
+plot "../collapse-inviscid/log" u 1:(($2*3.)**(1.4)*$4) not w l 
+~~~
 
-event stability(i++)
-{
-  foreach (reduction (min:dtmax)) {
-    double fc = clamp (f[],0.,1.);
-    double invgammaavg = fc/(gamma1 - 1.) + (1. - fc)/(gamma2 - 1.);
-    double PIGAMMAavg = (fc*PI1*gamma1/(gamma1 - 1.) +
-			 (1. - fc)*PI2*gamma2/(gamma2 - 1.));      
-    double cspeedsq = (p[]*(invgammaavg + 1.) + PIGAMMAavg)/invgammaavg/(frho1[]+frho2[]);
-    double cspeed = cspeedsq > 0. ? sqrt(cspeedsq) : sqrt(gamma1*(pinf + PI1));
-    double dtmaxac = CFLac*Delta/cspeed;
-    dtmax = min(dtmax, dtmaxac);
-  }
+The bubble does not remain spherical.
+
+~~~gnuplot Interfaces
+set xlabel 'x'
+set ylabel 'y'
+set size square 1
+plot "../collapse-inviscid/out" u 1:2 not w l 
+~~~
+
+## Results for a viscous fluid
+
+~~~gnuplot Bubble radius as a function of time
+set xlabel 't'
+set ylabel 'R/R_0'
+set key bottom
+plot "log" u 1:($2*3.)**(1./3.) every 3 w p pt 6 t "Basilisk", \
+     "RP.dat" u 1:2 w l lw 2 t 'Rayleigh-Plesset',             \
+     "" u 1:3 w l lw 2 t 'Keller-Miksis',                      \
+     "RPinviscid.dat" u 1:3 w l lw 2 t "Keller-Miksis (inviscid)"
+~~~
+
+For adiabatic gas transformations $P_b V_b^{\gamma}$ should remain
+constant inside the bubble.
+
+~~~gnuplot Entropy errors
+set ylabel 'p V^{/Symbol g}'
+plot "log" u 1:(($2*3.)**(1.4)*$4) not w l 
+~~~
+
+The bubble remains more spherical than in the inviscid case.
+
+~~~gnuplot Interfaces
+set xlabel 'x'
+set ylabel 'y'
+set size square 1
+plot "out" u 1:2 not w l 
+~~~
+
+## References
+
+~~~bib
+@book{brennen2014,
+  title={Cavitation and bubble dynamics},
+  author={Brennen, Christopher E},
+  year={2014},
+  publisher={Cambridge university press}
 }
+
+@article{keller1980,
+  title={Bubble oscillations of large amplitude},
+  author={Keller, Joseph B and Miksis, Michael},
+  journal={The Journal of the Acoustical Society of America},
+  volume={68},
+  number={2},
+  pages={628--633},
+  year={1980},
+  publisher={Acoustical Society of America}
+}
+~~~
+*/
+
+#include "bubble.h"
 
 int main()
 {
-  tend *= 0.915;
-  pg0 = p0 + 2./Web;
+  pinf = 5*pg0;
   
-  f.gradient = zero;
-  f.sigma = 1./Web;
+  tend = 2.612*0.915*sqrt (1./(pinf - pg0));
+
+#if INVISCID
+  MAXLEVEL = 12;
+#else // !INVISCID
+  MAXLEVEL = 11;
+  double Reynolds = 10.;
+  mu1 = sqrt(pinf - pg0)/Reynolds;
+
+  /** 
+  Rayleigh-Plesset like models neglect the gas viscosity. Here we put
+  a small value. */
   
-  mu1 = 1./Reynolds;
-  mu2 = mu1*0.01;
-    
+  mu2 = mu1*0.0001;
+#endif // !INVISCID
+  
+  CFLac = 10.;
   gamma2 = 1.4;
   gamma1 = 7.14;
-  PI1 = 1./sq(0.007)/7.14 - pinf;
-
-  struct RPdata RPd;
-  RPd.rhol  = rhoL;
-  RPd.pliq = pinf;
-  RPd.p0 = p0;
-  RPd.sigma = f.sigma;
-  RPd.gamma = gamma2;
-  RPd.R0 = Rbub;
-  RPd.visc = mu1;
-  RPd.cson = sqrt(gamma1*(pinf + PI1)/rhoL);
- 
-  FILE * fp = fopen("RP.dat", "w"); 
-  Integrate_RP (fp, 0., tend, &RPd);
+  PI1 = 300*pg0;
      
-  L0 = lambda;
+  L0 = 50;
   N = 1 << MINLEVEL;
   run();
 }
-
-event init (i = 0)
-{
-  for (int l = MINLEVEL ; l <= MAXLEVEL; l++)
-    refine (level < l && sqrt(sq(x) + sq(y)) < (2.5*Rbub + 4.*sqrt(2.)*lambda/(1<<(l-1))));
-
-  fraction (f, sq(x) + sq(y) - sq(Rbub));
-  
-  foreach() {
-    frho1[] = f[]*rhoL;
-    frho2[] = (1. - f[])*rhoG;
-
-    double r = sqrt(sq(x) + sq(y));
-    double pL = pinf*(1. - Rbub/r) + (pg0 - 2.*f.sigma/sq(Rbub))*Rbub/r;
-	
-    fE1[] = f[]*(pL/(gamma1 - 1.) + PI1*gamma1/(gamma1 - 1.));
-    fE2[] = (1. - f[])*pg0/(gamma2 - 1.);
-	
-    double invgammaavg = f[]/(gamma1 - 1.) + (1. - f[])/(gamma2 - 1.);
-    double PIGAMMAavg = (f[]*PI1*gamma1/(gamma1 - 1.) +
-			 (1. - f[])*PI2*gamma2/(gamma2 - 1.));
-	
-    p[] = (fE1[] + fE2[] - PIGAMMAavg)/invgammaavg;
-  }
-}
-
-event logfile (i++)
-{
-  scalar pgas[];
-  double volume = 0.;
-  double ekmax = 1e-20;
-  
-  foreach (reduction(+:volume) reduction(max:ekmax)) {
-    pgas[] = p[]*(1. - f[]);
-   
-    double Ek = 0.;
-    foreach_dimension()
-      Ek += sq(q.x[]);
-   
-    keliq[] = (Ek/(frho1[] + frho2[]))*f[];
-   
-    ekmax = max(ekmax, keliq[]);
-    volume += dv()*(1. - f[]);
-  }
-
-  if (i == 0)
-    fprintf (stderr,"# t volume statsf(keliq).sum statsf(pgas).sum/volume\n");
-  fprintf (stderr,"%10.9f %10.9f %10.9f %10.9f\n",
-	   t, volume, statsf(keliq).sum, statsf(pgas).sum/volume);
-
-}
-
-event end (t = tend);
-
-/**
-Comparison with the Rayleigh-Plesset solution
-~~~gnuplot Bubble radius as a function of time
-set xlabel 't/T_{RP}'
-set ylabel 'R/R_0'
-plot "log" u 1:($2*3.)**(1./3.) w l t "Basilisk",\
-"RP.dat" w l lw 2 t "Rayleigh-Plesset", "RP.dat" u 1:3 w l lw 2 t 'Keller-Miksis'
-~~~
-
-~~~gnuplot Entropy errors
-plot "log" u 1:(($2*3.)**(1.4)*$4) not w l 
-~~~
-*/
