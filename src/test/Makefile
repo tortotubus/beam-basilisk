@@ -19,6 +19,13 @@ basilisk.tst: CFLAGS += -DDEBUG=1
 
 boundaries3.tst: boundaries3.ctst
 
+collapse-inviscid.c: collapse.c
+	ln -s collapse.c collapse-inviscid.c 
+collapse-inviscid.s: CFLAGS += -DINVISCID=1 
+collapse-inviscid.tst: CFLAGS += -DINVISCID=1
+
+collapse.tst: collapse-inviscid.tst
+
 dry-explicit.c: dry.c
 	ln -s dry.c dry-explicit.c 
 dry-explicit.s: CFLAGS += -DEXPLICIT=1 

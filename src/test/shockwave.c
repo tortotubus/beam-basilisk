@@ -32,6 +32,9 @@ $$
   \end{array}\right)  
 $$
 
+See also section 4.1.2 in [Fuster & Popinet,
+2018](/src/compressible/two-phase.h#fuster2018).
+
 We use the two-phase flow formulation. */
 
 #include "compressible/two-phase.h"
