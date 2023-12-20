@@ -3,10 +3,8 @@
 
 #include "compressible/two-phase.h"
 #include "compressible/Mie-Gruneisen.h"
-#if dimension > 1
-# include "tension.h"
-# include "compressible/tension.h"
-#endif
+#include "tension.h"
+#include "compressible/tension.h"
 #include "rayleigh-plesset.h"
 
 /**
@@ -51,9 +49,7 @@ event init (i = 0)
       .rhol  = rhoL,
       .pliq = pinf,
       .p0 = pg0,
-#if dimension > 1
       .sigma = f.sigma,
-#endif
       .gamma = gamma2,
       .R0 = R0,
       .visc = mu1,
@@ -94,11 +90,7 @@ event init (i = 0)
     solution in the incompressible limit. */
     
     double r = sqrt(sq(x) + sq(y));
-    double pL = pinf*(1. - R0/r) + (pg0
-#if dimension > 1
-				    - 2*f.sigma/R0
-#endif
-				    )*R0/r;
+    double pL = pinf*(1. - R0/r) + (pg0 - 2*f.sigma/R0)*R0/r;
 	
     fE1[] = f[]*(pL + PI1*gamma1)/(gamma1 - 1.);
     fE2[] = (1. - f[])*pg0/(gamma2 - 1.);

@@ -19,6 +19,11 @@ basilisk.tst: CFLAGS += -DDEBUG=1
 
 boundaries3.tst: boundaries3.ctst
 
+bubble-spherical.c: bubble.c
+	ln -s bubble.c bubble-spherical.c 
+bubble-spherical.s: CFLAGS += -grid=multigrid1D -DSPHERICAL=1
+bubble-spherical.tst: CFLAGS += -grid=multigrid1D -DSPHERICAL=1
+
 collapse-inviscid.c: collapse.c
 	ln -s collapse.c collapse-inviscid.c 
 collapse-inviscid.s: CFLAGS += -DINVISCID=1 
