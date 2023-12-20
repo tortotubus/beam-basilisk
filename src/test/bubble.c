@@ -1,6 +1,11 @@
 /**
 # Small-amplitude oscillations of a compressible gas bubble due to surface tension */
 
+#if SPHERICAL
+# include "spherisym.h"
+#else
+# include "axi.h"
+#endif
 #include "bubble.h"
 
 int main()
@@ -15,7 +20,11 @@ int main()
   
   MINLEVEL = 5;
   for (MAXLEVEL = 9; MAXLEVEL <= 12; MAXLEVEL++) {
+#if TREE    
     N = 1 << MINLEVEL;
+#else
+    N = 1 << MAXLEVEL;
+#endif
     run();
     fprintf (stderr, "\n\n");
   }
