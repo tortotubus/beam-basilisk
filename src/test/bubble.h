@@ -1,11 +1,12 @@
 /**
 # A generic compressible gas bubble in a liquid */
 
-#include "axi.h"
 #include "compressible/two-phase.h"
 #include "compressible/Mie-Gruneisen.h"
-#include "tension.h"
-#include "compressible/tension.h"
+#if dimension > 1
+# include "tension.h"
+# include "compressible/tension.h"
+#endif
 #include "rayleigh-plesset.h"
 
 /**
@@ -33,8 +34,10 @@ Boundary conditions: imposed pressure and inflow "at infinity". */
 p[right]   = dirichlet (pinf);
 q.n[right] = neumann (0.);
 
+#if dimension > 1
 p[top]     = dirichlet (pinf);
 q.n[top]   = neumann (0.);
+#endif
 
 event init (i = 0)
 {
@@ -48,8 +51,9 @@ event init (i = 0)
       .rhol  = rhoL,
       .pliq = pinf,
       .p0 = pg0,
-      
+#if dimension > 1
       .sigma = f.sigma,
+#endif
       .gamma = gamma2,
       .R0 = R0,
       .visc = mu1,
@@ -70,13 +74,15 @@ event init (i = 0)
 
   /**
   The static mesh refinement. */
-  
+
+#if TREE
   for (int l = MINLEVEL ; l <= MAXLEVEL; l++)
     refine (level < l && sqrt(sq(x) + sq(y)) < (2.5*R0 + 4.*sqrt(2.)*L0/(1 << (l - 1))));
-
+#endif
+  
   /**
   The initial volume fraction, densities, energies and pressure. */
-  
+
   fraction (f, sq(x) + sq(y) - sq(R0));
   
   foreach() {
@@ -88,7 +94,11 @@ event init (i = 0)
     solution in the incompressible limit. */
     
     double r = sqrt(sq(x) + sq(y));
-    double pL = pinf*(1. - R0/r) + (pg0 - 2*f.sigma/R0)*R0/r;
+    double pL = pinf*(1. - R0/r) + (pg0
+#if dimension > 1
+				    - 2*f.sigma/R0
+#endif
+				    )*R0/r;
 	
     fE1[] = f[]*(pL + PI1*gamma1)/(gamma1 - 1.);
     fE2[] = (1. - f[])*pg0/(gamma2 - 1.);

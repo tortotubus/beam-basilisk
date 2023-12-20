@@ -24,7 +24,12 @@ collapse-inviscid.c: collapse.c
 collapse-inviscid.s: CFLAGS += -DINVISCID=1 
 collapse-inviscid.tst: CFLAGS += -DINVISCID=1
 
-collapse.tst: collapse-inviscid.tst
+collapse-spherical.c: collapse.c
+	ln -s collapse.c collapse-spherical.c 
+collapse-spherical.s: CFLAGS += -grid=multigrid1D -DSPHERICAL=1
+collapse-spherical.tst: CFLAGS += -grid=multigrid1D -DSPHERICAL=1
+
+collapse.tst: collapse-spherical.tst collapse-inviscid.tst
 
 dry-explicit.c: dry.c
 	ln -s dry.c dry-explicit.c 
