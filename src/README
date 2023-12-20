@@ -285,6 +285,7 @@ Several metric spaces/coordinate systems are predefined:
     \frac{\partial^2\psi}{\partial r^2} - \frac{1}{r}\partial_r\psi 
     = - \omega r
     $$
+* [Spherical symmetry](spherisym.h)
 * [Spherical](spherical.h)
 * [Radial/cylindrical](radial.h)
 

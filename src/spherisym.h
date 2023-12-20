@@ -1,51 +1,37 @@
 /**
-# Axisymmetric coordinates
+# Spherically-symmetric coordinates
 
-For problems with a symmetry of revolution around the $z$-axis of a
-[cylindrical coordinate
-system](http://en.wikipedia.org/wiki/Cylindrical_coordinate_system). The
-longitudinal coordinate ($z$-axis) is *x* and the radial coordinate
-($\rho$- or $r$-axis) is *y*. Note that *y* (and so *Y0*) cannot be
-negative.
+This file defines the metric coefficients for a (one-dimensional)
+[spherically-symmetric](https://en.wikipedia.org/wiki/Circular_symmetry#Spherical_symmetry)
+coordinate system.
+
+The radial coordinate $r$ is *x*.  Note that *x* (and so *X0*) cannot
+be negative.
 
 We first define a macro which will be used in some geometry-specific
-code (e.g. [curvature computation](curvature.h)). */
+code (e.g. [viscous stress tensor](viscosity.h)). */
 
 #define SPHERISYM 1
 
 /**
 On trees we need refinement functions. */
 
-/* #if TREE */
-/* static void refine_cm_axi (Point point, scalar cm) */
-/* { */
-/*   fine(cm,0,0) = fine(cm,1,0) = y - Delta/4.; */
-/*   fine(cm,0,1) = fine(cm,1,1) = y + Delta/4.; */
-/* } */
+#if TREE
+static void refine_cm_spherisym (Point point, scalar cm)
+{
+  fine(cm,0) = sq (x - Delta/4.);
+  fine(cm,1) = sq (x + Delta/4.);
+}
 
-/* static void refine_face_x_axi (Point point, scalar fm) */
-/* { */
-/*   if (!is_refined(neighbor(-1))) { */
-/*     fine(fm,0,0) = y - Delta/4.; */
-/*     fine(fm,0,1) = y + Delta/4.; */
-/*   } */
-/*   if (!is_refined(neighbor(1)) && neighbor(1).neighbors) { */
-/*     fine(fm,2,0) = y - Delta/4.; */
-/*     fine(fm,2,1) = y + Delta/4.; */
-/*   } */
-/*   fine(fm,1,0) = y - Delta/4.; */
-/*   fine(fm,1,1) = y + Delta/4.; */
-/* } */
-
-/* static void refine_face_y_axi (Point point, scalar fm) */
-/* { */
-/*   if (!is_refined(neighbor(0,-1))) */
-/*     fine(fm,0,0) = fine(fm,1,0) = max(y - Delta/2., 1e-20); */
-/*   if (!is_refined(neighbor(0,1)) && neighbor(0,1).neighbors) */
-/*     fine(fm,0,2) = fine(fm,1,2) = y + Delta/2.; */
-/*   fine(fm,0,1) = fine(fm,1,1) = y; */
-/* } */
-/* #endif */
+static void refine_face_x_spherisym (Point point, scalar fm)
+{
+  if (!is_refined(neighbor(-1)))
+    fine(fm,0) = sq (x - Delta/2.);
+  if (!is_refined(neighbor(1)) && neighbor(1).neighbors)
+    fine(fm,2) = sq (x + Delta/2.);
+  fine(fm,1) = sq(x);
+}
+#endif // TREE
 
 event metric (i = 0) {
 
@@ -64,7 +50,7 @@ event metric (i = 0) {
   }
 
   /**
-  The volume/area of a cell is proportional to $r$ (i.e. $y$). We need
+  The volume/area of a cell is proportional to $r^2$ (i.e. $x^2$). We need
   to set boundary conditions at the top and bottom so that *cm* is
   interpolated properly when refining/coarsening the mesh. */
 
@@ -76,9 +62,9 @@ event metric (i = 0) {
 
   /**
   We do the same for the length scale factors. The "length" of faces
-  on the axis of revolution is zero ($y=r=0$ on the axis). To avoid
-  division by zero we set it to epsilon (note that mathematically the
-  limit is well posed). */
+  on the center of spherical symmetry is zero ($x=r=0$ in the
+  center). To avoid division by zero we set it to epsilon (note that
+  mathematically the limit is well posed). */
 
   if (is_constant(fm.x)) {
     scalar * l = list_copy (all);
@@ -90,23 +76,12 @@ event metric (i = 0) {
   face vector fmv = fm;
   foreach_face()
     fmv.x[] = max(x*x, 1e-20);
-  /* fm.t[left] = dirichlet(x*x); */
-  /* fm.t[right] = dirichlet(x*x); */
   
   /**
   We set our refinement/prolongation functions on trees. */
 
-/* #if TREE */
-/*   cm.refine = cm.prolongation = refine_cm_axi; */
-/*   fm.x.prolongation = refine_face_x_axi; */
-/*   fm.y.prolongation = refine_face_y_axi; */
-/* #endif */
-  
-  boundary ({cm, fm});
+#if TREE
+  cm.refine = cm.prolongation = refine_cm_spherisym;
+  fm.x.prolongation = refine_face_x_spherisym;
+#endif
 }
-
-/**
-## See also
-
-* [Axisymmetric streamfunction](axistream.h)
-*/
