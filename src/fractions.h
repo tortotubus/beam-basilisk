@@ -121,9 +121,7 @@ trace
 void fractions (vertex scalar Phi, scalar c,
 		face vector s = {0}, double val = 0.)
 {
-#if dimension == 1
-  assert (false); // not implemented yet
-#else
+#if dimension > 1
   face vector as = automatic (s);
   
   /**
@@ -337,7 +335,19 @@ void fractions (vertex scalar Phi, scalar c,
     }
   }
 #endif // dimension == 3
-#endif // dimension != 1
+#else  // dimension == 1
+  if (s.x.i)
+    foreach_face()
+      s.x[] = Phi[] > 0.;
+  foreach()
+    if ((Phi[] - val)*(Phi[1] - val) < 0.) {
+      c[] = (Phi[] - val)/(Phi[] - Phi[1]);
+      if (Phi[] < val)
+	c[] = 1. - c[];
+    }
+    else
+      c[] = (Phi[] > val || Phi[1] > val);
+#endif
 }
 
 /**
