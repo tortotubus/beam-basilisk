@@ -42,6 +42,8 @@ static void curvature_prolongation (Point point, scalar kappa)
 }
 #endif // TREE
 
+#if dimension > 1
+
 /**
 ## Height-function curvature and normal
 
@@ -486,6 +488,8 @@ static double centroids_curvature_fit (Point point, scalar c)
   return kappa;
 }
 
+#endif // dimension > 1
+
 /**
 ## General curvature computation
 
@@ -538,9 +542,6 @@ cstats curvature (scalar c, scalar kappa,
 		  double sigma = 1.[0], bool add = false)
 {
   int sh = 0, sf = 0, sa = 0, sc = 0;
-  vector ch = c.height, h = automatic (ch);
-  if (!ch.x.i)
-    heights (c, h);
 
   /**
   On trees we set the prolongation and restriction functions for
@@ -550,6 +551,12 @@ cstats curvature (scalar c, scalar kappa,
   kappa.refine = kappa.prolongation = curvature_prolongation;
   kappa.restriction = curvature_restriction;
 #endif
+
+#if dimension > 1
+  
+  vector ch = c.height, h = automatic (ch);
+  if (!ch.x.i)
+    heights (c, h);
 
   /**
   We first compute a temporary curvature *k*: a "clone" of
@@ -617,9 +624,26 @@ cstats curvature (scalar c, scalar kappa,
     else
       kappa[] = sigma*kf;      
   }
+  
+#else // dimension == 1
+  foreach() {
+    if (!interfacial (point, c))
+      kappa[] = nodata;
+    else {
+      double r = x + sign(c[-1] - c[1])*(clamp(c[],0.,1.) - 0.5)*Delta;
+      double p = r > 0. ? - 2.*sigma/r : 0.;
+      if (add)
+	kappa[] += p;
+      else
+	kappa[] = p;
+    }
+  }
+#endif // dimension == 1
 
-  return (cstats){sh, sf, sa, sc};
+  return (cstats){sh, sf, sa, sc};   
 }
+
+#if dimension > 1
 
 /**
 # Position of an interface
@@ -697,6 +721,8 @@ static double height_position (Point point, scalar f, vector h,
   return pos;
 }
 
+#endif // dimension == 1
+
 /**
 The position() function fills field *pos* with
 $$
@@ -719,6 +745,7 @@ void position (scalar f, scalar pos,
   pos.restriction = curvature_restriction;
 #endif
 
+#if dimension > 1  
   vector fh = f.height, h = automatic (fh);
   if (!fh.x.i)
     heights (f, h);
@@ -746,4 +773,18 @@ void position (scalar f, scalar pos,
     else
       pos[] = nodata;
   }
+#else // dimension == 1
+  foreach() {
+    if (interfacial (point, f)) {
+      double hp = x + sign(f[-1] - f[1])*(clamp(f[],0.,1.) - 0.5)*Delta;
+      hp = (hp - Z.x)*G.x;
+      if (add)
+	pos[] += hp;
+      else
+	pos[] = hp;
+    }
+    else
+      pos[] = nodata;
+  }
+#endif // dimension == 1
 }
