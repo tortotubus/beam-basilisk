@@ -370,6 +370,15 @@ shockwave.tst: CFLAGS += -grid=bitree
 shockwave.ctst: CFLAGS += -grid=multigrid1D
 shockwave.tst: shockwave.ctst
 
+shrinking-axi.c: shrinking.c
+	ln -s shrinking.c shrinking-axi.c 
+shrinking-axi.s: CFLAGS += -DAXIS=1 -grid=quadtree
+shrinking-axi.tst: CFLAGS += -DAXIS=1 -grid=quadtree
+
+shrinking.s: CFLAGS += -grid=multigrid1D
+shrinking.tst: CFLAGS += -grid=multigrid1D
+shrinking.tst: shrinking-axi.tst
+
 ## MPI tests
 
 # bump2Dp.tst crashes with -DDEBUGCOND=1 but works with -DDEBUGCOND=0
