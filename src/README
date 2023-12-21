@@ -100,6 +100,16 @@ $$
 \nabla \cdot \left( \tau'_i \mathbf{u} \right)
 $$
 
+* [Thermal effects for all Mach compressible two-phase flows](compressible/thermal.h)
+
+$$
+\rho_ic_{p,i}\frac{DT_i}{Dt} = \beta_iT_i\frac{Dp_i}{Dt} - \nabla\cdot\mathbf{q}_i
+$$
+$$
+\left(\frac{\gamma_i}{\rho_ic_i^2} - \frac{\beta_i^2T_i}{\rho_ic_{p,i}}\right)\frac{Dp_i}{Dt} = 
+-\frac{\beta_i}{\rho_ic_{p,i}}\nabla\cdot\mathbf{q}_i - \nabla\cdot\mathbf{u}_i
+$$
+
 ## Navier--Stokes
 * [Streamfunction--Vorticity formulation](navier-stokes/stream.h)
 $$

@@ -193,7 +193,7 @@ event pressure (i++, last)
   \lambda = \frac{- 1}{\Delta t^2 \rho c^2}
   $$
   */
-
+  
   scalar lambda = rhoc2, rhs = ps;
   foreach() {
 
@@ -223,7 +223,7 @@ event pressure (i++, last)
   incompressible flows. */
   
   mgp = poisson (p, rhs, alpha, lambda, tolerance = TOLERANCE/sq(dt));
-
+  
   /**
   The pressure gradient is applied to $\mathbf{u}_\star$ to obtain the
   face velocity field at time $n + 1$. 
