@@ -18,8 +18,10 @@ These are the coefficients of the Mie-Gruneisen EOS for each phase. */
 double gamma1 = 1.4 [0], gamma2 = 1.4 [0], PI1 = 0., PI2 = 0.;
 
 /**
-The speed of sound: in mixture cells, this function returns the
-maximum between the speeds in both phases. */
+## Sound speed
+
+In mixture cells, this function returns the maximum between the speeds
+in both phases. */
 
 double sound_speed (Point point)
 {
@@ -47,7 +49,7 @@ double sound_speed (Point point)
 }
 
 /**
-Average pressure: */
+## Average pressure */
 
 #define PIGAMMA	 double invgammaavg = fc/(gamma1 - 1.) + (1. - fc)/(gamma2 - 1.), \
     PIGAMMAavg = fc*PI1*gamma1/(gamma1 - 1.) + (1. - fc)*PI2*gamma2/(gamma2 - 1.)
@@ -64,7 +66,9 @@ double average_pressure (Point point)
 }
 
 /**
-Bulk compressibility of the mixture: */
+## Bulk compressibility of the mixture
+
+i.e. $\rho c^2$. */
 
 double bulk_compressibility (Point point)
 {
@@ -74,7 +78,7 @@ double bulk_compressibility (Point point)
 }
 
 /**
-Internal energy: */
+## Internal energy */
 
 double internal_energy (Point point, double fc)
 {
