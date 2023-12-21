@@ -110,6 +110,10 @@ Note that only the documented test cases appear in the list below
 * [Double Mach reflection of a Mach 10 shock from a wall](inclined-shock.c)
 * [Shape oscillation of an inviscid droplet](oscillation.c)
 
+### Compressible two-phase flows with thermal effects
+
+* [Bubble shrinking due to thermal effects](shrinking.c)
+
 ## General orthogonal coordinates
 
 * [Circular dam break on a sphere](lonlat.c)
