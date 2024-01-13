@@ -1425,6 +1425,11 @@ Ast * identifier_type (Ast * n, Dimensions * d, Stack * stack)
       return NULL;
     type = ast_child (type, sym_generic_identifier)->child[0];
   }
+  
+  if (n->sym == sym_IDENTIFIER && type->sym == sym_IDENTIFIER &&
+      !strcmp (ast_terminal (n)->start, ast_terminal (type)->start))
+    // type and identifier are identical e.g. 'typedef struct Foo Foo;'
+    return type;
 
   return base_type (type, d, stack);
 }
