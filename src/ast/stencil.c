@@ -796,7 +796,27 @@ void undefined_variables (Ast * n, Stack * stack, void * data)
       undef->undefined = true;
       return;
     }
-    
+
+    /**
+    Check for global variables. */
+
+    if (!is_local_declaration (ref, stack, undef->scope)) {
+
+      /**
+      Check whether this is an (illegal parallel) `for (IDENTIFIER in ...)` construct. */
+
+      if (undef->parallel) {
+	Ast * assignment = ast_parent (n, sym_assignment_expression);
+	if (ast_is_identifier_expression (assignment)) {
+	  while (assignment->parent->sym == sym_expression)
+	    assignment = assignment->parent;
+	  if (ast_schema (assignment->parent, sym_forin_statement,
+			  2, sym_expression))
+	    check_missing_reductions (ref, stack, undef->scope);
+	}
+      }
+    }
+      
     break;
   }
     
