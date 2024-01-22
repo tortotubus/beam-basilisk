@@ -555,9 +555,30 @@ typedef struct {
 Move field accesses into their own expression statement, before their
 parent statement or declaration. */
 
-void move_field_accesses (Ast * n, Stack * stack, void * data)
+void move_field_accesses (Ast * n, Stack * stack, Undefined * u)
 {
-  Undefined * u = data;
+  Ast * scope = ast_push_declarations (n, stack);
+
+  switch (n->sym) {
+
+  case sym_assignment_expression: {
+    /**
+    In assignment expressions the right-hand-side must be evaluated
+    before the left-hand-side. */
+    
+    Ast ** c;
+    for (c = n->child; *c; c++);
+    for (c--; c >= n->child; c--)
+      move_field_accesses (*c, stack, u);
+    break;
+  }
+
+  default:
+    if (n->child)
+      for (Ast ** c = n->child; *c; c++)
+	move_field_accesses (*c, stack, u);
+  }
+
   if (is_field_access (n, stack)) {
     Ast * parent = n->parent;
     while (parent &&
@@ -587,6 +608,8 @@ void move_field_accesses (Ast * n, Stack * stack, void * data)
   }
   else
     ast_cleanup (n, stack, u->scope, false);
+  
+  ast_pop_scope (stack, scope);
 }
 
 /**
@@ -1457,7 +1480,7 @@ Ast * ast_stencil (Ast * n, bool parallel, bool overflow, bool nowarning)
   if (parallel && is_serial (n))
     parallel = false;
   Undefined u = {n, parallel, overflow, nowarning};
-  ast_traverse (n, stack, move_field_accesses, &u);
+  move_field_accesses (n, stack, &u);
   Ast * m = n->sym == sym_foreach_statement ? ast_child (n, sym_statement) : n;
   do {
     u.undefined = false;
