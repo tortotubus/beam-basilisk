@@ -35,11 +35,10 @@ bool ast_is_stencil_function (Ast * n)
 
 static bool is_scalar (Ast * n, Stack * stack)
 {
-  const char * typename =
-    ast_typedef_name (ast_expression_type (n, stack, true));
-  return (typename &&
-	  (!strcmp (typename, "scalar") ||
-	   !strcmp (typename, "vertex scalar")));    
+  const char * typename = ast_typedef_name (ast_expression_type (n, stack, true));  
+  return typename &&
+    (!strcmp (typename, "scalar") || !strcmp (typename, "vertex scalar")) &&
+    !ast_constant_postfix_expression (n, stack);
 }
 
 static Ast * is_point_function_call (Ast * n)
