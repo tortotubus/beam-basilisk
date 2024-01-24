@@ -9,6 +9,7 @@ Note that only the documented test cases appear in the list below
 ## Advection
 
 * [Pure rotation of a smooth tracer field](rotation.c)
+* [Time-reversed advection in a vortex](advection.c)
 
 ## Systems of conservation laws
 
