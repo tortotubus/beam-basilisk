@@ -254,6 +254,10 @@ int main (int argc, char ** argv)
       strcat (command1, argv[i]);
     }
   }
+  if (source && !file) {
+    fprintf (stderr, "usage: qcc -grid=[GRID] [OPTIONS] FILE.c\n");
+    return 1;
+  }
   if (dimensions == stdin) {
     fprintf (stderr, "qcc: error: -dimensions must be given "
 	     "before the .c source file name\n");
