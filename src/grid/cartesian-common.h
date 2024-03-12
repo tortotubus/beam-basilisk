@@ -47,6 +47,31 @@ void (* debug)    (Point);
 
 @define end_foreach_face()
 
+@def foreach_point(...)
+{
+  int ig = 0, jg = 0, kg = 0; NOT_UNUSED(ig); NOT_UNUSED(jg); NOT_UNUSED(kg);
+  coord _p = { S__VA_ARGS__ };
+  Point point = locate (_p.x, _p.y, _p.z); // fixme
+  if (point.level >= 0) {
+    POINT_VARIABLES
+@
+@define end_foreach_point() }}
+
+@def foreach_region(p, box, n)
+  OMP_PARALLEL() { NOT_UNUSED (p);
+    coord p = {0, 0, box[0].z};
+    OMP(omp for schedule(static))
+      for (int _i = 0; _i < (int) n.x; _i++) {
+	p.x = box[0].x + (box[1].x - box[0].x)/n.x*(_i + 0.5);
+	for (int _j = 0; _j < (int) n.y; _j++) {
+	  p.y = box[0].y + (box[1].y - box[0].y)/n.y*(_j + 0.5);
+	  Point point = locate (p.x, p.y, p.z); // fixme
+	  if (point.level >= 0) {
+	    int ig = 0, jg = 0, kg = 0; NOT_UNUSED(ig); NOT_UNUSED(jg); NOT_UNUSED(kg);
+	    POINT_VARIABLES
+@
+@define end_foreach_region() }}}}
+
 // field allocation
 
 static void init_block_scalar (scalar sb, const char * name, const char * ext,
@@ -807,40 +832,33 @@ static double interpolate_linear (Point point, scalar v,
 }
 
 trace
-double interpolate (scalar v, double xp = 0., double yp = 0., double zp = 0.)
+double interpolate (scalar v, double xp = 0., double yp = 0., double zp = 0.,
+		    bool linear = true)
 {
-  boundary ({v});
-  Point point = locate (xp, yp, zp);
-  if (point.level < 0)
-    return nodata;
-  return interpolate_linear (point, v, xp, yp, zp);
+  double val = nodata;
+  foreach_point (xp, yp, zp, reduction (min:val))
+    val = linear ? interpolate_linear (point, v, xp, yp, zp) : v[];
+  return val;
 }
 
 trace
 void interpolate_array (scalar * list, coord * a, int n, double * v,
 			bool linear = false)
 {
-  boundary (list);
-  int j = 0;
+  int len = 0;
+  for (scalar s in list)
+    len++;
   for (int i = 0; i < n; i++) {
-    Point point = locate (a[i].x, a[i].y, a[i].z);
-    if (point.level >= 0) {
+    double * w = v;
+    for (scalar s in list)
+      *(w++) = nodata;
+    foreach_point (a[i].x, a[i].y, a[i].z, reduction(min:v[:len])) {
+      int j = 0;
       for (scalar s in list)
-	v[j++] = !linear ? s[] :
-	  interpolate_linear (point, s, a[i].x, a[i].y, a[i].z);
+	v[j++] = !linear ? s[] : interpolate_linear (point, s, a[i].x, a[i].y, a[i].z);
     }
-    else
-      for (scalar s in list)
-	v[j++] = nodata;
+    v = w;
   }
-@if _MPI
-  if (pid() == 0)
-    MPI_Reduce (MPI_IN_PLACE, v, n*list_len(list), MPI_DOUBLE,
-		MPI_MIN, 0, MPI_COMM_WORLD);
-  else
-    MPI_Reduce (v, v, n*list_len(list), MPI_DOUBLE,
-		MPI_MIN, 0, MPI_COMM_WORLD);
-@endif
 }
 
 // Boundaries

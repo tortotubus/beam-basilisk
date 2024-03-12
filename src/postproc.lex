@@ -121,6 +121,10 @@ S_LINENO {
   fputs (nolineno ? "0" : "__LINE__", yyout);
 }
 	   
+S__VA_ARGS__ {
+  fputs ("__VA_ARGS__", yyout);
+}
+
 {STRING}+	{ ECHO; }
 \n            {
   if (indef)
