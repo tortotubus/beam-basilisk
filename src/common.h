@@ -1443,6 +1443,16 @@ void display (const char * commands, bool overwrite = false)
 
 #define display_control(val, ...)
 
+typedef struct {
+  double x;
+#if dimension > 1
+  double y;
+#endif
+#if dimension > 2
+  double z;
+#endif
+} _coord;
+
 #if LAYERS
 # include "grid/layers.h"
 #endif

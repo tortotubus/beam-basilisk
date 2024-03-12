@@ -139,16 +139,6 @@ void * interpreter_get_data (const Stack * s)
   return ((StackData *)stack_get_data (s))->data;
 }
 
-static AstTerminal
-  ast_int = { {sym_INT}, .start = "ast_int", .file = __FILE__, .line = __LINE__ },
-  ast_long = { {sym_LONG}, .start = "ast_long", .file = __FILE__, .line = __LINE__ },
-  ast_enum = { {sym_INT}, .start = "ast_int", .file = __FILE__, .line = __LINE__ },
-  ast_char = { {sym_CHAR}, .start = "ast_char", .file = __FILE__, .line = __LINE__ },
-  ast_void = { {sym_VOID}, .start = "ast_void", .file = __FILE__, .line = __LINE__ },
-  ast_float = { {sym_FLOAT}, .start = "ast_float", .file = __FILE__, .line = __LINE__ },
-  ast_double = { {sym_DOUBLE}, .start = "ast_double", .file = __FILE__, .line = __LINE__ },
-  ast_function = { {sym_function_definition}, .start = "ast_function", .file = __FILE__, .line = __LINE__ };
-
 typedef struct {
   int pointer, size;
   int * dimension;

@@ -43,7 +43,8 @@ Ast *     ast_parse_expression (const char * expr, AstRoot * parent);
 Ast *     ast_parse_external_declaration (const char * decl, AstRoot * parent);
 void      ast_destroy          (Ast * n);
 AstRoot * ast_parse_file       (FILE * fp, AstRoot * parent);
-void      ast_print            (Ast * n, FILE * fp, int kind);
+char *    ast_str_print        (const Ast * n, char * s, int kind, int real);
+void      ast_print            (const Ast * n, FILE * fp, int kind);
 void      ast_print_tree       (Ast * n, FILE * fp, const char * indent,
 				bool compress, int maxdepth);
 void      ast_print_file_line  (Ast * n, FILE * fp);
@@ -275,6 +276,26 @@ Ast * ast_stencil (Ast * n, bool parallel, bool overflow, bool nowarning);
 Ast * ast_is_point_point (const Ast * identifier);
 void  ast_stencil_access (Ast * n, Stack * stack, int dimension);
 Ast * ast_constant_postfix_expression (const Ast * n, Stack * stack);
+
+/**
+## Types */
+
+extern AstTerminal ast_int, ast_long, ast_enum, ast_char, ast_void, ast_float, ast_double, ast_function;
+
+typedef struct {
+  int pointer;
+  Ast ** dimension;
+} AstDimensions;
+
+Ast * ast_identifier_type      (Ast * n, AstDimensions * d, Stack * stack);
+Ast * ast_base_type            (Ast * type, AstDimensions * d, Stack * stack);
+Ast * ast_get_array_dimensions (Ast * direct_declarator, int symbol, AstDimensions * d, int nd, Stack * stack);
+
+/**
+## Kernels */
+
+void ast_non_local_references (Ast * n, Ast * argument);
+void ast_kernel               (Ast * n, Ast * argument);
 
 /**
 ## Interface for the generic C interpreter */

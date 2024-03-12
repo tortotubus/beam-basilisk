@@ -34,7 +34,10 @@ qcc: qcc.c include.o postproc.o ast/libast.a config
 		qcc.c include.o postproc.o -o qcc -Last -last -lm
 
 include.o: include.c
-	$(CC) $(CFLAGS) -DLIBDIR=\"`pwd`\" -c include.c
+	$(CC) $(CFLAGS) -DYY_BUF_SIZE=2097152 -DLIBDIR=\"`pwd`\" -c include.c
+
+postproc.o: postproc.c
+	$(CC) $(CFLAGS) -DYY_BUF_SIZE=2097152 -DLIBDIR=\"`pwd`\" -c postproc.c
 
 # uncomment the recipe below if you need to regenerate draw_get.h
 # and draw_json.h
