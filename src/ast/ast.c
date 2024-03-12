@@ -737,6 +737,7 @@ static const char * ignore_prefixes (const char * identifier)
 Ast * ast_identifier_declaration_from_to (Stack * stack, const char * identifier,
 					  const Ast * start, const Ast * end)
 {
+  if (!identifier) return NULL;
   identifier = ignore_prefixes (identifier);
   
   Ast ** d;
