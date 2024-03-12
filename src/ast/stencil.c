@@ -19,7 +19,7 @@ accesses). */
 #include "symbols.h"
 
 #if 0 // for debugging
-# define CHECK(x) ast_check_grammar(x, true)
+# define CHECK(x) ast_check_grammar(x, true, false)
 #else
 # define CHECK(x) (x)
 #endif
