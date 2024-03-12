@@ -2219,9 +2219,11 @@ static void global_boundaries_and_stencils (Ast * n, Stack * stack, void * data)
 
   case sym_foreach_statement: {
     if (!strcmp (ast_terminal (n->child[0])->start, "foreach") ||
-	!strcmp (ast_terminal (n->child[0])->start, "foreach_visible") ||
 	!strcmp (ast_terminal (n->child[0])->start, "foreach_vertex") ||
-	!strcmp (ast_terminal (n->child[0])->start, "foreach_face")) {
+	!strcmp (ast_terminal (n->child[0])->start, "foreach_face") ||
+	!strcmp (ast_terminal (n->child[0])->start, "foreach_visible") ||
+	!strcmp (ast_terminal (n->child[0])->start, "foreach_point") ||
+	!strcmp (ast_terminal (n->child[0])->start, "foreach_region")) {
       bool overflow = false, nowarning = false;
       Ast * parameters = ast_child (n, sym_foreach_parameters);
       foreach_item (parameters, 2, item) {
@@ -3700,6 +3702,19 @@ static void mpi_operator (Ast * n, Ast * op)
 	     "Unknown", ",");
 }
 
+static char * get_type (const char * name, Stack * stack)
+{
+  Ast * decl = ast_find (ast_declaration_from_type (ast_identifier_declaration (stack, name)),
+			 sym_declaration_specifiers);
+  if (!decl) return NULL;
+  AstTerminal * t = ast_left_terminal (decl);
+  char * before = t->before;
+  t->before = NULL;
+  char * type = ast_str_append (decl, NULL);
+  t->before = before;
+  return type;
+}
+
 static void macros (Ast * n, Stack * stack, void * data)
 {
   switch (n->sym) {
@@ -3810,51 +3825,50 @@ static void macros (Ast * n, Stack * stack, void * data)
 					   0, sym_generic_identifier,
 					   0, sym_IDENTIFIER);
 	    AstTerminal * t = ast_terminal (identifier);
+	    char * type = get_type (t->start, stack);
+	    if (!type) {
+	      fprintf (stderr,
+		       "%s:%d: error: cannot determine type of '%s'\n",
+		       t->file, t->line, t->start);
+	      exit (1);
+	    }
+	    if (strcmp (type, "coord") &&
+		strcmp (type, "double") &&
+		strcmp (type, "int") &&
+		strcmp (type, "long") &&
+		strcmp (type, "bool") &&
+		strcmp (type, "unsigned char")) {
+	      fprintf (stderr,
+		       "%s:%d: error: does not know how to reduce "
+		       "type '%s' of '%s'\n",
+		       t->file, t->line, type, t->start);
+	      exit (1);
+	    }
 	    Ast * array = ast_schema (reduction, sym_reduction,
 				      4, sym_reduction_array,
 				      3, sym_expression);
 	    if (array) {
-	      ast_after (n, "mpi_all_reduce_array(",
-			 t->start,
-			 ",double,");
+	      ast_after (n, "mpi_all_reduce_array(", t->start, ",", type, ",");
 	      mpi_operator (n, reduction->child[2]);
-	      ast_right_terminal (n)->after =
-		ast_str_append (array, ast_right_terminal (n)->after);
+	      ast_right_terminal (n)->after = ast_str_append (array, ast_right_terminal (n)->after);
 	      ast_after (n, ");");
 	    }
 	    else {
-	      AstTerminal * type = ast_type (ast_identifier_declaration
-					     (stack, t->start));
-	      if (!type) {
-		fprintf (stderr,
-			 "%s:%d: error: cannot determine type of '%s'\n",
-			 t->file, t->line, t->start);
-		exit (1);
-	      }
 	      char s[20] = "1";
 	      ast_after (n, "mpi_all_reduce_array(&", t->start);
-	      if (!strcmp (type->start, "coord")) {
+	      if (strcmp (type, "coord"))
+		ast_after (n, ",", type);
+	      else {
 		TranslateData * d = data;
 		snprintf (s, 19, "%d", d->dimension);
 		ast_after (n, ".x,double");
-	      }
-	      else if (!strcmp (type->start, "double") ||
-		       !strcmp (type->start, "int") ||
-		       !strcmp (type->start, "long") ||
-		       !strcmp (type->start, "bool"))
-		ast_after (n, ",", type->start);
-	      else {
-		fprintf (stderr,
-			 "%s:%d: error: does not know how to reduce "
-			 "type '%s' of '%s'\n",
-			 t->file, t->line, type->start, t->start);
-		exit (1);
 	      }
 	      ast_after (n, ",");
 	      mpi_operator (n, reduction->child[2]);
 	      ast_after (n, s, ");");
 	    }
 	    sreductions = ast_str_append (reduction, sreductions);
+	    free (type);
 	  }
 	  parameters = ast_list_remove (parameters, item);
 	}
@@ -4066,6 +4080,13 @@ static void macros (Ast * n, Stack * stack, void * data)
   case sym_IDENTIFIER: {
     Ast * decl = ast_is_point_point (n);
     if (decl) {
+      AstTerminal * t = ast_terminal (n);
+      if (ast_parent (n, sym_declaration) &&
+	  strncmp (t->file, BASILISK "/grid/", strlen (BASILISK "/grid/")) &&
+	  strncmp (t->file, "./grid/", strlen ("./grid/")))
+	fprintf (stderr,
+		 "%s:%d: warning: 'Point point' is deprecated, use 'foreach_point/region' instead\n",
+		 t->file, t->line);
       TranslateData * d = data;
       static const char * name[3] = {"ig", "jg", "kg"};
       for (int i = 0; i < d->dimension; i++)

@@ -692,7 +692,7 @@ int mpi_all_reduce0 (void *sendbuf, void *recvbuf, int count,
 @
 @def mpi_all_reduce_array(v,type,op,elem) {
   prof_start ("mpi_all_reduce");
-  type global[elem], tmp[elem];
+  type * global = malloc ((elem)*sizeof(type)), * tmp = malloc ((elem)*sizeof(type));
   for (int i = 0; i < elem; i++)
     tmp[i] = (v)[i];
   MPI_Datatype datatype;
@@ -700,6 +700,7 @@ int mpi_all_reduce0 (void *sendbuf, void *recvbuf, int count,
   else if (!strcmp(#type, "int")) datatype = MPI_INT;
   else if (!strcmp(#type, "long")) datatype = MPI_LONG;
   else if (!strcmp(#type, "bool")) datatype = MPI_C_BOOL;
+  else if (!strcmp(#type, "unsigned char")) datatype = MPI_UNSIGNED_CHAR;
   else {
     fprintf (stderr, "unknown reduction type '%s'\n", #type);
     fflush (stderr);
@@ -708,6 +709,7 @@ int mpi_all_reduce0 (void *sendbuf, void *recvbuf, int count,
   mpi_all_reduce0 (tmp, global, elem, datatype, op, MPI_COMM_WORLD);
   for (int i = 0; i < elem; i++)
     (v)[i] = global[i];
+  free (global), free (tmp);
   prof_stop();
 }
 @
