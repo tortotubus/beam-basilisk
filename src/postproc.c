@@ -855,16 +855,66 @@ static char * autolink = NULL;
 
 #define nonspace(s) { while (strchr(" \t\v\n\f", *s)) s++; }
 #define space(s) { while (!strchr(" \t\v\n\f", *s)) s++; }
+
+static int input0 (FILE * yyin)
+{
+  static int buf[2] = {0}, n = 0;  
+  int c;
+  if (n > 0)
+    c = buf[0], buf[0] = buf[1], n--;
+  else
+    c = fgetc (yyin);
+  switch (c) {
+
+  case EOF: return c;
+    
+  case '\n': line++; return c;
+
+  case '_': // skip "code strings" i.e. _("...")
+    if (n == 0) {
+      int d = fgetc (yyin); buf[0] = d;
+      if (d == '(') {
+	d = fgetc (yyin); buf[1] = d;
+	if (d == '"') {
+	  fputc (d, yyout);
+	  d = fgetc (yyin); 
+	  while (d != EOF && d != '"') {
+	    fputc (d, yyout);
+	    if (d == '\n') line++;
+	    else if (d == '\\') {
+	      d = fgetc (yyin); if (d == '\n') line++;
+	      fputc (d, yyout);
+	    }
+	    d = fgetc (yyin);
+	  }
+	  if (d == '"') {
+	    fputc (d, yyout);
+	    d = fgetc (yyin); if (d == '\n') line++;
+	    if (d == ')')
+	      d = fgetc (yyin); if (d == '\n') line++;
+	  }
+	  c = d;
+	}
+	else
+	  n = 2;
+      }
+      else
+	n = 1;
+    }
+    break;
+
+  }
+  return c;
+}
  
 #define YY_INPUT(buf,result,max_size)			      \
   {							      \
-    int c = fgetc(yyin);				      \
-    if (c == '\n') { line++; }				      \
+    int c = input0 (yyin);				      \
     result = (c == EOF) ? YY_NULL : (buf[0] = c, 1);	      \
   }
   
-#line 867 "postproc.c"
-#line 868 "postproc.c"
+#line 917 "postproc.c"
+#line 918 "postproc.c"
 
 #define INITIAL 0
 
@@ -1090,10 +1140,10 @@ YY_DECL
 		}
 
 	{
-#line 52 "postproc.lex"
+#line 102 "postproc.lex"
 
 
-#line 1097 "postproc.c"
+#line 1147 "postproc.c"
 
 	while ( /*CONSTCOND*/1 )		/* loops until end-of-file is reached */
 		{
@@ -1158,12 +1208,12 @@ do_action:	/* This label is used only to access EOF actions. */
 	{ /* beginning of action switch */
 case 1:
 YY_RULE_SETUP
-#line 54 "postproc.lex"
+#line 104 "postproc.lex"
 { comment(); }
 	YY_BREAK
 case 2:
 YY_RULE_SETUP
-#line 55 "postproc.lex"
+#line 105 "postproc.lex"
 { ECHO; /* consume //-comment */ }
 	YY_BREAK
 case 3:
@@ -1171,7 +1221,7 @@ case 3:
 (yy_c_buf_p) = yy_cp -= 1;
 YY_DO_BEFORE_ACTION; /* set up yytext again */
 YY_RULE_SETUP
-#line 57 "postproc.lex"
+#line 107 "postproc.lex"
 {
   char * s = strstr (yytext, "autolink"); space (s);
   if (!autolink) {
@@ -1185,7 +1235,7 @@ YY_RULE_SETUP
 	YY_BREAK
 case 4:
 YY_RULE_SETUP
-#line 68 "postproc.lex"
+#line 118 "postproc.lex"
 {
   /* replace # 3 "machin.h" 2 4 with #line 3 "machin.h" */
   char * s = strchr(yytext, '#') + 1;
@@ -1201,7 +1251,7 @@ YY_RULE_SETUP
 	YY_BREAK
 case 5:
 YY_RULE_SETUP
-#line 81 "postproc.lex"
+#line 131 "postproc.lex"
 {
   /* replace @def ... @ with #define ... \\ */
   fputs ("#define", yyout);
@@ -1211,7 +1261,7 @@ YY_RULE_SETUP
 	YY_BREAK
 case 6:
 YY_RULE_SETUP
-#line 88 "postproc.lex"
+#line 138 "postproc.lex"
 {
   yytext = strchr(yytext, '@'); yytext++;
   char * s = strstr (yytext, "Pragma("); *s++ = '\0';
@@ -1228,7 +1278,7 @@ YY_RULE_SETUP
 	YY_BREAK
 case 7:
 YY_RULE_SETUP
-#line 102 "postproc.lex"
+#line 152 "postproc.lex"
 {
   if (indef) {
     indef = 0;
@@ -1240,7 +1290,7 @@ YY_RULE_SETUP
 	YY_BREAK
 case 8:
 YY_RULE_SETUP
-#line 111 "postproc.lex"
+#line 161 "postproc.lex"
 {
   /* replace @define etc. with #define etc. */
   *strchr(yytext, '@') = '#'; ECHO;
@@ -1248,34 +1298,34 @@ YY_RULE_SETUP
 	YY_BREAK
 case 9:
 YY_RULE_SETUP
-#line 116 "postproc.lex"
+#line 166 "postproc.lex"
 {
   fputs ("__FILE__", yyout);
 }
 	YY_BREAK
 case 10:
 YY_RULE_SETUP
-#line 120 "postproc.lex"
+#line 170 "postproc.lex"
 {
   fputs (nolineno ? "0" : "__LINE__", yyout);
 }
 	YY_BREAK
 case 11:
 YY_RULE_SETUP
-#line 124 "postproc.lex"
+#line 174 "postproc.lex"
 {
   fputs ("__VA_ARGS__", yyout);
 }
 	YY_BREAK
 case 12:
 YY_RULE_SETUP
-#line 128 "postproc.lex"
+#line 178 "postproc.lex"
 { ECHO; }
 	YY_BREAK
 case 13:
 /* rule 13 can match eol */
 YY_RULE_SETUP
-#line 129 "postproc.lex"
+#line 179 "postproc.lex"
 {
   if (indef)
     fputs ("\\\n", yyout);
@@ -1285,15 +1335,15 @@ YY_RULE_SETUP
 	YY_BREAK
 case 14:
 YY_RULE_SETUP
-#line 135 "postproc.lex"
+#line 185 "postproc.lex"
 { ECHO; }
 	YY_BREAK
 case 15:
 YY_RULE_SETUP
-#line 137 "postproc.lex"
+#line 187 "postproc.lex"
 ECHO;
 	YY_BREAK
-#line 1297 "postproc.c"
+#line 1347 "postproc.c"
 			case YY_STATE_EOF(INITIAL):
 				yyterminate();
 
@@ -2274,7 +2324,7 @@ void yyfree (void * ptr )
 
 #define YYTABLES_NAME "yytables"
 
-#line 137 "postproc.lex"
+#line 187 "postproc.lex"
 
 
 int postproc (FILE * fin, FILE * fout, char ** autolink1, int _nolineno)

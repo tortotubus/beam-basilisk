@@ -5155,13 +5155,13 @@ void ast_kernel (Ast * n, Ast * argument)
   Stack * funcs = stack_new (sizeof (Ast *));
   Ast * statement = ast_copy (ast_child (n, sym_statement));
   ast_traverse (statement, stack, kernel, funcs);
-  ast_after (argument, "\"");
+  ast_after (argument, "_(\"");
   Ast ** func;
   while ((func = stack_pop (funcs)))
     stringify (ast_parent (*func, sym_function_definition), argument);
   stack_destroy (funcs);
-  ast_after (argument, "\",\"");
+  ast_after (argument, "\"),_(\"");
   stringify (statement, argument);
-  ast_after (argument, "\"");
+  ast_after (argument, "\")");
   ast_pop_scope (stack, n);
 }
