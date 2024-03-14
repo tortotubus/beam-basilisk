@@ -57,7 +57,6 @@ plot 'log' index 'F0 = 0.1' u 1:3 w l t 'C grid (Ro = 0.1)', \
 
 #include <gsl/gsl_integration.h>
 #pragma autolink -lgsl -lgslcblas
-#include "grid/multigrid.h"
 #if ML
 # include "layered/hydro.h"
 # include "layered/implicit.h"
@@ -68,12 +67,12 @@ double F0 = 0.;
 # include "atmosphere.h"
 #endif
 
-int main()
+int main (int argc, char * argv[])
 {
   // coordinates of lower-left corner
   origin (-0.5 + 1e-12, -0.5 + 1e-12);
   // number of grid points
-  init_grid (64);
+  init_grid (argc > 1 ? atoi(argv[1]) : 64);
   // size of the box
   size (1.[0]);
   DT = HUGE[0];
@@ -83,6 +82,10 @@ int main()
   F0 = 0.1;
   // CFL number: the C-grid model is unstable for larger CFL
   CFL = 0.25;
+#if !ML
+  if (N > 256)
+    NU = 1e-4; // need some viscosity to stabilize at high resolutions
+#endif
   for (F0 = 0.; F0 <= 0.1; F0 += 0.1) {
     fprintf (stderr, "# F0 = %g\n", F0);
     run();
@@ -96,7 +99,7 @@ int main()
 #define FROUDE 0.1
 
 double vtheta (double r) {
-  return FROUDE*(r < 0.4)*(1. + cos((r - 0.2)/0.2*M_PI))/2.;
+  return r >= 0.4 ? 0. : FROUDE*(1. + cos((r - 0.2)/0.2*M_PI))/2.;
 }
 
 double h0p (double r, void * p) {
@@ -121,7 +124,7 @@ event init (i = 0)
 #if ML
   CFL_H = 0.25;
 #endif
-  foreach() {
+  foreach (cpu) {
     zb[] = - H0;
     h1[] = h[] = (H0 + h0(sqrt (x*x + y*y)));
   }
@@ -190,3 +193,20 @@ event plots (t = end)
 {
   output_ppm (e, file = "e.png", spread = -1, n = 256);
 }
+
+/**
+## Benchmark on GPUs
+
+cd nonlinear.gpu/
+__NV_PRIME_RENDER_OFFLOAD=1 __GLX_VENDOR_LIBRARY_NAME=nvidia ./nonlinear.gpu 1024 2> /dev/null
+# Cartesian (GPU), 20565 steps, 23.6885 CPU, 23.7 real, 9.1e+08 points.step/s, 16 var
+# Cartesian (GPU), 20586 steps, 26.3772 CPU, 26.39 real, 8.18e+08 points.step/s, 16 var
+
+On CPU:
+
+CFLAGS='-grid=cartesian -fopenmp' make nonlinear.tst
+cd ./nonlinear/
+OMP_NUM_THREADS=8 ./nonlinear 512 2> /dev/null
+# Cartesian, 10283 steps, 172.003 CPU, 21.52 real, 1.25e+08 points.step/s, 13 var
+# Cartesian, 10293 steps, 172.957 CPU, 21.67 real, 1.25e+08 points.step/s, 13 var
+*/
