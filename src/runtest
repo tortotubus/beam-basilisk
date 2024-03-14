@@ -106,6 +106,10 @@ script()
     if test -f fail; then
 	return 1
     fi
+
+    # fixme: need to apply this also to convergence WARNING etc...
+    grep -E '.*:[0-9]*:.*(warning|error).*:' $log 1>&2
+
     touch pass
 }
 

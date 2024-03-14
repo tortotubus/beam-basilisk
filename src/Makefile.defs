@@ -33,10 +33,17 @@ clean:
 .DELETE_ON_ERROR:
 
 %.3D.c: %.c
-	ln -s $< $@
+	ln -s -f $< $@
 %.3D.s:   CFLAGS += -grid=octree
 %.3D.s.d: CFLAGS += -grid=octree
 %.3D.tst: CFLAGS += -grid=octree
+
+%.gpu.c: %.c
+	ln -s -f $< $@
+%.gpu.s:   CFLAGS += -grid=cartesian_gpu
+%.gpu.s: $(BASILISK)/libgpu.a
+%.gpu.s.d: CFLAGS += -grid=cartesian_gpu
+%.gpu.tst: CFLAGS += -grid=cartesian_gpu
 
 %.CADNA.c: %.c
 	ln -s $< $@
