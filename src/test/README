@@ -191,6 +191,13 @@ Note that only the documented test cases appear in the list below
 * [Boundary conditions for face vector fields](mpi-interpu.c)
 * [Simple test of Basilisk View](view.c)
 
+## GPUs
+
+* [gpu.c](Basic GPU operations)
+* [gpu-reduce.c](Reductions on GPUs)
+* [advection.c](Time-reversed advection in a vortex)
+* [bump2D-gpu.c](Saint-Venant bump)
+
 ## Speed benchmarks
 
 * [Speed of elementary operations on different grids](laplacian.c)

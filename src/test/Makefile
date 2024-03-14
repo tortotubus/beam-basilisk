@@ -265,7 +265,7 @@ multilayer-tests: dispersion-gn.tst dispersion.tst \
 	stokes-ns.tst stokes.tst ponds-ml.tst \
 	galilean_invariance.tst \
 	stommel-ml.tst explicit-ml.tst implicit-ml.tst lake-tr-ml.tst \
-	geo.tst nonlinear-ml.tst tsunami.tst
+	geo.tst nonlinear-ml.ctst tsunami.tst
 
 multilayer-stratified: horn.tst lock.tst overflow.tst kh.tst
 
@@ -359,12 +359,12 @@ ponds-ml.tst: CFLAGS += -DML=1
 
 stommel-ml.tst: CFLAGS += -DML=1
 
-nonlinear.tst: nonlinear-ml.tst
+nonlinear.ctst: nonlinear-ml.ctst
 
 nonlinear-ml.c: nonlinear.c
 	ln -sf nonlinear.c nonlinear-ml.c 
 nonlinear-ml.s: CFLAGS += -DML=1
-nonlinear-ml.tst: CFLAGS += -DML=1
+nonlinear-ml.ctst: CFLAGS += -DML=1
 
 shockwave.tst: CFLAGS += -grid=bitree
 shockwave.ctst: CFLAGS += -grid=multigrid1D
@@ -569,5 +569,10 @@ dimensions-tests: bump2D.s capwave.s lid.s rising-axi.s		\
 	rising-reduced.s vortex.s sessile.s large.s lock.s	\
 	wind-driven-stvt.s shock.s starting.s layered.s 	\
 	stokes.s stokes-ns.s lonlat.s overflow.s
+
+# GPUs
+# fixme: the dependencies *.gpu.s.d are not created automatically
+gpu-tests: gpu.gpu.tst gpu-reduce.gpu.tst nonlinear.gpu.tst \
+	advection.gpu.tst bump2D-gpu.tst
 
 include ../Makefile.defs
