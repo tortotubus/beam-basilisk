@@ -321,7 +321,7 @@ void init_grid (int n)
 }
 
 static
-void reset_scalar (scalar s)
+void interpreter_reset_scalar (scalar s)
 {
   Intergrid * p = (Intergrid *) grid;
   char * c = p->d + s.i*sizeof (double);
@@ -340,19 +340,12 @@ double z_indexing (scalar s, bool leaves)
 static void init_block_scalar (scalar sb, const char * name, const char * ext,
 			       int n, int block)
 {
-  char bname[strlen(name) + strlen(ext) + 1];
-  strcpy (bname, name);
-  strcat (bname, ext);
   if (n == 0) {
     _attribute[sb.i].block = block;
-    init_scalar (sb, bname);
     baseblock = list_append (baseblock, sb);
   }
-  else {
+  else
     _attribute[sb.i].block = - n;
-    init_scalar (sb, bname);
-  }
-  reset_scalar (sb); // should not be needed
   all = list_append (all, sb);
 }
 
