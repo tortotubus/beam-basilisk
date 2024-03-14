@@ -56,35 +56,27 @@ echo "updating $PWD/Makefile.tests"
 (
     echo "# Automatically generated using 'make Makefile.tests'"
     echo "# DO NOT EDIT, edit 'Makefile' instead"
-    if test -f Makefile; then
-	echo "ALLTESTS = \\"
-	(showfiles c
-	 grep '^[a-zA-Z_0-9-]*\.*tst[ ]*:' Makefile | \
-	     sed -n 's/\(^[a-zA-Z_0-9-]*\)\.*tst[ ]*:.*/	\1.c \\/p'
-	) | sort | uniq
-	echo ""
-	echo "TESTS = \\"
-	singleline < Makefile | 		                   \
-	    grep '^check:' | tr ' \t' '\n' |                     \
-	    sed -n 's/[ 	]*\([a-zA-Z_0-9-]*\..tst\)[ 	]*/\1/p' |  \
-	    sed 's/\(.*\)\..tst/	\1.c \\/g' | \
-	    sed 's/.*$(wildcard//g'
-	singleline < Makefile | 		                   \
-	    grep -v '^check:' | grep '^[^.]*:.*' | tr ' \t' '\n' |     \
-	    sed -n 's/[ 	]*\([a-zA-Z_0-9-]*\.tst\)[ 	]*/\1/p' |    \
-	    sed 's/\(.*\)\.tst/	\1.c \\/g'
-	echo ""
-	echo "SPECIAL_TESTS = \\"
-	sed -n 's/.*:[ 	]*\([a-zA-Z_0-9-]*\.ctst\)/\1/p' Makefile | \
-	    sort | uniq | sed 's/\(.*\)/	\1 \\/g'
-	echo ""
-    else
-	echo "ALLTESTS = \\"
-	showfiles c | sort | uniq
-	echo ""
-	echo "TESTS = "
-	echo "SPECIAL_TESTS = "
-    fi
+    echo "ALLTESTS = \\"
+    (showfiles c
+     grep '^[a-zA-Z_0-9-]*\.*tst[ ]*:' Makefile | \
+	 sed -n 's/\(^[a-zA-Z_0-9-]*\)\.*tst[ ]*:.*/	\1.c \\/p'
+    ) | sort | uniq
+    echo ""
+    echo "TESTS = \\"
+    singleline < Makefile | 		                   \
+	grep '^check:' | tr ' \t' '\n' |                     \
+	sed -n 's/[ 	]*\([a-zA-Z_0-9-]*\..tst\)[ 	]*/\1/p' |  \
+	sed 's/\(.*\)\..tst/	\1.c \\/g' | \
+	sed 's/.*$(wildcard//g'
+    singleline < Makefile | 		                   \
+	grep -v '^check:' | grep '^[^.]*:.*' | tr ' \t' '\n' |     \
+	sed -n 's/[ 	]*\([a-zA-Z_0-9-]*\.tst\)[ 	]*/\1/p' |    \
+	sed 's/\(.*\)\.tst/	\1.c \\/g'
+    echo ""
+    echo "SPECIAL_TESTS = \\"
+    sed -n 's/.*:[ 	]*\([a-zA-Z_0-9-]*\.ctst\)/\1/p' Makefile | \
+	sort | uniq | sed 's/\(.*\)/	\1 \\/g'
+    echo ""
     echo "ALLPAGES = \\"
     showpages ''
     echo ""

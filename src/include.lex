@@ -280,11 +280,13 @@ FDECL     {ID}+{SP}*\(
 
 ^{SP}*#{SP}*define{SP}+GRIDNAME{WS}+ {
     echo();
-    hasgrid = 1;
-    char * s = fname;
-    while (strchr (s, '/')) s = strchr (s, '/') + 1;
-    strcpy (grid, s);
-    if ((s = strchr (grid, '.'))) *s = '\0';
+    if (!hasgrid) {
+      hasgrid = 1;
+      char * s = fname;
+      while (strchr (s, '/')) s = strchr (s, '/') + 1;
+      strcpy (grid, s);
+      if ((s = strchr (grid, '.'))) *s = '\0';
+    }
 }
 
 ^{SP}*#{SP}*define{SP}+dimension{WS}+[123]{SP}*$ {
