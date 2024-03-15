@@ -39,6 +39,7 @@ static int intersects (KdtRect rect, Point * p)
   return intersects_point (rect, *p);
 }
 
+#if MULTIGRID
 static void reconstruct_terrain (Point point, scalar zb)
 {
   KdtSum s;
@@ -77,6 +78,7 @@ void refine_terrain (Point point, scalar zb)
   foreach_child()
     reconstruct_terrain (point, zb);
 }
+#endif // MULTIGRID
 
 static void delete_terrain (scalar zb)
 {
@@ -144,9 +146,39 @@ void terrain (scalar zb, ...)
 #endif
 
   trash ({zb});
+#if MULTIGRID
   for (int l = 0; l <= depth(); l++) {
     foreach_level (l)
       reconstruct_terrain (point, zb);
     boundary_level ({zb}, l);
   }
+#else
+  foreach (cpu) {
+    KdtSum s;
+    int niter = 8;
+    do {
+      kdt_sum_init (&s);
+      KdtRect rect = {{x - Delta_x/2., x + Delta_x/2.},
+		      {y - Delta_y/2., y + Delta_y/2.}};
+      for (Kdt ** kdt = (Kdt **) zb.kdt[PROC]; *kdt; kdt++)
+	kdt_query_sum (*kdt,
+		       (KdtCheck) includes,
+		       (KdtCheck) intersects, &point,
+		       rect, &s);
+      Delta_x *= 2., Delta_y *= 2.;
+    } while (!s.w && niter--);
+    scalar n = zb.nt, dmin = zb.dmin, dmax = zb.dmax;
+    n[] = s.n;
+    if (s.w > 0.) {
+      zb[] = s.H0/s.w;
+      dmin[] = s.Hmin;
+      dmax[] = s.Hmax;
+    }
+    else {
+      zb[] = 0.;
+      dmin[] = nodata;
+      dmax[] = nodata;
+    }
+  }
+#endif
 }
