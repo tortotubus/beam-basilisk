@@ -81,11 +81,12 @@ static void init_block_scalar (scalar sb, const char * name, const char * ext,
 {
   char bname[strlen(name) + strlen(ext) + 10];
   if (n == 0) {
-    sprintf (bname, "%s%s", name, ext);
+    strcat (strcpy (bname, name), ext);
     sb.block = block;
     baseblock = list_append (baseblock, sb);
   }
   else {
+     // fixme: should use functions compatible with the interpreter
     sprintf (bname, "%s%d%s", name, n, ext);
     sb.block = - n;
   }
@@ -216,10 +217,10 @@ vector new_block_face_vector (const char * name, int block)
 tensor new_tensor (const char * name)
 {
   char cname[strlen(name) + 3];
-  struct { char * x, * y, * z; } ext = {"%s.x", "%s.y", "%s.z"};
+  struct { char * x, * y, * z; } ext = {".x", ".y", ".z"};
   tensor t;
   foreach_dimension() {
-    sprintf (cname, ext.x, name);
+    strcat (strcpy (cname, name), ext.x);
     t.x = alloc_block_vector (cname, 1);
   }
   init_tensor (t, NULL);
@@ -560,11 +561,11 @@ vector cartesian_init_vector (vector v, const char * name)
   foreach_dimension() {
     if (name) {
       char cname[strlen(name) + 3];
-      sprintf (cname, "%s%s", name, ext.x);
+      strcat (strcpy (cname, name), ext.x);
       cartesian_init_scalar (v.x, cname);
     }
     else
-      cartesian_init_scalar (v.x, NULL);
+      init_scalar (v.x, NULL);
     v.x.v = v;
   }
   /* set default boundary conditions */
@@ -592,7 +593,7 @@ tensor cartesian_init_tensor (tensor t, const char * name)
   foreach_dimension() {
     if (name) {
       char cname[strlen(name) + 3];
-      sprintf (cname, "%s%s", name, ext.x);
+      strcat (strcpy (cname, name), ext.x);
       cartesian_init_vector (t.x, cname);
     }
     else
