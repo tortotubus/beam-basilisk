@@ -1,4 +1,6 @@
-#define GRIDNAME "Cartesian"
+#ifndef GRIDNAME
+# define GRIDNAME "Cartesian"
+#endif
 #define dimension 2
 #define GHOSTS 1
 
@@ -14,6 +16,12 @@ typedef struct {
 
 struct _Point {
   int i, j, level, n;
+@ifdef foreach_block
+  int l;
+  @define _BLOCK_INDEX , point.l
+@else
+  @define _BLOCK_INDEX
+@endif
 };
 static Point last_point;
 
@@ -25,10 +33,18 @@ static Point last_point;
 
 @define POINT_VARIABLES VARIABLES
 
+@ifndef BEGIN_FOREACH
+@ define BEGIN_FOREACH
+@endif
+
+@ifndef END_FOREACH
+@ define END_FOREACH
+@endif
+
 @def foreach()
-  OMP_PARALLEL() {
+{ BEGIN_FOREACH OMP_PARALLEL() {
   int ig = 0, jg = 0; NOT_UNUSED(ig); NOT_UNUSED(jg);
-  Point point;
+  Point point = {0};
   point.n = cartesian->n;
   int _k;
   OMP(omp for schedule(static))
@@ -37,12 +53,12 @@ static Point last_point;
     for (point.j = 1; point.j <= point.n; point.j++) {
       POINT_VARIABLES
 @
-@define end_foreach() }}}
+@define end_foreach() }}} END_FOREACH }
 
 @def foreach_face_generic()
-  OMP_PARALLEL() {
+{ BEGIN_FOREACH OMP_PARALLEL() {
   int ig = 0, jg = 0; NOT_UNUSED(ig); NOT_UNUSED(jg);
-  Point point;
+  Point point = {0};
   point.n = cartesian->n;
   int _k;
   OMP(omp for schedule(static))
@@ -51,7 +67,7 @@ static Point last_point;
     for (point.j = 1; point.j <= point.n + 1; point.j++) {
       POINT_VARIABLES
 @
-@define end_foreach_face_generic() }}}
+@define end_foreach_face_generic() }}} END_FOREACH }
 
 @def foreach_vertex()
 foreach_face_generic() {
@@ -87,7 +103,7 @@ void reset (void * alist, double val)
 @def foreach_boundary_dir(l,d)
   OMP_PARALLEL() {
   int ig = 0, jg = 0, kg = 0; NOT_UNUSED(ig); NOT_UNUSED(jg); NOT_UNUSED(kg);
-  Point point;
+  Point point = {0};
   point.n = cartesian->n;
   int * _i = &point.j;
   if (d == left) {
@@ -134,7 +150,7 @@ static void box_boundary_level_normal (const Boundary * b, scalar * list, int l)
   int d = ((BoxBoundary *)b)->d;
 
   OMP_PARALLEL() {
-    Point point;
+    Point point = {0};
     point.n = cartesian->n;
     if (d % 2)
       ig = jg = 0;
@@ -161,7 +177,7 @@ static void box_boundary_level_tangent (const Boundary * b,
   int d = ((BoxBoundary *)b)->d;
 
   OMP_PARALLEL() {
-    Point point;
+    Point point = {0};
     point.n = cartesian->n;
     ig = _ig[d]; jg = _jg[d];
     int _start = GHOSTS, _end = point.n + 2*GHOSTS, _k;
@@ -213,7 +229,7 @@ static void box_boundary_level (const Boundary * b, scalar * list, int l)
     }
 
   OMP_PARALLEL() {
-    Point point;
+    Point point = {0};
     point.n = cartesian->n;
     ig = _ig[d]; jg = _jg[d];
     int _start = 1, _end = point.n, _k;

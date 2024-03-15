@@ -558,3 +558,13 @@ void interpreter_set_int (int * i)
   flags += sizeof(int) - 1;
   *flags = 0;
 }
+
+/**
+GPU-specific functions */
+
+void gpu_init_grid (int n) { init_grid (n); }
+
+vec4 Vec4 (float r, float g, float b, float a)
+{
+  return (vec4){r, g, b, a};
+}

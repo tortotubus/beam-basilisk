@@ -391,7 +391,7 @@ void array_free (Array * a)
   free (a);
 }
 
-void array_append (Array * a, void * elem, size_t size)
+void * array_append (Array * a, void * elem, size_t size)
 {
   if (a->len + size >= a->max) {
     a->max += max (size, 4096);
@@ -399,6 +399,7 @@ void array_append (Array * a, void * elem, size_t size)
   }
   memcpy (((char *)a->p) + a->len, elem, size);
   a->len += size;
+  return (void *)(((char *)a->p) + a->len - size);
 }
 
 void * array_shrink (Array * a)
