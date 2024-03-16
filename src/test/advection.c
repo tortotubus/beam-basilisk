@@ -89,7 +89,7 @@ event field (t = 5) {
 #if 0 // Uncomment for real-time display when running on GPUs
 event display (i++)
 {
-  output_ppm (f, fps = 30, map = jet, spread = -1, linear = false);
+  output_ppm (f, fps = 30, map = jet, spread = -1, linear = false, n = 512);
 }
 #endif
 
