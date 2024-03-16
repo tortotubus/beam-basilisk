@@ -1,4 +1,6 @@
-// #include "grid/cartesian_gpu.h"
+/**
+# A range of GPU tests */
+
 #include "utils.h"
 
 scalar s[], s1[];

@@ -2,16 +2,6 @@
 #include <GLFW/glfw3.h>
 #pragma autolink -L$BASILISK/gpu -lglfw -lgpu -ldl
 
-typedef struct _Texture Texture;
-
-struct _Texture {
-  GLuint id;
-  bool used, out[4];
-  int type; // 0: scalar, 1: vector, 2: tensor
-  int input, output, width;
-  Texture * io;
-};
-
 static struct {
   ///// GPU /////
   GLFWwindow * window;
