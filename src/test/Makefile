@@ -138,9 +138,9 @@ lid.tst: lidmac.tst
 
 lid-restore.c: lid.c
 	ln -sf lid.c lid-restore.c
-lid-restore.dump: lid.tst
+lid-restore.dump: lid/dump
 	ln -sf lid/dump lid-restore.dump
-lid-restore.tst: lid-restore.dump
+lid-restore.tst: lid.tst lid-restore.dump
 
 oscillation-compressible.c: oscillation.c
 	ln -sf oscillation.c oscillation-compressible.c 
@@ -265,7 +265,7 @@ multilayer-tests: dispersion-gn.tst dispersion.tst \
 	stokes-ns.tst stokes.tst ponds-ml.tst \
 	galilean_invariance.tst \
 	stommel-ml.tst explicit-ml.tst implicit-ml.tst lake-tr-ml.tst \
-	geo.tst nonlinear-ml.ctst tsunami.tst
+	geo.tst nonlinear-ml.tst tsunami.tst
 
 multilayer-stratified: horn.tst lock.tst overflow.tst kh.tst
 
@@ -359,12 +359,14 @@ ponds-ml.tst: CFLAGS += -DML=1
 
 stommel-ml.tst: CFLAGS += -DML=1
 
-nonlinear.ctst: nonlinear-ml.ctst
+nonlinear.s: CFLAGS += -grid=multigrid
+nonlinear.tst: CFLAGS += -grid=multigrid
+nonlinear.tst: nonlinear-ml.tst
 
 nonlinear-ml.c: nonlinear.c
 	ln -sf nonlinear.c nonlinear-ml.c 
-nonlinear-ml.s: CFLAGS += -DML=1
-nonlinear-ml.ctst: CFLAGS += -DML=1
+nonlinear-ml.s: CFLAGS += -DML=1 -grid=multigrid
+nonlinear-ml.tst: CFLAGS += -DML=1 -grid=multigrid
 
 shockwave.tst: CFLAGS += -grid=bitree
 shockwave.ctst: CFLAGS += -grid=multigrid1D
@@ -447,9 +449,9 @@ boundary_vertex3D.tst: CC = mpicc -D_MPI=7
 # parallel dump()/restore()
 
 pdump.tst: CC = mpicc -D_MPI=7
-restore.dump: pdump.tst
+restore.dump: pdump/restore.dump
 	ln -sf pdump/restore.dump
-restore.tst: restore.dump
+restore.tst: pdump.tst restore.dump
 
 pdump-multigrid.c: pdump.c
 	ln -sf pdump.c pdump-multigrid.c
@@ -457,31 +459,31 @@ pdump-multigrid.tst: pdump.c
 pdump-multigrid.tst: CFLAGS = -grid=multigrid
 pdump-multigrid.tst: CC = mpicc -D_MPI=16
 
-restore-multigrid.dump: pdump-multigrid.tst
+restore-multigrid.dump: pdump-multigrid/restore.dump
 	ln -sf pdump-multigrid/restore.dump restore-multigrid.dump
-restore-multigrid.tst: restore-multigrid.dump
+restore-multigrid.tst: pdump-multigrid.tst restore-multigrid.dump
 restore-multigrid.tst: CFLAGS = -grid=multigrid
 restore-multigrid.tst: CC = mpicc -D_MPI=16
 
-restore-tree.dump: pdump.tst
+restore-tree.dump: pdump/restore.dump
 	ln -sf pdump/restore.dump restore-tree.dump
-restore-tree.tst: restore-tree.dump
+restore-tree.tst: pdump.tst restore-tree.dump
 restore-tree.tst: CFLAGS = -DDEBUGCOND=false
 restore-tree.tst: CC = mpicc -D_MPI=23
 
 bump2Dp-restore.c: bump2Dp.c
 	ln -sf bump2Dp.c bump2Dp-restore.c
-bump2Dp-restore.dump: bump2Dp.tst
+bump2Dp-restore.dump: bump2Dp/dump
 	ln -sf bump2Dp/dump bump2Dp-restore.dump
-bump2Dp-restore.tst: bump2Dp-restore.dump
+bump2Dp-restore.tst: bump2Dp.tst bump2Dp-restore.dump
 bump2Dp-restore.tst: CC = mpicc -D_MPI=15
 
 # parallel output_gfs()
 
 gfs.tst: CC = mpicc -D_MPI=7
-gfsi.gfs: gfs.tst
+gfsi.gfs: gfs/gfsi.gfs
 	ln -sf gfs/gfsi.gfs
-gfsi.tst: gfsi.gfs
+gfsi.tst: gfs.tst gfsi.gfs
 
 # load-balancing
 
