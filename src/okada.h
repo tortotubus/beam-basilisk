@@ -133,7 +133,7 @@ void okada (scalar d,
                           length, width, U};
     faults = lfaults;
   }
-  foreach() {
+  foreach (cpu) {
     d[] = 0.;
     for (Fault * f = faults; f && f->depth > 0.; f++) {
       double depth = f->depth, dtr = pi/180.;

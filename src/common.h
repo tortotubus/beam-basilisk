@@ -1455,6 +1455,14 @@ typedef struct {
 #endif
 } _coord;
 
+#if dimension == 1
+# define avector(x, ...)    {x}
+#elif dimension == 2
+# define avector(x, y, ...) {x, y}
+#else // dimension == 3
+# define avector(x, y, z)   {x, y, z}
+#endif
+  
 #if LAYERS
 # include "grid/layers.h"
 #endif
