@@ -103,6 +103,9 @@ This function writes timing statistics on standard output. */
 
 void timer_print (timer t, int i, size_t tnc)
 {
+#if GPU
+  glFinish(); // make sure rendering is done on the GPU
+#endif
   timing s = timer_timing (t, i, tnc, NULL);
   fprintf (fout,
 	   "\n# " GRIDNAME 
@@ -117,6 +120,7 @@ void timer_print (timer t, int i, size_t tnc)
 	   s.avg, 100.*s.avg/s.real,
 	   s.max, 100.*s.max/s.real);
 @endif
+  fflush (stdout);
 }
 
 /**
@@ -237,6 +241,34 @@ centered differencing is used. */
 void gradients (scalar * f, vector * g)
 {
   assert (list_len(f) == vectors_len(g));
+#if GPU
+  scalar * slistc = NULL, * slistm = NULL;
+  vector * vlistc = NULL, * vlistm = NULL, * vlistz = NULL;
+  scalar s; vector v;
+  for (s,v in f,g)
+    if (s.gradient == NULL)
+      slistc = list_append (slistc, s), vlistc = vectors_append (vlistc, v);
+    else if (s.gradient == minmod2)
+      slistm = list_append (slistm, s), vlistm = vectors_append (vlistm, v);
+    else if (s.gradient == zero)
+      vlistz = vectors_append (vlistz, v);
+    else
+      assert (false); // not implemented yet  
+  foreach() {
+    scalar s; vector v;
+    for (s, v in slistc, vlistc)
+      foreach_dimension()
+	v.x[] = (s[1] - s[-1])/(2.*Delta);
+    for (s, v in slistm, vlistm)
+      foreach_dimension()
+	v.x[] = minmod2 (s[-1], s[], s[1])/Delta;
+    for (vector v in vlistz)
+      foreach_dimension()
+	v.x[] = 0.;
+  }
+  free (slistc), free (slistm);
+  free (vlistc), free (vlistm), free (vlistz);
+#else // !GPU // fixme: the version above is always faster (but less general)
   foreach() {
     scalar s; vector v;
     for (s,v in f,g) {
@@ -260,6 +292,7 @@ void gradients (scalar * f, vector * g)
 	}
     }
   }
+#endif // !GPU
 }
 
 /**
