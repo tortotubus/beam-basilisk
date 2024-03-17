@@ -565,7 +565,7 @@ vector cartesian_init_vector (vector v, const char * name)
       cartesian_init_scalar (v.x, cname);
     }
     else
-      init_scalar (v.x, NULL);
+      cartesian_init_scalar (v.x, NULL);
     v.x.v = v;
   }
   /* set default boundary conditions */

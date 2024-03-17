@@ -1455,6 +1455,14 @@ typedef struct {
 #endif
 } _coord;
 
+// Types and macros for compatibility with GLSL
+
+typedef struct {
+  float r, g, b, a;
+} vec4;
+
+@define mix(a,b,c) (c=c,a)
+
 #if dimension == 1
 # define avector(x, ...)    {x}
 #elif dimension == 2

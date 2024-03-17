@@ -193,6 +193,12 @@ Note that only the documented test cases appear in the list below
 
 ## GPUs
 
+These tests need to be run manually using
+
+~~~bash
+make gpu-tests
+~~~
+
 * [gpu.c](Basic GPU operations)
 * [gpu-reduce.c](Reductions on GPUs)
 * [advection.c](Time-reversed advection in a vortex)
