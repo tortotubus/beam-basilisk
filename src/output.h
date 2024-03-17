@@ -55,7 +55,7 @@ void output_field (scalar * list = all,
   v = field[0];
   foreach_region (p, box1, cn, reduction(min:v[:n*ny*len]))
 #else
-  foreach_region (p, box1, cn)
+  foreach_region (p, box1, cn, cpu)
 #endif
   {
     double ** alias = field; // so that qcc considers 'field' a local variable
@@ -571,7 +571,7 @@ void output_ppm (scalar f,
 #if _MPI
   foreach_region (p, box, cn, reduction(max:ppm0[:len]))
 #else
-  foreach_region (p, box, cn)
+  foreach_region (p, box, cn, cpu)
 #endif
   {
     double v;
@@ -1283,3 +1283,7 @@ bool restore (const char * file = "dump",
 }
 
 #endif // MULTIGRID
+
+#if GPU
+# include "gpu/output.h"
+#endif
