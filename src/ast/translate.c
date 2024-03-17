@@ -5043,6 +5043,40 @@ static
 void kernel (Ast * n, Stack * stack, void * data)
 {
   switch (n->sym) {
+
+  /**
+  ## Postfix initializers */
+
+  case sym_postfix_expression: {
+    Ast * list;
+    if ((list = ast_schema (n, sym_postfix_expression,
+			    3, sym_postfix_initializer,
+			    1, sym_initializer_list))) {
+      Ast * a = n->child[0];
+      ast_set_child (n, 0, n->child[1]);
+      ast_set_child (n, 1, a);
+      a = n->child[3];
+      ast_set_child (n, 3, n->child[2]);
+      ast_set_child (n, 2, list);
+      ast_destroy (a);
+    }
+    break;
+  }
+
+  /**
+  ## Cast expressions */
+
+  case sym_cast_expression:
+    if (ast_schema (n, sym_cast_expression,
+		    1, sym_type_name)) {
+      Ast * a = n->child[0];
+      ast_set_child (n, 0, n->child[1]);
+      ast_set_child (n, 1, a);
+      a = n->child[3];
+      ast_set_child (n, 3, n->child[2]);
+      ast_set_child (n, 2, a);
+    }
+    break;
     
   /**
   ## forin_declaration_statement */

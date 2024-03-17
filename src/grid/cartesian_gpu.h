@@ -14,29 +14,8 @@ __NV_PRIME_RENDER_OFFLOAD=1 __GLX_VENDOR_LIBRARY_NAME=nvidia  glxinfo -B | \
 
 * gpu/cpu keyword
 * if 'gpu' is specified and the loop cannot run on the GPU, the code exits
-* type casts in GLSL i.e. int() etc.
+* type casts in GLSL i.e. (int)... etc.
 
-## Useful links
-
-* [Core Language (GLSL)](https://www.khronos.org/opengl/wiki/Core_Language_(GLSL))
-* [Image Load Store](https://www.khronos.org/opengl/wiki/Image_Load_Store)
-* [OpenGL* Performance Tips: Avoid OpenGL Calls that Synchronize CPU and GPU](https://www.intel.com/content/www/us/en/developer/articles/technical/opengl-performance-tips-avoid-opengl-calls-that-synchronize-cpu-and-gpu.html)
-* [Read pixel data from default framebuffer in OpenGL: Performance of FBO vs. PBO](https://coderedirect.com/questions/611796/read-pixel-data-from-default-framebuffer-in-opengl-performance-of-fbo-vs-pbo)
-* [Persistent Mapped Buffers in OpenGL](https://www.cppstories.com/2015/01/persistent-mapped-buffers-in-opengl/)
-* [Best Practices for Working with Texture Data (OpenGL Programming Guide for Mac)](https://developer.apple.com/library/archive/documentation/GraphicsImaging/Conceptual/OpenGL-MacProgGuide/opengl_texturedata/opengl_texturedata.html)
-* [https://github.com/Erkaman/fluid_sim]()
-* [https://stackoverflow.com/questions/67529148/how-can-i-optimize-a-compute-shader-thats-heavy-on-imageload-calls]()
-* [https://www.slideshare.net/Mark_Kilgard/siggraph-2012-nvidia-opengl-for-2012]()
-* [https://stackoverflow.com/questions/7954927/passing-a-list-of-values-to-fragment-shader]()
-* [https://computergraphics.stackexchange.com/questions/5416/why-use-image-load-stores-instead-of-fbos]()
-* [https://computergraphics.stackexchange.com/questions/9956/performance-of-compute-shaders-vs-fragment-shaders-for-deferred-rendering]()
-* [https://computergraphics.stackexchange.com/questions/54/when-is-a-compute-shader-more-efficient-than-a-pixel-shader-for-image-filtering]()
-* [http://diaryofagraphicsprogrammer.blogspot.com/2014/03/compute-shader-optimizations-for-amd.html]()
-* [DirectCompute: Optimizations and Best Practices, Eric Young, NVIDIA Corporation, 2010](http://on-demand.gputechconf.com/gtc/2010/presentations/S12312-DirectCompute-Pre-Conference-Tutorial.pdf)
-* [Compute shaders in graphics: Gaussian blur](https://lisyarus.github.io/blog/graphics/2022/04/21/compute-blur.html)
-* [Arm Mali GPUs Best Practices Developer Guide](https://armkeil.blob.core.windows.net/developer/Arm%20Developer%20Community/PDF/Arm%20Mali%20GPU%20Best%20Practices.pdf)
-* [Rendering to a 3D texture](https://community.khronos.org/t/rendering-to-a-3d-texture/75285/2)
-* [GLFW Shared Contexts](https://www.glfw.org/docs/3.3/context_guide.html#context_sharing)
 */
 
 #include <gpu/gpu.h>
@@ -207,8 +186,6 @@ static char glsl_preproc[] =
   "#define nodata (1e30)\n"
   "#define sq(x) ((x)*(x))\n"
   "#define fabs(x) abs(x)\n"
-  "#define cast_int(x) int(x)\n"
-  "#define inout(x) (x)\n"
   "const real z = 0.;\n"
   ;
 
@@ -1048,12 +1025,6 @@ double gpu_reduction (scalar s, const char op)
     break;
   default: assert (false);
   }
-
-#if 0
-  s1.gpu.stored = s2.gpu.stored = -1;
-  output_ppm (s1, file = "s1.png", n = 512, spread = -1);
-  output_ppm (s2, file = "s2.png", n = 512, spread = -1);
-#endif
   
   return result;
 }
@@ -1272,7 +1243,8 @@ static bool doloop_on_gpu (ForeachData * loop, NonLocal * nonlocals,
       t = ((Texture *)cartesian_gpu->texture->p) + _i;
       t->io = tex_texture (tmp);
 #if DEBUG_ALLOC_TEXTURE
-      fprintf (stderr, "input/output texture input: %d output: %d\n", t->id, t->io->id);
+      fprintf (stderr, "%s:%d: input/output texture input: %d output: %d\n",
+	       loop->fname, loop->line, t->id, t->io->id);
 #endif
     }
   
@@ -1298,12 +1270,14 @@ static bool doloop_on_gpu (ForeachData * loop, NonLocal * nonlocals,
 	GL_C (glActiveTexture (GL_TEXTURE0 + t->input));
 	GL_C (glBindTexture (GL_TEXTURE_2D, t->id));
 #if DEBUG_ALLOC_TEXTURE
-	fprintf (stderr, "attached texture %d to _inputs[%d]\n", t->id, t->input);
+	fprintf (stderr, "%s:%d: attached texture %d to _inputs[%d]\n",
+		 loop->fname, loop->line, t->id, t->input);
 #endif
       }
 #if PRINTUNIFORM
       else
-	fprintf (stderr, "'%s' not located (optimized out?)\n", s);
+	fprintf (stderr, "%s:%d: '%s' not located (optimized out?)\n",
+		 loop->fname, loop->line, s);
 #endif
     }
   
@@ -1324,8 +1298,9 @@ static bool doloop_on_gpu (ForeachData * loop, NonLocal * nonlocals,
 				    GL_TEXTURE_2D, t->id, 0));
       GL_C (glColorMaski (t->output, t->out[0], t->out[1], t->out[2], t->out[3]));
 #if DEBUG_ALLOC_TEXTURE
-      fprintf (stderr, "attached texture %d to _outputs[%d] mask [%d,%d,%d,%d]\n",
-	       t->id, t->output, t->out[0], t->out[1], t->out[2], t->out[3]);
+      fprintf (stderr, "%s:%d: attached texture %d to _outputs[%d] mask [%d,%d,%d,%d]\n",
+	       loop->fname, loop->line, t->id, t->output,
+	       t->out[0], t->out[1], t->out[2], t->out[3]);
 #endif
       if (t->output + 1 > draw_buffer)
 	draw_buffer = t->output + 1;
@@ -1529,3 +1504,28 @@ static void cartesian_gpu_methods()
   init_tensor        = cartesian_gpu_init_tensor;
   scalar_clone       = cartesian_gpu_scalar_clone;
 }
+
+/**
+## Useful links
+
+* [Core Language (GLSL)](https://www.khronos.org/opengl/wiki/Core_Language_(GLSL))
+* [Image Load Store](https://www.khronos.org/opengl/wiki/Image_Load_Store)
+* [OpenGL* Performance Tips: Avoid OpenGL Calls that Synchronize CPU and GPU](https://www.intel.com/content/www/us/en/developer/articles/technical/opengl-performance-tips-avoid-opengl-calls-that-synchronize-cpu-and-gpu.html)
+* [Read pixel data from default framebuffer in OpenGL: Performance of FBO vs. PBO](https://coderedirect.com/questions/611796/read-pixel-data-from-default-framebuffer-in-opengl-performance-of-fbo-vs-pbo)
+* [Persistent Mapped Buffers in OpenGL](https://www.cppstories.com/2015/01/persistent-mapped-buffers-in-opengl/)
+* [Best Practices for Working with Texture Data (OpenGL Programming Guide for Mac)](https://developer.apple.com/library/archive/documentation/GraphicsImaging/Conceptual/OpenGL-MacProgGuide/opengl_texturedata/opengl_texturedata.html)
+* [https://github.com/Erkaman/fluid_sim]()
+* [https://stackoverflow.com/questions/67529148/how-can-i-optimize-a-compute-shader-thats-heavy-on-imageload-calls]()
+* [https://www.slideshare.net/Mark_Kilgard/siggraph-2012-nvidia-opengl-for-2012]()
+* [https://stackoverflow.com/questions/7954927/passing-a-list-of-values-to-fragment-shader]()
+* [https://computergraphics.stackexchange.com/questions/5416/why-use-image-load-stores-instead-of-fbos]()
+* [https://computergraphics.stackexchange.com/questions/9956/performance-of-compute-shaders-vs-fragment-shaders-for-deferred-rendering]()
+* [https://computergraphics.stackexchange.com/questions/54/when-is-a-compute-shader-more-efficient-than-a-pixel-shader-for-image-filtering]()
+* [http://diaryofagraphicsprogrammer.blogspot.com/2014/03/compute-shader-optimizations-for-amd.html]()
+* [DirectCompute: Optimizations and Best Practices, Eric Young, NVIDIA Corporation, 2010](http://on-demand.gputechconf.com/gtc/2010/presentations/S12312-DirectCompute-Pre-Conference-Tutorial.pdf)
+* [Compute shaders in graphics: Gaussian blur](https://lisyarus.github.io/blog/graphics/2022/04/21/compute-blur.html)
+* [Arm Mali GPUs Best Practices Developer Guide](https://armkeil.blob.core.windows.net/developer/Arm%20Developer%20Community/PDF/Arm%20Mali%20GPU%20Best%20Practices.pdf)
+* [Rendering to a 3D texture](https://community.khronos.org/t/rendering-to-a-3d-texture/75285/2)
+* [GLFW Shared Contexts](https://www.glfw.org/docs/3.3/context_guide.html#context_sharing)
+
+*/
