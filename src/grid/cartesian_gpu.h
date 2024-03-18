@@ -24,9 +24,6 @@ __NV_PRIME_RENDER_OFFLOAD=1 __GLX_VENDOR_LIBRARY_NAME=nvidia  glxinfo -B | \
 
 #define free_grid cartesian_free_grid
 
-@undef foreach_stencil
-@undef end_foreach_stencil
-
 static bool _gpu_done_ = false;
 @def BEGIN_FOREACH if (_gpu_done_)
   _gpu_done_ = false;
@@ -35,15 +32,22 @@ static bool _gpu_done_ = false;
 @
 @define END_FOREACH   end_tracing("foreach", S__FILE__, S_LINENO); }
 
+typedef struct {
+  coord p, * box, n;
+} RegionParameters;
+
+@undef foreach_stencil
 @def foreach_stencil(_parallel, ...) {
   tracing ("foreach", S__FILE__, S_LINENO);
   static ForeachData _loop = {
     .fname = S__FILE__, .line = S_LINENO, .first = 1, .parallel = _parallel
   };
   struct {
+    RegionParameters parameters;
     NonLocal * nonlocals;
     const char * funcs, * kernel;
   } _params = S__VA_ARGS__;
+  RegionParameters * region = &_params.parameters;
   if (baseblock) for (scalar s = baseblock[0], * i = baseblock; s.i >= 0; i++, s = *i) {
     _attribute[s.i].input = _attribute[s.i].output = false;
     _attribute[s.i].width = 0;
@@ -51,7 +55,28 @@ static bool _gpu_done_ = false;
   int ig = 0, jg = 0, kg = 0; NOT_UNUSED(ig); NOT_UNUSED(jg); NOT_UNUSED(kg);
   Point point = {0}; NOT_UNUSED (point);
 @
-  
+
+@undef foreach_point_stencil
+@def foreach_point_stencil(_parallel, ...) {
+  tracing ("foreach", S__FILE__, S_LINENO);
+  static ForeachData _loop = {
+    .fname = S__FILE__, .line = S_LINENO, .first = 1, .parallel = _parallel
+  };
+  struct {
+    coord parameters;
+    NonLocal * nonlocals;
+    const char * funcs, * kernel;
+  } _params = S__VA_ARGS__;
+  RegionParameters r = { .p = _params.parameters, .n = {1,1} }, * region = &r;
+  if (baseblock) for (scalar s = baseblock[0], * i = baseblock; s.i >= 0; i++, s = *i) {
+    _attribute[s.i].input = _attribute[s.i].output = false;
+    _attribute[s.i].width = 0;
+  }
+  int ig = 0, jg = 0, kg = 0; NOT_UNUSED(ig); NOT_UNUSED(jg); NOT_UNUSED(kg);
+  Point point = {0}; NOT_UNUSED (point);
+@
+
+@undef end_foreach_stencil
 @def end_foreach_stencil()
 #if PRINTIO
   if (baseblock) {
@@ -66,7 +91,7 @@ static bool _gpu_done_ = false;
   }
 #endif // PRINTIO
   check_stencil (&_loop);
-  _gpu_done_ = gpu_end_stencil (&_loop, _params.nonlocals, _params.funcs, _params.kernel);
+  _gpu_done_ = gpu_end_stencil (&_loop, region, _params.nonlocals, _params.funcs, _params.kernel);
   boundary_stencil (&_loop);
   _loop.first = 0;
   end_tracing ("foreach", S__FILE__, S_LINENO);
@@ -78,8 +103,8 @@ static bool _gpu_done_ = false;
 @ define end_tracing(func, file, line) do { glFinish(); end_tracing(func, file, line); } while(0)
 @endif
 
-bool gpu_end_stencil (ForeachData * loop, NonLocal * nonlocals,
-		      const char * funcs, const char * kernel);
+bool gpu_end_stencil (ForeachData * loop, const RegionParameters * region,
+		      NonLocal * nonlocals, const char * funcs, const char * kernel);
 
 #include "cartesian.h"
 
@@ -163,7 +188,7 @@ static char glsl_preproc[] =
   "struct vector { scalar x, y; };\n"
   "struct tensor { vector x, y; };\n"
 #endif
-  "#define Vec4(r,g,b,a) vec4(r,g,b,a)\n"
+  "#define Point vec2\n"
   "#define valt(s,i,j,k) "
   "  (texture(s, point + vec2((i), (j))*_delta))\n"
   "#define val(s,i,j,k) ((s.a == 0 || i != 0 || j != 0 || k != 0 ?"
@@ -182,6 +207,9 @@ static char glsl_preproc[] =
   "#define end_is_face_x() }\n"
   "#define end_is_face_y() }\n"
   "#define VARIABLES\n"
+  "#define POINT_VARIABLES real Delta = L0/N, Delta_x = Delta, Delta_y = Delta,"
+  " x = X0 + point.x*L0, y = Y0 + point.y*L0;\n"
+  "#define NOT_UNUSED(x)\n"
   "#define pi 3.14159265359\n"
   "#define nodata (1e30)\n"
   "#define sq(x) ((x)*(x))\n"
@@ -365,11 +393,10 @@ char * build_shader (const NonLocal * nonlocals, const char * fname, int line)
   else
     fs = str_append (fs, "vec4 _outputs[1];\n");
   fs = str_append (fs,
-		   "in vec2 point;\n"
+		   "in Point point;\n"
 		   "out vec4 FragColor;\n"
 		   "real _delta = 1.0f/N;\n"
-		   "real Delta = L0/N, Delta_x = Delta, Delta_y = Delta;\n"
-		   "real x = X0 + point.x*L0, y = Y0 + point.y*L0;\n");
+		   "POINT_VARIABLES\n");
   return fs;
 }
 
@@ -699,6 +726,7 @@ void gpu_init()
     GL_C (glUseProgram (0));
     GL_C (glBindTexture (GL_TEXTURE_2D, 0));
     GL_C (glDepthFunc (GL_LESS));
+    GL_C (glPointSize (1));
 
     // enable vertex buffer used for full screen quad rendering. 
     // this buffer is used for all rendering, from now on.
@@ -906,8 +934,18 @@ static GLuint load_reduction_shader (char * start, char * reduct)
   return id;
 }
 
-double gpu_reduction (scalar s, const char op)
+double gpu_reduction (scalar s, const char op, const RegionParameters * region)
 {
+  if (region->n.x == 1 && region->n.y == 1) {
+    int i =  (region->p.x - X0)/L0*cartesian->n;
+    int j =  (region->p.y - Y0)/L0*cartesian->n;
+    GL_C (glFramebufferTexture2D (GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0,
+				  GL_TEXTURE_2D, scalar_texture(s)->id, 0));
+    float result = 0.;
+    GL_C (glReadPixels (i, j, 1, 1, GL_RED, GL_FLOAT, &result));
+    return result;
+  }
+
   GLuint id = 0;
 
   switch (op) {
@@ -1147,7 +1185,8 @@ static void inputs_to_gpu (ForeachData * loop, const NonLocal * nonlocals)
 
 const char _double[] = "double";
 
-static bool doloop_on_gpu (ForeachData * loop, NonLocal * nonlocals,
+static bool doloop_on_gpu (ForeachData * loop, const RegionParameters * region,
+			   NonLocal * nonlocals,
 			   const char * funcs, const char * kernel)
 {
   GLuint shaderid = (long)loop->data;
@@ -1378,6 +1417,13 @@ static bool doloop_on_gpu (ForeachData * loop, NonLocal * nonlocals,
 #endif
 	    glUniform1f (location, *((double *)p)); p = ((double *)p) + 1;
 	  }
+	  else if (!strcmp (g->type, "bool")) {
+#if PRINTUNIFORM
+	    bool * p = g->pointer;
+	    fprintf (stderr, "uniform bool %s = %d\n", g->name, *p);
+#endif
+	    glUniform1i (location, *((bool *)p)); p = ((bool *)p) + 1;
+	  }	  
 	  else if (!strcmp (g->type, "coord") || !strcmp(g->type, "_coord")) {
 #if PRINTUNIFORM
 	    fprintf (stderr, "uniform coord %s = {%g,%g}\n", g->name,
@@ -1385,8 +1431,10 @@ static bool doloop_on_gpu (ForeachData * loop, NonLocal * nonlocals,
 #endif
 	    glUniform2f (location, ((double *)p)[0], ((double *)p)[1]); p = ((double *)p) + 2;
 	  }
-	  else
+	  else {
+	    fprintf (stderr, "type: %s name: %s\n", g->type, g->name);
 	    assert (false);
+	  }
 	}
 	else
 	  assert (false);
@@ -1395,9 +1443,32 @@ static bool doloop_on_gpu (ForeachData * loop, NonLocal * nonlocals,
   }
     
   /**
-  ## Render */
+  ## Render 
+
+  If this is a `foreach_point()` iteration, we draw a single point */
+
+  if (region->n.x == 1 && region->n.y == 1) {
+    int i =  (region->p.x - X0)/L0*cartesian->n;
+    int j =  (region->p.y - Y0)/L0*cartesian->n;
+    float vertices[] = { (i + 0.5)/cartesian->n, (j + 0.5)/cartesian->n };
+    GLuint vbo;
+    GL_C (glGenBuffers (1, &vbo));
+    GL_C (glBindBuffer (GL_ARRAY_BUFFER, vbo));
+    GL_C (glVertexAttribPointer ((GLuint)0, 2, GL_FLOAT, GL_FALSE,
+				 2*sizeof(float), (void*)0));
+    GL_C (glBufferData (GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW));
+    GL_C (glDrawArrays (GL_POINTS, 0, 1));
+    GL_C (glBindBuffer (GL_ARRAY_BUFFER, GPUContext.vbo));
+    GL_C (glVertexAttribPointer ((GLuint)0, 2, GL_FLOAT, GL_FALSE,
+				 2*sizeof(float), (void*)0));
+    glDeleteBuffers (1, &vbo);
+  }
+
+  /**
+  Otherwise, we draw "fullscreen". */
   
-  GL_C (glDrawArrays(GL_TRIANGLES, 0, 6));
+  else
+    GL_C (glDrawArrays (GL_TRIANGLES, 0, 6));
 
   /**
   ## Perform reductions and cleanup */
@@ -1407,7 +1478,7 @@ static bool doloop_on_gpu (ForeachData * loop, NonLocal * nonlocals,
   for (const NonLocal * g = nonlocals; g->name; g++)
     if (g->reduct) {
       scalar s = g->data;
-      double result = gpu_reduction (s, g->reduct);
+      double result = gpu_reduction (s, g->reduct, region);
 #if 0
       fprintf (stderr, "%s:%d: %s %c %g\n",
 	       loop->fname, loop->line, g->name, g->reduct, result);
@@ -1426,12 +1497,13 @@ static bool doloop_on_gpu (ForeachData * loop, NonLocal * nonlocals,
 }
 
 bool gpu_end_stencil (ForeachData * loop,
+		      const RegionParameters * region,
 		      NonLocal * nonlocals,
 		      const char * funcs, const char * kernel)
 {
   bool on_gpu = loop->parallel == 1 || loop->parallel == 3;
   if (on_gpu)
-    on_gpu = doloop_on_gpu (loop, nonlocals, funcs, kernel);
+    on_gpu = doloop_on_gpu (loop, region, nonlocals, funcs, kernel);
   if (on_gpu) {
     // fixme: apply boundary conditions...
     free (loop->listc), loop->listc = NULL;

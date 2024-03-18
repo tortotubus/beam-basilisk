@@ -231,7 +231,33 @@ int main (int argc, char * argv[])
     s[] = myfunc (x);
   stats sf = statsf (s);
   fprintf (stderr, "%g %g %g\n", sf.min, sf.sum, sf.max);
+
+  /**
+  ## foreach_point() */
+
+  init_grid (2);
+  origin (-0.5, -0.5);
+  foreach()
+    s[] = 0.;
+  for (double xp = - 0.24; xp < 0.5; xp += 0.5)
+    for (double yp = - 0.24; yp < 0.5; yp += 0.5)
+      foreach_point (xp, yp)
+	s[] = (x + y) - (xp + yp);
+  foreach (serial)
+    fprintf (stderr, "%g %g %g\n", x, y, s[]);
+  origin (0, 0);
+
+  /**
+  ## Interpolation
   
+  This also tests foreach_point() and reductions. */
+  
+  foreach()
+    s[] = x*y;
+  fprintf (stderr, "%g %g\n",
+	   interpolate (s, 0.5, 0.5, linear = false),
+	   interpolate (s, 0.5, 0.5, linear = true));
+
   /**
   ## Other tests */
   
