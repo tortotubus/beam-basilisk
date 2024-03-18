@@ -3835,9 +3835,11 @@ static void stencils (Ast * n, Stack * stack, void * data)
       int parallel = (gpu ?
 		      1 :  // parallel on CPU || GPU
 		      2 ); // parallel on CPU
-      if (parameters)
-	foreach_item (parameters, 2, item) {
+      char * args = NULL;
+      if (parameters) {
+	foreach_item_r (parameters, sym_foreach_parameter, item) {
 	  Ast * identifier = ast_is_identifier_expression (item->child[0]);
+	  bool found = true;
 	  if (identifier) {
 	    AstTerminal * t = ast_terminal (identifier);
 	    if (!strcmp (t->start, "serial"))
@@ -3846,20 +3848,31 @@ static void stencils (Ast * n, Stack * stack, void * data)
 	      parallel = 2, gpu = false;
 	    else if (!strcmp (t->start, "gpu"))
 	      parallel = 3, gpu = true;
+	    else
+	      found = false;
+	  }
+	  else if (item->child[0]->sym == sym_assignment_expression)
+	    found = false;
+	  if (!found) {
+	    if (args) str_append (args, ",");
+	    args = ast_str_append (item, args);
 	  }
 	}
-
+      }
       ast_after (params,
 		 parallel == 0 ? "0" : parallel == 1 ? "1" : parallel == 2 ? "2" : "3",
-		 ",{(NonLocal[])");
+		 ",{");
+      if (args) {
+	ast_after (params, ".parameters={", args, "},");
+	free (args);
+      }
+      ast_after (params, ".nonlocals=(NonLocal[])");
       ast_non_local_references (foreach, params);
       if (gpu) {
 	ast_after (params, ",");
 	ast_kernel (foreach, params);
-	ast_after (params, "}");
       }
-      else
-	ast_after (params, ",NULL}");
+      ast_after (params, "}");
     }
 
     break;
@@ -5045,6 +5058,13 @@ void kernel (Ast * n, Stack * stack, void * data)
   switch (n->sym) {
 
   /**
+  ## Remove some reserved GLSL keywords */
+    
+  case sym_STATIC:
+    ast_terminal (n)->start[0] = '\0';
+    break;
+    
+  /**
   ## Postfix initializers */
 
   case sym_postfix_expression: {
@@ -5267,12 +5287,12 @@ void ast_kernel (Ast * n, Ast * argument)
   Stack * funcs = stack_new (sizeof (Ast *));
   Ast * statement = ast_copy (ast_child (n, sym_statement));
   ast_traverse (statement, stack, kernel, funcs);
-  ast_after (argument, "$(\"");
+  ast_after (argument, ".funcs=$(\"");
   Ast ** func;
   while ((func = stack_pop (funcs)))
     stringify (ast_parent (*func, sym_function_definition), argument);
   stack_destroy (funcs);
-  ast_after (argument, "\"),$(\"");
+  ast_after (argument, "\"),.kernel=$(\"");
   stringify (statement, argument);
   ast_after (argument, "\")");
   ast_pop_scope (stack, n);
