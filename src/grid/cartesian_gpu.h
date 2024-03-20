@@ -106,6 +106,8 @@ typedef struct {
 bool gpu_end_stencil (ForeachData * loop, const RegionParameters * region,
 		      NonLocal * nonlocals, const char * funcs, const char * kernel);
 
+#define GPU 1
+
 #include "cartesian.h"
 
 @undef POINT_VARIABLES
@@ -116,8 +118,6 @@ bool gpu_end_stencil (ForeachData * loop, const RegionParameters * region,
 @
 
 #include <khash.h>
-
-#define GPU 1
 
 KHASH_MAP_INIT_STR(STR, GLuint)
 
