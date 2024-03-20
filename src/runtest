@@ -68,7 +68,7 @@ script()
 	    fi
 	fi
     else
-	if ! $GDB -batch -return-child-result -ex "run 2> $log > $out" ./$test > gdb.log 2> gdb.err; then
+	if ! stdbuf -oL $GDB -batch -return-child-result -ex "run 2>&1 > $out | tee $log |  grep -E '.*:[0-9]*:.*(warning|error).*:'" ./$test 2> gdb.err | tee gdb.log; then
 	    pass=false
 	    $AWK '
      {
@@ -106,9 +106,6 @@ script()
     if test -f fail; then
 	return 1
     fi
-
-    # fixme: need to apply this also to convergence WARNING etc...
-    grep -E '.*:[0-9]*:.*(warning|error).*:' $log 1>&2
 
     touch pass
 }
