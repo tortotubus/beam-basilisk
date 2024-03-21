@@ -4981,6 +4981,9 @@ void * endfor (FILE * fin, FILE * fout,
 
   char methods[strlen(grid) + strlen("_methods") + 1];
   strcpy (methods, grid);
+  for (char * s = methods; *s; s++)
+    if (*s == '/')
+      *s = '_';
   strcat (methods, "_methods");
   compound_prepend (data.last_events, ast_new_function_call (data.last_events, methods));
   if (catch)

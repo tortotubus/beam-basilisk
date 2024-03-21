@@ -40,10 +40,10 @@ clean:
 
 %.gpu.c: %.c
 	ln -s -f $< $@
-%.gpu.s:   CFLAGS += -grid=cartesian_gpu
+%.gpu.s:   CFLAGS += -grid=gpu/cartesian
 %.gpu.s: $(BASILISK)/libgpu.a
-%.gpu.s.d: CFLAGS += -grid=cartesian_gpu
-%.gpu.tst: CFLAGS += -grid=cartesian_gpu
+%.gpu.s.d: CFLAGS += -grid=gpu/cartesian
+%.gpu.tst: CFLAGS += -grid=gpu/cartesian
 
 %.CADNA.c: %.c
 	ln -s $< $@

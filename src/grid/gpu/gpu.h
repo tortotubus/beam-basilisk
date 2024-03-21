@@ -1,6 +1,6 @@
-#include <gpu/glad.h>
+#include <grid/gpu/glad.h>
 #include <GLFW/glfw3.h>
-#pragma autolink -L$BASILISK/gpu -lglfw -lgpu -ldl
+#pragma autolink -L$BASILISK/grid/gpu -lglfw -lgpu -ldl
 
 static struct {
   ///// GPU /////

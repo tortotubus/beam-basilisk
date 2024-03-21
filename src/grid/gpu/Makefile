@@ -1,6 +1,6 @@
 .PHONY: all clean
 
-CFLAGS += -I..
+CFLAGS += -I.. -O2
 
 all: libgpu.a
 
