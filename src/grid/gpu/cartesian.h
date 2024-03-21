@@ -18,7 +18,7 @@ __NV_PRIME_RENDER_OFFLOAD=1 __GLX_VENDOR_LIBRARY_NAME=nvidia  glxinfo -B | \
 
 */
 
-#include <gpu/gpu.h>
+#include <grid/gpu/gpu.h>
 
 #define GRIDNAME "Cartesian (GPU)"
 
@@ -108,7 +108,7 @@ bool gpu_end_stencil (ForeachData * loop, const RegionParameters * region,
 
 #define GPU 1
 
-#include "cartesian.h"
+#include "../cartesian.h"
 
 @undef POINT_VARIABLES
 @def POINT_VARIABLES
@@ -127,7 +127,7 @@ typedef struct {
   khash_t(STR) * shaders;
 } CartesianGPU;
 
-#define cartesian_gpu ((CartesianGPU *)grid)
+#define gpu_cartesian ((CartesianGPU *)grid)
 
 typedef struct _Texture Texture;
 
@@ -139,12 +139,12 @@ struct _Texture {
   Texture * io;
 };
 
-#define tex_texture(tex)  (((Texture *)cartesian_gpu->texture->p) + tex - 1)
+#define tex_texture(tex)  (((Texture *)gpu_cartesian->texture->p) + tex - 1)
 #define scalar_texture(s) tex_texture (s.gpu.texture)
 
 @def foreach_texture(t)
-  for (int _i = 0; _i < cartesian_gpu->texture->len/sizeof(Texture); _i++) {
-    Texture * t = ((Texture *)cartesian_gpu->texture->p) + _i;
+  for (int _i = 0; _i < gpu_cartesian->texture->len/sizeof(Texture); _i++) {
+    Texture * t = ((Texture *)gpu_cartesian->texture->p) + _i;
     if (t->used) {
 @
 @define end_foreach_texture() }}
@@ -407,11 +407,11 @@ char * build_shader (const NonLocal * nonlocals, const char * fname, int line)
 
 GLuint load_shader (const char * fs)
 {
-  assert (cartesian_gpu->shaders);
-  khiter_t k = kh_get (STR, cartesian_gpu->shaders, fs);
-  if (k != kh_end (cartesian_gpu->shaders)) {
+  assert (gpu_cartesian->shaders);
+  khiter_t k = kh_get (STR, gpu_cartesian->shaders, fs);
+  if (k != kh_end (gpu_cartesian->shaders)) {
     sysfree ((void *)fs);
-    return kh_value (cartesian_gpu->shaders, k);
+    return kh_value (gpu_cartesian->shaders, k);
   }
 #if PRINTSHADER
   fputs (fs, stderr);
@@ -427,9 +427,9 @@ GLuint load_shader (const char * fs)
   GLuint id = loadNormalShader (quad, fs);
   if (id) {
     int ret;
-    khiter_t k = kh_put (STR, cartesian_gpu->shaders, fs, &ret);
+    khiter_t k = kh_put (STR, gpu_cartesian->shaders, fs, &ret);
     assert (ret > 0);
-    kh_value (cartesian_gpu->shaders, k) = id;
+    kh_value (gpu_cartesian->shaders, k) = id;
   }
   else
     sysfree ((void *)fs);
@@ -485,7 +485,7 @@ void gpu_periodic (int dir)
   periodic (dir);
   if (grid) {
     GLuint c = dir/2 ? GL_TEXTURE_WRAP_T : GL_TEXTURE_WRAP_S;
-    for (Texture * t = cartesian_gpu->texture->p; t->id; t++) {
+    for (Texture * t = gpu_cartesian->texture->p; t->id; t++) {
       GL_C (glBindTexture (GL_TEXTURE_2D, t->id));
       GL_C (glTexParameteri (GL_TEXTURE_2D, c, GL_REPEAT));
     }
@@ -503,14 +503,14 @@ static scalar texture_used_by (int tex)
 
 static void gpu_delete_scalar (scalar s)
 {
-  if (grid && cartesian_gpu->texture && scalar_texture(s)->used) {
+  if (grid && gpu_cartesian->texture && scalar_texture(s)->used) {
     scalar_texture(s)->used = false;
 #if DEBUG_ALLOC_TEXTURE
     fprintf (stderr, "deleting texture %d:%s %d max %ld\n",
 	     s.i, s.name, s.gpu.texture - 1,
-	     cartesian_gpu->texture->len/sizeof(Texture));
+	     gpu_cartesian->texture->len/sizeof(Texture));
     int tex = 0;
-    for (Texture * t = cartesian_gpu->texture->p; t->id; t++, tex++)
+    for (Texture * t = gpu_cartesian->texture->p; t->id; t++, tex++)
       if (t->used && texture_used_by (tex).i < 0) {
 	fprintf (stderr, "%s:%d: error: leaked texture %d\n",
 		 __FILE__, LINENO, tex);
@@ -524,7 +524,7 @@ void gpu_print_texture_list (FILE * fp)
 {
   fprintf (fp, "textures:");
   int tex = 0;
-  for (Texture * t = cartesian_gpu->texture->p; t->id; t++, tex++)
+  for (Texture * t = gpu_cartesian->texture->p; t->id; t++, tex++)
     if (t->used) {
       scalar s = texture_used_by (tex);
       if (s.i < 0) {
@@ -540,7 +540,7 @@ void gpu_print_texture_list (FILE * fp)
 static int get_new_texture (int type)
 {
   Texture * t;
-  for (t = cartesian_gpu->texture->p; t->id && (t->used || t->type != type); t++);
+  for (t = gpu_cartesian->texture->p; t->id && (t->used || t->type != type); t++);
   
   if (!t->id) {
     size_t size;
@@ -563,7 +563,7 @@ static int get_new_texture (int type)
       assert (false);
     }
     
-    t = array_append (cartesian_gpu->texture, &(Texture){0}, sizeof (Texture));
+    t = array_append (gpu_cartesian->texture, &(Texture){0}, sizeof (Texture));
     t--; // last element is always zero
     GL_C (glGenTextures (1, &t->id));
     assert (t->id);
@@ -585,14 +585,14 @@ static int get_new_texture (int type)
     free (buffer);
 #if DEBUG_ALLOC_TEXTURE
     fprintf (stderr, "new texture %d: %ld\n", type,
-	     t - (Texture *) cartesian_gpu->texture->p);
+	     t - (Texture *) gpu_cartesian->texture->p);
 #endif
   }
 
   t->used = true;
   t->input = t->output = -1;
   t->type = type;
-  return (t - (Texture *) cartesian_gpu->texture->p) + 1;
+  return (t - (Texture *) gpu_cartesian->texture->p) + 1;
 }
 
 static void gpu_init_scalar_texture (scalar s)
@@ -747,9 +747,9 @@ void gpu_init()
   
   GL_C (glViewport (0, 0, cartesian->n, cartesian->n));
   
-  cartesian_gpu->texture = array_new();
-  array_append (cartesian_gpu->texture, &(Texture){0}, sizeof(Texture));
-  cartesian_gpu->shaders = kh_init (STR);
+  gpu_cartesian->texture = array_new();
+  array_append (gpu_cartesian->texture, &(Texture){0}, sizeof(Texture));
+  gpu_cartesian->shaders = kh_init (STR);
 
   for (scalar s in all) {    
     switch (s.gpu.type) {
@@ -763,12 +763,12 @@ void gpu_init()
 
 void gpu_free()
 {
-  if (!grid || !cartesian_gpu->texture)
+  if (!grid || !gpu_cartesian->texture)
     return;
   if (GPUContext.window) {
     GL_C (glFinish());
     int tex = 0;
-    for (Texture * t = cartesian_gpu->texture->p; t->id; t++, tex++) {
+    for (Texture * t = gpu_cartesian->texture->p; t->id; t++, tex++) {
       if (t->used && texture_used_by (tex).i < 0) {
 	fprintf (stderr, "%s:%d: error: leaked texture %d\n",
 		 __FILE__, LINENO, tex);
@@ -777,13 +777,13 @@ void gpu_free()
       GL_C (glDeleteTextures (1, &t->id));
     }
   }
-  array_free (cartesian_gpu->texture);
-  cartesian_gpu->texture = NULL;
+  array_free (gpu_cartesian->texture);
+  gpu_cartesian->texture = NULL;
   const char * code;
   GLuint id;
-  kh_foreach (cartesian_gpu->shaders, code, id, sysfree ((void *) code)); id = id;
-  kh_destroy (STR, cartesian_gpu->shaders);
-  cartesian_gpu->shaders = NULL;
+  kh_foreach (gpu_cartesian->shaders, code, id, sysfree ((void *) code)); id = id;
+  kh_destroy (STR, gpu_cartesian->shaders);
+  gpu_cartesian->shaders = NULL;
   for (scalar s in all)
     s.gpu.texture = 0;
 }
@@ -835,7 +835,7 @@ The `stored` attibute tracks where the up-to-date field is stored:
 
 attribute {
   struct {
-    // take care to update cartesian_gpu_scalar_clone() when this changes
+    // take care to update gpu_cartesian_scalar_clone() when this changes
     int stored;
     int texture, component;
     int type; // 0: scalar, 1: vector, 2: tensor
@@ -1284,7 +1284,7 @@ static bool doloop_on_gpu (ForeachData * loop, const RegionParameters * region,
   foreach_texture (t)
     if (t->input >= 0 && t->output >= 0 && t->width > 0) {
       int tmp = get_new_texture (t->type);
-      t = ((Texture *)cartesian_gpu->texture->p) + _i;
+      t = ((Texture *)gpu_cartesian->texture->p) + _i;
       t->io = tex_texture (tmp);
 #if DEBUG_ALLOC_TEXTURE
       fprintf (stderr, "%s:%d: input/output texture input: %d output: %d\n",
@@ -1541,42 +1541,42 @@ bool gpu_end_stencil (ForeachData * loop,
   return on_gpu;
 }
 
-static scalar cartesian_gpu_init_scalar (scalar s, const char * name)
+static scalar gpu_cartesian_init_scalar (scalar s, const char * name)
 {
   s = cartesian_init_scalar (s, name);
   gpu_init_scalar_texture (s);  
   return s;
 }
 
-static scalar cartesian_gpu_init_vertex_scalar (scalar s, const char * name)
+static scalar gpu_cartesian_init_vertex_scalar (scalar s, const char * name)
 {
   s = cartesian_init_vertex_scalar (s, name);
   gpu_init_scalar_texture (s);  
   return s;
 }
 
-static vector cartesian_gpu_init_vector (vector v, const char * name)
+static vector gpu_cartesian_init_vector (vector v, const char * name)
 {
   v = cartesian_init_vector (v, name);
   gpu_init_vector_texture (v);
   return v;
 }
 
-static vector cartesian_gpu_init_face_vector (vector v, const char * name)
+static vector gpu_cartesian_init_face_vector (vector v, const char * name)
 {
   v = cartesian_init_face_vector (v, name);  
   gpu_init_vector_texture (v);
   return v;
 }
 
-static tensor cartesian_gpu_init_tensor (tensor t, const char * name)
+static tensor gpu_cartesian_init_tensor (tensor t, const char * name)
 {
   t = cartesian_init_tensor (t, name);
   gpu_init_tensor_texture (t);
   return t;
 }
 
-static void cartesian_gpu_scalar_clone (scalar clone, scalar src)
+static void gpu_cartesian_scalar_clone (scalar clone, scalar src)
 {
   int stored = clone.gpu.stored, texture = clone.gpu.texture,
     type = clone.gpu.type, component = clone.gpu.component;
@@ -1587,15 +1587,15 @@ static void cartesian_gpu_scalar_clone (scalar clone, scalar src)
   clone.gpu.t = t;
 }
 
-static void cartesian_gpu_methods()
+static void gpu_cartesian_methods()
 {
   cartesian_methods();
-  init_scalar        = cartesian_gpu_init_scalar;
-  init_vertex_scalar = cartesian_gpu_init_vertex_scalar;
-  init_vector        = cartesian_gpu_init_vector;
-  init_face_vector   = cartesian_gpu_init_face_vector;
-  init_tensor        = cartesian_gpu_init_tensor;
-  scalar_clone       = cartesian_gpu_scalar_clone;
+  init_scalar        = gpu_cartesian_init_scalar;
+  init_vertex_scalar = gpu_cartesian_init_vertex_scalar;
+  init_vector        = gpu_cartesian_init_vector;
+  init_face_vector   = gpu_cartesian_init_face_vector;
+  init_tensor        = gpu_cartesian_init_tensor;
+  scalar_clone       = gpu_cartesian_scalar_clone;
 }
 
 /**

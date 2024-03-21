@@ -1289,5 +1289,5 @@ bool restore (const char * file = "dump",
 #endif // MULTIGRID
 
 #if GPU
-# include "gpu/output.h"
+# include "grid/gpu/output.h"
 #endif

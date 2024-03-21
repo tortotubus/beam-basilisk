@@ -283,7 +283,13 @@ FDECL     {ID}+{SP}*\(
     if (!hasgrid) {
       hasgrid = 1;
       char * s = fname;
-      while (strchr (s, '/')) s = strchr (s, '/') + 1;
+      while (strchr (s, '/')) {
+	s = strchr (s, '/') + 1;
+	if (!strncmp (s, "grid/", 5)) {
+	  s += 5;
+	  break;
+	}
+      }
       strcpy (grid, s);
       if ((s = strchr (grid, '.'))) *s = '\0';
     }
