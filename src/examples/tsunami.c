@@ -37,6 +37,11 @@ int main (int argc, char * argv[])
   if (argc > 1)
     maxlevel = atoi(argv[1]);
 
+#if !TREE
+  foreach_dimension()
+    periodic (right);
+#endif
+
   /**
   Here we setup the domain geometry. We choose to use metre as length
   unit, so we set the radius of the Earth (required for the [spherical
@@ -94,9 +99,11 @@ zero. The top boundary is always "dry" in this example so can be left
 alone. Note that the sign is important and needs to reflect the
 orientation of the boundary. */
 
+#if TREE
 u.n[left]   = - radiation(0);
 u.n[right]  = + radiation(0);
 u.n[bottom] = - radiation(0);
+#endif
 
 /**
 ## Adaptation
@@ -162,9 +169,12 @@ event init (i = 0)
 {
   terrain (zb, "~/terrain/etopo2", NULL);
 
-  if (restore (file = "dump"))
+#if MULTIGRID  
+  if (restore (file = "restart"))
     conserve_elevation();
-  else {
+  else
+#endif // MULTIGRID
+  {
     conserve_elevation();
     
     /**
@@ -287,7 +297,9 @@ event snapshots (t += 60; t <= 600) {
   /**
   We also save a snapshot file we can restart from. */
 
+#if TREE
   dump (file = "dump");
+#endif
 }
 
 /**
@@ -306,7 +318,7 @@ as this one:
 
 ! awk '{ if ($1 == "file:") file = $2; else print $0 > file; }' < out
 
-set term pngcairo enhanced size 700,700 font ",8"
+set term pngcairo enhanced size 1024,1024 font ",8"
 set output 'maximum.png'
 
 # this sets the color palette to "jet"
@@ -346,11 +358,11 @@ topography. Any part of the image for which *m[]* is negative
 event movies (t++) {
   scalar m[], etam[];
   foreach() {
-    etam[] = eta[]*(h[] > dry);
+    etam[] = eta[]*(h[] > dry ? 1. : 0.);
     m[] = etam[] - zb[];
   }
   output_ppm (etam, mask = m, min = -2, max = 2, n = 512, linear = true,
-	      file = "eta.mp4");
+	      fps = 30, file = "eta.mp4");
 
   /**
   After completion this will give the following animation
@@ -362,7 +374,7 @@ event movies (t++) {
   (defined by the lower-left, upper-right coordinates). */
   
   output_ppm (etam, mask = m, min = -2, max = 2, n = 512, linear = true,
-	      box = {{91,5},{100,14}}, file = "eta-zoom.mp4");
+	      fps = 30, box = {{91,5},{100,14}}, file = "eta-zoom.mp4");
 
   /**
   ![Animation of the wave elevation. Dark blue is -2 metres and
@@ -370,11 +382,13 @@ event movies (t++) {
   
   And repeat the operation for the level of refinement...*/
 
+#if TREE  
   scalar l = etam;
   foreach()
     l[] = level;
   output_ppm (l, min = MINLEVEL, max = maxlevel, n = 512, file = "level.mp4");
-
+#endif
+  
   /**
   ![Animation of the level of refinement. Dark blue is 5 and dark red
   is 10.](tsunami/level.mp4)
@@ -494,7 +508,7 @@ event kml (t += 15)
   fflush (fp);
   scalar m[], etam[];
   foreach() {
-    etam[] = eta[]*(h[] > dry);
+    etam[] = eta[]*(h[] > dry ? 1. : 0.);
     m[] = etam[] - zb[];
   }
   char name[80];
@@ -511,3 +525,90 @@ event kml (t += 15)
 And finally we apply our *adapt()* function at every timestep. */
 
 event do_adapt (i++) adapt();
+
+/**
+## Benchmarks on GPUS
+
+Device: Mesa Intel(R) UHD Graphics (TGL GT1) (0x9a60)
+...
+Video memory: 3072MB
+
+# Cartesian (GPU), 3603 steps, 26.5225 CPU, 114.4 real, 3.3e+07 points.step/s, 34 var
+   calls    total     self   % total   function
+    7206    27.49    27.49     24.0%   foreach():/home/popinet/basilisk-gpu-devel/src/utils.h:268
+    7206    27.11    23.32     20.4%   foreach():/home/popinet/basilisk-gpu-devel/src/saint-venant.h:276
+    7206    15.37    15.37     13.4%   foreach():/home/popinet/basilisk-gpu-devel/src/saint-venant.h:322
+    7206    11.72    11.72     10.2%   foreach():/home/popinet/basilisk-gpu-devel/src/saint-venant.h:130
+       2     6.36     6.36      5.6%   foreach():/home/popinet/basilisk-gpu-devel/src/terrain.h:182
+    3604     4.88     4.88      4.3%   foreach():tsunami.gpu.c:306
+    3604     4.14     4.14      3.6%   gpu_reduction():/home/popinet/basilisk-gpu-devel/src/utils.h:167
+    3604     8.28     4.14      3.6%   foreach():/home/popinet/basilisk-gpu-devel/src/utils.h:175
+    7206     3.79     3.79      3.3%   gpu_reduction():/home/popinet/basilisk-gpu-devel/src/saint-venant.h:208
+    3604     5.88     2.98      2.6%   foreach():/home/popinet/basilisk-gpu-devel/src/utils.h:147
+    3604     2.90     2.90      2.5%   gpu_reduction():/home/popinet/basilisk-gpu-devel/src/utils.h:139
+    3604     2.20     2.20      1.9%   foreach():tsunami.gpu.c:314
+      10     1.53     1.53      1.3%   foreach():/home/popinet/basilisk-gpu-devel/src/okada.h:173
+    3604     3.96     0.97      0.8%   display_0():tsunami.gpu.c:316
+    1807     0.79     0.79      0.7%   foreach():/home/popinet/basilisk-gpu-devel/src/gpu/output.h:169
+       1     0.82     0.79      0.7%   output_field():/home/popinet/basilisk-gpu-devel/src/output.h:92
+
+OpenGL renderer string: NVIDIA GeForce RTX 3050 Ti Laptop GPU/PCIe/SSE2
+Dedicated video memory: 4096 MB
+
+__NV_PRIME_RENDER_OFFLOAD=1 __GLX_VENDOR_LIBRARY_NAME=nvidia ./tsunami.gpu 2> /dev/null > out
+
+# Cartesian (GPU), 3603 steps, 22.7717 CPU, 22.9 real, 1.65e+08 points.step/s, 34 var
+   calls    total     self   % total   function
+       2     5.43     5.43     23.7%   foreach():/home/popinet/basilisk-gpu-devel/src/terrain.h:182
+    7206     4.09     3.41     14.9%   foreach():/home/popinet/basilisk-gpu-devel/src/saint-venant.h:276
+    7206     2.23     2.23      9.7%   foreach():/home/popinet/basilisk-gpu-devel/src/utils.h:268
+    7206     1.87     1.87      8.2%   foreach():/home/popinet/basilisk-gpu-devel/src/saint-venant.h:322
+    7206     1.75     1.75      7.7%   foreach():/home/popinet/basilisk-gpu-devel/src/saint-venant.h:130
+      10     1.43     1.43      6.2%   foreach():/home/popinet/basilisk-gpu-devel/src/okada.h:173
+    3604     1.34     1.34      5.8%   gpu_reduction():/home/popinet/basilisk-gpu-devel/src/utils.h:167
+    3604     1.03     1.03      4.5%   gpu_reduction():/home/popinet/basilisk-gpu-devel/src/utils.h:139
+       1     0.87     0.84      3.7%   output_field():/home/popinet/basilisk-gpu-devel/src/output.h:92
+    7206     0.69     0.69      3.0%   gpu_reduction():/home/popinet/basilisk-gpu-devel/src/saint-venant.h:208
+    3604     1.99     0.66      2.9%   foreach():/home/popinet/basilisk-gpu-devel/src/utils.h:175
+    3604     0.59     0.59      2.6%   foreach():tsunami.gpu.c:306
+    3604     1.54     0.50      2.2%   foreach():/home/popinet/basilisk-gpu-devel/src/utils.h:147
+    7206     8.52     0.33      1.4%   update_saint_venant():/home/popinet/basilisk-gpu-devel/src/saint-venant.h:332
+    3604     0.61     0.32      1.4%   display_0():tsunami.gpu.c:316
+    3604     0.26     0.26      1.1%   foreach():tsunami.gpu.c:314
+       6     0.05     0.05      0.2%   foreach():/home/popinet/basilisk-gpu-devel/src/grid/cartesian_gpu.h:823
+       1     5.78     0.04      0.2%   init_0():tsunami.gpu.c:225
+       2     0.03     0.03      0.1%   foreach():/home/popinet/basilisk-gpu-devel/src/grid/cartesian_gpu.h:1042
+     404     0.03     0.03      0.1%   foreach():/home/popinet/basilisk-gpu-devel/src/gpu/output.h:169
+
+__NV_PRIME_RENDER_OFFLOAD=1 __GLX_VENDOR_LIBRARY_NAME=nvidia ./tsunami.gpu 11 2> /dev/null > out
+
+# Cartesian (GPU), 6604 steps, 140.476 CPU, 141 real, 1.96e+08 points.step/s, 34 var
+   calls    total     self   % total   function
+       2    36.45    36.45     25.8%   foreach():/home/popinet/basilisk-gpu-devel/src/terrain.h:182
+   13208    26.67    23.90     16.9%   foreach():/home/popinet/basilisk-gpu-devel/src/saint-venant.h:276
+   13208    16.40    16.40     11.6%   foreach():/home/popinet/basilisk-gpu-devel/src/utils.h:268
+   13208    12.35    12.35      8.8%   foreach():/home/popinet/basilisk-gpu-devel/src/saint-venant.h:322
+   13208    11.55    11.55      8.2%   foreach():/home/popinet/basilisk-gpu-devel/src/saint-venant.h:130
+    6605     5.90     5.90      4.2%   gpu_reduction():/home/popinet/basilisk-gpu-devel/src/utils.h:167
+      10     5.56     5.56      3.9%   foreach():/home/popinet/basilisk-gpu-devel/src/okada.h:173
+    6605    10.93     5.03      3.6%   foreach():/home/popinet/basilisk-gpu-devel/src/utils.h:175
+    6605     4.50     4.50      3.2%   gpu_reduction():/home/popinet/basilisk-gpu-devel/src/utils.h:139
+    6605     3.86     3.86      2.7%   foreach():tsunami.gpu.c:306
+    6605     8.18     3.68      2.6%   foreach():/home/popinet/basilisk-gpu-devel/src/utils.h:147
+
+__NV_PRIME_RENDER_OFFLOAD=1 __GLX_VENDOR_LIBRARY_NAME=nvidia ./tsunami.gpu 12 2> /dev/null > out
+
+# Cartesian (GPU), 13204 steps, 910.882 CPU, 913.3 real, 2.43e+08 points.step/s, 34 var
+   calls    total     self   % total   function
+       2   201.59   201.59     22.1%   foreach():/home/popinet/basilisk-gpu-devel/src/terrain.h:182
+   26408   196.85   182.77     20.0%   foreach():/home/popinet/basilisk-gpu-devel/src/saint-venant.h:276
+   26408   120.14   120.14     13.2%   foreach():/home/popinet/basilisk-gpu-devel/src/utils.h:268
+   26408    94.63    94.63     10.4%   foreach():/home/popinet/basilisk-gpu-devel/src/saint-venant.h:322
+   26408    85.97    85.97      9.4%   foreach():/home/popinet/basilisk-gpu-devel/src/saint-venant.h:130
+   13205    66.94    33.63      3.7%   foreach():/home/popinet/basilisk-gpu-devel/src/utils.h:175
+   13205    33.31    33.31      3.6%   gpu_reduction():/home/popinet/basilisk-gpu-devel/src/utils.h:167
+   13205    28.81    28.81      3.2%   foreach():tsunami.gpu.c:306
+   13205    52.86    26.73      2.9%   foreach():/home/popinet/basilisk-gpu-devel/src/utils.h:147
+   13205    26.13    26.13      2.9%   gpu_reduction():/home/popinet/basilisk-gpu-devel/src/utils.h:139
+      10    22.69    22.69      2.5%   foreach():/home/popinet/basilisk-gpu-devel/src/okada.h:173
+*/
