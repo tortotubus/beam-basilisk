@@ -215,6 +215,8 @@ static char glsl_preproc[] =
   "#define sq(x) ((x)*(x))\n"
   "#define fabs(x) abs(x)\n"
   "const real z = 0.;\n"
+  "uniform vec2 vsOrigin = vec2(0.,0.);\n"
+  "uniform vec2 vsScale = vec2(1.,1.);\n"
   ;
 
 static inline int list_size (const NonLocal * i)
@@ -246,14 +248,16 @@ Format: read index, component, write index, write mode (1: write, 0: read)
 
 static char * write_scalar (char * fs, scalar s)
 {
-  char component[20], input[20] = "0", output[20] = "0";
-  snprintf (component, 19, "%d", s.gpu.component);
-  Texture * t = scalar_texture(s);
-  if (t->input > 0)
-    snprintf (input, 19, "%d", t->input);
-  if (t->output > 0)
-    snprintf (output, 19, "%d", t->output);
-  return str_append (fs, input, ",", component, ",", output, ",", s.output ? "1" : "0");
+  char component[20] = "0", input[20] = "0", output[20] = "0";
+  if (s.i >= 0) {
+    snprintf (component, 19, "%d", s.gpu.component);
+    Texture * t = scalar_texture(s);
+    if (t->input > 0)
+      snprintf (input, 19, "%d", t->input);
+    if (t->output > 0)
+      snprintf (output, 19, "%d", t->output);
+  }
+  return str_append (fs, input, ",", component, ",", output, ",", s.i >= 0 && s.output ? "1" : "0");
 }
 
 static char * write_vector (char * fs, vector v)
@@ -393,7 +397,8 @@ char * build_shader (const NonLocal * nonlocals, const char * fname, int line)
   else
     fs = str_append (fs, "vec4 _outputs[1];\n");
   fs = str_append (fs,
-		   "in Point point;\n"
+		   "in Point vsPoint;\n"
+		   "Point point = vsPoint*vsScale + vsOrigin;\n"
 		   "out vec4 FragColor;\n"
 		   "real _delta = 1.0f/N;\n"
 		   "POINT_VARIABLES\n");
@@ -414,9 +419,9 @@ GLuint load_shader (const char * fs)
   char quad[] =
     "#version 420\n"
     "layout(location = 0) in vec3 vsPos;"
-    "out vec2 point;"
+    "out vec2 vsPoint;"
     "void main() {"
-    "  point = vsPos.xy;"
+    "  vsPoint = vsPos.xy;"
     "  gl_Position =  vec4(2.*vsPos.xy - vec2(1.), 0., 1.);"
     "}";
   GLuint id = loadNormalShader (quad, fs);
@@ -1462,6 +1467,22 @@ static bool doloop_on_gpu (ForeachData * loop, const RegionParameters * region,
     GL_C (glVertexAttribPointer ((GLuint)0, 2, GL_FLOAT, GL_FALSE,
 				 2*sizeof(float), (void*)0));
     glDeleteBuffers (1, &vbo);
+  }
+
+  /**
+  This is a region */
+  
+  else if (region->n.x && region->n.y) {
+    float vsScale[] = {
+      (region->box[1].x - region->box[0].x)/L0,
+      (region->box[1].y - region->box[0].y)/L0
+    };
+    float vsOrigin[] = { (region->box[0].x - X0)/L0, (region->box[0].y - Y0)/L0 };
+    GLint location = glGetUniformLocation (shaderid, "vsOrigin");
+    GL_C (glUniform2fv (location, 1, vsOrigin));
+    location = glGetUniformLocation (shaderid, "vsScale");
+    GL_C (glUniform2fv (location, 1, vsScale));
+    GL_C (glDrawArrays (GL_TRIANGLES, 0, 6));
   }
 
   /**

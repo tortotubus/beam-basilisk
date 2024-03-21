@@ -77,15 +77,10 @@ void output_ppm_gpu (OutputPPMGPU * display,
 		     char * opt = NULL,
 		     int fps = 0)
 {
-  if (!fps) {
-    output_ppm (f, fp, n, file, min, max, spread, z, linear, box, mask, map, opt);
-    return;
-  }
-  
   if (display->frameStartTime < 0.) // window has been closed by user
     return;
 
-  if (glfwGetTime() - display->frameStartTime > 1./fps) {
+  if (!fps || fp || file || glfwGetTime() - display->frameStartTime > 1./fps) {
 
     /**
     This code should be the same as
@@ -101,14 +96,20 @@ void output_ppm_gpu (OutputPPMGPU * display,
 	min = avg - spread*s.stddev; max = avg + spread*s.stddev;
       }
     }
-
+    box[0].z = z, box[1].z = z;
+  
+    coord cn = {n};
+    double delta = (box[1].x - box[0].x)/n;
+    cn.y = (int)((box[1].y - box[0].y)/delta);
+    if (((int)cn.y) % 2) cn.y++;    
+    
     /**
     ... to here. */
     
     GL_C (glBindFramebuffer (GL_FRAMEBUFFER, 0));
     if (!display->window) {
-      glfwWindowHint (GLFW_VISIBLE, GL_TRUE);
-      display->window = glfwCreateWindow (n, n, f.name, NULL, GPUContext.window);
+      glfwWindowHint (GLFW_VISIBLE, fps ? GL_TRUE : GL_FALSE);
+      display->window = glfwCreateWindow (cn.x, cn.y, f.name, NULL, GPUContext.window);
       glfwSetKeyCallback (display->window, key_callback);
       glfwMakeContextCurrent (display->window);
       
@@ -125,21 +126,24 @@ void output_ppm_gpu (OutputPPMGPU * display,
 				   2*sizeof(float), (void*)0));
     }
     else {
-      glfwSetWindowSize (display->window, n, n);
+      glfwSetWindowSize (display->window, cn.x, cn.y);
       glfwMakeContextCurrent (display->window);
     }
     
-    GL_C (glViewport(0, 0, n, n));
+    GL_C (glViewport(0, 0, cn.x, cn.y));
     GL_C (glColorMask (GL_TRUE, GL_TRUE, GL_TRUE, GL_TRUE));
     GL_C (glClearColor (0.0f, 0.0f, 0.0f, 0.0f));
     GL_C (glClear (GL_COLOR_BUFFER_BIT));
   
+    bool masked = mask.i >= 0;
     GLuint sampler = 0;
     if (linear) {
       GL_C (glGenSamplers (1, &sampler));
       GL_C (glSamplerParameteri (sampler, GL_TEXTURE_MAG_FILTER, GL_LINEAR));
       GL_C (glSamplerParameteri (sampler, GL_TEXTURE_MIN_FILTER, GL_LINEAR));
       GL_C (glBindSampler (0, sampler));
+      if (masked)
+	GL_C (glBindSampler (1, sampler));
     }
     
     double dmap[NCMAP][3];
@@ -151,13 +155,15 @@ void output_ppm_gpu (OutputPPMGPU * display,
       cmap[i].b = dmap[i][2];
       cmap[i].a = 0.;
     }
-
-    foreach (gpu) {
-      if (f[] == nodata)
+    
+    coord p;
+    foreach_region (p, box, cn, gpu) {
+      float m = masked ? mask[] : 0., v = m < 0. ? nodata : f[];
+      if (v == nodata)
 	FragColor = (vec4){0,0,0,0};
       else {
 	int i;
-	float val = max != min ? (f[] - min)/(max - min) : 0., coef;
+	float val = max != min ? (v - min)/(max - min) : 0., coef;
 	if (val <= 0.) i = 0, coef = 0.;
 	else if (val >= 1.) i = NCMAP - 2, coef = 1.;
 	else {
@@ -170,10 +176,36 @@ void output_ppm_gpu (OutputPPMGPU * display,
 
     if (linear) {
       GL_C (glBindSampler (0, 0));
+      if (masked)
+	GL_C (glBindSampler (1, 0));
       GL_C (glDeleteSamplers (1, &sampler));
     }
-   
-    glfwSwapBuffers (display->window);    
+
+    /**
+    File output */
+    
+    if (file || fp) {
+      if (file)
+	fp = open_image (file, opt);
+    
+      fprintf (fp, "P6\n%g %g 255\n", cn.x, cn.y);
+      unsigned char * ppm = malloc (sizeof(unsigned char)*3*cn.x*cn.y);
+      GL_C (glReadPixels (0, 0, cn.x, cn.y, GL_RGB, GL_UNSIGNED_BYTE, ppm));
+      size_t len = 3*cn.x;
+      unsigned char * line = ppm + len*((size_t) cn.y - 1);
+      for (int i = 0; i < cn.y; i++, line -= len)
+	fwrite (line, sizeof(unsigned char), len, fp);
+      free (ppm);
+    
+      if (file)
+	close_image (file, fp);
+      else
+	fflush (fp);
+    }
+
+    if (fps)
+    glfwSwapBuffers (display->window);
+    
     glfwMakeContextCurrent (GPUContext.window);
     GL_C (glBindFramebuffer (GL_FRAMEBUFFER, GPUContext.fbo0));
     GL_C (glViewport (0, 0, cartesian->n, cartesian->n));
@@ -181,11 +213,13 @@ void output_ppm_gpu (OutputPPMGPU * display,
     display->frameStartTime = glfwGetTime();
   }
 
-  do
-    glfwPollEvents();
-  while (Display.paused && !Display.step);
-  Display.step = false;
-  
+  if (fps) {
+    do
+      glfwPollEvents();
+    while (Display.paused && !Display.step);
+    Display.step = false;
+  }
+    
   if (display->window && glfwWindowShouldClose (display->window)) {
     glfwDestroyWindow (display->window);
     display->frameStartTime = -1; // window closed

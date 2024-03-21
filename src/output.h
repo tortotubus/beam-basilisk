@@ -529,6 +529,9 @@ of the domain for which *mask* is negative.
 *opt*
 : options to pass to 'convert' or to the 'ppm2???' scripts (used
 with *file*).
+
+*fps*
+: used only for [online output](gpu/output.h) on GPUs.
 */
 
 trace
@@ -542,7 +545,8 @@ void output_ppm (scalar f,
 		 coord box[2] = {{X0, Y0}, {X0 + L0, Y0 + L0}},
 		 scalar mask = {-1},
 		 Colormap map = jet,
-		 char * opt = NULL)
+		 char * opt = NULL,
+		 int fps = 0)
 {
   // default values
   if (!min && !max) {
