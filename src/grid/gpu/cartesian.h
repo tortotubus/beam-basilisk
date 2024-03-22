@@ -25,12 +25,14 @@ __NV_PRIME_RENDER_OFFLOAD=1 __GLX_VENDOR_LIBRARY_NAME=nvidia  glxinfo -B | \
 #define free_grid cartesian_free_grid
 
 static bool _gpu_done_ = false;
+@undef BEGIN_FOREACH
 @def BEGIN_FOREACH if (_gpu_done_)
   _gpu_done_ = false;
  else {
    tracing ("foreach", S__FILE__, S_LINENO);
 @
-@define END_FOREACH   end_tracing("foreach", S__FILE__, S_LINENO); }
+@undef END_FOREACH
+@define END_FOREACH end_tracing("foreach", S__FILE__, S_LINENO); }
 
 typedef struct {
   coord p, * box, n;

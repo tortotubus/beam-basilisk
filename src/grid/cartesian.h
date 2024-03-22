@@ -33,16 +33,8 @@ static Point last_point;
 
 @define POINT_VARIABLES VARIABLES
 
-@ifndef BEGIN_FOREACH
-@ define BEGIN_FOREACH
-@endif
-
-@ifndef END_FOREACH
-@ define END_FOREACH
-@endif
-
 @def foreach()
-{ BEGIN_FOREACH OMP_PARALLEL() {
+OMP_PARALLEL() {
   int ig = 0, jg = 0; NOT_UNUSED(ig); NOT_UNUSED(jg);
   Point point = {0};
   point.n = cartesian->n;
@@ -53,10 +45,10 @@ static Point last_point;
     for (point.j = 1; point.j <= point.n; point.j++) {
       POINT_VARIABLES
 @
-@define end_foreach() }}} END_FOREACH }
+@define end_foreach() }}}
 
 @def foreach_face_generic()
-{ BEGIN_FOREACH OMP_PARALLEL() {
+OMP_PARALLEL() {
   int ig = 0, jg = 0; NOT_UNUSED(ig); NOT_UNUSED(jg);
   Point point = {0};
   point.n = cartesian->n;
@@ -67,7 +59,7 @@ static Point last_point;
     for (point.j = 1; point.j <= point.n + 1; point.j++) {
       POINT_VARIABLES
 @
-@define end_foreach_face_generic() }}} END_FOREACH }
+@define end_foreach_face_generic() }}}
 
 @def foreach_vertex()
 foreach_face_generic() {

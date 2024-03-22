@@ -4183,16 +4183,16 @@ static void macros (Ast * n, Stack * stack, void * data)
       ast_before (n, "\n"
 		  "#undef OMP_PARALLEL\n"
 		  "#define OMP_PARALLEL()\n"
-		  "OMP(omp parallel ", sreductions, "){");
+		  "BEGIN_FOREACH OMP(omp parallel ", sreductions, "){");
       ast_after (n,
 		 "\n"
 		 "#undef OMP_PARALLEL\n"
-		 "#define OMP_PARALLEL() OMP(omp parallel)\n}");
+		 "#define OMP_PARALLEL() OMP(omp parallel)\n}END_FOREACH ");
       free (sreductions);
     }
     else {
-      ast_before (n, "{");
-      ast_after (n, "}");
+      ast_before (n, " BEGIN_FOREACH{");
+      ast_after (n, "}END_FOREACH ");
     }
     if (serial)
       ast_after (n, "\n"
