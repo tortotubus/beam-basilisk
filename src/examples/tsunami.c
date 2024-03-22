@@ -395,7 +395,7 @@ event movies (t++) {
   
   ...and for the process id for parallel runs. */
   
-#if _OPENMP || _MPI
+#if (_OPENMP || _MPI) && !GPU
   foreach()
     etam[] = tid();
   double tmax = npe() - 1;

@@ -1470,7 +1470,10 @@ typedef struct {
 #else // dimension == 3
 # define avector(x, y, z)   {x, y, z}
 #endif
-  
+
+@define BEGIN_FOREACH
+@define END_FOREACH
+ 
 #if LAYERS
 # include "grid/layers.h"
 #endif

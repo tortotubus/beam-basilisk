@@ -47,26 +47,18 @@ void (* debug)    (Point);
 
 @define end_foreach_face()
 
-@ifndef BEGIN_FOREACH
-@ define BEGIN_FOREACH
-@endif
-
-@ifndef END_FOREACH
-@ define END_FOREACH
-@endif
-
 @def foreach_point(...)
-{ BEGIN_FOREACH {
+{
   int ig = 0, jg = 0, kg = 0; NOT_UNUSED(ig); NOT_UNUSED(jg); NOT_UNUSED(kg);
   coord _p = { S__VA_ARGS__ };
   Point point = locate (_p.x, _p.y, _p.z); // fixme
   if (point.level >= 0) {
     POINT_VARIABLES
 @
-@define end_foreach_point() }} END_FOREACH }
+@define end_foreach_point() }}
 
 @def foreach_region(p, box, n)
- { BEGIN_FOREACH OMP_PARALLEL() { NOT_UNUSED (p);
+ OMP_PARALLEL() { NOT_UNUSED (p);
     coord p = {0, 0, box[0].z};
     OMP(omp for schedule(static))
       for (int _i = 0; _i < (int) n.x; _i++) {
@@ -78,7 +70,7 @@ void (* debug)    (Point);
 	    int ig = 0, jg = 0, kg = 0; NOT_UNUSED(ig); NOT_UNUSED(jg); NOT_UNUSED(kg);
 	    POINT_VARIABLES
 @
-@define end_foreach_region() }}}} END_FOREACH }
+@define end_foreach_region() }}}}
 
 // field allocation
 //
