@@ -124,9 +124,9 @@ ES     (\\([\'\"\?\\abfnrtv]|[0-7]{1,3}|x[a-fA-F0-9]+))
 
 %%
 
-^"//"{SP}*#{SP}*line{SP}+[0-9]+({SP}+\".*\")? {
-  char * sline = strchr (yytext, 'e'); sline++;
-  while (strchr (" \t", *sline)) sline++;
+^"//"{SP}*#{SP}*(line)?{SP}+[0-9]+({SP}+\".*\")? {
+  char * sline = yytext;
+  while (!strchr ("0123456789", *sline)) sline++;
   line = atoi (sline) - 1;
 
   if (strchr (yytext, '"')) {

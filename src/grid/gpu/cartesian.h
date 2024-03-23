@@ -15,6 +15,7 @@ __NV_PRIME_RENDER_OFFLOAD=1 __GLX_VENDOR_LIBRARY_NAME=nvidia  glxinfo -B | \
 * gpu/cpu keyword
 * if 'gpu' is specified and the loop cannot run on the GPU, the code exits
 * type casts in GLSL i.e. (int)... etc.
+* boolean type casts i.e.   float a = (b > 0);  ... if (a) ...
 
 */
 
@@ -191,10 +192,11 @@ static char glsl_preproc[] =
   "struct tensor { vector x, y; };\n"
 #endif
   "#define Point vec2\n"
-  "#define valt(s,i,j,k) "
-  "  (texture(s, point + vec2((i), (j))*_delta))\n"
-  "#define val(s,i,j,k) ((s.a == 0 || i != 0 || j != 0 || k != 0 ?"
-  " valt(_inputs[s.r],i,j,k) : _outputs[s.b])[s.g])\n"
+  "#define valt(s,i,j,k) (texture(s, point + vec2((i), (j))*_delta))\n"
+  "#define _NVARMAX 65536\n"
+  "#define val(s,i,j,k) (s.a == 0 || i != 0 || j != 0 || k != 0 ?"
+  "(s.r < _NVARMAX ? valt(_inputs[s.r],i,j,k)[s.g] : _constant[clamp(s.r-_NVARMAX,0,_nconst-1)])"
+  ": _outputs[s.b][s.g])\n"
   "#define val_out_(s,i,j,k) (_outputs[s.b][s.g])\n"
   "#define forin(type,s,list) for (int _i = 0; _i < list.length() - 1; _i++) { type s = list[_i];\n"
   "#define endforin() }\n"
@@ -252,14 +254,19 @@ static char * write_scalar (char * fs, scalar s)
 {
   char component[20] = "0", input[20] = "0", output[20] = "0";
   if (s.i >= 0) {
-    snprintf (component, 19, "%d", s.gpu.component);
-    Texture * t = scalar_texture(s);
-    if (t->input > 0)
-      snprintf (input, 19, "%d", t->input);
-    if (t->output > 0)
-      snprintf (output, 19, "%d", t->output);
+    if (is_constant(s))
+      snprintf (input, 19, "%d", s.i);
+    else {
+      snprintf (component, 19, "%d", s.gpu.component);
+      Texture * t = scalar_texture(s);
+      if (t->input > 0)
+	snprintf (input, 19, "%d", t->input);
+      if (t->output > 0)
+	snprintf (output, 19, "%d", t->output);
+    }
   }
-  return str_append (fs, input, ",", component, ",", output, ",", s.i >= 0 && s.output ? "1" : "0");
+  return str_append (fs, input, ",", component, ",", output, ",",
+		     s.i >= 0 && !is_constant(s) && s.output ? "1" : "0");
 }
 
 static char * write_vector (char * fs, vector v)
@@ -284,7 +291,18 @@ static char * write_tensor (char * fs, tensor t)
 
 char * build_shader (const NonLocal * nonlocals, const char * fname, int line)
 {
-  char * fs = str_append (NULL, "#version 420\n", glsl_preproc);
+  char s[20];
+  snprintf (s, 19, "%d", nconst > 0 ? nconst : 1);
+  char a[20];
+  snprintf (a, 19, "%g", nconst > 0 ? _constant[0] : 0);
+  char * fs = str_append (NULL, "#version 420\n", glsl_preproc,
+			  "const int _nconst = ", s, ";\n"
+			  "const real _constant[_nconst] = {", a);
+  for (int i = 1; i < nconst; i++) {
+    snprintf (a, 19, "%g", _constant[i]);
+    fs = str_append (fs, ",", a);
+  }
+  fs = str_append (fs, "};\n");
   foreach_texture (t) {
     t->input = t->output = -1;
     t->width = 0;

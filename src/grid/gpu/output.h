@@ -50,7 +50,7 @@ static void key_callback (GLFWwindow * window, int key, int scancode, int action
 
   case GLFW_KEY_Q:
     if (action == GLFW_PRESS)
-      exit (0);
+      exit (1);
     break;
     
   case GLFW_KEY_S:
@@ -80,7 +80,7 @@ void output_ppm_gpu (OutputPPMGPU * display,
   if (display->frameStartTime < 0.) // window has been closed by user
     return;
 
-  if (!fps || fp || file || glfwGetTime() - display->frameStartTime > 1./fps) {
+  if (!fps || fp != stdout || file || glfwGetTime() - display->frameStartTime > 1./fps) {
 
     /**
     This code should be the same as

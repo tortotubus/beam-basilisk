@@ -2750,43 +2750,6 @@ static void translate (Ast * n, Stack * stack, void * data)
     break;
   }
 
-  /**
-  ## (const) fields combinations for Point functions */
-
-  case sym_function_definition: {
-    if (obsolete_function_declaration (n)) {
-      AstTerminal * t = ast_left_terminal (n);
-      fprintf (stderr, "%s:%d: warning: obsolete optional/named arguments syntax\n", t->file, t->line);      
-    }
-    if (ast_is_point_function (ast_schema (n, sym_function_definition,
-					   0, sym_function_declaration,
-					   1, sym_declarator)) &&
-	!ast_is_stencil_function (n)) {
-      Ast ** consts = NULL;
-      maybeconst (n, stack, append_const, &consts);
-      if (consts) {
-	Ast * compoundi = ast_schema (n, sym_function_definition,
-				      1, sym_compound_statement);
-	Ast * compound = ast_copy (compoundi);
-	Ast * list = ast_child (compoundi, sym_block_item_list);
-	Ast * item = list->child[0];
-	if (list->child[1]) {
-	  ast_destroy (list->child[1]);
-	  list->child[1] = NULL;
-	}
-	item->sym = sym_block_item;
-	ast_destroy (item->child[0]);
-	if (item->child[1]) {
-	  ast_destroy (item->child[1]);
-	  item->child[1] = NULL;
-	}
-	combinations (compound, stack, data, consts, list, item, "");
-	free (consts);
-      }
-    }
-    break;
-  }
-
   case sym_array_access:
     ast_stencil_access (n, stack, ((TranslateData *)data)->dimension);
     break;
@@ -4630,6 +4593,40 @@ static void macros (Ast * n, Stack * stack, void * data)
   }
 
   case sym_function_definition: {
+    if (obsolete_function_declaration (n)) {
+      AstTerminal * t = ast_left_terminal (n);
+      fprintf (stderr, "%s:%d: warning: obsolete optional/named arguments syntax\n", t->file, t->line);      
+    }
+    
+    /**
+    ## (const) fields combinations for Point functions */
+
+    if (ast_is_point_function (ast_schema (n, sym_function_definition,
+					   0, sym_function_declaration,
+					   1, sym_declarator)) &&
+	!ast_is_stencil_function (n)) {
+      Ast ** consts = NULL;
+      maybeconst (n, stack, append_const, &consts);
+      if (consts) {
+	Ast * compoundi = ast_schema (n, sym_function_definition,
+				      1, sym_compound_statement);
+	Ast * compound = ast_copy (compoundi);
+	Ast * list = ast_child (compoundi, sym_block_item_list);
+	Ast * item = list->child[0];
+	if (list->child[1]) {
+	  ast_destroy (list->child[1]);
+	  list->child[1] = NULL;
+	}
+	item->sym = sym_block_item;
+	ast_destroy (item->child[0]);
+	if (item->child[1]) {
+	  ast_destroy (item->child[1]);
+	  item->child[1] = NULL;
+	}
+	combinations (compound, stack, data, consts, list, item, "");
+	free (consts);
+      }
+    }
     
     /**
     ## Function profiling with `trace` */

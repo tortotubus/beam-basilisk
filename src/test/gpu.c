@@ -30,6 +30,11 @@ void myfunc3 (double * a)
   *a += 2;
 }
 
+void myfunc4 (Point point, scalar a, (const) scalar b)
+{
+  a[] = b[];
+}
+
 int main (int argc, char * argv[])
 {
   init_grid (1);
@@ -222,6 +227,21 @@ int main (int argc, char * argv[])
   }
   foreach (serial)
     fprintf (stderr, "%g\n", s[]);
+
+  /**
+  ## Constant fields and point functions */
+
+  foreach()
+    s[] = 1.;
+  foreach()
+    myfunc4 (point, s1, s);
+  foreach (serial)
+    fprintf (stderr, "%g %g\n", s[], s1[]);
+  const scalar c[] = 2;
+  foreach()
+    myfunc4 (point, s1, c);
+  foreach (serial)
+    fprintf (stderr, "%g %g\n", s1[], c[]);
   
   /**
   ## Functions */
