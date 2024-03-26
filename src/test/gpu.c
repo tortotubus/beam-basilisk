@@ -244,6 +244,14 @@ int main (int argc, char * argv[])
     fprintf (stderr, "%g %g\n", s1[], c[]);
   
   /**
+  ## Attributes */
+
+  foreach()
+    s[] = s.block + (s.nodump ? 1 : 0);
+  foreach (serial)
+    fprintf (stderr, "%g\n", s[]);
+  
+  /**
   ## Functions */
 
   init_grid (16);
