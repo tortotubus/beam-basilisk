@@ -194,14 +194,17 @@ static char glsl_preproc[] =
   "#define Point vec2\n"
   "#define valt(s,i,j,k) (texture(s, point + vec2((i), (j))*_delta))\n"
   "#define _NVARMAX 65536\n"
-  "#define val(s,i,j,k) (s.a == 0 || i != 0 || j != 0 || k != 0 ?"
+  "#define val(s,i,j,k) (s.a < 0 || i != 0 || j != 0 || k != 0 ?"
   "(s.r < _NVARMAX ? valt(_inputs[s.r],i,j,k)[s.g] : _constant[clamp(s.r-_NVARMAX,0,_nconst-1)])"
   ": _outputs[s.b][s.g])\n"
   "#define val_out_(s,i,j,k) (_outputs[s.b][s.g])\n"
+  "#define _attr(s,member) (_attr[abs(s.a) - 1].member)\n"
   "#define forin(type,s,list) for (int _i = 0; _i < list.length() - 1; _i++) { type s = list[_i];\n"
   "#define endforin() }\n"
   "#define forin2(a,b,c,d) for (int _i = 0; _i < c.length() - 1; _i++) { a = c[_i]; b = d[_i];\n"
   "#define endforin2() }\n"
+  "#define forin3(a,b,e,c,d,f) for (int _i = 0; _i < c.length() - 1; _i++) { a = c[_i]; b = d[_i]; e = f[_i];\n"
+  "#define endforin3() }\n"
   "#define is_face_x() {"
   "  real Delta = L0/N, Delta_x = Delta, Delta_y = Delta,"
   "  x = X0 + point.x*L0 - Delta/2., y = Y0 + point.y*L0;\n"
@@ -250,14 +253,16 @@ static inline int list_size (const NonLocal * i)
 Format: read index, component, write index, write mode (1: write, 0: read)
 */
 
-static char * write_scalar (char * fs, scalar s)
+static char * write_scalar (char * fs, scalar s, bool attributes)
 {
-  char component[20] = "0", input[20] = "0", output[20] = "0";
+  char component[20] = "0", input[20] = "0", output[20] = "0", index[20] = "1";
   if (s.i >= 0) {
     if (is_constant(s))
       snprintf (input, 19, "%d", s.i);
     else {
       snprintf (component, 19, "%d", s.gpu.component);
+      if (attributes)
+	snprintf (index, 19, "%d", s.i + 1);
       Texture * t = scalar_texture(s);
       if (t->input > 0)
 	snprintf (input, 19, "%d", t->input);
@@ -266,25 +271,25 @@ static char * write_scalar (char * fs, scalar s)
     }
   }
   return str_append (fs, input, ",", component, ",", output, ",",
-		     s.i >= 0 && !is_constant(s) && s.output ? "1" : "0");
+		     s.i >= 0 && !is_constant(s) && s.output ? "+" : "-", index);
 }
 
-static char * write_vector (char * fs, vector v)
+static char * write_vector (char * fs, vector v, bool attributes)
 {
   fs = str_append (fs, "{");
-  fs = write_scalar (fs, v.x);
+  fs = write_scalar (fs, v.x, attributes);
   fs = str_append (fs, "},{");
-  fs = write_scalar (fs, v.y);
+  fs = write_scalar (fs, v.y, attributes);
   fs = str_append (fs, "}");
   return fs;
 }
 
-static char * write_tensor (char * fs, tensor t)
+static char * write_tensor (char * fs, tensor t, bool attributes)
 {
   fs = str_append (fs, "{");
-  fs = write_vector (fs, t.x);
+  fs = write_vector (fs, t.x, attributes);
   fs = str_append (fs, "},{");
-  fs = write_vector (fs, t.y);
+  fs = write_vector (fs, t.y, attributes);
   fs = str_append (fs, "}");
   return fs;
 }
@@ -323,77 +328,132 @@ char * build_shader (const NonLocal * nonlocals, const char * fname, int line)
       t->out[s.gpu.component] = true;
     }
   }
-  for (const NonLocal * g = nonlocals; g->name; g++) {
-    if (strcmp (g->type, "scalar") && strcmp (g->type, "vector") && strcmp (g->type, "tensor")) {
-      if (!strcmp (g->name, "nl") && !strcmp (g->type, "int")) {
-
-	/**
-	'int nl' gets special treatment. */
-	
-	char nl[20];
-	snprintf (nl, 19, "%d", *((int *)g->pointer));
-	fs = str_append (fs, "const int nl = ", nl, ";\n");
+      
+  /**
+  Scalar field attributes */
+      
+  char * attributes = NULL;
+  for (const NonLocal * g = nonlocals; g->name; g++)
+    if (g->name[0] == '.') {
+      char * type = !strcmp (g->type, "float") || !strcmp (g->type, "double") ? "real" : g->type;
+      attributes = str_append (attributes, "  ", type, " ", g->name + 1);
+      for (int * d = g->dimensions; d && *d > 0; d++) {
+	char s[20]; snprintf (s, 19, "%d", *d);
+	attributes = str_append (attributes, "[", s, "]");
       }
-      else {
-	char * type = !strcmp (g->type, "float") || !strcmp (g->type, "double") ? "real" : g->type;
-	fs = str_append (fs, "uniform ", type, " ", g->name, g->reduct ? "_in_" : "");
-	for (int * d = g->dimensions; d && *d > 0; d++) {
-	  char s[20]; snprintf (s, 19, "%d", *d);
-	  fs = str_append (fs, "[", s, "]");
-	}
-	fs = str_append (fs, ";\n");
-	if (g->reduct) {
-	  fs = str_append (fs, type, " ", g->name, " = ", g->name, "_in_;\n");
-	  fs = str_append (fs, "const scalar ", g->name, "_out_ = ");
-	  fs = str_append (fs, "{");
-	  fs = write_scalar (fs, g->data);
-	  fs = str_append (fs, "};\n");
-	}
-      }
+      attributes = str_append (attributes, ";\n");
     }
-    else { // scalar, vector and tensor fields
-      int size = list_size (g);
-      for (int j = 0; j < size; j++) {
-	if (j == 0) {
-	  fs = str_append (fs, "const ", g->type, " ", g->name);
-	  if (g->nd == 0)
-	    fs = str_append (fs, " = ");
-	  else {
-	    char s[20]; snprintf (s, 19, "%d", size);
-	    fs = str_append (fs, "[", s, "] = {");
+
+  if (attributes) {
+    fs = str_append (fs, "struct _Attributes {\n", attributes, "};\n");
+    sysfree (attributes);
+    fs = str_append (fs, "const _Attributes _attr[]={");
+    int nvar = datasize/sizeof(double);
+    for (int i = 0; i < nvar; i++) {
+      fs = str_append (fs, "{");
+      bool first = true;
+      char * data = (char *) &_attribute[i];
+      for (const NonLocal * g = nonlocals; g->name; g++)
+	if (g->name[0] == '.') {
+	  if (!first) fs = str_append (fs, ",");
+	  first = false;
+	  if (!strcmp (g->type, "int")) {
+	    char s[20]; snprintf (s, 19, "%d", *((int *)(data + g->nd)));
+	    fs = str_append (fs, s);
+	  }
+	  else if (!strcmp (g->type, "bool"))
+	    fs = str_append (fs, *((bool *)(data + g->nd)) ? "true" : "false");
+	  else if (!strcmp (g->type, "float")) {
+	    char s[20]; snprintf (s, 19, "%g", *((float *)(data + g->nd)));
+	    fs = str_append (fs, s);
+	  }
+	  else if (!strcmp (g->type, "double")) {
+	    char s[20]; snprintf (s, 19, "%g", *((double *)(data + g->nd)));
+	    fs = str_append (fs, s);
+	  }
+	  else
+	    fs = str_append (fs, "not implemented");
+	}
+      fs = str_append (fs, i < nvar - 1 ? "}," : "}");
+    }
+    fs = str_append (fs, "};\n");
+  }
+  
+  /**
+  Non-local variables */
+  
+  for (const NonLocal * g = nonlocals; g->name; g++)
+    if (g->name[0] != '.') {
+      if (strcmp (g->type, "scalar") && strcmp (g->type, "vector") && strcmp (g->type, "tensor")) {
+	if (!strcmp (g->name, "nl") && !strcmp (g->type, "int")) {
+
+	  /**
+	  'int nl' gets special treatment. */
+	
+	  char nl[20];
+	  snprintf (nl, 19, "%d", *((int *)g->pointer));
+	  fs = str_append (fs, "const int nl = ", nl, ";\n");
+	}
+	else {
+	  char * type = !strcmp (g->type, "float") || !strcmp (g->type, "double") ? "real" : g->type;
+	  fs = str_append (fs, "uniform ", type, " ", g->name, g->reduct ? "_in_" : "");
+	  for (int * d = g->dimensions; d && *d > 0; d++) {
+	    char s[20]; snprintf (s, 19, "%d", *d);
+	    fs = str_append (fs, "[", s, "]");
+	  }
+	  fs = str_append (fs, ";\n");
+	  if (g->reduct) {
+	    fs = str_append (fs, type, " ", g->name, " = ", g->name, "_in_;\n");
+	    fs = str_append (fs, "const scalar ", g->name, "_out_ = ");
+	    fs = str_append (fs, "{");
+	    fs = write_scalar (fs, g->data, attributes);
+	    fs = str_append (fs, "};\n");
 	  }
 	}
-	if (g->nd == 0 || j < size - 1) {
-	  fs = str_append (fs, "{");
-	  if (!strcmp (g->type, "scalar"))
-	    fs = write_scalar (fs, ((scalar *)g->pointer)[j]);
-	  else if (!strcmp (g->type, "vector"))
-	    fs = write_vector (fs, ((vector *)g->pointer)[j]);
-	  else if (!strcmp (g->type, "tensor"))
-	    fs = write_tensor (fs, ((tensor *)g->pointer)[j]);
+      }
+      else { // scalar, vector and tensor fields
+	int size = list_size (g);
+	for (int j = 0; j < size; j++) {
+	  if (j == 0) {
+	    fs = str_append (fs, "const ", g->type, " ", g->name);
+	    if (g->nd == 0)
+	      fs = str_append (fs, " = ");
+	    else {
+	      char s[20]; snprintf (s, 19, "%d", size);
+	      fs = str_append (fs, "[", s, "] = {");
+	    }
+	  }
+	  if (g->nd == 0 || j < size - 1) {
+	    fs = str_append (fs, "{");
+	    if (!strcmp (g->type, "scalar"))
+	      fs = write_scalar (fs, ((scalar *)g->pointer)[j], attributes);
+	    else if (!strcmp (g->type, "vector"))
+	      fs = write_vector (fs, ((vector *)g->pointer)[j], attributes);
+	    else if (!strcmp (g->type, "tensor"))
+	      fs = write_tensor (fs, ((tensor *)g->pointer)[j], attributes);
+	    else
+	      assert (false);
+	    fs = str_append (fs, "}");
+	  }
+	  else { // last element of a list is always ignored (this is necessary for empty lists)
+	    if (!strcmp (g->type, "scalar"))
+	      fs = str_append (fs, "{0,0,0,0}");
+	    else if (!strcmp (g->type, "vector"))
+	      fs = str_append (fs, "{{0,0,0,0},{0,0,0,0}}");
+	    else if (!strcmp (g->type, "tensor"))
+	      fs = str_append (fs, "{{{0,0,0,0},{0,0,0,0}},{{0,0,0,0},{0,0,0,0}}}");
+	    else
+	      assert (false);
+	  }
+	  if (g->nd == 0)
+	    fs = str_append (fs, ";\n");
+	  else if (j < size - 1)
+	    fs = str_append (fs, ",");
 	  else
-	    assert (false);
-	  fs = str_append (fs, "}");
+	    fs = str_append (fs, "};\n");
 	}
-	else { // last element of a list is always ignored (this is necessary for empty lists)
-	  if (!strcmp (g->type, "scalar"))
-	    fs = str_append (fs, "{0,0,0,0}");
-	  else if (!strcmp (g->type, "vector"))
-	    fs = str_append (fs, "{{0,0,0,0},{0,0,0,0}}");
-	  else if (!strcmp (g->type, "tensor"))
-	    fs = str_append (fs, "{{{0,0,0,0},{0,0,0,0}},{{0,0,0,0},{0,0,0,0}}}");
-	  else
-	    assert (false);
-	}
-	if (g->nd == 0)
-	  fs = str_append (fs, ";\n");
-	else if (j < size - 1)
-	  fs = str_append (fs, ",");
-	else
-	  fs = str_append (fs, "};\n");
       }
     }
-  }  
   {
     // fixme: check for maximum number of inputs
     char s[20];
@@ -416,6 +476,7 @@ char * build_shader (const NonLocal * nonlocals, const char * fname, int line)
   }
   else
     fs = str_append (fs, "vec4 _outputs[1];\n");
+  
   fs = str_append (fs,
 		   "in Point vsPoint;\n"
 		   "Point point = vsPoint*vsScale + vsOrigin;\n"
@@ -1260,6 +1321,10 @@ static bool doloop_on_gpu (ForeachData * loop, const RegionParameters * region,
 
   char * shader = build_shader (nonlocals, loop->fname, loop->line);
   if (shader) {
+
+    /**
+    ## Functions and main() */
+    
     shader = str_append (shader, funcs);
     shader = str_append (shader, "void main() {\n");
     foreach_texture (t)
@@ -1376,14 +1441,23 @@ static bool doloop_on_gpu (ForeachData * loop, const RegionParameters * region,
       DrawBuffers[i] = GL_COLOR_ATTACHMENT0 + i;
     glDrawBuffers (draw_buffer, DrawBuffers);
   }
-    
+
+  /**
+  ## Set attributes of scalar fields */
+
+  for (const NonLocal * g = nonlocals; g->name; g++)
+    if (g->name[0] == '.') {
+      
+    }
+
   /**
   ## Set global variables */
 
   int nreductions = 0;  
   for (const NonLocal * g = nonlocals; g->name; g++) {
+    if (g->name[0] == '.') continue;
     if (g->reduct)
-      nreductions++;    
+      nreductions++;
     if (!strcmp (g->type, "int") ||
 	!strcmp (g->type, "float") ||
 	!strcmp (g->type, "vec4")) {

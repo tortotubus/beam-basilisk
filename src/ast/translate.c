@@ -3985,6 +3985,28 @@ static char * get_type (const char * name, Stack * stack)
   return type;
 }
 
+const Ast * ast_attribute_access (const Ast * n, Stack * stack)
+{
+  if (!ast_schema (n, sym_postfix_expression,
+		   1, token_symbol('.')))
+    return NULL;
+  const char * typename = ast_typedef_name (ast_expression_type (n->child[0], stack, false));
+  if (typename && (!strcmp (typename, "scalar") ||
+		   !strcmp (typename, "vertex scalar"))) {
+    Ast * member = ast_find (n->child[2], sym_member_identifier,
+			     0, sym_generic_identifier,
+			     0, sym_IDENTIFIER);
+    Ast * type = ast_identifier_declaration (stack, "scalar");
+    assert (type);
+    while (type->sym != sym_declaration)
+      type = type->parent;
+    if (!find_struct_member (ast_find (type, sym_struct_declaration_list),
+			     ast_terminal (member)->start))
+      return n;
+  }
+  return NULL;
+}
+
 /**
 # Fourth pass: "macro" expressions 
 
@@ -4279,37 +4301,27 @@ static void macros (Ast * n, Stack * stack, void * data)
     break;
   }
 
-  /**
-  ## Attribute access */
-
   case sym_postfix_expression: {
-    if (n->child[1] && n->child[1]->sym == token_symbol('.')) {
-      const char * typename =
-	ast_typedef_name (ast_expression_type (n->child[0], stack, false));
-      if (typename && (!strcmp (typename, "scalar") ||
-		       !strcmp (typename, "vertex scalar"))) {
-	Ast * member = ast_find (n->child[2], sym_member_identifier,
-				 0, sym_generic_identifier,
-				 0, sym_IDENTIFIER);
-	Ast * type = ast_identifier_declaration (stack, "scalar");
-	assert (type);
-	while (type->sym != sym_declaration)
-	  type = type->parent;
-	if (!find_struct_member (ast_find (type, sym_struct_declaration_list),
-				 ast_terminal (member)->start)) {
-	  Ast * expr = ast_parse_expression ("_attribute[_field_.i];",
-					     ast_get_root (n));
-	  ast_replace (expr, "_field_", n->child[0]);
-	  ast_replace_child (n, 0, ast_find (expr, sym_postfix_expression));
-	  ast_destroy (expr);
-	}
-      }
+    if (ast_attribute_access (n, stack)) {
+      
+      /**
+      ## Attribute access */
+
+      Ast * expr = ast_parse_expression ("_attribute[_field_.i];",
+					 ast_get_root (n));
+      ast_replace (expr, "_field_", n->child[0]);
+      ast_replace_child (n, 0, ast_find (expr, sym_postfix_expression));
+      ast_destroy (expr);
+    }
+    else if (ast_schema (n, sym_postfix_expression,
+			 1, token_symbol('.'))) {
+      const char * typename = ast_typedef_name (ast_expression_type (n->child[0], stack, false));
 
       /**
       ## Boundary vector component access */
       
-      else if (typename && (!strcmp (typename, "vector") ||
-			    !strcmp (typename, "face vector")))
+      if (typename && (!strcmp (typename, "vector") ||
+		       !strcmp (typename, "face vector")))
 	set_boundary_component (ast_find (n->child[2], sym_member_identifier));
     }
     break;
@@ -5064,14 +5076,15 @@ void kernel (Ast * n, Stack * stack, void * data)
     ast_terminal (n)->start[0] = '\0';
     break;
     
-  /**
-  ## Postfix initializers */
-
   case sym_postfix_expression: {
     Ast * list;
     if ((list = ast_schema (n, sym_postfix_expression,
 			    3, sym_postfix_initializer,
 			    1, sym_initializer_list))) {
+      
+      /**
+      ## Postfix initializers */
+      
       Ast * a = n->child[0];
       ast_set_child (n, 0, n->child[1]);
       ast_set_child (n, 1, a);
@@ -5079,6 +5092,16 @@ void kernel (Ast * n, Stack * stack, void * data)
       ast_set_child (n, 3, n->child[2]);
       ast_set_child (n, 2, list);
       ast_destroy (a);
+    }
+    else if (ast_attribute_access (n, stack)) {
+
+      /**
+      ## Attribute access */
+
+      ast_before (n, "_attr(");
+      ast_terminal (ast_schema (n, sym_postfix_expression,
+				1, token_symbol('.')))->start[0] = ',';
+      ast_after (n, ")");
     }
     break;
   }
@@ -5097,7 +5120,7 @@ void kernel (Ast * n, Stack * stack, void * data)
       ast_set_child (n, 2, a);
     }
     break;
-    
+
   /**
   ## forin_declaration_statement */
 
