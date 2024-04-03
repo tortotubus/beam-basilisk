@@ -28,7 +28,7 @@ int MAXLEVEL;
 /**
 We center the unit box on the origin and set a maximum timestep of 0.1 */
 
-int main()
+int main (int argc, char * argv[])
 {
   origin (-0.5, -0.5);
   DT = .1[0,1];
@@ -42,7 +42,7 @@ int main()
   /**
   We then run the simulation for different levels of refinement. */
 
-  for (MAXLEVEL = 5; MAXLEVEL <= 7; MAXLEVEL++) {
+  for (MAXLEVEL = 5; MAXLEVEL <= (argc > 1 ? atoi(argv[1]) : 7); MAXLEVEL++) {
     init_grid (1 << MAXLEVEL);
     run();
   }
@@ -152,8 +152,10 @@ We also output the shape of the reconstructed interface at regular
 intervals (but only on the finest grid considered). */
 
 event shape (t += T/4.) {
+#if !BENCHMARK
   if (N == 128)
     output_facets (f);
+#endif
 }
 
 /**
@@ -181,6 +183,13 @@ event movie (i += 10)
 }
 #endif
 
+#if 0 // GPU // uncomment for real-time display on GPU
+event display (i++) {
+  output_ppm (f, n = 400, min = 0, max = 1, fps = 30);
+  output_ppm (cf, n = 400, min = 0, max = 1, fps = 30);
+}
+#endif
+
 /**
 ## Results
 
@@ -196,9 +205,9 @@ f2(x)=a2+b2*x
 fit f2(x) 'log' u (log($1)):(log($2)) via a2,b2
 
 fc(x)=ac+bc*x
-fit fc(x) 'clog' u (log($1)):(log($4)) via ac,bc
+fit fc(x) '../reversed/clog' u (log($1)):(log($4)) via ac,bc
 fc2(x)=ac2+bc2*x
-fit fc2(x) 'clog' u (log($1)):(log($2)) via ac2,bc2
+fit fc2(x) '../reversed/clog' u (log($1)):(log($2)) via ac2,bc2
 
 set xlabel 'Maximum resolution'
 set ylabel 'Maximum error'
@@ -208,10 +217,10 @@ set xrange [16:256]
 set xtics 16,2,256
 set grid ytics
 set cbrange [1:1]
-plot 'log' u 1:4 t 'max (adaptive)', exp(f(log(x))) t ftitle(a,b), \
-     'clog' u 1:4 t 'max (constant)', exp(fc(log(x))) t ftitle(ac,bc), \
-     'log' u 1:2 t 'norm1 (adaptive)', exp(f2(log(x))) t ftitle(a2,b2), \
-     'clog' u 1:2 t 'norm1 (constant)', exp(fc2(log(x))) t ftitle(ac2,bc2)
+plot 'log' u 1:4 t 'max', exp(f(log(x))) t ftitle(a,b), \
+     '../reversed/clog' u 1:4 t 'max (constant)', exp(fc(log(x))) t ftitle(ac,bc), \
+     'log' u 1:2 t 'norm1', exp(f2(log(x))) t ftitle(a2,b2), \
+     '../reversed/clog' u 1:2 t 'norm1 (constant)', exp(fc2(log(x))) t ftitle(ac2,bc2)
 ~~~
 
 The shapes of the interface at $t=0$, $t=T/4$, $t=T/2$, $t=3T/4$ and
@@ -224,7 +233,24 @@ larger than those for $t=T$.
 ~~~gnuplot Shapes of the interface for $t=0$, $t=T/4$, $t=T/2$, $t=3T/4$ and $t=T$ for two sets of simulations.
 reset
 set size ratio -1
-plot [-0.5:0.5][-0.5:0.5]'out' w l t "adaptive", 'cout' w l t "constant"
+plot [-0.5:0.5][-0.5:0.5]'out' w l t "current", '../reversed/cout' w l t "constant"
 ~~~
 
-![Refinement levels for $t=T/2$ and $N=128$.](reversed/levels.png) */
+![Refinement levels for $t=T/2$ and $N=128$.](reversed/levels.png) 
+
+## Benchmark on GPU
+
+~~~bash
+OpenGL renderer string: NVIDIA GeForce RTX 3050 Ti Laptop GPU/PCIe/SSE2
+Dedicated video memory: 4096 MB
+
+__NV_PRIME_RENDER_OFFLOAD=1 __GLX_VENDOR_LIBRARY_NAME=nvidia  ./reversed.gpu/reversed.gpu 10 2> /dev/null | grep -a steps
+
+# Cartesian (GPU), 959 steps, 0.48923 CPU, 0.5417 real, 1.81e+06 points.step/s, 13 var
+# Cartesian (GPU), 1877 steps, 0.94141 CPU, 0.9569 real, 8.03e+06 points.step/s, 15 var
+# Cartesian (GPU), 3720 steps, 2.00134 CPU, 2.036 real, 2.99e+07 points.step/s, 15 var
+# Cartesian (GPU), 7393 steps, 4.66335 CPU, 4.735 real, 1.02e+08 points.step/s, 15 var
+# Cartesian (GPU), 14735 steps, 11.5514 CPU, 11.66 real, 3.31e+08 points.step/s, 15 var
+# Cartesian (GPU), 29411 steps, 54.7206 CPU, 55.41 real, 5.57e+08 points.step/s, 15 var
+~~~
+*/
