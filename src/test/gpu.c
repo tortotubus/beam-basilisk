@@ -35,6 +35,15 @@ void myfunc4 (Point point, scalar a, (const) scalar b)
   a[] = b[];
 }
 
+double myfunc5 (double x)
+{
+  return x*x;
+}
+
+attribute {
+  double (* func) (double x);
+}
+
 int main (int argc, char * argv[])
 {
   init_grid (1);
@@ -252,6 +261,31 @@ int main (int argc, char * argv[])
     fprintf (stderr, "%g\n", s[]);
   
   /**
+  ## Function pointers */
+  
+  double (* myfuncp) (double x) = myfunc;
+  foreach()
+    s[] = myfuncp (1.);
+  foreach (serial)
+    fprintf (stderr, "%g\n", s[]);
+
+  {
+    s.func = myfunc;
+    s1.func = myfunc5;
+    scalar * list = {s, s1};
+    foreach()
+      for (scalar s in list)
+	s[] = s.func (2);
+    foreach (serial)
+      fprintf (stderr, "%g %g\n", s[], s1[]);
+  }
+
+  s.gradient = minmod2;
+  foreach()
+    if (s.gradient != NULL && s.gradient != zero)
+      s1[] = s.gradient (s[-1], s[], s[1])/Delta;
+
+  /**
   ## Functions */
 
   init_grid (16);
@@ -332,7 +366,7 @@ int main (int argc, char * argv[])
 #endif
   }
 
-#if GPU
+#if _GPU
   glFinish(); // make sure rendering is done on the GPU
 #endif
   

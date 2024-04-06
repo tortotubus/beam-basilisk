@@ -24,15 +24,19 @@ attribute {
   // 2: boundary_face applied
 }
 
-typedef struct {
-  char * name;       // the name of the variable
-  char * type;       // the type of the variable
-  void * pointer;    // a pointer to the data
-  int * dimensions;  // the dimensions of the array
-  int nd;            // the number of pointer dereferences
-  char reduct;       // the reduction operation
-  scalar data;       // user data
-} NonLocal;
+typedef struct _External External;
+
+struct _External {
+  char * name;    // the name of the variable
+  char * type;    // the type of the variable
+  void * pointer; // a pointer to the data
+  int nd;         // the number of pointer dereferences or attribute offset or enum constant
+  char reduct;    // the reduction operation
+  void * data;    // the dimensions (int *) for arrays or the code (char *) for functions
+  scalar s;       // used for reductions on GPUs
+  External * externals, * next;
+  int used;
+};
 
 typedef struct {
   const char * fname; // name of the source file

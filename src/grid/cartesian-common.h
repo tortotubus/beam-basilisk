@@ -72,9 +72,59 @@ void (* debug)    (Point);
 @
 @define end_foreach_region() }}}}
 
-// field allocation
-//
-// if this routine is modified, do not forget to update /src/ast/interpreter/overload.h
+/**
+Register functions on GPUs */
+
+#if _GPU
+#include "khash.h"
+KHASH_MAP_INIT_INT64(PTR, External)
+
+static khash_t(PTR) * _functions = NULL;
+  
+static External * _get_function (long ptr)
+{
+  if (!_functions)
+    return NULL;  
+  khiter_t k = kh_get (PTR, _functions, ptr);
+  if (k == kh_end (_functions))
+    return NULL;
+  return &kh_value (_functions, k);
+}
+
+static void register_function (void (* ptr) (void), const char * name,
+			       const char * kernel, const void * externals)
+{
+  static int index = 1;
+  if (!_functions)
+    _functions = kh_init (PTR), index = 1;
+  int m = 0;
+  for (const External * i = externals; i && i->name; i++, m++);
+  External * copy = NULL;
+  if (m > 0) {
+    copy = malloc ((m + 1)*sizeof (External));
+    memcpy (copy, externals, (m + 1)*sizeof (External));
+  }
+  int ret;
+  khiter_t k = kh_put(PTR, _functions, (long) ptr, &ret);
+  External p = { .name = (char *) name, .type = "func()", .pointer = (void *)(long) ptr, .nd = index++,
+    .data = (void *) kernel, .externals = copy };
+  kh_value(_functions, k) = p;
+}
+
+#define foreach_function(f, body) do {					\
+    for (khiter_t k = kh_begin(_functions); k != kh_end(_functions); ++k) \
+      if (kh_exist(_functions, k)) {					\
+	External * f = &kh_value(_functions, k);			\
+	body;								\
+      }									\
+  } while(0)
+
+#endif // _GPU
+
+/**
+# Field allocation
+
+If this routine is modified, do not forget to update [/src/ast/interpreter/overload.h](). */
 
 static void init_block_scalar (scalar sb, const char * name, const char * ext,
 			       int n, int block)
@@ -391,6 +441,10 @@ void free_solver()
   free (Events); Events = NULL;
   free (_attribute); _attribute = NULL;
   free (_constant); _constant = NULL;
+#if _GPU
+  foreach_function (f, free ((void *) f->externals));
+  kh_destroy (PTR, _functions); _functions = NULL;
+#endif
   free_grid();
   qpclose_all();
 @if TRACE
@@ -865,7 +919,7 @@ void interpolate_array (scalar * list, coord * a, int n, double * v,
     len++;
   for (int i = 0; i < n; i++) {
     double * w = v;
-#if GPU
+#if _GPU
     coord p = a[i];
     for (scalar s in list) {
       coord shift;
@@ -876,7 +930,7 @@ void interpolate_array (scalar * list, coord * a, int n, double * v,
 	value = !linear ? s[] : interpolate_linear_shifted (point, s, shift, p.x, p.y, 0.);
       *(w++) = value;
     }
-#else // !GPU
+#else // !_GPU
     for (scalar s in list)
       *(w++) = nodata;
     foreach_point (a[i].x, a[i].y, a[i].z, reduction(min:v[:len])) {
@@ -884,7 +938,7 @@ void interpolate_array (scalar * list, coord * a, int n, double * v,
       for (scalar s in list)
 	v[j++] = !linear ? s[] : interpolate_linear (point, s, a[i].x, a[i].y, a[i].z);
     }
-#endif // !GPU
+#endif // !_GPU
     v = w;
   }
 }

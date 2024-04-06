@@ -702,6 +702,7 @@ static Ast * vast_copy_internal (const Ast * n, va_list ap, bool * found,
 
 Ast * ast_copy_internal (const Ast * n, ...)
 {
+  if (!n) return NULL;
   va_list ap;
   va_start (ap, n);
   bool found = false;

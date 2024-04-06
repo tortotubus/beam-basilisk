@@ -69,3 +69,44 @@ void _Variables() {
   double Delta;
   int level;
 }
+
+/**
+# Functions supported by GLSL */
+
+bool is_face_x();
+bool is_face_y();
+bool is_face_z();
+bool is_constant();
+void dimensional();
+void NOT_UNUSED();
+
+double abs (double x);
+double acos (double x);
+double acosh (double x);
+double asin (double x);
+double asinh (double x);
+double atan (double x);
+double atanh (double x);
+double ceil (double x);
+double clamp (double a, double b, double c);
+double cos (double x);
+double cosh (double x);
+double exp (double x);
+double fabs(double x);
+double log (double x);
+double log2 (double x);
+double sq (double x);
+double max (double a, double b);
+double min (double a, double b);
+double mix (double a, double b, double c);
+double mod (double a, double b);
+double modf (double a, double * b);
+double pow (double a, double b);
+double round (double x);
+double sign (double x);
+double sin (double x);
+double sinh (double x);
+double sqrt (double x);
+double tan (double x);
+double tanh (double x);
+double trunc (double x);

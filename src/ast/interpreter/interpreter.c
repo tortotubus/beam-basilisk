@@ -2497,6 +2497,17 @@ Value * ast_run_node (Ast * n, Stack * stack)
     break;
 
   case sym_function_call:
+    {
+      Ast * identifier;
+      if ((identifier = ast_schema (n, sym_function_call,
+				    0, sym_postfix_expression,
+				    0, sym_primary_expression,
+				    0, sym_IDENTIFIER)) &&
+	  !strcmp (ast_terminal (identifier)->start, "_register_fpointer")) {
+	value = run (ast_find (n, sym_argument_expression_list_item), stack);
+	break;
+      }
+    }
     value = run (n->child[0], stack);
     if (value) {
       Ast * identifier, * function_definition;

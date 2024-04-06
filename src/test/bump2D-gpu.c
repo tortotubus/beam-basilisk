@@ -14,7 +14,7 @@ int main (int argc, char * argv[])
   run();
 }
 
-#if 0 // GPU
+#if 0 // _GPU
 event display (i++)
 {
   output_ppm (h, map = blue_white_red, n = 1024, spread = -1, fps = 30, linear = true);

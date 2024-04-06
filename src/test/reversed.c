@@ -183,7 +183,7 @@ event movie (i += 10)
 }
 #endif
 
-#if 0 // GPU // uncomment for real-time display on GPU
+#if 0 // _GPU // uncomment for real-time display on GPU
 event display (i++) {
   output_ppm (f, n = 400, min = 0, max = 1, fps = 30);
   output_ppm (cf, n = 400, min = 0, max = 1, fps = 30);
