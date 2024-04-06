@@ -58,9 +58,9 @@ processes), this function returns the statistics above. */
 timing timer_timing (timer t, int i, size_t tnc, double * mpi)
 {
   timing s;
-@if _MPI
+#if _MPI
   s.avg = mpi_time - t.tm;
-@endif
+#endif
   clock_t end = clock();
   s.cpu = ((double) (end - t.c))/CLOCKS_PER_SEC;
   s.real = timer_elapsed (t);
@@ -72,14 +72,14 @@ timing timer_timing (timer t, int i, size_t tnc, double * mpi)
   }
   else
     s.tnc = tnc;
-@if _GNU_SOURCE
+#if _GNU_SOURCE
   struct rusage usage;
   getrusage (RUSAGE_SELF, &usage);
   s.mem = usage.ru_maxrss;
-@else
+#else
   s.mem = 0;
-@endif
-@if _MPI
+#endif
+#if _MPI
   if (mpi)
     MPI_Allgather (&s.avg, 1, MPI_DOUBLE, mpi, 1, MPI_DOUBLE, MPI_COMM_WORLD);
   s.max = s.min = s.avg;
@@ -91,9 +91,9 @@ timing timer_timing (timer t, int i, size_t tnc, double * mpi)
   s.real /= npe();
   s.avg /= npe();
   s.mem /= npe();
-@else
+#else
   s.min = s.max = s.avg = 0.;
-@endif
+#endif
   s.speed = s.real > 0. ? tnc/s.real : -1.;
   return s;
 }
@@ -103,7 +103,7 @@ This function writes timing statistics on standard output. */
 
 void timer_print (timer t, int i, size_t tnc)
 {
-#if GPU
+#if _GPU
   glFinish(); // make sure rendering is done on the GPU
 #endif
   timing s = timer_timing (t, i, tnc, NULL);
@@ -111,7 +111,7 @@ void timer_print (timer t, int i, size_t tnc)
 	   "\n# " GRIDNAME 
 	   ", %d steps, %g CPU, %.4g real, %.3g points.step/s, %d var\n",
 	   i, s.cpu, s.real, s.speed, (int) (datasize/sizeof(double)));
-@if _MPI
+#if _MPI
   fprintf (fout,
 	   "# %d procs, MPI: min %.2g (%.2g%%) "
 	   "avg %.2g (%.2g%%) max %.2g (%.2g%%)\n",
@@ -119,7 +119,7 @@ void timer_print (timer t, int i, size_t tnc)
 	   s.min, 100.*s.min/s.real,
 	   s.avg, 100.*s.avg/s.real,
 	   s.max, 100.*s.max/s.real);
-@endif
+#endif
   fflush (stdout);
 }
 
@@ -241,34 +241,6 @@ centered differencing is used. */
 void gradients (scalar * f, vector * g)
 {
   assert (list_len(f) == vectors_len(g));
-#if GPU
-  scalar * slistc = NULL, * slistm = NULL;
-  vector * vlistc = NULL, * vlistm = NULL, * vlistz = NULL;
-  scalar s; vector v;
-  for (s,v in f,g)
-    if (s.gradient == NULL)
-      slistc = list_append (slistc, s), vlistc = vectors_append (vlistc, v);
-    else if (s.gradient == minmod2)
-      slistm = list_append (slistm, s), vlistm = vectors_append (vlistm, v);
-    else if (s.gradient == zero)
-      vlistz = vectors_append (vlistz, v);
-    else
-      assert (false); // not implemented yet  
-  foreach() {
-    scalar s; vector v;
-    for (s, v in slistc, vlistc)
-      foreach_dimension()
-	v.x[] = (s[1] - s[-1])/(2.*Delta);
-    for (s, v in slistm, vlistm)
-      foreach_dimension()
-	v.x[] = minmod2 (s[-1], s[], s[1])/Delta;
-    for (vector v in vlistz)
-      foreach_dimension()
-	v.x[] = 0.;
-  }
-  free (slistc), free (slistm);
-  free (vlistc), free (vlistm), free (vlistz);
-#else // !GPU // fixme: the version above is always faster (but less general)
   foreach() {
     scalar s; vector v;
     for (s,v in f,g) {
@@ -292,7 +264,6 @@ void gradients (scalar * f, vector * g)
 	}
     }
   }
-#endif // !GPU
 }
 
 /**

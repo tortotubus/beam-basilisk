@@ -54,7 +54,7 @@ All other options will be passed directly to the C compiler. */
 int dimension = 2, bghosts = 0, layers = 0;
   
 int debug = 0, catch = 0, cadna = 0, nolineno = 0, events = 0, progress = 0;
-int parallel = 0, cpu = 0;
+int parallel = 0, cpu = 0, gpu = 0;
 static FILE * dimensions = NULL;
 static int run = -1, finite = 1, redundant = 0, warn = 0, maxcalls = 20000000;
 char dir[] = ".qccXXXXXX";
@@ -67,7 +67,7 @@ FILE * dopen (const char * fname, const char * mode);
   
 void includes (int argc, char ** argv,
 	       char ** grid, int * default_grid,
-	       int * dimension, int * bg, int * layers,
+	       int * dimension, int * bg, int * layers, int * gpu,
 	       const char * dir);
 
 FILE * writepath (char * path, const char * mode)
@@ -115,9 +115,9 @@ void * compdir (FILE * fin, FILE * fout, FILE * swigfp,
 
   void * endfor (FILE * fin, FILE * fout,
 		 const char * grid, int dimension,
-		 int nolineno, int progress, int catch, int parallel, int cpu,
+		 int nolineno, int progress, int catch, int parallel, int cpu, int gpu,
 		 FILE * swigfp, char * swigname);
-  void * ast = endfor (fin, fout1, grid, dimension, nolineno, progress, catch, parallel, cpu,
+  void * ast = endfor (fin, fout1, grid, dimension, nolineno, progress, catch, parallel, cpu, gpu,
 		       swigfp, swigname);
   fclose (fout1);
   
@@ -309,8 +309,10 @@ int main (int argc, char ** argv)
     char * grid = NULL;
     int default_grid;
     includes (argc, argv, &grid, &default_grid,
-	      &dimension, &bghosts, &layers,
+	      &dimension, &bghosts, &layers, &gpu,
 	      dep || tags ? NULL : dir);
+    if (gpu)
+      parallel = 1;
     FILE * swigfp = NULL;
     char swigname[80] = "";
     if (swig) {

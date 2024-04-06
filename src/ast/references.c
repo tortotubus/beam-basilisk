@@ -1,7 +1,7 @@
 /**
-# Non-local references 
+# External references 
 
-Returns a list of non-local references. */
+Returns a list of external references. */
 
 #include <stdlib.h>
 #include <string.h>
@@ -29,10 +29,10 @@ bool is_local_declaration (Ast * n, Stack * stack, Ast * scope)
 }
 
 static
-void non_local_references (Ast * n, Stack * stack, void * data);
+void external_references (Ast * n, Stack * stack, void * data);
 
 static
-void add_non_local_reference (const char * name, Stack * stack, Accelerator * a)
+void add_external_reference (const char * name, Stack * stack, Accelerator * a)
 {
   Ast * ref = ast_identifier_declaration (stack, name);
   if (!ref) {
@@ -45,35 +45,38 @@ void add_non_local_reference (const char * name, Stack * stack, Accelerator * a)
 
   if (!strcmp (ast_terminal (ref)->file, "ast/defaults.h")) // ignore "internal" variables and macros
     return;
-    
+
   if (!is_local_declaration (ref, stack, a->scope) &&
       !fast_stack_find (a->nonlocals, ast_terminal (ref)->start)) {
-    stack_push (a->nonlocals, &ref);
 
     /**
     Function call */
 
-    Ast * definition = ast_parent (ref, sym_function_definition);
-    if (definition && (ref = ast_find (definition, sym_direct_declarator,
+    Ast * definition = ast_parent (ref, sym_function_definition), * def;
+    if (definition && (def = ast_find (definition, sym_direct_declarator,
 				       0, sym_direct_declarator,
 				       0, sym_generic_identifier,
 				       0, sym_IDENTIFIER)) &&
-	!strcmp (ast_terminal (ref)->start, name)) {
+	!strcmp (ast_terminal (def)->start, name)) {
       Accelerator b = *a;
       b.scope = definition;
       stack_push (stack, &definition);
-      ast_traverse (definition, stack, non_local_references, &b);
+      ast_traverse (definition, stack, external_references, &b);
       ast_pop_scope (stack, definition);
+      a->nonlocals = b.nonlocals;
+      a->attributes = b.attributes;
     }
+
+    stack_push (a->nonlocals, &ref);
   }
 }
 
 static
-void non_local_references (Ast * n, Stack * stack, void * data)
+void external_references (Ast * n, Stack * stack, void * data)
 {
   if (n->sym == sym_IDENTIFIER) {
     if (n->parent->sym == sym_primary_expression)
-      add_non_local_reference (ast_terminal (n)->start, stack, data);
+      add_external_reference (ast_terminal (n)->start, stack, data);
     else if (ast_attribute_access (ast_ancestor (n, 3), stack)) {
       
       /**
@@ -106,25 +109,51 @@ void non_local_references (Ast * n, Stack * stack, void * data)
 }
 
 static
-void add_reference (Ast * ref, Ast * argument, Ast * scope, Stack * stack)
+char * add_reference (Ast * ref, char * references, Ast * scope, Stack * stack, Stack * functions)
 {
-  AstDimensions dim = {0};
-  Ast * type = ast_identifier_type (ref, &dim, stack), * def;
-    
-  if (type == (Ast *) &ast_function)
-    return; // fixme: external functions not handled yet
-
   const char * start = ast_terminal (ref)->start;
   if (!strcmp (start, "NULL"))
-    return;
+    return references;
 
+  AstDimensions dim = {0};
+  Ast * type = ast_identifier_type (ref, &dim, stack);
   Ast * attributes = ast_parent (ref, sym_struct_or_union_specifier);
   
-  ast_after (argument, "{\"", attributes ? "." : "", start, "\""); // name
+  if (type == (Ast *) &ast_function) {
     
+    /**
+    Function pointers */
+  
+    if (ast_schema (ast_ancestor (ref, 4), sym_direct_declarator,
+		    1, sym_declarator,
+		    0, sym_pointer)) {
+      str_append (references, "{.name=\"", attributes ? "." : "", start,
+		  "\",.type=\"*func()\"");
+      if (attributes)
+	str_append (references, ",.nd=attroffset(", start, ")},");
+      else
+	str_append (references, ",.pointer=(void *)(long)", start, "},");
+    }
+
+    /**
+    Function definitions */
+    
+    else if (ast_ancestor (ref, 6)->sym == sym_function_definition) {
+      str_append (references, "{.name=\"", attributes ? "." : "", start,
+		  "\",.type=\"func()\",.pointer=(void *)(long)", start, "},");
+      if (!fast_stack_find (functions, ast_terminal (ref)->start))
+	stack_push (functions, &ref);
+    }
+    
+    return references;
+  }
+  
+  str_append (references, "{.name=\"", attributes ? "." : "", start, "\"");
+      
   /**
   Type */
 
+  Ast * def;
   if (ast_schema (ast_ancestor (type, 5), sym_declaration,
 		  0, sym_declaration_specifiers,
 		  0, sym_storage_class_specifier,
@@ -137,46 +166,35 @@ void add_reference (Ast * ref, Ast * argument, Ast * scope, Stack * stack)
 			 0, sym_generic_identifier,
 			 0, sym_IDENTIFIER)))
     // typedef
-    ast_after (argument, ",\"", ast_terminal (def)->start, "\"");
+    str_append (references, ",.type=\"", ast_terminal (def)->start, "\"");
+  else if (ref->parent->sym == sym_enumeration_constant)
+    str_append (references, ",.type=\"enum\"");
   else switch (type->sym) {
     case sym_INT: case sym_DOUBLE: case sym_FLOAT:
-      ast_after (argument, ",\"", ast_terminal (type)->start, "\""); break;
+      str_append (references, ",.type=\"", ast_terminal (type)->start, "\""); break;
 	
     default:
-      ast_after (argument, ",\"not implemented yet\""); break;
+      str_append (references, ",.type=\"not implemented yet\""); break;
     }
     
-
   /**
   Pointer */
 
-  if (attributes)
-    ast_after (argument, ",NULL");
-  else
-    ast_after (argument, ",(void *)", dim.pointer || dim.dimension ? "" : "&", start);
+  if (!(attributes || ref->parent->sym == sym_enumeration_constant))
+    str_append (references, ",.pointer=(void *)", dim.pointer || (dim.dimension && (*dim.dimension)->sym != sym_VOID) ?
+		"" : "&", start);
 
   /**
-  Array dimensions */
-  
-  if (dim.dimension) {
-    ast_after (argument, ",(int[]){");
-    for (Ast ** d = dim.dimension; *d; d++)
-      ast_right_terminal (argument)->after = ast_str_append (*d, ast_right_terminal (argument)->after);
-    ast_after (argument, ",0}");
-  }
-  else
-    ast_after (argument, ",NULL");
-  free (dim.dimension);
-
-  /**
-  Attribute offset or number of pointer dereferences */
+  Attribute offset or enumeration constant or number of pointer dereferences */
 
   if (attributes)
-    ast_after (argument, ",offsetof(_Attributes,", start, ")");
-  else {
+    str_append (references, ",.nd=attroffset(", start, ")");
+  else if (ref->parent->sym == sym_enumeration_constant)
+    str_append (references, ",.nd=", start);
+  else if (dim.pointer) {
     char s[10];
     snprintf (s, 10, "%d", dim.pointer);
-    ast_after (argument, ",", s);
+    str_append (references, ",.nd=", s);
   }
     
   /**
@@ -201,43 +219,52 @@ void add_reference (Ast * ref, Ast * argument, Ast * scope, Stack * stack)
 	      // fixme: not implemented yet
 	    }
 	    else
-	      ast_after (argument, ",",
-			 !strcmp(operator, "min") ? "'m'" :
-			 !strcmp(operator, "max") ? "'M'" :
-			 !strcmp(operator, "+")   ? "'+'" :
-			 "'?'");
+	      str_append (references, ",.reduct=",
+			  !strcmp(operator, "min") ? "'m'" :
+			  !strcmp(operator, "max") ? "'M'" :
+			  !strcmp(operator, "+")   ? "'+'" :
+			  "'?'");
 	  }
 	}
       }
     }
+  
+  /**
+  Array dimensions */
+  
+  if (dim.dimension && (*dim.dimension)->sym != sym_VOID) {
+    str_append (references, ",.data=(int[]){");
+    for (Ast ** d = dim.dimension; *d; d++)
+      references = ast_str_append (*d, references);
+    str_append (references, ",0}");
+  }
+  free (dim.dimension);
     
-  ast_after (argument, "},");
+  str_append (references, "},");
+  
+  return references;
 }
 
-void ast_non_local_references (Ast * scope, Ast * argument)
+char * ast_external_references (Ast * scope, char * references, Stack * functions)
 {
   AstRoot * root = ast_get_root (scope);
   Stack * stack = root->stack;
-  
+
   stack_push (stack, &scope);
   Accelerator a = { scope };
   a.nonlocals = stack_new (sizeof (Ast *));
   a.attributes = stack_new (sizeof (Ast *));
-  add_non_local_reference ("X0", stack, &a);
-  add_non_local_reference ("Y0", stack, &a);
-  add_non_local_reference ("Z0", stack, &a);
-  add_non_local_reference ("L0", stack, &a);
-  add_non_local_reference ("N", stack, &a);
-  ast_traverse (scope, stack, non_local_references, &a);
+  ast_traverse (scope, stack, external_references, &a);
   ast_pop_scope (stack, scope);
 
-  ast_after (argument, "{");
   Ast ** n;
-  while ((n = stack_pop (a.nonlocals)))
-    add_reference (*n, argument, scope, stack);
-  while ((n = stack_pop (a.attributes)))
-    add_reference (*n, argument, scope, stack);
-  ast_after (argument, "{0}}");
+  for (int i = 0; (n = stack_indexi (a.nonlocals, i)) && (!references || !strstr (references, "@error ")); i++)
+    references = add_reference (*n, references, scope, stack, functions);
+  for (int i = 0; (n = stack_indexi (a.attributes, i)) && (!references || !strstr (references, "@error ")); i++)
+    references = add_reference (*n, references, scope, stack, functions);
+
   stack_destroy (a.nonlocals);
   stack_destroy (a.attributes);
+  
+  return references;
 }

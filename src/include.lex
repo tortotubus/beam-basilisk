@@ -43,7 +43,7 @@
   
   static char * paths[100] = { LIBDIR }, grid[80] = "quadtree";
   static int npath = 1, hasgrid = 0, debug = 0;
-  static int dimension = 0, bghosts = 0, layers = 0;
+  static int dimension = 0, bghosts = 0, layers = 0, gpu = 0;
   static int incode;    // are we in code (or in a code block)?
   
   static char * strip_path (char * s) {
@@ -307,6 +307,10 @@ FDECL     {ID}+{SP}*\(
   bghosts = atoi(s);
 }
 
+^{SP}*#{SP}*define{SP}+_GPU{WS}+1{SP}*$ {
+  gpu = 1;
+}
+
 ^{SP}*#{SP}*define{SP}+LAYERS{WS}+1{SP}*$ {
   layers = 1;
 }
@@ -568,7 +572,7 @@ static void prepend_path (char * path)
 
 void includes (int argc, char ** argv,
 	       char ** grid1, int * default_grid,
-	       int * dim, int * bg, int * lyrs,
+	       int * dim, int * bg, int * lyrs, int * gpus,
 	       const char * dir)
 {
   int depend = 0, tags = 0, swig = 0;
@@ -727,6 +731,7 @@ void includes (int argc, char ** argv,
     *dim = dimension;
   *bg = bghosts;
   *lyrs = layers;
+  *gpus = gpu;
   free (basilisk_include_path);
   free_allocator (alloc);
 }

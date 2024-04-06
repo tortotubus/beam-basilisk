@@ -2,13 +2,13 @@
 #include <kdt/kdt.h>
 #pragma autolink -L$BASILISK/kdt -lkdt
 
-@if _OPENMP
-@ define NPROC omp_get_max_threads()
-@ define PROC tid()
-@else
-@ define NPROC 1
-@ define PROC 0
-@endif
+#if _OPENMP
+# define NPROC omp_get_max_threads()
+# define PROC tid()
+#else
+# define NPROC 1
+# define PROC 0
+#endif
 
 attribute {
   void ** kdt;

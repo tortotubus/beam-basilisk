@@ -747,7 +747,7 @@ void output_gfs (FILE * fp = NULL,
 {
   char * fname = file;
   
-@if _MPI
+#if _MPI
 #if MULTIGRID_MPI
   not_mpi_compatible();
 #endif // !MULTIGRID_MPI
@@ -759,7 +759,7 @@ void output_gfs (FILE * fp = NULL,
     snprintf (fname, 80, ".output-%ld", pid);
     fp = NULL;
   }
-@endif // _MPI
+#endif // _MPI
   
   bool opened = false;
   if (fp == NULL) {
@@ -806,7 +806,7 @@ void output_gfs (FILE * fp = NULL,
   fprintf (fp, "  VariableTracerVOF f\n");
   fprintf (fp, "}\nGfsBox { x = 0 y = 0 z = 0 } {\n");
 
-@if _MPI
+#if _MPI
   long header;
   if ((header = ftell (fp)) < 0) {
     perror ("output_gfs(): error in header");
@@ -818,21 +818,21 @@ void output_gfs (FILE * fp = NULL,
       cell_size += sizeof(double);
   scalar index = new scalar;
   size_t total_size = header + (z_indexing (index, false) + 1)*cell_size;
-@endif
+#endif
   
   // see gerris/ftt.c:ftt_cell_write()
   //     gerris/domain.c:gfs_cell_write()
   foreach_cell() {
-@if _MPI // fixme: this won't work when combining MPI and mask()
+#if _MPI // fixme: this won't work when combining MPI and mask()
     if (is_local(cell))
-@endif
+#endif
     {
-@if _MPI
+#if _MPI
       if (fseek (fp, header + index[]*cell_size, SEEK_SET) < 0) {
 	perror ("output_gfs(): error while seeking");
 	exit (1);
       }
-@endif
+#endif
       unsigned flags = 
 	level == 0 ? 0 :
 #if dimension == 1
@@ -887,14 +887,14 @@ void output_gfs (FILE * fp = NULL,
       continue;
   }
   
-@if _MPI
+#if _MPI
   delete ({index});
   if (!pid() && fseek (fp, total_size, SEEK_SET) < 0) {
     perror ("output_gfs(): error while finishing");
     exit (1);
   }
   if (!pid())
-@endif  
+#endif  
     fputs ("}\n", fp);
   fflush (fp);
 
@@ -903,7 +903,7 @@ void output_gfs (FILE * fp = NULL,
   if (opened)
     fclose (fp);
 
-@if _MPI
+#if _MPI
   if (file == NULL) {
     MPI_Barrier (MPI_COMM_WORLD);
     if (pid() == 0) {
@@ -919,7 +919,7 @@ void output_gfs (FILE * fp = NULL,
     }
     free (fname);
   }
-@endif // _MPI
+#endif // _MPI
 }
 
 /**
@@ -988,7 +988,7 @@ static void dump_header (FILE * fp, struct DumpHeader * header, scalar * list)
   }
 }
 
-@if !_MPI
+#if !_MPI
 trace
 void dump (const char * file = "dump",
 	   scalar * list = all,
@@ -1040,7 +1040,7 @@ void dump (const char * file = "dump",
     free (name);
   }
 }
-@else // _MPI
+#else // _MPI
 trace
 void dump (const char * file = "dump",
 	   scalar * list = all,
@@ -1114,7 +1114,7 @@ void dump (const char * file = "dump",
   if (!unbuffered && pid() == 0)
     rename (name, file);
 }
-@endif // _MPI
+#endif // _MPI
 
 trace
 bool restore (const char * file = "dump",
@@ -1288,6 +1288,6 @@ bool restore (const char * file = "dump",
 
 #endif // MULTIGRID
 
-#if GPU
+#if _GPU
 # include "grid/gpu/output.h"
 #endif

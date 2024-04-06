@@ -17,6 +17,10 @@ __NV_PRIME_RENDER_OFFLOAD=1 __GLX_VENDOR_LIBRARY_NAME=nvidia  glxinfo -B | \
 * type casts in GLSL i.e. (int)... etc.
 * boolean type casts i.e.   float a = (b > 0);  ... if (a) ...
 
+GLSL: error: if-statement condition must be scalar boolean
+
+GLSL: error: value of type float cannot be assigned to variable of type int
+
 */
 
 #include <grid/gpu/gpu.h>
@@ -47,7 +51,7 @@ typedef struct {
   };
   struct {
     RegionParameters parameters;
-    NonLocal * nonlocals;
+    External * externals;
     const char * funcs, * kernel;
   } _params = S__VA_ARGS__;
   RegionParameters * region = &_params.parameters;
@@ -67,8 +71,8 @@ typedef struct {
   };
   struct {
     coord parameters;
-    NonLocal * nonlocals;
-    const char * funcs, * kernel;
+    External * externals;
+    const char * kernel;
   } _params = S__VA_ARGS__;
   RegionParameters r = { .p = _params.parameters, .n = {1,1} }, * region = &r;
   if (baseblock) for (scalar s = baseblock[0], * i = baseblock; s.i >= 0; i++, s = *i) {
@@ -94,7 +98,7 @@ typedef struct {
   }
 #endif // PRINTIO
   check_stencil (&_loop);
-  _gpu_done_ = gpu_end_stencil (&_loop, region, _params.nonlocals, _params.funcs, _params.kernel);
+  _gpu_done_ = gpu_end_stencil (&_loop, region, _params.externals, _params.kernel);
   boundary_stencil (&_loop);
   _loop.first = 0;
   end_tracing ("foreach", S__FILE__, S_LINENO);
@@ -107,9 +111,9 @@ typedef struct {
 @endif
 
 bool gpu_end_stencil (ForeachData * loop, const RegionParameters * region,
-		      NonLocal * nonlocals, const char * funcs, const char * kernel);
+		      External * externals, const char * kernel);
 
-#define GPU 1
+#define _GPU 1
 
 #include "../cartesian.h"
 
@@ -184,8 +188,8 @@ static char glsl_preproc[] =
   "// #line 134 \"" __FILE__ "\"\n"
   "#define dimensional(x)\n"
   "#define real float\n"
+  "#define coord vec3\n"
 #if dimension == 2
-  "#define coord vec2\n"
   "#define _coord vec2\n"
   "#define scalar ivec4\n"
   "struct vector { scalar x, y; };\n"
@@ -194,8 +198,9 @@ static char glsl_preproc[] =
   "#define Point vec2\n"
   "#define valt(s,i,j,k) (texture(s, point + vec2((i), (j))*_delta))\n"
   "#define _NVARMAX 65536\n"
+  "#define NULL 0\n"
   "#define val(s,i,j,k) (s.a < 0 || i != 0 || j != 0 || k != 0 ?"
-  "(s.r < _NVARMAX ? valt(_inputs[s.r],i,j,k)[s.g] : _constant[clamp(s.r-_NVARMAX,0,_nconst-1)])"
+  "(s.a > - _NVARMAX ? valt(_inputs[s.r],i,j,k)[s.g] : _constant[clamp(- s.a -_NVARMAX,0,_nconst-1)])"
   ": _outputs[s.b][s.g])\n"
   "#define val_out_(s,i,j,k) (_outputs[s.b][s.g])\n"
   "#define _attr(s,member) (_attr[abs(s.a) - 1].member)\n"
@@ -226,7 +231,7 @@ static char glsl_preproc[] =
   "uniform vec2 vsScale = vec2(1.,1.);\n"
   ;
 
-static inline int list_size (const NonLocal * i)
+static inline int list_size (const External * i)
 {
   int size = 0;
   if (!strcmp (i->type, "scalar")) {
@@ -249,20 +254,15 @@ static inline int list_size (const NonLocal * i)
   return size;
 }
 
-/**
-Format: read index, component, write index, write mode (1: write, 0: read)
-*/
-
-static char * write_scalar (char * fs, scalar s, bool attributes)
+static char * write_scalar (char * fs, scalar s)
 {
   char component[20] = "0", input[20] = "0", output[20] = "0", index[20] = "1";
   if (s.i >= 0) {
     if (is_constant(s))
-      snprintf (input, 19, "%d", s.i);
+      snprintf (index, 19, "%d", s.i);
     else {
       snprintf (component, 19, "%d", s.gpu.component);
-      if (attributes)
-	snprintf (index, 19, "%d", s.i + 1);
+      snprintf (index, 19, "%d", s.gpu.index);
       Texture * t = scalar_texture(s);
       if (t->input > 0)
 	snprintf (input, 19, "%d", t->input);
@@ -274,27 +274,99 @@ static char * write_scalar (char * fs, scalar s, bool attributes)
 		     s.i >= 0 && !is_constant(s) && s.output ? "+" : "-", index);
 }
 
-static char * write_vector (char * fs, vector v, bool attributes)
+static char * write_vector (char * fs, vector v)
 {
   fs = str_append (fs, "{");
-  fs = write_scalar (fs, v.x, attributes);
+  fs = write_scalar (fs, v.x);
   fs = str_append (fs, "},{");
-  fs = write_scalar (fs, v.y, attributes);
+  fs = write_scalar (fs, v.y);
   fs = str_append (fs, "}");
   return fs;
 }
 
-static char * write_tensor (char * fs, tensor t, bool attributes)
+static char * write_tensor (char * fs, tensor t)
 {
   fs = str_append (fs, "{");
-  fs = write_vector (fs, t.x, attributes);
+  fs = write_vector (fs, t.x);
   fs = str_append (fs, "},{");
-  fs = write_vector (fs, t.y, attributes);
+  fs = write_vector (fs, t.y);
   fs = str_append (fs, "}");
   return fs;
 }
 
-char * build_shader (const NonLocal * nonlocals, const char * fname, int line)
+static External * append_external (External * externals, External ** end, External * g)
+{
+  if (externals)
+    (*end)->next = g;
+  else
+    externals = g;
+  *end = g;
+  (*end)->next = NULL;
+  return externals;
+}
+
+static External * merge_external (External * externals, External ** end, External * g, const ForeachData * loop)
+{
+  if (!strcmp (g->type, "*func()") || !strcmp (g->type, "func()"))
+    for (scalar s in baseblock)
+      if (g->name[0] != '.' || s.gpu.index) {
+	void * ptr = g->name[0] != '.' ? g->pointer :
+	  *((void **)(((char *) &_attribute[s.i]) + g->nd));
+	if (ptr) {
+	  External * p = _get_function ((long) ptr);
+	  if (!p) {
+	    fprintf (stderr, "%s:%d: GLSL: error: unregistered function pointer '%s'\n",
+		     loop->fname, loop->line, g->name);
+	    return NULL;
+	  }
+	  if (!p)
+	    return NULL;
+	  if (!p->used) {
+	    p->used = true;
+	    for (External * i = p->externals; i && i->name; i++)
+	      externals = merge_external (externals, end, i, loop);
+	    externals = append_external (externals, end, p);
+	  }
+	}
+	if (g->name[0] != '.')
+	    break;
+      }
+
+  for (External * i = externals; i; i = i->next)
+    if (!strcmp (i->name, g->name))
+      return externals;
+
+  return append_external (externals, end, g);
+}
+
+static External * merge_externals (External * externals, const ForeachData * loop)
+{
+  External * merged = NULL, * end = NULL;
+  static External x0 = { .name = "X0", .type = "double", .pointer = &X0 };
+  static External y0 = { .name = "Y0", .type = "double", .pointer = &Y0 };
+  static External z0 = { .name = "Z0", .type = "double", .pointer = &Z0 };
+  static External l0 = { .name = "L0", .type = "double", .pointer = &L0 };
+  static External n =  { .name = "N",  .type = "int",    .pointer = &N };
+  for (External * g = externals; g->name; g++)
+    g->used = false;
+  foreach_function (f, f->used = false);
+  x0.used = y0.used = z0.used = l0.used = n.used = false;
+  merged = merge_external (merged, &end, &x0, loop);
+  merged = merge_external (merged, &end, &y0, loop);
+  merged = merge_external (merged, &end, &z0, loop);
+  merged = merge_external (merged, &end, &l0, loop);
+  merged = merge_external (merged, &end, &n, loop);
+  for (External * g = externals; g->name; g++)
+    merged = merge_external (merged, &end, g, loop);
+#if PRINTEXTERNAL  
+  for (External * i = merged; i; i = i->next)
+    fprintf (stderr, "external %s %s\n", i->name, i->type);
+#endif
+  return merged;
+}
+
+trace
+char * build_shader (const External * externals, const char * fname, int line)
 {
   char s[20];
   snprintf (s, 19, "%d", nconst > 0 ? nconst : 1);
@@ -328,132 +400,6 @@ char * build_shader (const NonLocal * nonlocals, const char * fname, int line)
       t->out[s.gpu.component] = true;
     }
   }
-      
-  /**
-  Scalar field attributes */
-      
-  char * attributes = NULL;
-  for (const NonLocal * g = nonlocals; g->name; g++)
-    if (g->name[0] == '.') {
-      char * type = !strcmp (g->type, "float") || !strcmp (g->type, "double") ? "real" : g->type;
-      attributes = str_append (attributes, "  ", type, " ", g->name + 1);
-      for (int * d = g->dimensions; d && *d > 0; d++) {
-	char s[20]; snprintf (s, 19, "%d", *d);
-	attributes = str_append (attributes, "[", s, "]");
-      }
-      attributes = str_append (attributes, ";\n");
-    }
-
-  if (attributes) {
-    fs = str_append (fs, "struct _Attributes {\n", attributes, "};\n");
-    sysfree (attributes);
-    fs = str_append (fs, "const _Attributes _attr[]={");
-    int nvar = datasize/sizeof(double);
-    for (int i = 0; i < nvar; i++) {
-      fs = str_append (fs, "{");
-      bool first = true;
-      char * data = (char *) &_attribute[i];
-      for (const NonLocal * g = nonlocals; g->name; g++)
-	if (g->name[0] == '.') {
-	  if (!first) fs = str_append (fs, ",");
-	  first = false;
-	  if (!strcmp (g->type, "int")) {
-	    char s[20]; snprintf (s, 19, "%d", *((int *)(data + g->nd)));
-	    fs = str_append (fs, s);
-	  }
-	  else if (!strcmp (g->type, "bool"))
-	    fs = str_append (fs, *((bool *)(data + g->nd)) ? "true" : "false");
-	  else if (!strcmp (g->type, "float")) {
-	    char s[20]; snprintf (s, 19, "%g", *((float *)(data + g->nd)));
-	    fs = str_append (fs, s);
-	  }
-	  else if (!strcmp (g->type, "double")) {
-	    char s[20]; snprintf (s, 19, "%g", *((double *)(data + g->nd)));
-	    fs = str_append (fs, s);
-	  }
-	  else
-	    fs = str_append (fs, "not implemented");
-	}
-      fs = str_append (fs, i < nvar - 1 ? "}," : "}");
-    }
-    fs = str_append (fs, "};\n");
-  }
-  
-  /**
-  Non-local variables */
-  
-  for (const NonLocal * g = nonlocals; g->name; g++)
-    if (g->name[0] != '.') {
-      if (strcmp (g->type, "scalar") && strcmp (g->type, "vector") && strcmp (g->type, "tensor")) {
-	if (!strcmp (g->name, "nl") && !strcmp (g->type, "int")) {
-
-	  /**
-	  'int nl' gets special treatment. */
-	
-	  char nl[20];
-	  snprintf (nl, 19, "%d", *((int *)g->pointer));
-	  fs = str_append (fs, "const int nl = ", nl, ";\n");
-	}
-	else {
-	  char * type = !strcmp (g->type, "float") || !strcmp (g->type, "double") ? "real" : g->type;
-	  fs = str_append (fs, "uniform ", type, " ", g->name, g->reduct ? "_in_" : "");
-	  for (int * d = g->dimensions; d && *d > 0; d++) {
-	    char s[20]; snprintf (s, 19, "%d", *d);
-	    fs = str_append (fs, "[", s, "]");
-	  }
-	  fs = str_append (fs, ";\n");
-	  if (g->reduct) {
-	    fs = str_append (fs, type, " ", g->name, " = ", g->name, "_in_;\n");
-	    fs = str_append (fs, "const scalar ", g->name, "_out_ = ");
-	    fs = str_append (fs, "{");
-	    fs = write_scalar (fs, g->data, attributes);
-	    fs = str_append (fs, "};\n");
-	  }
-	}
-      }
-      else { // scalar, vector and tensor fields
-	int size = list_size (g);
-	for (int j = 0; j < size; j++) {
-	  if (j == 0) {
-	    fs = str_append (fs, "const ", g->type, " ", g->name);
-	    if (g->nd == 0)
-	      fs = str_append (fs, " = ");
-	    else {
-	      char s[20]; snprintf (s, 19, "%d", size);
-	      fs = str_append (fs, "[", s, "] = {");
-	    }
-	  }
-	  if (g->nd == 0 || j < size - 1) {
-	    fs = str_append (fs, "{");
-	    if (!strcmp (g->type, "scalar"))
-	      fs = write_scalar (fs, ((scalar *)g->pointer)[j], attributes);
-	    else if (!strcmp (g->type, "vector"))
-	      fs = write_vector (fs, ((vector *)g->pointer)[j], attributes);
-	    else if (!strcmp (g->type, "tensor"))
-	      fs = write_tensor (fs, ((tensor *)g->pointer)[j], attributes);
-	    else
-	      assert (false);
-	    fs = str_append (fs, "}");
-	  }
-	  else { // last element of a list is always ignored (this is necessary for empty lists)
-	    if (!strcmp (g->type, "scalar"))
-	      fs = str_append (fs, "{0,0,0,0}");
-	    else if (!strcmp (g->type, "vector"))
-	      fs = str_append (fs, "{{0,0,0,0},{0,0,0,0}}");
-	    else if (!strcmp (g->type, "tensor"))
-	      fs = str_append (fs, "{{{0,0,0,0},{0,0,0,0}},{{0,0,0,0},{0,0,0,0}}}");
-	    else
-	      assert (false);
-	  }
-	  if (g->nd == 0)
-	    fs = str_append (fs, ";\n");
-	  else if (j < size - 1)
-	    fs = str_append (fs, ",");
-	  else
-	    fs = str_append (fs, "};\n");
-	}
-      }
-    }
   {
     // fixme: check for maximum number of inputs
     char s[20];
@@ -477,15 +423,204 @@ char * build_shader (const NonLocal * nonlocals, const char * fname, int line)
   else
     fs = str_append (fs, "vec4 _outputs[1];\n");
   
-  fs = str_append (fs,
-		   "in Point vsPoint;\n"
-		   "Point point = vsPoint*vsScale + vsOrigin;\n"
-		   "out vec4 FragColor;\n"
-		   "real _delta = 1.0f/N;\n"
-		   "POINT_VARIABLES\n");
+  /**
+  Scalar field attributes */
+      
+  char * attributes = NULL;
+  for (const External * g = externals; g; g = g->next)
+    if (g->name[0] == '.') {
+      char * type =
+	!strcmp (g->type, "float") || !strcmp (g->type, "double") ? "real" :
+	!strcmp (g->type, "*func()") ? "int" :
+	g->type;
+      attributes = str_append (attributes, "  ", type, " ", g->name + 1);
+      for (int * d = g->data; d && *d > 0; d++) {
+	char s[20]; snprintf (s, 19, "%d", *d);
+	attributes = str_append (attributes, "[", s, "]");
+      }
+      attributes = str_append (attributes, ";\n");
+    }
+  
+  if (attributes) {
+    fs = str_append (fs, "struct _Attributes {\n", attributes, "};\n");
+    sysfree (attributes);
+    fs = str_append (fs, "const _Attributes _attr[]={");
+    for (scalar s in baseblock)
+      if (s.gpu.index) {
+	fs = str_append (fs, "{");
+	bool first = true;
+	char * data = (char *) &_attribute[s.i];
+	for (const External * g = externals; g; g = g->next)
+	  if (g->name[0] == '.') {
+	    if (!first) fs = str_append (fs, ",");
+	    first = false;
+	    if (!strcmp (g->type, "int")) {
+	      char s[20]; snprintf (s, 19, "%d", *((int *)(data + g->nd)));
+	      fs = str_append (fs, s);
+	    }
+	    else if (!strcmp (g->type, "bool"))
+	      fs = str_append (fs, *((bool *)(data + g->nd)) ? "true" : "false");
+	    else if (!strcmp (g->type, "float")) {
+	      char s[20]; snprintf (s, 19, "%g", *((float *)(data + g->nd)));
+	      fs = str_append (fs, s);
+	    }
+	    else if (!strcmp (g->type, "double")) {
+	      char s[20]; snprintf (s, 19, "%g", *((double *)(data + g->nd)));
+	      fs = str_append (fs, s);
+	    }
+	    else if (!strcmp (g->type, "*func()")) {
+	      void * func = *((void **)(data + g->nd));
+	      if (!func)
+		fs = str_append (fs, "0");
+	      else {
+		External * ptr = _get_function ((long) func);
+		char s[20]; snprintf (s, 19, "%d", ptr->nd);
+		fs = str_append (fs, s);
+	      }
+	    }
+	    else
+	      fs = str_append (fs, "not implemented");
+	  }
+	// fs = str_append (fs, i < nvar - 1 ? "}," : "}");
+	fs = str_append (fs, "},");
+      }
+    fs = str_append (fs, "};\n");
+  }
+  
+  /**
+  Non-local variables */
+
+  for (const External * g = externals; g; g = g->next) {
+    if (g->name[0] == '.') {
+      if (!strcmp (g->type, "*func()")) {
+	fs = str_append (fs, "#define _attr_", g->name + 1, "(s,args) (");
+	foreach_function (f, f->used = false);
+	char * expr = NULL;
+	for (scalar s in baseblock)
+	  if (s.gpu.index) {
+	    char * data = (char *) &_attribute[s.i];
+	    void * func = *((void **)(data + g->nd));
+	    if (func) {
+	      External * f = _get_function ((long) func);
+	      if (!f->used) {
+		f->used = true;
+		if (!expr)
+		  expr = str_append (NULL, "(", f->name, " args)");
+		else {
+		  char index[20];
+		  snprintf (index, 19, "%d", f->nd);
+		  char * s = str_append (NULL, "_attr(s,", g->name + 1, ")==", index,
+					 "?(", f->name, " args):", expr);
+		  sysfree (expr);
+		  expr = s;
+		}
+	      }
+	    }
+	  }
+	if (expr) {
+	  fs = str_append (fs, expr, ")\n");
+	  sysfree (expr);
+	}
+	else
+	  fs = str_append (fs, "0)\n");
+      }
+    }
+    else if (!strcmp (g->type, "func()")) {
+      External * f = _get_function ((long) g->pointer);
+      fs = str_append (fs, "\n", f->data, "\n");
+      char s[20]; snprintf (s, 19, "%d", f->nd);
+      fs = str_append (fs, "const int _p_", g->name, " = ", s, ";\n");
+    }
+    else if (!strcmp (g->type, "*func()")) {
+      External * f = _get_function ((long) g->pointer);
+      char s[20]; snprintf (s, 19, "%d", f->nd);
+      fs = str_append (fs, "const int ", g->name, " = ", s, ";\n",
+		       "#define _f_", g->name, "(args) (", f->name, " args)\n");      
+    }
+    else if (strcmp (g->type, "scalar") &&
+	     strcmp (g->type, "vector") &&
+	     strcmp (g->type, "tensor")) {
+      if (!strcmp (g->name, "N") && !strcmp (g->type, "int"))
+        fs = str_append (fs,
+			 "uniform int N;\n"
+			 "in Point vsPoint;\n"
+			 "Point point = vsPoint*vsScale + vsOrigin;\n"
+			 "out vec4 FragColor;\n"
+			 "real _delta = 1.0f/N;\n");
+      else if (!strcmp (g->name, "nl") && !strcmp (g->type, "int")) {
+
+	/**
+	'int nl' gets special treatment. */
+	
+	char nl[20];
+	snprintf (nl, 19, "%d", *((int *)g->pointer));
+	fs = str_append (fs, "const int nl = ", nl, ";\n");
+      }
+      else {
+	char * type = !strcmp (g->type, "float") || !strcmp (g->type, "double") ? "real" : g->type;
+	fs = str_append (fs, "uniform ", type, " ", g->name, g->reduct ? "_in_" : "");
+	for (int * d = g->data; d && *d > 0; d++) {
+	  char s[20]; snprintf (s, 19, "%d", *d);
+	  fs = str_append (fs, "[", s, "]");
+	}
+	fs = str_append (fs, ";\n");
+	if (g->reduct) {
+	  fs = str_append (fs, type, " ", g->name, " = ", g->name, "_in_;\n");
+	  fs = str_append (fs, "const scalar ", g->name, "_out_ = ");
+	  fs = str_append (fs, "{");
+	  fs = write_scalar (fs, g->s);
+	  fs = str_append (fs, "};\n");
+	}
+      }
+    }
+    else { // scalar, vector and tensor fields
+      int size = list_size (g);
+      for (int j = 0; j < size; j++) {
+	if (j == 0) {
+	  fs = str_append (fs, "const ", g->type, " ", g->name);
+	  if (g->nd == 0)
+	    fs = str_append (fs, " = ");
+	  else {
+	    char s[20]; snprintf (s, 19, "%d", size);
+	    fs = str_append (fs, "[", s, "] = {");
+	  }
+	}
+	if (g->nd == 0 || j < size - 1) {
+	  fs = str_append (fs, "{");
+	  if (!strcmp (g->type, "scalar"))
+	    fs = write_scalar (fs, ((scalar *)g->pointer)[j]);
+	  else if (!strcmp (g->type, "vector"))
+	    fs = write_vector (fs, ((vector *)g->pointer)[j]);
+	  else if (!strcmp (g->type, "tensor"))
+	    fs = write_tensor (fs, ((tensor *)g->pointer)[j]);
+	  else
+	    assert (false);
+	  fs = str_append (fs, "}");
+	}
+	else { // last element of a list is always ignored (this is necessary for empty lists)
+	  if (!strcmp (g->type, "scalar"))
+	    fs = str_append (fs, "{0,0,0,0}");
+	  else if (!strcmp (g->type, "vector"))
+	    fs = str_append (fs, "{{0,0,0,0},{0,0,0,0}}");
+	  else if (!strcmp (g->type, "tensor"))
+	    fs = str_append (fs, "{{{0,0,0,0},{0,0,0,0}},{{0,0,0,0},{0,0,0,0}}}");
+	  else
+	    assert (false);
+	}
+	if (g->nd == 0)
+	  fs = str_append (fs, ";\n");
+	else if (j < size - 1)
+	  fs = str_append (fs, ",");
+	else
+	  fs = str_append (fs, "};\n");
+      }
+    }
+  }
+    
   return fs;
 }
 
+trace
 GLuint load_shader (const char * fs)
 {
   assert (gpu_cartesian->shaders);
@@ -918,7 +1053,7 @@ attribute {
   struct {
     // take care to update gpu_cartesian_scalar_clone() when this changes
     int stored;
-    int texture, component;
+    int texture, component, index;
     int type; // 0: scalar, 1: vector, 2: tensor
     tensor t;
   } gpu;
@@ -1245,7 +1380,7 @@ static void inputs_from_gpu (ForeachData * loop)
 #endif
 }
 
-static void inputs_to_gpu (ForeachData * loop, const NonLocal * nonlocals)
+static void inputs_to_gpu (ForeachData * loop)
 {
 #if PRINTCOPYGPU
   bool copy = false;
@@ -1272,15 +1407,34 @@ static void inputs_to_gpu (ForeachData * loop, const NonLocal * nonlocals)
 const char _double[] = "double";
 
 static bool doloop_on_gpu (ForeachData * loop, const RegionParameters * region,
-			   NonLocal * nonlocals,
-			   const char * funcs, const char * kernel)
+			   External * externals,
+			   const char * kernel)
 {
   GLuint shaderid = (long)loop->data;
   if (!loop->first && !shaderid)
     // already tried and failed, do not try again
     return false;
+
+  const char * error = strstr (kernel, "@error ");
+  if (error) {
+    for (const char * s = error + 7; *s != '\n' && *s != '\0'; s++)
+      fputc (*s, stderr);
+    fputc ('\n', stderr);
+    loop->data = NULL;
+    return false;
+  }
+
+  int index = 1;
+  for (scalar s in baseblock)
+    if (s.input || s.output)
+      s.gpu.index = index++;
+    else
+      s.gpu.index = 0;
   
-  for (const NonLocal * n = nonlocals; n->name; n++)
+  if (!(externals = merge_externals (externals, loop)))
+    return false;
+  
+  for (const External * n = externals; n; n = n->next)
     if (strcmp(n->type, "scalar") && strcmp(n->type, "vector") && strcmp(n->type, "tensor")) {
       if (n->reduct && !strchr ("+mM", n->reduct)) {
 	if (loop->first)
@@ -1301,7 +1455,9 @@ static bool doloop_on_gpu (ForeachData * loop, const RegionParameters * region,
       else if (strcmp (n->type, "float") &&
 	       strcmp (n->type, "double") &&
 	       strcmp (n->type, "int") &&
-	       strcmp (n->type, "bool")) {
+	       strcmp (n->type, "bool") &&
+	       strcmp (n->type, "*func()") &&
+	       strcmp (n->type, "func()")) {
 	if (loop->first)
 	  fprintf (stderr, "%s:%d: GLSL: error: unknown type '%s' for '%s'\n",
 		   loop->fname, loop->line, n->type, n->name);
@@ -1312,21 +1468,20 @@ static bool doloop_on_gpu (ForeachData * loop, const RegionParameters * region,
   /**
   ## Allocate reduction fields */
 
-  for (NonLocal * g = nonlocals; g->name; g++)
+  for (External * g = externals; g; g = g->next)
     if (g->reduct) {
       scalar s = new scalar;
       s.output = 1;
-      g->data = s;
+      g->s = s;
     }
 
-  char * shader = build_shader (nonlocals, loop->fname, loop->line);
+  char * shader = build_shader (externals, loop->fname, loop->line);
   if (shader) {
 
     /**
-    ## Functions and main() */
+    ## main() */
     
-    shader = str_append (shader, funcs);
-    shader = str_append (shader, "void main() {\n");
+    shader = str_append (shader, "void main() { POINT_VARIABLES\n");
     foreach_texture (t)
       if (t->input >= 0 && t->output >= 0) {
 	// initialize the central value of input/output fields
@@ -1337,7 +1492,7 @@ static bool doloop_on_gpu (ForeachData * loop, const RegionParameters * region,
 			     " valt(_inputs[", input, "],0,0,0);\n");
       }
     shader = str_append (shader, kernel);
-    for (const NonLocal * g = nonlocals; g->name; g++)
+    for (const External * g = externals; g; g = g->next)
       if (g->reduct)
 	shader = str_append (shader, "\nval_out_(", g->name, "_out_,0,0,0) = ", g->name, ";");
     shader = str_append (shader, "\n}\n");
@@ -1353,15 +1508,15 @@ static bool doloop_on_gpu (ForeachData * loop, const RegionParameters * region,
     /**
     ## Free reduction fields */
     
-    for (const NonLocal * g = nonlocals; g->name; g++)
+    for (const External * g = externals; g; g = g->next)
       if (g->reduct) {
-	scalar s = g->data;
+	scalar s = g->s;
 	delete ({s});
       }
     return false;
   }
   
-  inputs_to_gpu (loop, nonlocals);
+  inputs_to_gpu (loop);
   
   /**
   ## Allocate input/output texture */
@@ -1443,26 +1598,19 @@ static bool doloop_on_gpu (ForeachData * loop, const RegionParameters * region,
   }
 
   /**
-  ## Set attributes of scalar fields */
-
-  for (const NonLocal * g = nonlocals; g->name; g++)
-    if (g->name[0] == '.') {
-      
-    }
-
-  /**
   ## Set global variables */
 
   int nreductions = 0;  
-  for (const NonLocal * g = nonlocals; g->name; g++) {
+  for (const External * g = externals; g; g = g->next) {
     if (g->name[0] == '.') continue;
+    if (!strcmp (g->type, "*func()") || !strcmp (g->type, "func()")) continue;
     if (g->reduct)
       nreductions++;
     if (!strcmp (g->type, "int") ||
 	!strcmp (g->type, "float") ||
 	!strcmp (g->type, "vec4")) {
       // not an array or just a one-dimensional array
-      assert (!g->dimensions || g->dimensions[1] == 0);
+      assert (!g->data || ((int *)g->data)[1] == 0);
       GLint location;
       char name[strlen(g->name) + strlen ("_in_[]") + 20];
       strcpy (name, g->name);
@@ -1474,21 +1622,21 @@ static bool doloop_on_gpu (ForeachData * loop, const RegionParameters * region,
 	int * p = g->pointer;
 	fprintf (stderr, "uniform int %s = %d\n", g->name, *p);
 #endif
-	glUniform1iv (location, g->dimensions ? g->dimensions[0] : 1, g->pointer);
+	glUniform1iv (location, g->data ? ((int *)g->data)[0] : 1, g->pointer);
       }
       else if (!strcmp (g->type, "float")) {
 #if PRINTUNIFORM
 	float * p = g->pointer;
 	fprintf (stderr, "uniform float %s = %g\n", g->name, *p);
 #endif
-	glUniform1fv (location, g->dimensions ? g->dimensions[0] : 1, g->pointer);
+	glUniform1fv (location, g->data ? ((int *)g->data)[0] : 1, g->pointer);
       }
       else if (!strcmp (g->type, "vec4")) {
 #if PRINTUNIFORM
 	float * p = g->pointer;
 	fprintf (stderr, "uniform vec4 %s = {%g,%g,%g,%g}\n", g->name, p[0], p[1], p[2], p[3]);
 #endif
-	glUniform4fv (location, g->dimensions ? g->dimensions[0] : 1, g->pointer);
+	glUniform4fv (location, g->data ? ((int *)g->data)[0] : 1, g->pointer);
       }
     }
     else if (strcmp(g->type, "scalar") &&
@@ -1496,8 +1644,8 @@ static bool doloop_on_gpu (ForeachData * loop, const RegionParameters * region,
 	     strcmp(g->type, "tensor")) {
       void * p = g->pointer;
       // not an array or just a one-dimensional array
-      assert (!g->dimensions || g->dimensions[1] == 0);
-      int nd = g->dimensions ? g->dimensions[0] : 1;
+      assert (!g->data || ((int *)g->data)[1] == 0);
+      int nd = g->data ? ((int *)g->data)[0] : 1;
       for (int d = 0; d < nd; d++) {
 	char name[strlen(g->name) + strlen ("_in_[]") + 20];
 	strcpy (name, g->name);
@@ -1522,10 +1670,17 @@ static bool doloop_on_gpu (ForeachData * loop, const RegionParameters * region,
 	    fprintf (stderr, "uniform bool %s = %d\n", g->name, *p);
 #endif
 	    glUniform1i (location, *((bool *)p)); p = ((bool *)p) + 1;
-	  }	  
-	  else if (!strcmp (g->type, "coord") || !strcmp(g->type, "_coord")) {
+	  }
+	  else if (!strcmp (g->type, "coord")) {
 #if PRINTUNIFORM
-	    fprintf (stderr, "uniform coord %s = {%g,%g}\n", g->name,
+	    fprintf (stderr, "uniform coord %s = {%g,%g,%g}\n", g->name,
+		     ((double *)p)[0], ((double *)p)[1], ((double *)p)[2]);
+#endif
+	    glUniform3f (location, ((double *)p)[0], ((double *)p)[1], ((double *)p)[2]); p = ((double *)p) + 3;
+	  }
+	  else if (!strcmp(g->type, "_coord")) {
+#if PRINTUNIFORM
+	    fprintf (stderr, "uniform _coord %s = {%g,%g}\n", g->name,
 		     ((double *)p)[0], ((double *)p)[1]);
 #endif
 	    glUniform2f (location, ((double *)p)[0], ((double *)p)[1]); p = ((double *)p) + 2;
@@ -1590,9 +1745,9 @@ static bool doloop_on_gpu (ForeachData * loop, const RegionParameters * region,
   
   if (nreductions)
     tracing ("gpu_reduction", loop->fname, loop->line);
-  for (const NonLocal * g = nonlocals; g->name; g++)
+  for (const External * g = externals; g; g = g->next)
     if (g->reduct) {
-      scalar s = g->data;
+      scalar s = g->s;
       double result = gpu_reduction (s, g->reduct, region);
 #if 0
       fprintf (stderr, "%s:%d: %s %c %g\n",
@@ -1613,12 +1768,16 @@ static bool doloop_on_gpu (ForeachData * loop, const RegionParameters * region,
 
 bool gpu_end_stencil (ForeachData * loop,
 		      const RegionParameters * region,
-		      NonLocal * nonlocals,
-		      const char * funcs, const char * kernel)
+		      External * externals,
+		      const char * kernel)
 {
   bool on_gpu = loop->parallel == 1 || loop->parallel == 3;
-  if (on_gpu)
-    on_gpu = doloop_on_gpu (loop, region, nonlocals, funcs, kernel);
+  if (on_gpu) {
+    on_gpu = doloop_on_gpu (loop, region, externals, kernel);
+    if (loop->first && !on_gpu)
+      fprintf (stderr, "%s:%d: warning: loop done on CPU (see GLSL errors above)\n",
+	       loop->fname, loop->line);
+  }
   if (on_gpu) {
     // fixme: apply boundary conditions...
     free (loop->listc), loop->listc = NULL;

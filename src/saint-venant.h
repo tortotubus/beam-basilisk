@@ -325,10 +325,10 @@ double update_saint_venant (scalar * evolving, scalar * updates, double dtmax)
   /**
   For [multiple layers](multilayer.h#fluxes-between-layers) we need to
   add fluxes between layers. */
-#if !GPU // fixme
+
   if (nl > 1)
     vertical_fluxes ((vector *) &evolving[1], (vector *) &updates[1], wl, dh);
-#endif
+
   return dtmax;
 }
 

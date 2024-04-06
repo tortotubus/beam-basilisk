@@ -277,6 +277,7 @@ Ast * ast_is_point_point (const Ast * identifier);
 void  ast_stencil_access (Ast * n, Stack * stack, int dimension);
 const Ast * ast_attribute_access (const Ast * n, Stack * stack);
 Ast * ast_constant_postfix_expression (const Ast * n, Stack * stack);
+Ast * ast_is_function_pointer (const Ast * n, Stack * stack);
 
 /**
 ## Types */
@@ -295,8 +296,8 @@ Ast * ast_get_array_dimensions (Ast * direct_declarator, int symbol, AstDimensio
 /**
 ## Kernels */
 
-void ast_non_local_references (Ast * n, Ast * argument);
-void ast_kernel               (Ast * n, Ast * argument);
+char * ast_external_references (Ast * n, char * references, Stack * functions);
+char * ast_kernel               (Ast * n, Ast * argument, char * s);
 
 /**
 ## Interface for the generic C interpreter */

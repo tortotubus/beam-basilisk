@@ -58,6 +58,7 @@ script()
     pass=true
     rm -f log-* stencil stencil-* fine fine-* coarse coarse-*
     tail -f --pid=$$ --retry display.html 2> /dev/null | grep -o 'http://.*:[0-9]*' &
+    tail -f --pid=$$ --retry $log 2> /dev/null | grep -E '.*:[0-9]*:.*(warning|error).*:' &
     if test -n "$EXEC" -o -z "$GDB"; then
 	if ! $EXEC ./$test 2> $log > $out; then
 	    pass=false
@@ -68,7 +69,7 @@ script()
 	    fi
 	fi
     else
-	if ! stdbuf -oL $GDB -batch -return-child-result -ex "run 2>&1 > $out | tee $log |  grep -E '.*:[0-9]*:.*(warning|error).*:'" ./$test 2> gdb.err | tee gdb.log; then
+	if ! stdbuf -oL $GDB -batch -return-child-result -ex "run 2> $log > $out" ./$test > gdb.log 2> gdb.err; then
 	    pass=false
 	    $AWK '
      {

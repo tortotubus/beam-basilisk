@@ -9,3 +9,6 @@ static const void * NULL = 0;
 static const int _NVARMAX = 65536, INT_MAX = 2147483647;
 
 FILE * stderr, * stdout, * systderr, * systdout;
+FILE * qstderr (void);
+FILE * qstdout (void);
+FILE * ferr = NULL, * fout = NULL;

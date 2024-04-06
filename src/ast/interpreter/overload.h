@@ -568,3 +568,5 @@ vec4 Vec4 (float r, float g, float b, float a)
 {
   return (vec4){r, g, b, a};
 }
+
+void register_fpointer (void (* ptr) (void), const char * name, const void * nonlocals) {}
