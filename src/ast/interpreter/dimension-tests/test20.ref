@@ -2,7 +2,7 @@
 Dimensions of constants
   [1]
     ast/interpreter/overload.h:168: '0.'
-    /src/common.h:856: 'X0 = 0.'
-    /src/common.h:856: 'Y0 = 0.'
-    /src/common.h:856: 'Z0 = 0.'
-    /src/common.h:858: 'L0 = 1. [1]'
+    /src/common.h:70: 'X0 = 0.'
+    /src/common.h:70: 'Y0 = 0.'
+    /src/common.h:70: 'Z0 = 0.'
+    /src/common.h:72: 'L0 = 1. [1]'
