@@ -176,6 +176,21 @@ char * add_reference (Ast * ref, char * references, Ast * scope, Stack * stack, 
     default:
       str_append (references, ",.type=\"not implemented yet\""); break;
     }
+  
+  /**
+  Assumes 'double *' are references to arrays with 'nl'
+  elements. Fixme: this is very specific and should be made more
+  general e.g. systematically using 'fat pointers' to get array
+  sizes. */
+
+  Ast * nl;
+  if (type->sym == sym_DOUBLE && dim.pointer == 1 && !dim.dimension && strcmp (ast_terminal (ref)->start, "_constant") &&
+      (nl = ast_identifier_declaration (stack, "nl"))) {
+    dim.pointer = 0;
+    dim.dimension = malloc (2*sizeof (Ast *));
+    dim.dimension[0] = nl;
+    dim.dimension[1] = NULL;
+  }
     
   /**
   Pointer */
