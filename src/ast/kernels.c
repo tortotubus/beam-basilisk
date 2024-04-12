@@ -164,7 +164,7 @@ void kernel (Ast * n, Stack * stack, void * data)
       ## Scalar, vector and tensor lists parameters */
 
       ast_terminal (p)->start[0] = '\0';
-      ast_after (identifier, "[12]"); // fixme: need to set the correct fixed size
+      ast_after (identifier, "[2]"); // fixme: need to set the correct fixed size
       //      ast_print_tree (ast_ancestor (n, 2), stderr, 0, 0, -1);
     }
     else if ((identifier = ast_schema (ast_ancestor (n, 2), sym_parameter_declaration,
