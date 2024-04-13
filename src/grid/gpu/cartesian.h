@@ -1775,7 +1775,7 @@ bool gpu_end_stencil (ForeachData * loop,
   if (on_gpu) {
     on_gpu = doloop_on_gpu (loop, region, externals, kernel);
     if (loop->first && !on_gpu)
-      fprintf (stderr, "%s:%d: warning: loop done on CPU (see GLSL errors above)\n",
+      fprintf (stderr, "%s:%d: warning: foreach() done on CPU (see GLSL errors above)\n",
 	       loop->fname, loop->line);
   }
   if (on_gpu) {

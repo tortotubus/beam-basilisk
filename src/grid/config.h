@@ -101,6 +101,8 @@ static inline void qassert (const char * file, int line, const char * cond) {
 #define qmalloc(size, type) ((type *) malloc ((size)*sizeof(type)))
 #define qcalloc(size, type) ((type *) calloc (size, sizeof(type)))
 
+#include "array.h"
+
 // Function tracing
 
 #if TRACE == 1 // with Extrae library

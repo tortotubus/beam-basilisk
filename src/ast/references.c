@@ -148,7 +148,7 @@ char * add_reference (Ast * ref, char * references, Ast * scope, Stack * stack, 
     return references;
   }
   
-  str_append (references, "{.name=\"", attributes ? "." : "", start, "\"");
+  str_append (references, "{.name=\"", attributes ? "." : "", !strcmp (start, "val") ? "_val" : start, "\"");
       
   /**
   Type */

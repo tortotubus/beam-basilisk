@@ -10,6 +10,156 @@ typedef struct {
   char * error;
 } KernelData;
 
+/**
+## Implicit type casting
+
+GLSL does not support implicit type casting, so we insert the
+necessary explicit casts using the function below. */
+
+static
+Ast * implicit_type_cast (Ast * n, Stack * stack)
+{
+  if (!n) return NULL;
+  
+  Ast * type = NULL;
+  
+  switch (n->sym) {
+
+  case sym_I_CONSTANT: case sym_ENUMERATION_CONSTANT:
+    return (Ast *) &ast_int;
+
+  case sym_F_CONSTANT:
+    return (Ast *) &ast_double;
+
+  case sym_types:
+    if (ast_terminal (n->child[0]))
+      return n->child[0];
+    else
+      return NULL;
+
+  case sym_IDENTIFIER:
+    if (n->parent->sym == sym_primary_expression) {
+      Ast * ref = ast_identifier_declaration (stack, ast_terminal (n)->start);
+      if (ref) {
+	AstDimensions dim = {0};
+	type = ast_identifier_type (ref, &dim, stack);
+	if (dim.pointer)
+	  type = NULL;
+      }
+      return type;
+    }
+    if (ast_schema (ast_ancestor (n, 2), sym_member_identifier,
+		    0, sym_generic_identifier,
+		    0, sym_IDENTIFIER)) {
+      n = ast_expression_type (n, stack, false);
+      if (ast_schema (ast_ancestor (n, 2), sym_direct_declarator))
+	return implicit_type_cast (ast_schema (ast_parent (n, sym_struct_declaration), sym_struct_declaration,
+					       0, sym_specifier_qualifier_list,
+					       0, sym_type_specifier,
+					       0, sym_types),
+				   stack);
+      return NULL;
+    }
+    if (ast_schema (ast_ancestor (n, 2), sym_direct_declarator))
+      return implicit_type_cast (ast_schema (ast_parent (n, sym_declaration), sym_declaration,
+					     0, sym_declaration_specifiers,
+					     0, sym_type_specifier,
+					     0, sym_types),
+				 stack);
+    break;
+
+  case sym_additive_expression:
+  case sym_multiplicative_expression:
+    if (n->child[1]) {
+      Ast * a = implicit_type_cast (n->child[0], stack);
+      if (a && a->sym == sym_BOOL) {
+	ast_before (n->child[0], "int(");
+	ast_after (n->child[0], ")");
+      }
+      Ast * b = implicit_type_cast (n->child[2], stack);
+      if (b && b->sym == sym_BOOL) {
+	ast_before (n->child[2], "int(");
+	ast_after (n->child[2], ")");
+      }
+      if (b && (b->sym == sym_DOUBLE || b->sym == sym_FLOAT))
+	return b;
+      return a;
+    }
+    break;
+
+  case sym_assignment_expression:
+  case sym_init_declarator:
+    if (n->child[1]) {
+      Ast * a = implicit_type_cast (n->child[0], stack);
+      Ast * b = implicit_type_cast (n->child[2], stack);
+      if (a && b && a->sym != b->sym) {
+	if (a->sym == sym_INT || b->sym == sym_BOOL) {
+	  ast_before (n->child[2], "int(");
+	  ast_after (n->child[2], ")");
+	}
+      }
+      return a;
+    }
+    break;
+
+  case sym_cast_expression: case sym_primary_expression:
+    if (n->child[1])
+      return implicit_type_cast (n->child[1], stack);
+    break;
+
+  case sym_relational_expression:
+  case sym_equality_expression:
+    if (n->child[1])
+      return (Ast *)&ast_bool;
+    break;    
+    
+  case sym_logical_and_expression:
+  case sym_logical_or_expression:
+    if (n->child[1]) {
+      Ast * a = implicit_type_cast (n->child[0], stack);
+      if (a && a->sym != sym_BOOL) {
+	ast_before (n->child[0], "bool(");
+	ast_after (n->child[0], ")");
+      }
+      Ast * b = implicit_type_cast (n->child[2], stack);
+      if (b && b->sym != sym_BOOL) {
+	ast_before (n->child[2], "bool(");
+	ast_after (n->child[2], ")");
+      }
+      return (Ast *)&ast_bool;
+    }
+    break;
+
+  case sym_conditional_expression:
+    if (n->child[1])
+      return implicit_type_cast (n->child[2], stack);
+    break;
+
+  case sym_selection_statement: {
+    Ast * type = implicit_type_cast (n->child[2], stack);
+    if (!type || type->sym != sym_BOOL) {
+      ast_after (n->child[1], "bool(");
+      ast_before (n->child[3], ")");
+    }
+    return type;
+  }
+
+  case sym_function_call: {
+    Ast * identifier = ast_function_call_identifier (n);
+    if (identifier && (!strcmp (ast_terminal (identifier)->start, "val") ||
+		       !strcmp (ast_terminal (identifier)->start, "val_out_")))
+      return (Ast *) &ast_double;
+    break;
+  }
+
+  }
+  if (n->child)
+    for (Ast ** c = n->child; *c; c++)
+      type = implicit_type_cast (*c, stack);
+    
+  return type;
+}
+
 static
 void kernel (Ast * n, Stack * stack, void * data)
 {
@@ -31,12 +181,26 @@ void kernel (Ast * n, Stack * stack, void * data)
     return;
   }    
 
-  /**
-  ## Function pointers */
-
   case sym_IDENTIFIER: {
+
+    /**
+    ## Function pointers */
+
     if (ast_is_function_pointer (n, stack))
       str_prepend (ast_terminal (n)->start, "_p_");
+
+    /**
+    ## 'val'
+
+    Buggy GLSL preprocessors do not make the difference between 'val'
+    as a variable identifier and 'val()' as a macro call. */
+
+    else if (!ast_schema (ast_ancestor (n, 3), sym_function_call,
+			  0, sym_postfix_expression,
+			  0, sym_primary_expression) &&
+	     !strcmp (ast_terminal (n)->start, "val"))
+      free (ast_terminal (n)->start), ast_terminal (n)->start = strdup ("_val");
+    
     break;
   }
     
@@ -58,6 +222,19 @@ void kernel (Ast * n, Stack * stack, void * data)
     ast_terminal (n)->start[0] = '\0';
     break;
 
+  /**
+  ## Implicit type casts */
+    
+  case sym_assignment_expression:
+    if (n->child[1])
+      implicit_type_cast (n, stack);
+    break;
+    
+  case sym_init_declarator:
+  case sym_selection_statement:
+    implicit_type_cast (n, stack);
+    break;
+    
   /**
   ## Typedef struct */
 
