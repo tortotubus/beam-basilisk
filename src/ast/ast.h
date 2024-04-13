@@ -282,7 +282,7 @@ Ast * ast_is_function_pointer (const Ast * n, Stack * stack);
 /**
 ## Types */
 
-extern AstTerminal ast_int, ast_long, ast_enum, ast_char, ast_void, ast_float, ast_double, ast_function;
+extern AstTerminal ast_int, ast_long, ast_enum, ast_char, ast_void, ast_float, ast_double, ast_function, ast_bool;
 
 typedef struct {
   int pointer;
