@@ -321,6 +321,17 @@ int main (int argc, char * argv[])
 	   interpolate (s, 0.5, 0.5, linear = true));
 
   /**
+  ## foreach_vertex() coordinates */
+
+  {
+    vertex scalar a[], b[];
+    foreach_vertex()
+      a[] = x, b[] = y;
+    foreach (serial)
+      fprintf (stderr, "%g %g\n", a[], b[]);
+  }
+
+  /**
   ## Other tests */
   
   init_grid (argc > 1 ? atoi(argv[1]) : 64);
