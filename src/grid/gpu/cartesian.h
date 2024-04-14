@@ -219,8 +219,6 @@ static char glsl_preproc[] =
   "#define end_is_face_x() }\n"
   "#define end_is_face_y() }\n"
   "#define VARIABLES\n"
-  "#define POINT_VARIABLES real Delta = L0/N, Delta_x = Delta, Delta_y = Delta,"
-  " x = X0 + point.x*L0, y = Y0 + point.y*L0;\n"
   "#define NOT_UNUSED(x)\n"
   "#define pi 3.14159265359\n"
   "#define nodata (1e30)\n"
@@ -366,13 +364,15 @@ static External * merge_externals (External * externals, const ForeachData * loo
 }
 
 trace
-char * build_shader (const External * externals, const char * fname, int line)
+char * build_shader (const External * externals, const ForeachData * loop)
 {
   char s[20];
   snprintf (s, 19, "%d", nconst > 0 ? nconst : 1);
   char a[20];
   snprintf (a, 19, "%g", nconst > 0 ? _constant[0] : 0);
   char * fs = str_append (NULL, "#version 420\n", glsl_preproc,
+			  "#define POINT_VARIABLES real Delta = L0/N, Delta_x = Delta, Delta_y = Delta,",
+			  " x = X0 + point.x*L0, y = Y0 + point.y*L0;\n",
 			  "const int _nconst = ", s, ";\n"
 			  "const real _constant[_nconst] = {", a);
   for (int i = 1; i < nconst; i++) {
@@ -412,7 +412,7 @@ char * build_shader (const External * externals, const char * fname, int line)
     if (noutputs > max) {
       fprintf (stderr,
 	       "%s:%d: GLSL: error: too many outputs (%d > GL_MAX_DRAW_BUFFERS = %d)\n",
-	       fname, line, noutputs, max);
+	       loop->fname, loop->line, noutputs, max);
       sysfree (fs);
       return NULL;
     }
@@ -1475,13 +1475,15 @@ static bool doloop_on_gpu (ForeachData * loop, const RegionParameters * region,
       g->s = s;
     }
 
-  char * shader = build_shader (externals, loop->fname, loop->line);
+  char * shader = build_shader (externals, loop);
   if (shader) {
 
     /**
     ## main() */
     
     shader = str_append (shader, "void main() { POINT_VARIABLES\n");
+    if (loop->vertex)
+      shader = str_append (shader, "  x -= Delta/2., y -= Delta/2.;\n");
     foreach_texture (t)
       if (t->input >= 0 && t->output >= 0) {
 	// initialize the central value of input/output fields
