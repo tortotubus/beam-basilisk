@@ -1620,10 +1620,10 @@ field_deallocation (Stack * stack, TranslateData * d,
     char * arg = ast_str_append (argument, NULL);
     if (strchr (typename, ' '))
       typename = strchr (typename, ' ') + 1;
-    str_append (delete[1], "if(!(", arg, ")",
+    str_append (delete[1], "if((", arg, ")",
 		!strcmp (typename, "scalar") ? ".i" :
 		!strcmp (typename, "vector") ? ".x.i" : ".x.x.i",
-		")delete((scalar*){",
+		"<=0)delete((scalar*){",
 		ast_terminal (allocator->child[0])->start,
 		"});");
     free (arg);
