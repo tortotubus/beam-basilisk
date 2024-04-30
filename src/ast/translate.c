@@ -5054,7 +5054,7 @@ void * endfor (FILE * fin, FILE * fout,
     char n[10];
     snprintf (n, 9, "%d", data.fields_index);
     char * src = NULL;
-    str_append (src, "datasize=", n, "*sizeof(double);");
+    str_append (src, "datasize=", n, "*sizeof(real);");
     Ast * expr = ast_parse_expression (src, root);
     free (src);
     ast_block_list_insert_before2 (ast_parent (call_init_solver, sym_block_item),

@@ -1099,8 +1099,10 @@ void dump (const char * file = "dump",
       }
       unsigned flags = is_leaf(cell) ? leaf : 0;
       fwrite (&flags, 1, sizeof(unsigned), fh);
-      for (scalar s in slist)
-	fwrite (&s[], 1, sizeof(double), fh);
+      for (scalar s in slist) {
+	double val = s[];
+	fwrite (&val, 1, sizeof(double), fh);
+      }
       pos += cell_size;
     }
     if (is_leaf(cell))

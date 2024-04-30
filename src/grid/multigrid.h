@@ -1,3 +1,5 @@
+typedef double real;
+
 #define GRIDNAME "Multigrid"
 #define GHOSTS 2
 

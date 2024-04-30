@@ -345,57 +345,6 @@ void   (* scalar_clone)       (scalar, scalar);
 
 #define vector(x) (*((vector *)&(x)))
 
-// events 
-
-typedef struct _Event Event;
-typedef int (* Expr) (int *, double *, Event *);
-
-struct _Event {
-  int last, nexpr;
-  int (* action) (const int, const double, Event *);
-  Expr expr[3];
-  int * arrayi;
-  double * arrayt;
-  char * file;
-  int line;
-  char * name;
-  double t;
-  int i, a;
-  void * data;
-  Event * next;
-};
-
-static Event * Events = NULL; // all events
-
-int iter = 0, inext = 0; // current step and step of next event
-double t = 0, tnext = 0; // current time and time of next event
-void init_events (void);
-void event_register (Event event);
-static void _init_solver (void);
-
-void init_solver()
-{
-  Events = malloc (sizeof (Event));
-  Events[0].last = 1;
-  _attribute = calloc (datasize/sizeof(double), sizeof (_Attributes));
-  int n = datasize/sizeof(double);
-  all = (scalar *) malloc (sizeof (scalar)*(n + 1));
-  baseblock = (scalar *) malloc (sizeof (scalar)*(n + 1));
-  for (int i = 0; i < n; i++)
-    baseblock[i].i = all[i].i = i;
-  baseblock[n].i = all[n].i = -1;
-#if _CADNA
-  cadna_init (-1);
-#endif
-#if _MPI
-  mpi_init();
-#elif MTRACE == 1
-  char * etrace = getenv ("MTRACE");
-  pmtrace.fp = fopen (etrace ? etrace : "mtrace", "w");
-  pmtrace.fname = systrdup (etrace ? etrace : "mtrace");
-#endif
-}
-
 // timers
 
 #if _MPI

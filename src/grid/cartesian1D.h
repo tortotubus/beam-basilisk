@@ -1,3 +1,5 @@
+typedef double real;
+
 #define GRIDNAME "Cartesian 1D"
 #define dimension 1
 #define GHOSTS 1

@@ -1,3 +1,5 @@
+typedef double real;
+
 #include "mempool.h"
 
 #define TWO_ONE 1 // enforce 2:1 refinement ratio

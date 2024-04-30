@@ -1,3 +1,9 @@
+#if _GPU
+typedef float real;
+#else
+typedef double real;
+#endif
+
 #ifndef GRIDNAME
 # define GRIDNAME "Cartesian"
 #endif
@@ -27,7 +33,7 @@ static Point last_point;
 
 #define cartesian ((Cartesian *)grid)
 
-@def data(k,l,m) ((double *)&cartesian->d[((point.i + k)*(point.n + 2) +
+@def data(k,l,m) ((real *)&cartesian->d[((point.i + k)*(point.n + 2) +
 					 (point.j + l))*datasize]) @
 @define allocated(...) true
 
@@ -87,7 +93,7 @@ void reset (void * alist, double val)
   for (int i = 0; i < sq(cartesian->n + 2); i++)
     for (scalar s in list)
       if (!is_constant(s))
-	((double *)(&cartesian->d[i*datasize]))[s.i] = val;
+	((real *)(&cartesian->d[i*datasize]))[s.i] = val;
 }
 
 // Boundaries
@@ -280,10 +286,10 @@ static void periodic_boundary_level_x (const Boundary * b, scalar * list, int l)
       for (j = 0; j < point.n + 2*GHOSTS; j++) {
 	for (int i = 0; i < GHOSTS; i++)
 	  for (scalar s in list1)
-	    memcpy (&s[i,j], &s[i + point.n,j], s.block*sizeof(double));
+	    memcpy (&s[i,j], &s[i + point.n,j], s.block*sizeof(real));
 	for (int i = point.n + GHOSTS; i < point.n + 2*GHOSTS; i++)
 	  for (scalar s in list1)
-	    memcpy (&s[i,j], &s[i - point.n,j], s.block*sizeof(double));
+	    memcpy (&s[i,j], &s[i - point.n,j], s.block*sizeof(real));
       }
   }
   free (list1);
@@ -314,9 +320,11 @@ void init_grid (int n)
   p->d = qmalloc (len, char);
   /* trash the data just to make sure it's either explicitly
      initialised or never touched */
-  double * v = (double *) p->d;
-  for (int i = 0; i < len/sizeof(double); i++)
-    v[i] = undefined;
+  if (sizeof (undefined) == sizeof (real)) {
+    real * v = (real *) p->d;
+    for (int i = 0; i < len/sizeof(real); i++)
+      v[i] = undefined;
+  }
   grid = (Grid *) p;
   reset (all, 0.);
   for (int d = 0; d < nboundary; d++) {
