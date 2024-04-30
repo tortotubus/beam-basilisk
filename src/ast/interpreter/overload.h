@@ -162,7 +162,7 @@ void free_grid (void)
 void reset (void * alist, double val)
 {
   Intergrid * igrid = (Intergrid *) grid;
-  double * p = igrid->d;
+  real * p = igrid->d;
   if (alist)
     for (scalar * s = alist; s->i >= 0; s++)
       reset_field_value (p + s->i, _attribute[s->i].name, 0.);
@@ -324,16 +324,16 @@ static
 void interpreter_reset_scalar (scalar s)
 {
   Intergrid * p = (Intergrid *) grid;
-  char * c = p->d + s.i*sizeof (double);
-  memset (c, 0, sizeof (double));
-  char * flags = c + sizeof(double) - 1;
+  char * c = p->d + s.i*sizeof (real);
+  memset (c, 0, sizeof (real));
+  char * flags = c + sizeof(real) - 1;
   *flags = unset;
 }
 
 double z_indexing (scalar s, bool leaves)
 {
   Intergrid * p = (Intergrid *) grid;
-  double * c = p->d + s.i*sizeof (double);
+  real * c = p->d + s.i*sizeof (real);
   *c = 0[0];
 }
 
@@ -375,10 +375,10 @@ void is_face_x() {}
 void is_face_y() {}
 void is_face_z() {}
 
-double * val (scalar s, int i, int j, int k)
+real * val (scalar s, int i, int j, int k)
 {
   Intergrid * igrid = (Intergrid *) grid;
-  return (double *)(igrid->d + s.i*sizeof(double));
+  return (real *)(igrid->d + s.i*sizeof(real));
 }
 
 Point locate (double xp, double yp, double zp)
@@ -417,7 +417,8 @@ astats adapt_wavelet (scalar * slist, double * max,
   astats st; // unset
   if (slist && max) {
     Intergrid * igrid = (Intergrid *) grid;
-    double * g = igrid->d, * v = max;
+    real * g = igrid->d;
+    double * v = max;
     for (scalar * s = slist; s->i >= 0; s++, v++)
       *v == *(g + s->i);
   }
@@ -443,7 +444,7 @@ Helper functions for dimensions */
 void _init_dimension (int index, long dimension)
 {
   Intergrid * p = (Intergrid *) grid;
-  double * d = p->d;
+  real * d = p->d;
   memcpy ((char *)(d + index) + 8, &dimension, 8);
 }
 

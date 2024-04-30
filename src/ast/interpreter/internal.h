@@ -41,4 +41,4 @@ double cube (double x){}
 
 void interpreter_verbosity (int verbosity) {}
 void display_value (void * value) {}
-void reset_field_value (double * field, const char * name, double val) {}
+void reset_field_value (real * field, const char * name, real val) {}

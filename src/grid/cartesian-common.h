@@ -150,7 +150,7 @@ static void init_block_scalar (scalar sb, const char * name, const char * ext,
 scalar alloc_block_scalar (const char * name, const char * ext, int block)
 {
   interpreter_set_int (&block);
-  int nvar = datasize/sizeof(double);
+  int nvar = datasize/sizeof(real);
 
   scalar s = {0};
   while (s.i < nvar) {
@@ -185,7 +185,7 @@ scalar alloc_block_scalar (const char * name, const char * ext, int block)
     init_block_scalar (sb, name, ext, n, block);
   }
   // allocate extra space on the grid
-  realloc_scalar (block*sizeof(double));
+  realloc_scalar (block*sizeof(real));
   trash (((scalar []){s, {-1}})); // fixme: only trashes one block?
   return s;
 }
@@ -355,7 +355,7 @@ static void cartesian_scalar_clone (scalar clone, scalar src)
 scalar * list_clone (scalar * l)
 {
   scalar * list = NULL;
-  int nvar = datasize/sizeof(double), map[nvar];
+  int nvar = datasize/sizeof(real), map[nvar];
   for (int i = 0; i < nvar; i++)
     map[i] = -1;
   for (scalar s in l) {

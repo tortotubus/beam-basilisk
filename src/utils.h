@@ -110,7 +110,7 @@ void timer_print (timer t, int i, size_t tnc)
   fprintf (fout,
 	   "\n# " GRIDNAME 
 	   ", %d steps, %g CPU, %.4g real, %.3g points.step/s, %d var\n",
-	   i, s.cpu, s.real, s.speed, (int) (datasize/sizeof(double)));
+	   i, s.cpu, s.real, s.speed, (int) (datasize/sizeof(real)));
 #if _MPI
   fprintf (fout,
 	   "# %d procs, MPI: min %.2g (%.2g%%) "
