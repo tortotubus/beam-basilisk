@@ -246,11 +246,22 @@ Dedicated video memory: 4096 MB
 
 __NV_PRIME_RENDER_OFFLOAD=1 __GLX_VENDOR_LIBRARY_NAME=nvidia  ./reversed.gpu/reversed.gpu 10 2> /dev/null | grep -a steps
 
-# Cartesian (GPU), 959 steps, 0.48923 CPU, 0.5417 real, 1.81e+06 points.step/s, 13 var
-# Cartesian (GPU), 1877 steps, 0.94141 CPU, 0.9569 real, 8.03e+06 points.step/s, 15 var
-# Cartesian (GPU), 3720 steps, 2.00134 CPU, 2.036 real, 2.99e+07 points.step/s, 15 var
-# Cartesian (GPU), 7393 steps, 4.66335 CPU, 4.735 real, 1.02e+08 points.step/s, 15 var
-# Cartesian (GPU), 14735 steps, 11.5514 CPU, 11.66 real, 3.31e+08 points.step/s, 15 var
-# Cartesian (GPU), 29411 steps, 54.7206 CPU, 55.41 real, 5.57e+08 points.step/s, 15 var
+# Cartesian (GPU), 963 steps, 0.608312 CPU, 0.6094 real, 1.62e+06 points.step/s, 13 var
+# Cartesian (GPU), 1880 steps, 0.877724 CPU, 0.8778 real, 8.77e+06 points.step/s, 15 var
+# Cartesian (GPU), 3720 steps, 1.85479 CPU, 1.855 real, 3.29e+07 points.step/s, 15 var
+# Cartesian (GPU), 7395 steps, 4.09398 CPU, 4.094 real, 1.18e+08 points.step/s, 15 var
+# Cartesian (GPU), 14735 steps, 10.7966 CPU, 10.8 real, 3.58e+08 points.step/s, 15 var
+# Cartesian (GPU), 29410 steps, 48.3212 CPU, 48.32 real, 6.38e+08 points.step/s, 15 var
+~~~
+
+with compute shaders
+
+~~~bash
+# Cartesian (GPU), 963 steps, 0.553183 CPU, 0.5886 real, 1.68e+06 points.step/s, 13 var
+# Cartesian (GPU), 1880 steps, 0.975595 CPU, 0.9773 real, 7.88e+06 points.step/s, 15 var
+# Cartesian (GPU), 3720 steps, 1.96949 CPU, 1.969 real, 3.09e+07 points.step/s, 15 var
+# Cartesian (GPU), 7395 steps, 4.18939 CPU, 4.189 real, 1.16e+08 points.step/s, 15 var
+# Cartesian (GPU), 14735 steps, 11.0764 CPU, 11.08 real, 3.49e+08 points.step/s, 15 var
+# Cartesian (GPU), 29410 steps, 48.8418 CPU, 48.84 real, 6.31e+08 points.step/s, 15 var
 ~~~
 */

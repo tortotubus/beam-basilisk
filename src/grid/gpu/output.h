@@ -155,7 +155,9 @@ void output_ppm_gpu (OutputPPMGPU * display,
       cmap[i].b = dmap[i][2];
       cmap[i].a = 0.;
     }
-    
+
+    GPUContext.fragment_shader = true;
+      
     coord p;
     foreach_region (p, box, cn, gpu) {
       float m = masked ? mask[] : 0., v = m < 0. ? nodata : f[];
@@ -174,6 +176,8 @@ void output_ppm_gpu (OutputPPMGPU * display,
       }
     }
 
+    GPUContext.fragment_shader = false;
+    
     if (linear) {
       GL_C (glBindSampler (0, 0));
       if (masked)

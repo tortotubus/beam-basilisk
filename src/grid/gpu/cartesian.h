@@ -185,7 +185,7 @@ static char * str_append_array (char * dst, const char * list[])
 #define str_append(dst, ...) str_append_array (dst, (const char *[]){__VA_ARGS__, NULL})
 
 static char glsl_preproc[] =
-  "// #line 134 \"" __FILE__ "\"\n"
+  "// #line 189 \"" __FILE__ "\"\n"
   "#define dimensional(x)\n"
   "#define real float\n"
   "#define coord vec3\n"
@@ -225,6 +225,7 @@ static char glsl_preproc[] =
   "#define sq(x) ((x)*(x))\n"
   "#define fabs(x) abs(x)\n"
   "const real z = 0.;\n"
+  "uniform ivec2 csOrigin = ivec2(0,0);\n"
   "uniform vec2 vsOrigin = vec2(0.,0.);\n"
   "uniform vec2 vsScale = vec2(1.,1.);\n"
   ;
@@ -303,7 +304,8 @@ static External * append_external (External * externals, External ** end, Extern
   return externals;
 }
 
-static External * merge_external (External * externals, External ** end, External * g, const ForeachData * loop)
+static External * merge_external (External * externals, External ** end, External * g,
+				  const ForeachData * loop)
 {
   if (!strcmp (g->type, "*func()") || !strcmp (g->type, "func()"))
     for (scalar s in baseblock)
@@ -370,8 +372,9 @@ char * build_shader (const External * externals, const ForeachData * loop)
   snprintf (s, 19, "%d", nconst > 0 ? nconst : 1);
   char a[20];
   snprintf (a, 19, "%g", nconst > 0 ? _constant[0] : 0);
-  char * fs = str_append (NULL, "#version 420\n", glsl_preproc,
-			  "#define POINT_VARIABLES real Delta = L0/N, Delta_x = Delta, Delta_y = Delta,",
+  char * fs = str_append (NULL, "#version 430\n", glsl_preproc,
+			  "#define POINT_VARIABLES real Delta = L0/N,"
+			  " Delta_x = Delta, Delta_y = Delta,",
 			  " x = X0 + point.x*L0, y = Y0 + point.y*L0;\n",
 			  "const int _nconst = ", s, ";\n"
 			  "const real _constant[_nconst] = {", a);
@@ -418,7 +421,8 @@ char * build_shader (const External * externals, const ForeachData * loop)
     }
     char s[20];
     snprintf (s, 19, "%d", noutputs);
-    fs = str_append (fs, "layout(location = 0) out vec4 _outputs[", s, "];\n");
+    fs = str_append (fs, "vec4 _outputs[", s, "];\n");
+    fs = str_append (fs, "uniform writeonly image2D _image[", s, "];\n");
   }
   else
     fs = str_append (fs, "vec4 _outputs[1];\n");
@@ -540,13 +544,21 @@ char * build_shader (const External * externals, const ForeachData * loop)
     else if (strcmp (g->type, "scalar") &&
 	     strcmp (g->type, "vector") &&
 	     strcmp (g->type, "tensor")) {
-      if (!strcmp (g->name, "N") && !strcmp (g->type, "int"))
-        fs = str_append (fs,
-			 "uniform int N;\n"
-			 "in Point vsPoint;\n"
-			 "Point point = vsPoint*vsScale + vsOrigin;\n"
-			 "out vec4 FragColor;\n"
-			 "real _delta = 1.0f/N;\n");
+      if (!strcmp (g->name, "N") && !strcmp (g->type, "int")) {
+	char s[20], size[20];
+	snprintf (s, 19, "%d", N);
+	snprintf (size, 19, "%d", N > 16 ? 16 : 1);
+        fs = str_append (fs, "const int N = ", s, ";\n");
+	if (GPUContext.fragment_shader)
+	  fs = str_append (fs, "in Point vsPoint;\n"
+			   "Point point = vsPoint*vsScale + vsOrigin;\n"
+			   "ivec2 ipoint = ivec2(int(point.x*N), int(point.y*N));\n"
+			   "out vec4 FragColor;\n");
+	else
+	  fs = str_append (fs, "layout (local_size_x = ", size,
+			   ", local_size_y = ", size, ") in;\n");
+	fs = str_append (fs, "real _delta = 1.0f/N;\n");
+      }
       else if (!strcmp (g->name, "nl") && !strcmp (g->type, "int")) {
 
 	/**
@@ -632,15 +644,20 @@ GLuint load_shader (const char * fs)
 #if PRINTSHADER
   fputs (fs, stderr);
 #endif
-  char quad[] =
-    "#version 420\n"
-    "layout(location = 0) in vec3 vsPos;"
-    "out vec2 vsPoint;"
-    "void main() {"
-    "  vsPoint = vsPos.xy;"
-    "  gl_Position =  vec4(2.*vsPos.xy - vec2(1.), 0., 1.);"
-    "}";
-  GLuint id = loadNormalShader (quad, fs);
+  GLuint id;
+  if (!GPUContext.fragment_shader)
+    id = loadNormalShader (NULL, fs);
+  else {
+    char quad[] =
+      "#version 430\n"
+      "layout(location = 0) in vec3 vsPos;"
+      "out vec2 vsPoint;"
+      "void main() {"
+      "  vsPoint = vsPos.xy;"
+      "  gl_Position =  vec4(2.*vsPos.xy - vec2(1.), 0., 1.);"
+      "}";
+    id = loadNormalShader (quad, fs);
+  }
   if (id) {
     int ret;
     khiter_t k = kh_put (STR, gpu_cartesian->shaders, fs, &ret);
@@ -721,7 +738,7 @@ static void gpu_delete_scalar (scalar s)
 {
   if (grid && gpu_cartesian->texture && scalar_texture(s)->used) {
     scalar_texture(s)->used = false;
-#if DEBUG_ALLOC_TEXTURE
+#if 0 // DEBUG_ALLOC_TEXTURE
     fprintf (stderr, "deleting texture %d:%s %d max %ld\n",
 	     s.i, s.name, s.gpu.texture - 1,
 	     gpu_cartesian->texture->len/sizeof(Texture));
@@ -914,8 +931,9 @@ void gpu_init()
     glfwMakeContextCurrent (GPUContext.window);
 
     // load GLAD.
-    gladLoadGLLoader ((GLADloadproc)glfwGetProcAddress);
-
+    assert (gladLoadGLLoader ((GLADloadproc)glfwGetProcAddress));
+    assert (glBindImageTexture);
+    
     // Bind and create VAO, otherwise, we can't do anything in OpenGL.
     GL_C (glGenVertexArrays (1, &GPUContext.vao));
     GL_C (glBindVertexArray (GPUContext.vao));
@@ -1122,7 +1140,7 @@ void export_to_gpu (scalar s, char * sep)
 }
 
 #define REDUCTION_VS						\
-  "#version 420\n"						\
+  "#version 430\n"						\
   "layout(location = 0) in vec3 vsPos;"				\
   "uniform float f;"						\
   "out vec2 point;"						\
@@ -1141,7 +1159,7 @@ void export_to_gpu (scalar s, char * sep)
 static GLuint load_reduction_shader (char * start, char * reduct)
 {
   char * fs = str_append (NULL,
-			  "#version 420\n", glsl_preproc, REDUCTION_FS,
+			  "#version 430\n", glsl_preproc, REDUCTION_FS,
 			  start,
 			  "for (int i = 0; i < 2; i++)\n"
 			  "  for (int j = 0; j < 2; j++)\n",
@@ -1157,6 +1175,8 @@ static GLuint load_reduction_shader (char * start, char * reduct)
 
 double gpu_reduction (scalar s, const char op, const RegionParameters * region)
 {
+  GL_C (glColorMaski (0, 1, 0, 0, 0));
+
   if (region->n.x == 1 && region->n.y == 1) {
     int i =  (region->p.x - X0)/L0*cartesian->n;
     int j =  (region->p.y - Y0)/L0*cartesian->n;
@@ -1183,9 +1203,8 @@ double gpu_reduction (scalar s, const char op, const RegionParameters * region)
   case 'M': {
     static GLuint shader = 0;
     if (!shader)
-      shader =
-	load_reduction_shader ("reduction = valt(s,0,0,0).r;",
-			       "reduction = max(reduction, valt(s,i,j,k).r);");
+      shader = load_reduction_shader ("reduction = valt(s,0,0,0).r;",
+				      "reduction = max(reduction, valt(s,i,j,k).r);");
     id = shader;
     break;    
   }
@@ -1193,9 +1212,8 @@ double gpu_reduction (scalar s, const char op, const RegionParameters * region)
   case 'm': {
     static GLuint shader = 0;
     if (!shader)
-      shader =
-	load_reduction_shader ("reduction = valt(s,0,0,0).r;",
-			       "reduction = min(reduction, valt(s,i,j,k).r);");
+      shader = load_reduction_shader ("reduction = valt(s,0,0,0).r;",
+				      "reduction = min(reduction, valt(s,i,j,k).r);");
     id = shader;
     break;
   }
@@ -1481,7 +1499,11 @@ static bool doloop_on_gpu (ForeachData * loop, const RegionParameters * region,
     /**
     ## main() */
     
-    shader = str_append (shader, "void main() { POINT_VARIABLES\n");
+    shader = str_append (shader, "void main() {\n");
+    if (!GPUContext.fragment_shader)
+      shader = str_append (shader, "ivec2 ipoint = csOrigin + ivec2(gl_GlobalInvocationID);\n");
+    shader = str_append (shader,  "Point point = (vec2(ipoint) + vec2(0.5, 0.5))/N;\n"
+			 "POINT_VARIABLES\n");
     if (loop->vertex)
       shader = str_append (shader, "  x -= Delta/2., y -= Delta/2.;\n");
     foreach_texture (t)
@@ -1496,7 +1518,13 @@ static bool doloop_on_gpu (ForeachData * loop, const RegionParameters * region,
     shader = str_append (shader, kernel);
     for (const External * g = externals; g; g = g->next)
       if (g->reduct)
-	shader = str_append (shader, "\nval_out_(", g->name, "_out_,0,0,0) = ", g->name, ";");
+	shader = str_append (shader, "\nval_out_(", g->name, "_out_,0,0,0) = ", g->name, ";");    
+    foreach_texture (t)
+      if (t->output >= 0) {
+	char output[20];
+	snprintf (output, 19, "%d", t->output);
+	shader = str_append (shader, "\nimageStore(_image[", output, "],ipoint,_outputs[", output, "]);");
+      }
     shader = str_append (shader, "\n}\n");
     shaderid = load_shader (shader);
     loop->data = (void *) ((long) shaderid);
@@ -1541,10 +1569,9 @@ static bool doloop_on_gpu (ForeachData * loop, const RegionParameters * region,
 
   foreach_texture (t)
     if (t->input >= 0) {
-      GLint location;
       char s[30];
       snprintf (s, 29, "_inputs[%d]", t->input);
-      location = glGetUniformLocation (shaderid, s);
+      GLint location = glGetUniformLocation (shaderid, s);
     
       /** 
       If 'location' is negative the input field has been optimised out
@@ -1570,6 +1597,48 @@ static bool doloop_on_gpu (ForeachData * loop, const RegionParameters * region,
   /**
   ## Set output fields */
 
+#if 1
+  foreach_texture (t)
+    if (t->output >= 0) {
+      if (t->io) { // swap input and output textures
+	GLuint tex = t->io->id;
+	t->io->id = t->id;
+	t->io->used = false;
+	t->io = NULL;
+	t->id = tex;
+      }
+      char s[30];
+      snprintf (s, 29, "_image[%d]", t->output);
+      GLint location = glGetUniformLocation (shaderid, s);
+      if (location >= 0) {
+	GL_C (glBindImageTexture (t->output, t->id, 0, GL_FALSE, 0, GL_WRITE_ONLY,
+				  t->type == 0 ? GL_R32F : t->type == 1 ? GL_RG32F :  GL_RGBA32F));
+	GL_C (glUniform1i (location, t->output));
+
+#if DEBUG_ALLOC_TEXTURE
+	fprintf (stderr, "%s:%d: attached texture %d to _image[%d] mask [%d,%d,%d,%d]\n",
+		 loop->fname, loop->line, t->id, t->output,
+		 t->out[0], t->out[1], t->out[2], t->out[3]);
+#endif
+      }
+    }
+
+#if 0  
+  GL_C (glFramebufferTexture2D (GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0,
+				GL_TEXTURE_2D, scalar_texture (dummy)->id,
+				0));
+  GL_C (glColorMaski (0, 0, 0, 0, 0));
+#if 1  
+  int draw_buffer = 1;
+  if (draw_buffer) {
+    GLenum DrawBuffers[draw_buffer];
+    for (int i = 0; i < draw_buffer; i++)
+      DrawBuffers[i] = GL_COLOR_ATTACHMENT0 + i;
+    glDrawBuffers (draw_buffer, DrawBuffers);
+  }
+#endif
+#endif
+#else
   int draw_buffer = 0;
   foreach_texture (t)
     if (t->output >= 0) {
@@ -1598,6 +1667,7 @@ static bool doloop_on_gpu (ForeachData * loop, const RegionParameters * region,
       DrawBuffers[i] = GL_COLOR_ATTACHMENT0 + i;
     glDrawBuffers (draw_buffer, DrawBuffers);
   }
+#endif
 
   /**
   ## Set global variables */
@@ -1704,20 +1774,11 @@ static bool doloop_on_gpu (ForeachData * loop, const RegionParameters * region,
   If this is a `foreach_point()` iteration, we draw a single point */
 
   if (region->n.x == 1 && region->n.y == 1) {
-    int i =  (region->p.x - X0)/L0*cartesian->n;
-    int j =  (region->p.y - Y0)/L0*cartesian->n;
-    float vertices[] = { (i + 0.5)/cartesian->n, (j + 0.5)/cartesian->n };
-    GLuint vbo;
-    GL_C (glGenBuffers (1, &vbo));
-    GL_C (glBindBuffer (GL_ARRAY_BUFFER, vbo));
-    GL_C (glVertexAttribPointer ((GLuint)0, 2, GL_FLOAT, GL_FALSE,
-				 2*sizeof(float), (void*)0));
-    GL_C (glBufferData (GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW));
-    GL_C (glDrawArrays (GL_POINTS, 0, 1));
-    GL_C (glBindBuffer (GL_ARRAY_BUFFER, GPUContext.vbo));
-    GL_C (glVertexAttribPointer ((GLuint)0, 2, GL_FLOAT, GL_FALSE,
-				 2*sizeof(float), (void*)0));
-    glDeleteBuffers (1, &vbo);
+    int csOrigin[] = { (region->p.x - X0)/L0*cartesian->n, (region->p.y - Y0)/L0*cartesian->n };
+    GLint location = glGetUniformLocation (shaderid, "csOrigin");
+    GL_C (glUniform2iv (location, 1, csOrigin));
+    assert (!GPUContext.fragment_shader);
+    glDispatchCompute (1, 1, 1);
   }
 
   /**
@@ -1733,14 +1794,19 @@ static bool doloop_on_gpu (ForeachData * loop, const RegionParameters * region,
     GL_C (glUniform2fv (location, 1, vsOrigin));
     location = glGetUniformLocation (shaderid, "vsScale");
     GL_C (glUniform2fv (location, 1, vsScale));
+    assert (GPUContext.fragment_shader);
     GL_C (glDrawArrays (GL_TRIANGLES, 0, 6));
   }
 
   /**
   Otherwise, we draw "fullscreen". */
   
-  else
-    GL_C (glDrawArrays (GL_TRIANGLES, 0, 6));
+  else {
+    assert (!GPUContext.fragment_shader);
+    glDispatchCompute (N > 16 ? N/16 : N, N > 16 ? N/16 : N, 1);
+  }
+  
+  glMemoryBarrier (GL_ALL_BARRIER_BITS);
 
   /**
   ## Perform reductions and cleanup */
@@ -1875,5 +1941,5 @@ static void gpu_cartesian_methods()
 * [Arm Mali GPUs Best Practices Developer Guide](https://armkeil.blob.core.windows.net/developer/Arm%20Developer%20Community/PDF/Arm%20Mali%20GPU%20Best%20Practices.pdf)
 * [Rendering to a 3D texture](https://community.khronos.org/t/rendering-to-a-3d-texture/75285/2)
 * [GLFW Shared Contexts](https://www.glfw.org/docs/3.3/context_guide.html#context_sharing)
-
+* [Slides on using Array or Bindless Textures](https://www.slideshare.net/CassEveritt/beyond-porting)
 */

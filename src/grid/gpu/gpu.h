@@ -5,7 +5,8 @@
 static struct {
   ///// GPU /////
   GLFWwindow * window;
-  GLuint vao, fbo0, vbo;  
+  GLuint vao, fbo0, vbo;
+  bool fragment_shader;
 } GPUContext = {0};
 
 static void gpu_check_error (const char * stmt,
@@ -98,15 +99,19 @@ static GLuint createShaderFromString (const char * shaderSource,
 
 static GLuint loadNormalShader (const char * vsSource, const char * fsShader)
 {
-  GLuint vs = createShaderFromString (vsSource, GL_VERTEX_SHADER);
-  if (!vs)
-    return 0;
-  GLuint fs = createShaderFromString (fsShader, GL_FRAGMENT_SHADER);
+  GLuint vs = 0;
+  if (vsSource) {
+    vs = createShaderFromString (vsSource, GL_VERTEX_SHADER);
+    if (!vs)
+      return 0;
+  }
+  GLuint fs = createShaderFromString (fsShader, vsSource ? GL_FRAGMENT_SHADER : GL_COMPUTE_SHADER);
   if (!fs)
     return 0;
   
   GLuint shader = glCreateProgram();
-  glAttachShader (shader, vs);
+  if (vs)
+    glAttachShader (shader, vs);
   glAttachShader (shader, fs);
   glLinkProgram (shader);
 
@@ -123,11 +128,13 @@ static GLuint loadNormalShader (const char * vsSource, const char * fsShader)
   }
 
   if (shader) {
-    glDetachShader (shader, vs);
+    if (vs)
+      glDetachShader (shader, vs);
     glDetachShader (shader, fs);
   }
-    
-  glDeleteShader (vs);
+
+  if (vs)
+    glDeleteShader (vs);
   glDeleteShader (fs);
   
   return shader;
@@ -178,3 +185,27 @@ GLString gpu_limits_list[] = {
   {"GL_MAX_IMAGE_UNITS", GL_MAX_IMAGE_UNITS},
   {NULL}
 };
+
+void printWorkGroupsCapabilities()
+{
+  int workgroup_count[3];
+  int workgroup_size[3];
+  int workgroup_invocations;
+
+  glGetIntegeri_v(GL_MAX_COMPUTE_WORK_GROUP_COUNT, 0, &workgroup_count[0]);
+  glGetIntegeri_v(GL_MAX_COMPUTE_WORK_GROUP_COUNT, 1, &workgroup_count[1]);
+  glGetIntegeri_v(GL_MAX_COMPUTE_WORK_GROUP_COUNT, 2, &workgroup_count[2]);
+
+  printf ("Taille maximale des workgroups:\n\tx:%u\n\ty:%u\n\tz:%u\n",
+  workgroup_size[0], workgroup_size[1], workgroup_size[2]);
+
+  glGetIntegeri_v(GL_MAX_COMPUTE_WORK_GROUP_SIZE, 0, &workgroup_size[0]);
+  glGetIntegeri_v(GL_MAX_COMPUTE_WORK_GROUP_SIZE, 1, &workgroup_size[1]);
+  glGetIntegeri_v(GL_MAX_COMPUTE_WORK_GROUP_SIZE, 2, &workgroup_size[2]);
+
+  printf ("Nombre maximal d'invocation locale:\n\tx:%u\n\ty:%u\n\tz:%u\n",
+  workgroup_size[0], workgroup_size[1], workgroup_size[2]);
+
+  glGetIntegerv (GL_MAX_COMPUTE_WORK_GROUP_INVOCATIONS, &workgroup_invocations);
+  printf ("Nombre maximum d'invocation de workgroups:\n\t%u\n", workgroup_invocations);
+}

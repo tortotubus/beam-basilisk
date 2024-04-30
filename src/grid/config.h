@@ -10,6 +10,9 @@
 #include <time.h>
 #include <sys/time.h>
 #include <sys/resource.h>
+#if NVTX
+ @include <nvtx3/nvToolsExt.h>
+#endif
 
 #if _OPENMP
 @ include <omp.h>
@@ -240,6 +243,9 @@ static void tracing (const char * func, const char * file, int line)
   fprintf (stderr, "trace %s:%s:%d t: %g sum: %g\n",
 	   func, file, line, t[0], t[1]);
 #endif
+#if NVTX
+  nvtxRangePush (func);
+#endif
 }
 
 static void end_tracing (const char * func, const char * file, int line)
@@ -261,6 +267,9 @@ static void end_tracing (const char * func, const char * file, int line)
     t -= 2;
     t[1] += dt;
   }
+#if NVTX
+  nvtxRangePop();
+#endif
 }
 
 static int compar_self (const void * p1, const void * p2)
