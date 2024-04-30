@@ -138,15 +138,19 @@ ES     (\\([\'\"\?\\abfnrtv]|[0-7]{1,3}|x[a-fA-F0-9]+))
 }
 
 @[^@]*@ {
-  if (fname)
-    sout = str_append (sout, fname);
-  else
-    sout = str_append (sout, "(fragment shader)");
-  sout = str_append (sout, ":");
-  char s[81];
-  snprintf (s, 80, "%d", line);
-  sout = str_append (sout, s);
-  sout = str_append (sout, ": GLSL: ");
+  if (!strncmp (yytext, "@error ", 7))
+    yytext += 6;
+  else {
+    if (fname)
+      sout = str_append (sout, fname);
+    else
+      sout = str_append (sout, "(fragment shader)");
+    sout = str_append (sout, ":");
+    char s[81];
+    snprintf (s, 80, "%d", line);
+    sout = str_append (sout, s);
+    sout = str_append (sout, ": GLSL: ");
+  }
   *strchr (yytext + 1, '@') = '\0';
   sout = str_append (sout, yytext + 1);
   sout = str_append (sout, "\n");

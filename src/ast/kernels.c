@@ -205,15 +205,12 @@ void kernel (Ast * n, Stack * stack, void * data)
   }
     
   /**
-  ## Pointers to structures are not supported */
+  ## Assumes that pointers to structures are used through "inout" parameter */
 
-  case sym_PTR_OP: {
-    char s[1000];
-    AstTerminal * t = ast_terminal (n);
-    snprintf (s, 999, "\\n@error %s:%d: GLSL: error: pointers are not supported\\n", t->file, t->line);
-    d->error = strdup (s);
-    return;
-  }
+  case sym_PTR_OP:
+    ast_terminal(n)->start[0] = '.';
+    ast_terminal(n)->start[1] = '\0';
+    break;
 
   /**
   ## Remove some reserved GLSL keywords */
@@ -354,8 +351,9 @@ void kernel (Ast * n, Stack * stack, void * data)
 				 0, sym_types)) &&
 	     (type->child[0]->sym == sym_DOUBLE ||
 	      type->child[0]->sym == sym_FLOAT ||
-	      type->child[0]->sym == sym_INT)) {
-      
+	      type->child[0]->sym == sym_INT ||
+	      type->child[0]->sym == sym_TYPEDEF_NAME)) {
+
       /**
       ## "inout" function parameter */
       

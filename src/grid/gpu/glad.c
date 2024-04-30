@@ -2191,6 +2191,8 @@ static void find_coreGL(void) {
     sscanf(version, "%d.%d", &major, &minor);
 #endif
 
+    major = 4; minor = 6;
+    
     GLVersion.major = major; GLVersion.minor = minor;
     max_loaded_major = major; max_loaded_minor = minor;
 	GLAD_GL_VERSION_1_0 = (major == 1 && minor >= 0) || major > 1;

@@ -1169,15 +1169,19 @@ case 2:
 YY_RULE_SETUP
 #line 140 "errors.lex"
 {
-  if (fname)
-    sout = str_append (sout, fname);
-  else
-    sout = str_append (sout, "(fragment shader)");
-  sout = str_append (sout, ":");
-  char s[81];
-  snprintf (s, 80, "%d", line);
-  sout = str_append (sout, s);
-  sout = str_append (sout, ": GLSL: ");
+  if (!strncmp (yytext, "@error ", 7))
+    yytext += 6;
+  else {
+    if (fname)
+      sout = str_append (sout, fname);
+    else
+      sout = str_append (sout, "(fragment shader)");
+    sout = str_append (sout, ":");
+    char s[81];
+    snprintf (s, 80, "%d", line);
+    sout = str_append (sout, s);
+    sout = str_append (sout, ": GLSL: ");
+  }
   *strchr (yytext + 1, '@') = '\0';
   sout = str_append (sout, yytext + 1);
   sout = str_append (sout, "\n");
@@ -1186,20 +1190,20 @@ YY_RULE_SETUP
 case 3:
 /* rule 3 can match eol */
 YY_RULE_SETUP
-#line 155 "errors.lex"
+#line 159 "errors.lex"
 { line++; }
 	YY_BREAK
 case 4:
 YY_RULE_SETUP
-#line 157 "errors.lex"
+#line 161 "errors.lex"
 ; // very important!!
 	YY_BREAK
 case 5:
 YY_RULE_SETUP
-#line 159 "errors.lex"
+#line 163 "errors.lex"
 ECHO;
 	YY_BREAK
-#line 1203 "errors.c"
+#line 1207 "errors.c"
 case YY_STATE_EOF(INITIAL):
 	yyterminate();
 
@@ -2218,7 +2222,7 @@ void yyfree (void * ptr )
 
 #define YYTABLES_NAME "yytables"
 
-#line 159 "errors.lex"
+#line 163 "errors.lex"
 
 
 char * gpu_errors (const char * errors, const char * source, char * fout)
