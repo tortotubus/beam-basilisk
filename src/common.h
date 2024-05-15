@@ -1463,3 +1463,19 @@ typedef struct {
 #define dirichlet(expr)                 _dirichlet(expr, point, neighbor, _s, data)
 #define dirichlet_face(expr)            _dirichlet_face(expr, point, neighbor, _s, data)
 #define neumann(expr)                   _neumann(expr, point, neighbor, _s, data)
+
+typedef struct {
+  coord x, y, z;
+} mat3;
+
+OMP(omp declare reduction (+ : mat3 :
+          omp_out.x.x += omp_in.x.x,
+          omp_out.x.y += omp_in.x.y,
+          omp_out.x.z += omp_in.x.z,
+          omp_out.y.x += omp_in.y.x,
+          omp_out.y.y += omp_in.y.y,
+          omp_out.y.z += omp_in.y.z,
+          omp_out.z.x += omp_in.z.x,
+          omp_out.z.y += omp_in.z.y,
+          omp_out.z.z += omp_in.z.z
+          ))
