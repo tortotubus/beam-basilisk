@@ -14,6 +14,7 @@ respecting the C99 grammar (with added macros).
 #include "ast.h"
 #include "symbols.h"
 #include "einstein_sum.h"
+
 /**
 By default grammar checks are turned off. */
 
@@ -2272,16 +2273,20 @@ static void global_boundaries_and_stencils (Ast * n, Stack * stack, void * data)
     }
     break;
   }
-  // identify Einstein summation macros 
+
+  /**
+  ## Einstein summation */
+
   case sym_macro_statement: {
     Ast * identifier = ast_schema (n, sym_macro_statement,
 				   0, sym_function_call,
 				   0, sym_postfix_expression,
 				   0, sym_primary_expression,
 				   0, sym_IDENTIFIER);
-    if (!strcmp (ast_terminal (identifier)->start, "einstein_sum")) 
-      einstein_sum_global(n ,stack, ((TranslateData *) data)->dimension);
+    if (!strcmp (ast_terminal (identifier)->start, "einstein_sum"))
+      einstein_sum_global (n, stack, ((TranslateData *)data)->dimension);
   }
+
   }
 }
 
