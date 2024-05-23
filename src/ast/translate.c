@@ -4054,31 +4054,31 @@ static void macros (Ast * n, Stack * stack, void * data)
 	      exit (1);
 	    }
 	    if (array) {
-	      if(strcmp (type, "coord") && strcmp (type, "mat3")) {
-          ast_after (n, "mpi_all_reduce_array(", t->start, ",", type, ",");
-          mpi_operator (n, reduction->child[2]);
-          ast_right_terminal (n)->after = ast_str_append(array, ast_right_terminal (n)->after);
-          ast_after (n, ");");
-        } else {
-          ast_after (n, "mpi_all_reduce_array((double *)", t->start, ",double,");
-          mpi_operator (n, reduction->child[2]);
-          char s[100];
-          snprintf (s,100, "sizeof(%s)/(sizeof(double))", t->start);
-          ast_after (n,s,");");
-        }
+	      if (strcmp (type, "coord") && strcmp (type, "mat3")) {
+		ast_after (n, "mpi_all_reduce_array(", t->start, ",", type, ",");
+		mpi_operator (n, reduction->child[2]);
+		ast_right_terminal (n)->after = ast_str_append (array, ast_right_terminal (n)->after);
+		ast_after (n, ");");
+	      } else {
+		ast_after (n, "mpi_all_reduce_array((double *)", t->start, ",double,");
+		mpi_operator (n, reduction->child[2]);
+		char s[100];
+		snprintf (s, 99, "sizeof(%s)/sizeof(double)", t->start);
+		ast_after (n, s, ");");
+	      }
 	    }
 	    else {
-        char s[100] = "1";
-        if (strcmp (type, "coord") && strcmp (type, "mat3")){
-          ast_after (n, "mpi_all_reduce_array(&", t->start,",", type);
-        } else {
-          // cast the adress of the first member into a double for coord and mat3
-          ast_after (n, "mpi_all_reduce_array((double *)&", t->start,",double");
-      	  snprintf (s, 100, "sizeof(%s)/(sizeof(double))", t->start);
-        }
-        ast_after (n, ",");
-        mpi_operator (n, reduction->child[2]);
-        ast_after (n, s, ");");
+	      char s[100] = "1";
+	      if (strcmp (type, "coord") && strcmp (type, "mat3"))
+		ast_after (n, "mpi_all_reduce_array(&", t->start,",", type);
+	      else {
+		// cast the adress of the first member into a double for coord and mat3
+		ast_after (n, "mpi_all_reduce_array((double *)&", t->start,",double");
+		snprintf (s, 99, "sizeof(%s)/sizeof(double)", t->start);
+	      }
+	      ast_after (n, ",");
+	      mpi_operator (n, reduction->child[2]);
+	      ast_after (n, s, ");");
 	    }
 	    sreductions = ast_str_append (reduction, sreductions);
 	    free (type);

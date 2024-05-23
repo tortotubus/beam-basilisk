@@ -1469,13 +1469,13 @@ typedef struct {
 } mat3;
 
 OMP(omp declare reduction (+ : mat3 :
-          omp_out.x.x += omp_in.x.x,
-          omp_out.x.y += omp_in.x.y,
-          omp_out.x.z += omp_in.x.z,
-          omp_out.y.x += omp_in.y.x,
-          omp_out.y.y += omp_in.y.y,
-          omp_out.y.z += omp_in.y.z,
-          omp_out.z.x += omp_in.z.x,
-          omp_out.z.y += omp_in.z.y,
-          omp_out.z.z += omp_in.z.z
-          ))
+			   omp_out.x.x += omp_in.x.x,
+			   omp_out.x.y += omp_in.x.y,
+			   omp_out.x.z += omp_in.x.z,
+			   omp_out.y.x += omp_in.y.x,
+			   omp_out.y.y += omp_in.y.y,
+			   omp_out.y.z += omp_in.y.z,
+			   omp_out.z.x += omp_in.z.x,
+			   omp_out.z.y += omp_in.z.y,
+			   omp_out.z.z += omp_in.z.z
+			   ))
