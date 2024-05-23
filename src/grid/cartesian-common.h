@@ -888,8 +888,8 @@ static double interpolate_linear_shifted (Point point, scalar v, coord shift,
 #endif  
 }
 
-static double interpolate_linear (Point point, scalar v,
-				  double xp = 0., double yp = 0., double zp = 0.)
+double interpolate_linear (Point point, scalar v,
+			   double xp = 0., double yp = 0., double zp = 0.)
 {
   coord shift;
   foreach_dimension()

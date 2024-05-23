@@ -27,8 +27,6 @@ GLSL: error: value of type float cannot be assigned to variable of type int
 
 #define GRIDNAME "Cartesian (GPU)"
 
-#define free_grid cartesian_free_grid
-
 static bool _gpu_done_ = false;
 @undef BEGIN_FOREACH
 @def BEGIN_FOREACH if (_gpu_done_)
@@ -40,7 +38,8 @@ static bool _gpu_done_ = false;
 @define END_FOREACH end_tracing("foreach", S__FILE__, S_LINENO); }
 
 typedef struct {
-  coord p, * box, n;
+  coord p, * box, n; // region
+  int boundary; // boundary
 } RegionParameters;
 
 @undef foreach_stencil
@@ -55,6 +54,31 @@ typedef struct {
     const char * funcs, * kernel;
   } _params = S__VA_ARGS__;
   RegionParameters * region = &_params.parameters;
+  if (baseblock) for (scalar s = baseblock[0], * i = baseblock; s.i >= 0; i++, s = *i) {
+    _attribute[s.i].input = _attribute[s.i].output = false;
+    _attribute[s.i].width = 0;
+  }
+  int ig = 0, jg = 0, kg = 0; NOT_UNUSED(ig); NOT_UNUSED(jg); NOT_UNUSED(kg);
+  Point point = {0}; NOT_UNUSED (point);
+@
+
+@define foreach_boundary_gpu(d) foreach()
+@define end_foreach_boundary_gpu() end_foreach()
+
+@undef foreach_boundary_gpu_stencil
+@def foreach_boundary_gpu_stencil(_parallel, ...) {
+  tracing ("foreach", S__FILE__, S_LINENO);
+  _Attributes _backup[datasize/sizeof(real)];
+  memcpy (_backup, _attribute, sizeof (_backup));
+  static ForeachData _loop = {
+    .fname = S__FILE__, .line = S_LINENO, .first = 1, .parallel = 4
+  };
+  struct {
+    coord parameters;
+    External * externals;
+    const char * funcs, * kernel;
+  } _params = S__VA_ARGS__;
+  RegionParameters r = { .boundary = _params.parameters.x + 1 }, * region = &r;
   if (baseblock) for (scalar s = baseblock[0], * i = baseblock; s.i >= 0; i++, s = *i) {
     _attribute[s.i].input = _attribute[s.i].output = false;
     _attribute[s.i].width = 0;
@@ -105,6 +129,29 @@ typedef struct {
 }
 @
 
+@undef end_foreach_boundary_gpu_stencil
+@def end_foreach_boundary_gpu_stencil()
+#if PRINTIO
+  if (baseblock) {
+    fprintf (stderr, "%s:%d:", _loop.fname, _loop.line);
+    for (scalar s = baseblock[0], * i = baseblock; s.i >= 0; i++, s = *i)
+      if (_attribute[s.i].input || _attribute[s.i].output)
+	fprintf (stderr, " %s:%d:%c:%d", _attribute[s.i].name, s.i,
+		 _attribute[s.i].input && _attribute[s.i].output ? 'a' :
+		 _attribute[s.i].input ? 'r' : 'w',
+		 _attribute[s.i].width);
+    fprintf (stderr, "\n");
+  }
+#endif // PRINTIO
+  check_stencil (&_loop);
+  _gpu_done_ = gpu_end_stencil (&_loop, region, _params.externals, _params.kernel);
+  boundary_stencil (&_loop);
+  _loop.first = 0;
+  memcpy (_attribute, _backup, sizeof (_backup));
+  end_tracing ("foreach", S__FILE__, S_LINENO);
+}
+@
+
 @ifndef tracing
 @ define tracing(func, file, line) do { glFinish(); tracing(func, file, line); } while(0)
 @ define end_tracing(func, file, line) do { glFinish(); end_tracing(func, file, line); } while(0)
@@ -130,8 +177,10 @@ KHASH_MAP_INIT_STR(STR, GLuint)
 
 typedef struct {
   Cartesian parent;
+  Boundary ** boundaries;
   Array * texture;
   khash_t(STR) * shaders;
+  GLuint t[2];
 } CartesianGPU;
 
 #define gpu_cartesian ((CartesianGPU *)grid)
@@ -212,10 +261,10 @@ static char glsl_preproc[] =
   "#define endforin3() }\n"
   "#define is_face_x() {"
   "  real Delta = L0/N, Delta_x = Delta, Delta_y = Delta,"
-  "  x = X0 + point.x*L0 - Delta/2., y = Y0 + point.y*L0;\n"
+  "  x = X0 + (point.x*(N + 2) - 1.5)*Delta, y = Y0 + (point.y*(N + 2) - 1.0)*Delta;\n"
   "#define is_face_y() {"
   "  real Delta = L0/N, Delta_x = Delta, Delta_y = Delta,"
-  "  x = X0 + point.x*L0, y = Y0 + point.y*L0 - Delta/2.;\n"
+  "  x = X0 + (point.x*(N + 2) - 1.0)*Delta, y = Y0 + (point.y*(N + 2) - 1.5)*Delta;\n"
   "#define end_is_face_x() }\n"
   "#define end_is_face_y() }\n"
   "#define VARIABLES\n"
@@ -365,8 +414,12 @@ static External * merge_externals (External * externals, const ForeachData * loo
   return merged;
 }
 
+#define NWG 16
+#define NWGB 16
+
 trace
-char * build_shader (const External * externals, const ForeachData * loop)
+char * build_shader (const External * externals, const ForeachData * loop,
+		     const RegionParameters * region)
 {
   char s[20];
   snprintf (s, 19, "%d", nconst > 0 ? nconst : 1);
@@ -375,7 +428,8 @@ char * build_shader (const External * externals, const ForeachData * loop)
   char * fs = str_append (NULL, "#version 430\n", glsl_preproc,
 			  "#define POINT_VARIABLES real Delta = L0/N,"
 			  " Delta_x = Delta, Delta_y = Delta,",
-			  " x = X0 + point.x*L0, y = Y0 + point.y*L0;\n",
+			  " x = X0 + (point.x*(N + 2) - 1.)*Delta,"
+			  " y = Y0 + (point.y*(N + 2) - 1.)*Delta;\n",
 			  "const int _nconst = ", s, ";\n"
 			  "const real _constant[_nconst] = {", a);
   for (int i = 1; i < nconst; i++) {
@@ -411,7 +465,7 @@ char * build_shader (const External * externals, const ForeachData * loop)
   }
   if (noutputs > 0) {
     int max = 0;
-    GL_C (glGetIntegerv (GL_MAX_DRAW_BUFFERS, &max));
+    GL_C (glGetIntegerv (GL_MAX_DRAW_BUFFERS, &max)); // fixme: obsolete
     if (noutputs > max) {
       fprintf (stderr,
 	       "%s:%d: GLSL: error: too many outputs (%d > GL_MAX_DRAW_BUFFERS = %d)\n",
@@ -426,7 +480,7 @@ char * build_shader (const External * externals, const ForeachData * loop)
   }
   else
     fs = str_append (fs, "vec4 _outputs[1];\n");
-  
+
   /**
   Scalar field attributes */
       
@@ -545,9 +599,12 @@ char * build_shader (const External * externals, const ForeachData * loop)
 	     strcmp (g->type, "vector") &&
 	     strcmp (g->type, "tensor")) {
       if (!strcmp (g->name, "N") && !strcmp (g->type, "int")) {
-	char s[20], size[20];
+	char s[20], size[20] = "1";
 	snprintf (s, 19, "%d", N);
-	snprintf (size, 19, "%d", N > 16 ? 16 : 1);
+	if (region->boundary)
+	  snprintf (size, 19, "%d", N >= NWGB ? NWGB : 1);
+	else
+	  snprintf (size, 19, "%d", N >= NWG ? NWG : 1);
         fs = str_append (fs, "const int N = ", s, ";\n");
 	if (GPUContext.fragment_shader)
 	  fs = str_append (fs, "in Point vsPoint;\n"
@@ -556,8 +613,8 @@ char * build_shader (const External * externals, const ForeachData * loop)
 			   "out vec4 FragColor;\n");
 	else
 	  fs = str_append (fs, "layout (local_size_x = ", size,
-			   ", local_size_y = ", size, ") in;\n");
-	fs = str_append (fs, "real _delta = 1.0f/N;\n");
+			   ", local_size_y = ", region->boundary ? "1" : size, ") in;\n");
+	fs = str_append (fs, "real _delta = 1.0f/(N + 2);\n");
       }
       else if (!strcmp (g->name, "nl") && !strcmp (g->type, "int")) {
 
@@ -569,7 +626,8 @@ char * build_shader (const External * externals, const ForeachData * loop)
 	fs = str_append (fs, "const int nl = ", nl, ";\n");
       }
       else {
-	char * type = !strcmp (g->type, "float") || !strcmp (g->type, "double") ? "real" : g->type;
+	char * type = !strcmp (g->type, "float") || !strcmp (g->type, "double") ? "real" :
+	  !strcmp (g->type, "enum") ? "int" : g->type;
 	fs = str_append (fs, "uniform ", type, " ", g->name, g->reduct ? "_in_" : "");
 	for (int * d = g->data; d && *d > 0; d++) {
 	  char s[20]; snprintf (s, 19, "%d", *d);
@@ -669,49 +727,6 @@ GLuint load_shader (const char * fs)
   return id;
 }
 
-trace
-void cpu_to_gpu (const void * buffer, Texture * t)
-{
-  int internalformat, format;
-  switch (t->type) {
-  case 0: internalformat = GL_R32F, format = GL_RED; break;
-  case 1: internalformat = GL_RG32F, format = GL_RG; break;
-  case 2: internalformat = GL_RGBA32F, format = GL_RGBA; break;
-  default: assert (false);
-  }
-  GL_C (glBindTexture (GL_TEXTURE_2D, t->id));
-  GL_C (glTexImage2D (GL_TEXTURE_2D, 0, internalformat,
-		      cartesian->n, cartesian->n, 0,
-		      format, GL_FLOAT, buffer));
-  GL_C (glBindTexture (GL_TEXTURE_2D, 0));
-}
-
-trace
-float * gpu_to_cpu (Texture * t)
-{
-  float * buffer;
-  int format;
-  switch (t->type) {
-  case 0: // scalar
-    buffer = qmalloc (sq(cartesian->n), float);
-    format = GL_RED;
-    break;
-  case 1: // vector
-    buffer = qmalloc (sq(cartesian->n)*dimension, float);
-    format = GL_RG;
-    break;
-  case 2: // tensor
-    buffer = qmalloc (sq(cartesian->n)*sq(dimension), float);
-    format = GL_RGBA;
-    break;
-  default: assert (false);
-  }
-  GL_C (glBindTexture (GL_TEXTURE_2D, t->id));
-  GL_C (glGetTexImage (GL_TEXTURE_2D, 0, format, GL_FLOAT, buffer));
-  GL_C (glBindTexture (GL_TEXTURE_2D, 0));
-  return buffer;
-}
-
 void gpu_periodic (int dir)
 {
   void periodic (int dir);
@@ -780,17 +795,17 @@ static int get_new_texture (int type)
     int format, internal_format;
     switch (type) {
     case 0:
-      format = GL_RED, internal_format = GL_R32F, size = sq(cartesian->n);
+      format = GL_RED, internal_format = GL_R32F, size = sq(cartesian->n + 2*GHOSTS);
       break;
     case 1:
       assert (dimension == 2);
       format = GL_RG, internal_format = GL_RG32F,
-	size = dimension*sq(cartesian->n);
+	size = dimension*sq(cartesian->n + 2*GHOSTS);
       break;
     case 2:
       assert (dimension == 2);
       format = GL_RGBA, internal_format = GL_RGBA32F,
-	size = sq(dimension)*sq(cartesian->n);
+	size = sq(dimension)*sq(cartesian->n + 2*GHOSTS);
       break;
     default:
       assert (false);
@@ -805,7 +820,7 @@ static int get_new_texture (int type)
     memset (buffer, 0, size*sizeof (float));
     GL_C (glBindTexture (GL_TEXTURE_2D, t->id));
     GL_C (glTexImage2D (GL_TEXTURE_2D, 0, internal_format,
-			cartesian->n, cartesian->n, 0,
+			(cartesian->n + 2*GHOSTS), (cartesian->n + 2*GHOSTS), 0,
 			format, GL_FLOAT, buffer));
     GL_C (glTexParameteri (GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST));
     GL_C (glTexParameteri (GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST));
@@ -909,6 +924,39 @@ void gpu_limits (FILE * fp)
   }
 }
 
+void gpu_free()
+{
+  if (!grid)
+    return;
+  swap (Boundary **, boundaries, gpu_cartesian->boundaries);
+  free_boundaries();
+  swap (Boundary **, boundaries, gpu_cartesian->boundaries);
+  if (!gpu_cartesian->texture)
+    return;
+  if (GPUContext.window) {
+    GL_C (glFinish());
+    int tex = 0;
+    for (Texture * t = gpu_cartesian->texture->p; t->id; t++, tex++) {
+      if (t->used && texture_used_by (tex).i < 0) {
+	fprintf (stderr, "%s:%d: error: leaked texture %d\n",
+		 __FILE__, LINENO, tex);
+	abort();
+      }
+      GL_C (glDeleteTextures (1, &t->id));
+    }
+    GL_C (glDeleteTextures (2, gpu_cartesian->t));
+  }
+  array_free (gpu_cartesian->texture);
+  gpu_cartesian->texture = NULL;
+  const char * code;
+  GLuint id;
+  kh_foreach (gpu_cartesian->shaders, code, id, sysfree ((void *) code)); id = id;
+  kh_destroy (STR, gpu_cartesian->shaders);
+  gpu_cartesian->shaders = NULL;
+  for (scalar s in all)
+    s.gpu.texture = 0;
+}
+
 void gpu_init()
 {
   if (!GPUContext.window) {
@@ -926,6 +974,7 @@ void gpu_init()
     GPUContext.window = glfwCreateWindow (1, 1, "Cartesian grid on GPU", NULL, NULL);
     if (!GPUContext.window) {
       glfwTerminate();
+      fprintf (stderr, "GLFW: error: could not create window!\n");
       exit (1);
     }
     glfwMakeContextCurrent (GPUContext.window);
@@ -976,6 +1025,7 @@ void gpu_init()
 
     GL_C (glBindFramebuffer (GL_FRAMEBUFFER, GPUContext.fbo0));
 
+    free_solver_func_add (gpu_free);
     free_solver_func_add (gpu_free_solver);
   }
   
@@ -984,7 +1034,8 @@ void gpu_init()
   gpu_cartesian->texture = array_new();
   array_append (gpu_cartesian->texture, &(Texture){0}, sizeof(Texture));
   gpu_cartesian->shaders = kh_init (STR);
-
+  gpu_cartesian->t[0] = gpu_cartesian->t[1] = 0;
+  
   for (scalar s in all) {    
     switch (s.gpu.type) {
     case 0: gpu_init_scalar_texture (s); break;
@@ -993,33 +1044,6 @@ void gpu_init()
     default: assert (false);
     }
   }
-}
-
-void gpu_free()
-{
-  if (!grid || !gpu_cartesian->texture)
-    return;
-  if (GPUContext.window) {
-    GL_C (glFinish());
-    int tex = 0;
-    for (Texture * t = gpu_cartesian->texture->p; t->id; t++, tex++) {
-      if (t->used && texture_used_by (tex).i < 0) {
-	fprintf (stderr, "%s:%d: error: leaked texture %d\n",
-		 __FILE__, LINENO, tex);
-	abort();
-      }
-      GL_C (glDeleteTextures (1, &t->id));
-    }
-  }
-  array_free (gpu_cartesian->texture);
-  gpu_cartesian->texture = NULL;
-  const char * code;
-  GLuint id;
-  kh_foreach (gpu_cartesian->shaders, code, id, sysfree ((void *) code)); id = id;
-  kh_destroy (STR, gpu_cartesian->shaders);
-  gpu_cartesian->shaders = NULL;
-  for (scalar s in all)
-    s.gpu.texture = 0;
 }
 
 void reset_gpu (void * alist, double val)
@@ -1041,6 +1065,110 @@ void gpu_free_grid (void)
   free_grid();
 }
 
+static void box_boundary_level_gpu (const Boundary * b, scalar * list, int l)
+{
+  int d = ((BoxBoundary *)b)->d;
+  scalar * centered = NULL, * normal = NULL, * tangent = NULL;
+
+  int component = d/2;
+  for (scalar s in list)
+    if (!is_constant(s)) {
+      if (s.face) {	
+	if ((&s.d.x)[component]) {
+	  scalar b = s.v.x;
+	  if (b.boundary[d] && b.boundary[d] != periodic_bc)
+	    normal = list_add (normal, s);
+	}
+	else {
+	  scalar b = s.v.y;
+	  if (b.boundary[d] && b.boundary[d] != periodic_bc)
+	    tangent = list_add (tangent, s);
+	}
+      }	
+      else if (s.boundary[d] && s.boundary[d] != periodic_bc)
+	centered = list_add (centered, s);
+    }
+
+#if 1
+  if (centered) {
+#if 0    
+    fprintf (stderr, "applying BC %d to ", d);
+    for (scalar s in centered)
+      fprintf (stderr, "%s:%d ", s.name, s.gpu.stored);
+    fputc ('\n', stderr);
+#endif
+#if 1 // symmetry
+    int ig = - _ig[d], jg = - _jg[d];
+    foreach_boundary_gpu (d)
+      for (scalar s in centered)
+	s[] = s[ig,jg];
+#endif
+  }
+  free (centered);
+  free (normal);
+  free (tangent);
+#else
+  OMP_PARALLEL() {
+    Point point = {0};
+    point.n = cartesian->n;
+    ig = _ig[d]; jg = _jg[d];
+    int _start = 1, _end = point.n, _k;
+    /* traverse corners only for top and bottom */
+    if (d > left) { _start--; _end++; }
+    OMP(omp for schedule(static))
+      for (_k = _start; _k <= _end; _k++) {
+	point.i = d > left ? _k : d == right ? point.n : 1;
+	point.j = d < top  ? _k : d == top   ? point.n : 1;
+	Point neighbor = {point.i + ig, point.j + jg};
+	for (scalar s in centered) {
+	  scalar b = (s.v.x.i < 0 ? s :
+		      s.i == s.v.x.i && d < top ? s.v.x :
+		      s.i == s.v.y.i && d >= top ? s.v.x :
+		      s.v.y);
+	  val(s,ig,jg) = b.boundary[d] (point, neighbor, s, NULL);
+	}
+      }
+  }
+  free (centered);
+
+  box_boundary_level_normal (b, normal, l);
+  free (normal);
+  box_boundary_level_tangent (b, tangent, l);
+  free (tangent);
+#endif
+}
+
+@define VT _attribute[s.i].v.y
+
+foreach_dimension()
+static void periodic_boundary_level_gpu_x (const Boundary * b, scalar * list, int l)
+{
+  scalar * list1 = NULL;
+  for (scalar s in list)
+    if (!is_constant(s) && s.block > 0) {
+      if (s.face) {
+	scalar vt = VT;
+	if (vt.boundary[right] == periodic_bc)
+	  list1 = list_add (list1, s);
+      }
+      else if (s.boundary[right] == periodic_bc)
+	list1 = list_add (list1, s);
+    }
+  if (!list1)
+    return;
+
+  foreach_boundary_gpu (overflow, left)
+    for (scalar s in list1)
+      s[] = s[N];
+  foreach_boundary_gpu (overflow, right)
+    for (scalar s in list1)
+      s[] = s[- N];
+
+  free (list1);
+}
+
+@undef VT
+
 void gpu_init_grid (int n)
 {
   if (cartesian && n == cartesian->n)
@@ -1048,8 +1176,23 @@ void gpu_init_grid (int n)
   gpu_free_grid();
   init_grid (n);
   grid = realloc (grid, sizeof (CartesianGPU));
+  gpu_cartesian->boundaries = NULL;
+  swap (Boundary **, boundaries, gpu_cartesian->boundaries);
+  for (int d = 0; d < nboundary; d++) {
+    BoxBoundary * box = qcalloc (1, BoxBoundary);
+    box->d = d;
+    Boundary * b = (Boundary *) box;
+    b->level = box_boundary_level_gpu;
+    add_boundary (b);
+  }
+  // periodic boundaries
+  foreach_dimension() {
+    Boundary * b = qcalloc (1, Boundary);
+    b->level = periodic_boundary_level_gpu_x;
+    add_boundary (b);
+  }
+  swap (Boundary **, boundaries, gpu_cartesian->boundaries);
   gpu_init();
-  free_solver_func_add (gpu_free);
 }
 
 // overload the default various functions
@@ -1078,6 +1221,23 @@ attribute {
 }
 
 trace
+void cpu_to_gpu (const void * buffer, Texture * t)
+{
+  int internalformat, format;
+  switch (t->type) {
+  case 0: internalformat = GL_R32F, format = GL_RED; break;
+  case 1: internalformat = GL_RG32F, format = GL_RG; break;
+  case 2: internalformat = GL_RGBA32F, format = GL_RGBA; break;
+  default: assert (false);
+  }
+  GL_C (glBindTexture (GL_TEXTURE_2D, t->id));
+  GL_C (glTexImage2D (GL_TEXTURE_2D, 0, internalformat,
+		      (cartesian->n + 2*GHOSTS), (cartesian->n + 2*GHOSTS), 0,
+		      format, GL_FLOAT, buffer));
+  GL_C (glBindTexture (GL_TEXTURE_2D, 0));
+}
+
+trace
 void export_to_gpu (scalar s, char * sep)
 {
   static char comma[] = ",";
@@ -1085,9 +1245,9 @@ void export_to_gpu (scalar s, char * sep)
   switch (s.gpu.type) {
   case 0: { // scalar
     assert (s.gpu.stored > 0);
-    buffer = qmalloc (sq(cartesian->n), float);
+    buffer = qmalloc (sq(cartesian->n + 2*GHOSTS), float);
     foreach (serial, noauto)
-      buffer[(point.j - 1)*point.n + point.i - 1] = s[];
+      buffer[point.j*(point.n + 2*GHOSTS) + point.i] = s[];
     if (sep)
       fprintf (stderr, "%s%s", sep, s.name);
     s.gpu.stored = 0;
@@ -1095,9 +1255,9 @@ void export_to_gpu (scalar s, char * sep)
   }
   case 1: { // vector
     vector v = s.v;
-    buffer = qmalloc (dimension*sq(cartesian->n), float);
+    buffer = qmalloc (dimension*sq(cartesian->n + 2*GHOSTS), float);
     foreach (serial, noauto) {
-      long index = dimension*((point.j - 1)*point.n + point.i - 1), k = 0;
+      long index = dimension*(point.j*(point.n + 2*GHOSTS) + point.i), k = 0;
       foreach_dimension()
 	buffer[index + k++] = v.x[];
     }
@@ -1111,10 +1271,10 @@ void export_to_gpu (scalar s, char * sep)
   }
   case 2: { // tensor
     tensor t = s.gpu.t;
-    buffer = qmalloc (sq(dimension)*sq(cartesian->n), float);
+    buffer = qmalloc (sq(dimension)*sq(cartesian->n + 2*GHOSTS), float);
     foreach (serial, noauto) {
       // fixme: long???
-      int index = sq(dimension)*((point.j - 1)*point.n + point.i - 1), k = 0;
+      int index = sq(dimension)*(point.j*(point.n + 2*GHOSTS) + point.i), k = 0;
       foreach_dimension() {
 	buffer[index + k++] = t.x.x[];
 	buffer[index + k++] = t.x.y[];
@@ -1154,6 +1314,8 @@ void export_to_gpu (scalar s, char * sep)
   "uniform sampler2D s;\n"			\
   "in vec2 point;\n"				\
   "layout(location = 0) out real reduction;\n"	\
+  "#undef valt\n"				\
+  "#define valt(s,i,j,k) (texture(s, point + vec2((i), (j))*_delta))\n" \
   "void main() {\n"
 
 static GLuint load_reduction_shader (char * start, char * reduct)
@@ -1225,17 +1387,42 @@ double gpu_reduction (scalar s, const char op, const RegionParameters * region)
   if (!id)
     exit (1);
 
+  GLuint * t = gpu_cartesian->t;
+  if (!t[0]) {
+    GL_C (glGenTextures (2, t));
+    for (int i = 0; i < 2; i++) {
+      assert (t[i]);
+      GL_C (glBindTexture (GL_TEXTURE_2D, t[i]));
+      GL_C (glTexStorage2D (GL_TEXTURE_2D, 1, GL_R32F, cartesian->n, cartesian->n));
+      GL_C (glTexParameteri (GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST));
+      GL_C (glTexParameteri (GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST));
+      GL_C (glBindTexture (GL_TEXTURE_2D, 0));
+    }
+  }
+  
+  // Initially draw/compute from s  
+#if PRINTCOPYGPU
+  if (s.gpu.stored > 0)
+    fprintf (stderr, "%s:%d: exporting {%s} to GPU\n", __FILE__, LINENO, s.name);
+#endif
+  if (s.gpu.stored > 0)
+    export_to_gpu (s, NULL);
+  
+  GL_C (glCopyImageSubData (scalar_texture(s)->id, GL_TEXTURE_2D,
+			    0, 1, 1, 0,
+			    t[0], GL_TEXTURE_2D,
+			    0, 0, 0, 0,
+			    cartesian->n, cartesian->n, 1));
+  
   int hmin = 32; // below this size, just use GLReadPixels and the CPU
 
   if (cartesian->n <= hmin) {
     hmin = cartesian->n;
     assert (s.v.x.i == -1); // fixme
     GL_C (glFramebufferTexture2D (GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0,
-				  GL_TEXTURE_2D, scalar_texture(s)->id, 0));
+				  GL_TEXTURE_2D, t[0], 0));
   }
   else {
-    scalar s1[], s2[];
-  
     GL_C (glUseProgram (id));
     GLint location = glGetUniformLocation (id, "_delta");
     assert (location >= 0);
@@ -1253,33 +1440,26 @@ double gpu_reduction (scalar s, const char op, const RegionParameters * region)
     GLint flocation = glGetUniformLocation (id, "f");
     assert (flocation >= 0);
 
-    // Initially draw/compute from s  
-#if PRINTCOPYGPU
-    if (s.gpu.stored > 0)
-      fprintf (stderr, "%s:%d: exporting {%s} to GPU\n", __FILE__, LINENO, s.name);
-#endif
-    if (s.gpu.stored > 0)
-      export_to_gpu (s, NULL);
-    GL_C (glBindTexture (GL_TEXTURE_2D, scalar_texture(s)->id));
-
+    GL_C (glBindTexture (GL_TEXTURE_2D, t[0]));
+    
     int h = cartesian->n/nr;
     while (h >= hmin) {
       // Select which texture to draw/compute into
       GL_C (glFramebufferTexture2D (GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0,
-				    GL_TEXTURE_2D, scalar_texture(s2)->id,
+				    GL_TEXTURE_2D, t[1],
 				    0));
       // Scale to smaller square
       GL_C (glViewport (0, 0, h, h));
       GL_C (glUniform1f (flocation, 2.*(float)h/(float)cartesian->n));
       GL_C (glDrawArrays (GL_TRIANGLES, 0, 6));
       // ping pong
-      swap (scalar, s1, s2);
+      swap (GLuint, t[0], t[1]);
       // draw/compute from s1
-      GL_C (glBindTexture (GL_TEXTURE_2D, scalar_texture(s1)->id));
+      GL_C (glBindTexture (GL_TEXTURE_2D, t[0]));
       h /= nr;
     }
     GL_C (glFramebufferTexture2D (GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0,
-				  GL_TEXTURE_2D, scalar_texture(s1)->id, 0));
+				  GL_TEXTURE_2D, t[0], 0));
     GL_C (glViewport (0, 0, cartesian->n, cartesian->n));
   }
   
@@ -1302,8 +1482,36 @@ double gpu_reduction (scalar s, const char op, const RegionParameters * region)
     break;
   default: assert (false);
   }
+
+  GL_C (glBindTexture (GL_TEXTURE_2D, 0));
   
   return result;
+}
+
+trace
+float * gpu_to_cpu (Texture * t)
+{
+  float * buffer;
+  int format;
+  switch (t->type) {
+  case 0: // scalar
+    buffer = qmalloc (sq(cartesian->n + 2*GHOSTS), float);
+    format = GL_RED;
+    break;
+  case 1: // vector
+    buffer = qmalloc (sq(cartesian->n + 2*GHOSTS)*dimension, float);
+    format = GL_RG;
+    break;
+  case 2: // tensor
+    buffer = qmalloc (sq(cartesian->n + 2*GHOSTS)*sq(dimension), float);
+    format = GL_RGBA;
+    break;
+  default: assert (false);
+  }
+  GL_C (glBindTexture (GL_TEXTURE_2D, t->id));
+  GL_C (glGetTexImage (GL_TEXTURE_2D, 0, format, GL_FLOAT, buffer));
+  GL_C (glBindTexture (GL_TEXTURE_2D, 0));
+  return buffer;
 }
 
 trace
@@ -1315,36 +1523,55 @@ static void import_from_gpu (scalar s, char * sep)
   switch (s.gpu.type) {
   case 0: { // scalar
     assert (s.gpu.stored < 0);
+#if 0    
     foreach (serial, noauto)
-      s[] = buffer[(point.j - 1)*point.n + point.i - 1];
+      s[] = buffer[point.j*(point.n + 2*GHOSTS) + point.i];
+#else
+    for (int i = 0; i < cartesian->n + 2; i++)
+      for (int j = 0; j < cartesian->n + 2; j++)
+	((real *)(&cartesian->d[(i*(cartesian->n + 2) + j)*datasize]))[s.i] =
+	  buffer[j*(cartesian->n + 2) + i];
+#endif
     if (sep)
       fprintf (stderr, "%s%s", sep, s.name);
     s.gpu.stored = 0;
-    s.dirty = true;
     break;
   }
   case 1: { // vector
     vector v = s.v;
+#if 0    
     foreach (serial, noauto) {
       int k = 0;
       foreach_dimension() {
 	if (v.x.gpu.stored < 0)
-	  v.x[] = buffer[dimension*((point.j - 1)*point.n + point.i - 1) + k];
+	  v.x[] = buffer[dimension*(point.j*(point.n + 2*GHOSTS) + point.i) + k];
 	k++;
       }
     }
+#else
+    int k = 0;
+    foreach_dimension() {
+      if (v.x.gpu.stored < 0) {
+	for (int i = 0; i < cartesian->n + 2; i++)
+	  for (int j = 0; j < cartesian->n + 2; j++)
+	    ((real *)(&cartesian->d[(i*(cartesian->n + 2) + j)*datasize]))[v.x.i] =
+	      buffer[dimension*(j*(cartesian->n + 2) + i) + k];
+      }
+      k++;
+    }
+#endif
     foreach_dimension()
       if (v.x.gpu.stored < 0) {
 	if (sep)
 	  fprintf (stderr, "%s%s", sep, v.x.name), sep = comma;
-	v.x.gpu.stored = 0, v.x.dirty = true;
+	v.x.gpu.stored = 0;
       }
     break;
   }
   case 2: { // tensor
     tensor t = s.gpu.t;
     foreach (serial, noauto) {
-      long index = sq(dimension)*((point.j - 1)*point.n + point.i - 1), k = 0;
+      long index = sq(dimension)*(point.j*(point.n + 2*GHOSTS) + point.i), k = 0;
       foreach_dimension() {
 	if (t.x.x.gpu.stored < 0)
 	  t.x.x[] = buffer[index + k];
@@ -1474,6 +1701,7 @@ static bool doloop_on_gpu (ForeachData * loop, const RegionParameters * region,
 	       strcmp (n->type, "double") &&
 	       strcmp (n->type, "int") &&
 	       strcmp (n->type, "bool") &&
+	       strcmp (n->type, "enum") &&
 	       strcmp (n->type, "*func()") &&
 	       strcmp (n->type, "func()")) {
 	if (loop->first)
@@ -1493,21 +1721,42 @@ static bool doloop_on_gpu (ForeachData * loop, const RegionParameters * region,
       g->s = s;
     }
 
-  char * shader = build_shader (externals, loop);
+  char * shader = build_shader (externals, loop, region);
   if (shader) {
 
     /**
     ## main() */
     
     shader = str_append (shader, "void main() {\n");
-    if (!GPUContext.fragment_shader)
-      shader = str_append (shader, "ivec2 ipoint = csOrigin + ivec2(gl_GlobalInvocationID);\n");
-    shader = str_append (shader,  "Point point = (vec2(ipoint) + vec2(0.5, 0.5))/N;\n"
+    if (!GPUContext.fragment_shader) {
+      shader = str_append (shader, "ivec2 ipoint = ");
+      if (region->boundary)
+	switch (region->boundary - 1) {
+	case left:
+	  shader = str_append (shader, "ivec2(0, gl_GlobalInvocationID.x + 1);\n");
+	  break;
+	case right:
+	  shader = str_append (shader, "ivec2(N + 1, gl_GlobalInvocationID.x + 1);\n");
+	  break;
+	case bottom:
+	  shader = str_append (shader, "ivec2(gl_GlobalInvocationID.x, 0);\n");
+	  break;
+	case top:
+	  shader = str_append (shader, "ivec2(gl_GlobalInvocationID.x, N + 1);\n");
+	  break;
+	default:
+	  assert (false);
+	}
+      else
+	shader = str_append (shader, "csOrigin + ivec2(gl_GlobalInvocationID) + ivec2(1,1);\n");
+    }
+    shader = str_append (shader,
+			 "Point point = (vec2(ipoint) + vec2(0.5, 0.5))/(N + 2);\n"
 			 "POINT_VARIABLES\n");
     if (loop->vertex)
       shader = str_append (shader, "  x -= Delta/2., y -= Delta/2.;\n");
     foreach_texture (t)
-      if (t->input >= 0 && t->output >= 0) {
+      if (t->input >= 0 && t->output >= 0 && !region->boundary) {
 	// initialize the central value of input/output fields
 	char input[20], output[20];
 	snprintf (input, 19, "%d", t->input);
@@ -1523,7 +1772,8 @@ static bool doloop_on_gpu (ForeachData * loop, const RegionParameters * region,
       if (t->output >= 0) {
 	char output[20];
 	snprintf (output, 19, "%d", t->output);
-	shader = str_append (shader, "\nimageStore(_image[", output, "],ipoint,_outputs[", output, "]);");
+	shader = str_append (shader, "\nimageStore(_image[", output,
+			     "],ipoint,_outputs[", output, "]);");
       }
     shader = str_append (shader, "\n}\n");
     shaderid = load_shader (shader);
@@ -1532,9 +1782,6 @@ static bool doloop_on_gpu (ForeachData * loop, const RegionParameters * region,
     
   if (!shaderid) {
 
-    if (loop->parallel == 3) // must run on GPU but cannot run
-      exit (1);
-    
     /**
     ## Free reduction fields */
     
@@ -1552,7 +1799,7 @@ static bool doloop_on_gpu (ForeachData * loop, const RegionParameters * region,
   ## Allocate input/output texture */
 
   foreach_texture (t)
-    if (t->input >= 0 && t->output >= 0 && t->width > 0) {
+    if (t->input >= 0 && t->output >= 0 && t->width > 0 && !region->boundary) {
       int tmp = get_new_texture (t->type);
       t = ((Texture *)gpu_cartesian->texture->p) + _i;
       t->io = tex_texture (tmp);
@@ -1729,7 +1976,14 @@ static bool doloop_on_gpu (ForeachData * loop, const RegionParameters * region,
 	  strcat (name, s);
 	}
 	GLint location = glGetUniformLocation (shaderid, name);
-	if (g->nd == 0) {
+	if (!strcmp (g->type, "enum")) {
+#if PRINTUNIFORM
+	  fprintf (stderr, "uniform enum %s = %d\n", g->name, g->nd);
+#endif
+	  assert (nd == 1);
+	  glUniform1i (location, g->nd);
+	}
+	else if (g->nd == 0) {
 	  if (!strcmp (g->type, "double")) {
 #if PRINTUNIFORM
 	    fprintf (stderr, "uniform double %s = %g\n", g->name, *((double *)p));
@@ -1799,11 +2053,33 @@ static bool doloop_on_gpu (ForeachData * loop, const RegionParameters * region,
   }
 
   /**
+  This is a boundary */
+
+  else if (region->boundary) {
+    assert (!GPUContext.fragment_shader);
+    switch (region->boundary - 1) {
+    case left: case right:
+      glDispatchCompute (N >= NWGB ? N/NWGB : N, 1, 1); break;
+    case top: case bottom:
+      glDispatchCompute (N >= NWGB ? ceil((N + 2.)/NWGB) : N + 2, 1, 1); break;
+    default:
+      assert (false);
+    }
+  }
+
+  /**
   Otherwise, we draw "fullscreen". */
   
   else {
     assert (!GPUContext.fragment_shader);
-    glDispatchCompute (N > 16 ? N/16 : N, N > 16 ? N/16 : N, 1);
+    if (loop->face || loop->vertex)
+      glDispatchCompute (N >= NWG ? ceil((N + 1.)/NWG) : N + 1,
+			 N >= NWG ? ceil((N + 1.)/NWG) : N + 1,
+			 1);
+    else
+      glDispatchCompute (N >= NWG ? N/NWG : N,
+			 N >= NWG ? N/NWG : N,
+			 1);
   }
   
   glMemoryBarrier (GL_ALL_BARRIER_BITS);
@@ -1839,15 +2115,25 @@ bool gpu_end_stencil (ForeachData * loop,
 		      External * externals,
 		      const char * kernel)
 {
-  bool on_gpu = loop->parallel == 1 || loop->parallel == 3;
+  bool on_gpu = loop->parallel == 1 || loop->parallel >= 3;
   if (on_gpu) {
+#if 1    
+    if (loop->parallel <= 3) { // loop->parallel == 4 is a noauto and gpu loop
+      swap (Boundary **, boundaries, gpu_cartesian->boundaries);
+      boundary_stencil (loop);
+      swap (Boundary **, boundaries, gpu_cartesian->boundaries);
+    }
+#endif
     on_gpu = doloop_on_gpu (loop, region, externals, kernel);
-    if (loop->first && !on_gpu)
-      fprintf (stderr, "%s:%d: warning: foreach() done on CPU (see GLSL errors above)\n",
-	       loop->fname, loop->line);
+    if (loop->first && !on_gpu) {
+      fprintf (stderr, "%s:%d: %s: foreach() done on CPU (see GLSL errors above)\n",
+	       loop->fname, loop->line, loop->parallel >= 3 ? "error" : "warning");
+      if (loop->parallel >= 3) // must run on GPU but cannot run
+	exit (1);
+    }
   }
   if (on_gpu) {
-    // fixme: apply boundary conditions...
+    // do not apply BCs on CPU
     free (loop->listc), loop->listc = NULL;
     foreach_dimension()
       free (loop->listf.x), loop->listf.x = NULL;
