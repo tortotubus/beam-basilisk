@@ -2296,7 +2296,8 @@ static void global_boundaries_and_stencils (Ast * n, Stack * stack, void * data)
 	!strcmp (ast_terminal (n->child[0])->start, "foreach_face") ||
 	!strcmp (ast_terminal (n->child[0])->start, "foreach_visible") ||
 	!strcmp (ast_terminal (n->child[0])->start, "foreach_point") ||
-	!strcmp (ast_terminal (n->child[0])->start, "foreach_region")) {
+	!strcmp (ast_terminal (n->child[0])->start, "foreach_region") ||
+	!strcmp (ast_terminal (n->child[0])->start, "foreach_boundary_gpu")) {
       bool overflow = false, nowarning = false, gpu = false;
       Ast * parameters = ast_child (n, sym_foreach_parameters);
       foreach_item (parameters, 2, item) {
@@ -3685,9 +3686,9 @@ static void stencils (Ast * n, Stack * stack, void * data)
 	  }
 	}
       }
-      ast_after (params,
-		 parallel == 0 ? "0" : parallel == 1 ? "1" : parallel == 2 ? "2" : "3",
-		 ",{");
+      char sparallel[] = "0";
+      sparallel[0] = '0' + parallel;
+      ast_after (params, sparallel, ",{");
       if (args) {
 	ast_after (params, ".parameters={", args, "},");
 	free (args);

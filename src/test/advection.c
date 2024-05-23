@@ -44,6 +44,10 @@ int main (int argc, char * argv[])
   // coordinates of lower-left corner
   size (1.[0]); // dimensionless
   origin (-0.5, -0.5);
+#if _GPU
+  periodic (right);
+  periodic (top);
+#endif
   // maximum timestep
   DT = .1;
   // CFL number

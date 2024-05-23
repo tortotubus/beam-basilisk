@@ -32,6 +32,10 @@ int main (int argc, char * argv[])
 {
   origin (-0.5, -0.5);
   DT = .1[0,1];
+#if _GPU  
+  periodic (right);
+  periodic (top);
+#endif
   
   /**
   The scalar field `cf` is a "vof concentration" associated with phase
