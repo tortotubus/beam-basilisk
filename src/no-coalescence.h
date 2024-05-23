@@ -35,22 +35,13 @@ tracers. Individual VOF tracers are named *f0*, *f1*, *f2*, ... and
 are stored in the *interfaces* list (defined by
 [vof.h](/src/vof.h)). They should be used in particular to display the
 actual interfaces, as displaying interfaces using *f* will result in
-coalescence artefacts. To restore() using a dump file, one needs to
-declare *length_of_interfaces* to be part of command line arguments in
-the *main()*. While restoring, one needs to pass the
-*length_of_interafces* in command line to be the total number of
-VOF tracers available in the interfaces list. This can be found either
-by printing the *list_len(interfaces)* or by evaluating the dump file
-using bview, where one can count (Ex: f0, f1, f2, f3 implies 4 VOF
-tracers) the number of VOF tracers. It is useful only when
-*length_of_interfaces* is greater than 1.
+coalescence artefacts.
 
-##Future devellopements 
-1/ Find a way to relax the capillary time step in the context of Mult-VoF. 
-2/ Rare events might generate new tracer that are not nessesary most of the 
-simulation time find a way to detect these "useless" tracers and delet them. 
+## Possible improvements
 
-########""
+1. Find a way to relax the capillary time step in the context of Multi-VoF.
+2. Rare events might generate new tracers that are not necessary most of the 
+simulation time: find a way to detect these "useless" tracers and delete them.
 
 ## Utility functions
 
@@ -59,8 +50,7 @@ for tagging.
 threshold_volume is the minimal volum to which we ignore coalesence event */
 
 #include "tag.h"
-#define EPS 1e-10
-int length_of_interfaces = 0; //Don't change this
+
 /**
 This function returns a renamed clone of the default volume fraction
 field *f*, with *i* its index. */
@@ -79,6 +69,8 @@ static scalar fclone (int i)
 /**
 This function does a fast detection of cases which may correspond to
 two interfaces being close to one another. */
+
+#define EPS 1e-10
 
 static bool tracer_is_close (Point point, scalar c)
 {
@@ -192,23 +184,21 @@ void no_coalescence()
   for (scalar c in interfaces)
     if (too_close[c.i])
       maybe_close = list_append (maybe_close, c);
-  //   else 
-  //     not_close = list_append (not_close, c);
+#if 0
+    else 
+      not_close = list_append (not_close, c);
 
-  // if(list_len (interfaces) > 2){
-  // scalar b[] = {interfaces[0].i};
-  // for (scalar c in not_close) {
-  //   if(c.i != b.i){
-  //     foreach(){
-  //       b[] += c[];
-  //       c[] = 0;
-  //     }
-  //   }
-  // }
-  // boundary({b});
-  // }
-  // free(not_close);
-
+    if (list_len (interfaces) > 2) {
+      scalar b[] = {interfaces[0].i};
+      for (scalar c in not_close)
+	if (c.i != b.i)
+	  foreach(){
+	    b[] += c[];
+	    c[] = 0;
+	  }
+    }
+    free (not_close);
+#endif
 
   for (scalar c in maybe_close) {
 
@@ -222,18 +212,15 @@ void no_coalescence()
       b[] = c[] > EPS;
     tag (b);
 
-
-
     /**
     The next step is to build the array *tc* of the bubbles which are
     indeed too close to one another. */
     
     Array * tc = array_new();
-    foreach(serial) { // no openMP
-      int b1=0, b2=0;
-      if (bubbles_are_close (point, c, b, &b1, &b2)
-          ) {
-        for (int l = 0, * p = tc->p; l < tc->len/sizeof(int); l+=2, p+=2)
+    foreach (serial) { // no openMP
+      int b1 = 0, b2 = 0;
+      if (bubbles_are_close (point, c, b, &b1, &b2)) {
+        for (int l = 0, * p = tc->p; l < tc->len/sizeof(int); l += 2, p += 2)
           if ((*p == b1 && p[1] == b2)  ||
               (p[1] == b1 && *p == b2)) {
             // the pair of bubbles is already in the list 
@@ -251,10 +238,8 @@ void no_coalescence()
 #if _MPI
     reduce_bubbles (tc);
 #endif
-
+    
     int len = tc->len/sizeof(int);
-    
-    
     if (len > 0) {
       
       /**
@@ -273,7 +258,7 @@ void no_coalescence()
       /**
       Since we are updating *adj*, we cannot use openMP. */
       
-      foreach(serial) // no openMP
+      foreach (serial) // no openMP
         if (b[])
           for (int i = 0, * p = tc->p; i < len; i++, p++)
             if (b[] == *p + 1)
@@ -304,7 +289,6 @@ void no_coalescence()
         scalar f1 = fclone (0);
         foreach()
           f1[] = f[];
-        boundary ({f1});
         interfaces = list_copy ({f});
         swap (char *, f.name, f1.name);
         f.i = f1.i;
@@ -316,6 +300,7 @@ void no_coalescence()
       
       int rep[len/2];
       for (int i = 0, * p = tc->p; i < len; i += 2) {
+	
         /**
         The indices of the pair of neighboring bubbles are stored in
         `p[i]` and `p[i+1]`. We need to replace only one of the two
@@ -324,37 +309,35 @@ void no_coalescence()
 
         int n1 = 0, n2 = 0, j = i;
         for (scalar s in interfaces){
-            if (adj[i*nvar + s.i]) n1++;
-            if (adj[(i + 1)*nvar + s.i]) n2++;
+	  if (adj[i*nvar + s.i]) n1++;
+	  if (adj[(i + 1)*nvar + s.i]) n2++;
         }
 
         /**
-         * We check out if the tags are already modified before 
-         * in which case we do not want to modify them again. 
-         * 
-         */
+	We check if the tags are already modified, in which case
+	we do not want to modify them again. */
 
-        int first_modified = 0;
-        int second_modified = 0;
-        int tag_not_modified = 0;
-        for(int e = 0; e < i; e++){
-          if(p[i] == p[e]) 
+        int first_modified = 0, second_modified = 0, tag_not_modified = 0;
+        for (int e = 0; e < i; e++) {
+          if (p[i] == p[e])
             first_modified = 1;
-          if(p[i+1] == p[e])
+          if (p[i + 1] == p[e])
             second_modified = 1;
         }
 
-        if(first_modified || second_modified){
-            p[i] = -1;
-            p[i+1] = -1;
-        }else{
+        if (first_modified || second_modified) {
+	  p[i] = -1;
+	  p[i + 1] = -1;
+        }
+	else {
           if (n2 < n1) {
             tag_not_modified = p[i];
             p[i] = p[i + 1];
             j++;
-          }else{
-            tag_not_modified = p[i+1];
-            p[i+1] = p[i];
+          }
+	  else {
+            tag_not_modified = p[i + 1];
+            p[i + 1] = p[i];
           }
         }
 
@@ -365,8 +348,8 @@ void no_coalescence()
         rep[i/2] = -1;
         for (scalar s in interfaces)
           if (s.i != c.i && !adj[j*nvar + s.i]) {
-              rep[i/2] = s.i; 
-              break;
+	    rep[i/2] = s.i; 
+	    break;
           }
           
 
@@ -381,24 +364,24 @@ void no_coalescence()
         }
 
         /**
-         * Refresh the ajd list for all pair of bubbles which contain 
-         * an indice ajd to p[i] or to tag_not_modif
-         */
-        if(p[i] != -1)
-          for(int e = i; e < len; e+=2){
-            if(p[e] == p[i])
-              for(int k = 0; k < len; k ++)
-                if(p[k] == p[e+1])
+	Refresh the adj list for all pairs of bubbles which contain 
+	an index adj to p[i] or to tag_not_modified. */
+
+        if (p[i] != -1)
+          for (int e = i; e < len; e += 2) {
+            if (p[e] == p[i])
+              for (int k = 0; k < len; k++)
+                if (p[k] == p[e + 1])
                   adj[k*nvar + rep[i/2]] = 1;
-            if(p[e+1] == p[i])
-              for(int k = 0; k < len; k ++)
-                if(p[k] == p[e])
+            if (p[e+1] == p[i])
+              for (int k = 0; k < len; k ++)
+                if (p[k] == p[e])
                   adj[k*nvar + rep[i/2]] = 1;
               
-            if(p[e] == tag_not_modified)
+            if (p[e] == tag_not_modified)
               adj[e*nvar + rep[i/2]] = 1;
-            if(p[e+1] == tag_not_modified)
-              adj[(e+1)*nvar + rep[i/2]] = 1;
+            if (p[e + 1] == tag_not_modified)
+              adj[(e + 1)*nvar + rep[i/2]] = 1;
           }
       }
 
@@ -406,7 +389,7 @@ void no_coalescence()
       ### Replacing tracers
       
       We perform the replacement for each bubble (which is too
-      close) and apply boundary conditions. */
+      close). */
       
       foreach()
         for (int i = 0, * p = tc->p; i < len; i += 2, p += 2)
@@ -415,11 +398,6 @@ void no_coalescence()
             t[] = c[]; 
             c[] = 0.;
           }
-      scalar * list = list_copy ({c});
-      for (int i = 0; i < len/2; i++)
-        list = list_add (list, (scalar){rep[i]});
-      boundary (list);
-      free (list);
     }
     
     /**
@@ -433,7 +411,6 @@ void no_coalescence()
 /**
 ## Coupling with the solver
 
-      // c[] = c[] < EPS ? 0 : (c[] > (1-EPS) ? 1 : c[]);
 We apply the no coalescence function just before VOF advection. */
 
 event vof (i++)
@@ -441,20 +418,18 @@ event vof (i++)
   no_coalescence();
 }
 
-/** After VOF advection, the default volume fraction field *f* is updated
-   as the sum of all VOF tracer fields. */
+/** 
+After VOF advection, the default volume fraction field *f* is updated
+as the sum of all VOF tracer fields. */
 
 event tracer_advection (i++)
 {
   foreach() {
     double fsum = 0.;
-    for (scalar c in interfaces){
-      // c[] = clip(c[]);
+    for (scalar c in interfaces)
       fsum += c[];
-    }
     f[] = clamp(fsum,0,1);
-  }  
-  boundary ({f});
+  }
 }
 
 /**
@@ -471,25 +446,26 @@ event cleanup (i = end)
 
 /**
 ## Restore
-   This event is called before *init*. It is useful in case of
-   restoring through a dump. For this one need to add
-   *length_of_interfaces* as a command line argument. While restoring
-   one needs to pass the argument value, which is equal to the number
-   of VOF tracers in the interfaces list. */
 
-event defaults (i=0)
+This event is called before *init*. It is useful in case of restoring
+through a dump. For this one needs to add *number_of_interfaces* as a
+command line argument. While restoring one needs to pass the argument
+value, which is equal to the number of VOF tracers in the interfaces
+list. */
+
+int number_of_interfaces = 0; // Don't change this
+
+event defaults (i = 0)
 {
-  if(length_of_interfaces > 1)
-    {
-      scalar f1 = fclone (0);
-      interfaces = list_copy ({f});
-      swap (char *, f.name, f1.name);
-      f.i = f1.i;
-      while(list_len(interfaces) < length_of_interfaces)
-        {
-          scalar t = fclone (list_len (interfaces));
-          interfaces = list_append (interfaces, t);  
-        }
-      length_of_interfaces = 0;
+  if (number_of_interfaces > 1) {
+    scalar f1 = fclone (0);
+    interfaces = list_copy ({f});
+    swap (char *, f.name, f1.name);
+    f.i = f1.i;
+    while (list_len (interfaces) < number_of_interfaces) {
+      scalar t = fclone (list_len (interfaces));
+      interfaces = list_append (interfaces, t);  
     }
+    number_of_interfaces = 0;
+  }
 }
