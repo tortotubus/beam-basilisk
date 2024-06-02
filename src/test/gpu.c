@@ -53,16 +53,24 @@ int main (int argc, char * argv[])
 #endif
 
   /**
+  ## reset() */
+
+  reset ({s}, 1);
+  reset ({s1}, 2);
+  foreach (serial)
+    fprintf (stderr, "0) %g %g\n", s[], s1[]);
+  
+  /**
   ## Check input/output for vector fields */
 
   foreach()
     v.x[] = 1., v.y[] = 2.;
   foreach (serial)
-    fprintf (stderr, "v.x: %g v.y: %g\n", v.x[], v.y[]);
+    fprintf (stderr, "1) v.x: %g v.y: %g\n", v.x[], v.y[]);
   foreach()
     v.x[] += 1., v.y[] += 2.;
   foreach (serial)
-    fprintf (stderr, "v.x: %g v.y: %g\n", v.x[], v.y[]);
+    fprintf (stderr, "2) v.x: %g v.y: %g\n", v.x[], v.y[]);
 
   /**
   ## Check consistent writes to individual texture components */
@@ -70,7 +78,7 @@ int main (int argc, char * argv[])
   foreach()
     v.y[] = 3; // v.x[] should not be modified
   foreach (serial)
-    fprintf (stderr, "v.x: %g v.y: %g\n", v.x[], v.y[]);
+    fprintf (stderr, "3) v.x: %g v.y: %g\n", v.x[], v.y[]);
 
   /**
   ## Check consistent CPU copies of individual texture components */
@@ -80,7 +88,7 @@ int main (int argc, char * argv[])
   foreach()
     v.x[] += v.y[];
   foreach (serial)
-    fprintf (stderr, "v.x: %g v.y: %g\n", v.x[], v.y[]);
+    fprintf (stderr, "4) v.x: %g v.y: %g\n", v.x[], v.y[]);
 
   /**
   ## Check for "no inputs" */
@@ -92,7 +100,7 @@ int main (int argc, char * argv[])
       b[] = 3. - a[];
     }
     foreach (serial)
-      fprintf (stderr, "%g %g\n", a[], b[]);
+      fprintf (stderr, "5) %g %g\n", a[], b[]);
   }
   
   /**
@@ -105,7 +113,7 @@ int main (int argc, char * argv[])
       s1[] = array[1];
     }
     foreach (serial)
-      fprintf (stderr, "%g %g\n", s[], s1[]);
+      fprintf (stderr, "6) %g %g\n", s[], s1[]);
   }
 
   /**
@@ -120,7 +128,7 @@ int main (int argc, char * argv[])
       s1[] = array[1];
     }
     foreach (serial)
-      fprintf (stderr, "%g %g\n", s[], s1[]);
+      fprintf (stderr, "7) %g %g\n", s[], s1[]);
   }
 
   /**
@@ -132,7 +140,7 @@ int main (int argc, char * argv[])
     a[] = 5., b[] = 6.;
   }
   foreach (serial)
-    fprintf (stderr, "%g %g\n", s[], s1[]);
+    fprintf (stderr, "8) %g %g\n", s[], s1[]);
   
   foreach()
     s1[] = 7;
@@ -142,7 +150,7 @@ int main (int argc, char * argv[])
     a[] = b[];
   }
   foreach (serial)
-    fprintf (stderr, "%g %g\n", s[], s1[]);
+    fprintf (stderr, "9) %g %g\n", s[], s1[]);
 
   /**
   ## List of vectors */
@@ -156,7 +164,7 @@ int main (int argc, char * argv[])
 	a.x[] = 5., b.x[] = 6.;
     }
     foreach (serial)
-      fprintf (stderr, "%g %g %g %g\n", v.x[], v.y[], v1.x[], v1.y[]);
+      fprintf (stderr, "10) %g %g %g %g\n", v.x[], v.y[], v1.x[], v1.y[]);
   }
 
   /**
@@ -166,7 +174,7 @@ int main (int argc, char * argv[])
     for (scalar s in list)
       s[] = 12;
   foreach (serial)
-    fprintf (stderr, "%g %g\n", s[], s1[]);
+    fprintf (stderr, "11) %g %g\n", s[], s1[]);
 
   /**
   ## A list with a single element */
@@ -202,7 +210,7 @@ int main (int argc, char * argv[])
       }
     }
     foreach (serial)
-      fprintf (stderr, "%g %g %g %g %g %g\n", v.x[], v.y[], v1.x[], v1.y[], s[], s1[]);
+      fprintf (stderr, "12) %g %g %g %g %g %g\n", v.x[], v.y[], v1.x[], v1.y[], s[], s1[]);
   }
 
   /**
@@ -214,16 +222,16 @@ int main (int argc, char * argv[])
 
   variable_list ({s, s1});
   foreach (serial)
-    fprintf (stderr, "%g %g\n", s[], s1[]);
+    fprintf (stderr, "13) %g %g\n", s[], s1[]);
 
   variable_list ({s1, s});
   foreach (serial)
-    fprintf (stderr, "%g %g\n", s[], s1[]);
+    fprintf (stderr, "14) %g %g\n", s[], s1[]);
 
   scalar s2[];
   variable_list ({s, s1, s2});
   foreach (serial)
-    fprintf (stderr, "%g %g %g\n", s[], s1[], s2[]);
+    fprintf (stderr, "15) %g %g %g\n", s[], s1[], s2[]);
 
   /**
   ## Functions with "inout" parameters */
@@ -235,7 +243,7 @@ int main (int argc, char * argv[])
     s[] = b;
   }
   foreach (serial)
-    fprintf (stderr, "%g\n", s[]);
+    fprintf (stderr, "16) %g\n", s[]);
 
   /**
   ## Constant fields and point functions */
@@ -245,12 +253,12 @@ int main (int argc, char * argv[])
   foreach()
     myfunc4 (point, s1, s);
   foreach (serial)
-    fprintf (stderr, "%g %g\n", s[], s1[]);
+    fprintf (stderr, "17) %g %g\n", s[], s1[]);
   const scalar c[] = 2;
   foreach()
     myfunc4 (point, s1, c);
   foreach (serial)
-    fprintf (stderr, "%g %g\n", s1[], c[]);
+    fprintf (stderr, "18) %g %g\n", s1[], c[]);
   
   /**
   ## Attributes */
@@ -258,7 +266,7 @@ int main (int argc, char * argv[])
   foreach()
     s[] = s.block + (s.nodump ? 1 : 0);
   foreach (serial)
-    fprintf (stderr, "%g\n", s[]);
+    fprintf (stderr, "19) %g\n", s[]);
   
   /**
   ## Function pointers */
@@ -267,7 +275,7 @@ int main (int argc, char * argv[])
   foreach()
     s[] = myfuncp (1.);
   foreach (serial)
-    fprintf (stderr, "%g\n", s[]);
+    fprintf (stderr, "20) %g\n", s[]);
 
   {
     s.func = myfunc;
@@ -277,7 +285,7 @@ int main (int argc, char * argv[])
       for (scalar s in list)
 	s[] = s.func (2);
     foreach (serial)
-      fprintf (stderr, "%g %g\n", s[], s1[]);
+      fprintf (stderr, "21) %g %g\n", s[], s1[]);
   }
 
   s.gradient = minmod2;
@@ -292,7 +300,7 @@ int main (int argc, char * argv[])
   foreach()
     s[] = myfunc (x);
   stats sf = statsf (s);
-  fprintf (stderr, "%g %g %g\n", sf.min, sf.sum, sf.max);
+  fprintf (stderr, "22) %g %g %g\n", sf.min, sf.sum, sf.max);
 
   /**
   ## foreach_point() */
@@ -306,7 +314,7 @@ int main (int argc, char * argv[])
       foreach_point (xp, yp)
 	s[] = (x + y) - (xp + yp);
   foreach (serial)
-    fprintf (stderr, "%g %g %g\n", x, y, s[]);
+    fprintf (stderr, "23) %g %g %g\n", x, y, s[]);
   origin (0, 0);
 
   /**
@@ -316,7 +324,7 @@ int main (int argc, char * argv[])
   
   foreach()
     s[] = x*y;
-  fprintf (stderr, "%g %g\n",
+  fprintf (stderr, "24) %g %g\n",
 	   interpolate (s, 0.5, 0.5, linear = false),
 	   interpolate (s, 0.5, 0.5, linear = true));
 
@@ -328,7 +336,7 @@ int main (int argc, char * argv[])
     foreach_vertex()
       a[] = x, b[] = y;
     foreach (serial)
-      fprintf (stderr, "%g %g\n", a[], b[]);
+      fprintf (stderr, "25) %g %g\n", a[], b[]);
   }
 
   /**
@@ -386,7 +394,7 @@ int main (int argc, char * argv[])
 	   N, elapsed, grid->tn*iter/elapsed);
 
   stats sp = statsf (p);
-  fprintf (stderr, "sp: %g %g %g\n", sp.min, sp.sum, sp.max);
+  fprintf (stderr, "27) sp: %g %g %g\n", sp.min, sp.sum, sp.max);
   
 #if 0
   foreach (serial)

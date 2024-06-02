@@ -50,7 +50,7 @@ cd bump2D-gpu
 OpenGL renderer string: NVIDIA GeForce RTX 3050 Ti Laptop GPU/PCIe/SSE2
 Dedicated video memory: 4096 MB
 
-__NV_PRIME_RENDER_OFFLOAD=1 __GLX_VENDOR_LIBRARY_NAME=nvidia ./bump2D-gpu 10 2> /dev/null
+__NV_PRIME_RENDER_OFFLOAD=1 __GLX_VENDOR_LIBRARY_NAME=nvidia bump2D-gpu/bump2D-gpu 10 2> /dev/null
 
 # Cartesian (GPU), 3615 steps, 12.3778 CPU, 12.38 real, 3.06e+08 points.step/s, 30 var
    calls    total     self   % total   function
@@ -122,7 +122,7 @@ __NV_PRIME_RENDER_OFFLOAD=1 __GLX_VENDOR_LIBRARY_NAME=nvidia ./bump2D-gpu 10 2> 
     7230    10.43     0.49      3.9%   update_saint_venant():/src/saint-venant.h:331
       11     0.20     0.20      1.6%   load_shader():/src/grid/gpu/cartesian.h:667
 
-./bump2D-gpu 10 2> /dev/null
+./bump2D-gpu/bump2D-gpu 10 2> /dev/null
 
 # Cartesian (GPU), 3615 steps, 21.4548 CPU, 150.5 real, 2.52e+07 points.step/s, 30 var
    calls    total     self   % total   function
@@ -133,5 +133,37 @@ __NV_PRIME_RENDER_OFFLOAD=1 __GLX_VENDOR_LIBRARY_NAME=nvidia ./bump2D-gpu 10 2> 
    28923     4.77     4.75      3.2%   build_shader():/src/grid/gpu/cartesian.h:630
     7230     4.62     4.62      3.1%   gpu_reduction():/src/saint-venant.h:207
     7230   133.57     1.78      1.2%   update_saint_venant():/src/saint-venant.h:331
+~~~
+
+with SSBO
+
+~~~bash
+__NV_PRIME_RENDER_OFFLOAD=1 __GLX_VENDOR_LIBRARY_NAME=nvidia ./bump2D-gpu/bump2D-gpu 10
+
+# Cartesian (GPU), 3615 steps, 15.398 CPU, 15.4 real, 2.46e+08 points.step/s, 28 var
+   calls    total     self   % total   function
+    7230     6.68     4.38     28.4%   foreach():/src/saint-venant.h:275
+    7230     3.40     2.36     15.3%   foreach():/src/utils.h:266
+    7230     2.35     2.18     14.2%   foreach():/src/saint-venant.h:129
+    7230     2.24     2.12     13.8%   foreach():/src/saint-venant.h:321
+    7230     0.94     0.87      5.7%   gpu_reduction():/src/saint-venant.h:207
+   86763     0.83     0.83      5.4%   build_shader():/src/grid/gpu/cartesian.h:628
+   28920     1.02     0.79      5.1%   foreach():/src/grid/gpu/cartesian.h:959
+   28920     0.91     0.68      4.4%   foreach():/src/grid/gpu/cartesian.h:962
+    7230    12.96     0.60      3.9%   update_saint_venant():/src/saint-venant.h:331
+  101194     0.23     0.23      1.5%   load_shader():/src/grid/gpu/cartesian.h:638
+
+./bump2D-gpu/bump2D-gpu 10 2> /dev/null
+
+# Cartesian (GPU), 3615 steps, 6.84099 CPU, 88.07 real, 4.3e+07 points.step/s, 30 var
+   calls    total     self   % total   function
+    7230    37.45    30.70     34.9%   foreach():/src/saint-venant.h:275
+    7230    22.98    20.93     23.8%   foreach():/src/utils.h:266
+    7230    14.32    14.19     16.1%   foreach():/src/saint-venant.h:321
+    7230    12.43    12.25     13.9%   foreach():/src/saint-venant.h:129
+    7230     4.21     4.05      4.6%   gpu_reduction():/src/saint-venant.h:207
+   28920     2.18     1.92      2.2%   foreach():/src/grid/gpu/cartesian.h:959
+   28920     1.91     1.65      1.9%   foreach():/src/grid/gpu/cartesian.h:962
+   86763     0.92     0.92      1.0%   build_shader():/src/grid/gpu/cartesian.h:628
 ~~~
 */

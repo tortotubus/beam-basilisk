@@ -5,7 +5,7 @@
 static struct {
   ///// GPU /////
   GLFWwindow * window;
-  GLuint vao, fbo0, vbo;
+  GLuint vao, fbo0, vbo, ssbo;
   bool fragment_shader;
 } GPUContext = {0};
 
@@ -35,6 +35,7 @@ void gpu_free_solver (void)
 {
   GL_C (glFinish());
   GL_C (glBindFramebuffer (GL_FRAMEBUFFER, 0));
+  glDeleteBuffers (1, &GPUContext.ssbo);
   glDeleteBuffers (1, &GPUContext.vbo);  
   glDeleteVertexArrays (1, &GPUContext.vao);
   glDeleteFramebuffers (1, &GPUContext.fbo0);  
