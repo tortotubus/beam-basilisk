@@ -33,8 +33,8 @@ static Point last_point;
 
 #define cartesian ((Cartesian *)grid)
 
-@def data(k,l,m) ((real *)&cartesian->d[((point.i + k)*(point.n + 2) +
-					 (point.j + l))*datasize]) @
+@undef val
+@define val(a,k,l,m) (((real *)cartesian->d)[(point.i + k + _index(a,m)*(point.n + 2))*(point.n + 2) + point.j + l])
 @define allocated(...) true
 
 @define POINT_VARIABLES VARIABLES
@@ -90,10 +90,11 @@ foreach_face_generic() {
 void reset (void * alist, double val)
 {
   scalar * list = (scalar *) alist;
-  for (int i = 0; i < sq(cartesian->n + 2); i++)
-    for (scalar s in list)
-      if (!is_constant(s))
-	((real *)(&cartesian->d[i*datasize]))[s.i] = val;
+  size_t len = sq(cartesian->n + 2);
+  for (scalar s in list)
+    if (!is_constant(s))
+      for (int i = 0; i < len; i++)
+	((real *)cartesian->d)[i + s.i*len] = val;
 }
 
 // Boundaries
@@ -318,13 +319,6 @@ void init_grid (int n)
   size_t len = (n + 2)*(n + 2)*datasize;
   p->n = N = n;
   p->d = qmalloc (len, char);
-  /* trash the data just to make sure it's either explicitly
-     initialised or never touched */
-  if (sizeof (undefined) == sizeof (real)) {
-    real * v = (real *) p->d;
-    for (int i = 0; i < len/sizeof(real); i++)
-      v[i] = undefined;
-  }
   grid = (Grid *) p;
   reset (all, 0.);
   for (int d = 0; d < nboundary; d++) {
@@ -347,12 +341,8 @@ void init_grid (int n)
 void realloc_scalar (int size)
 {
   Cartesian * p = cartesian;
-  size_t len = (p->n + 2)*(p->n + 2);
-  qrealloc (p->d, len*(datasize + size), char);
-  char * data = p->d + (len - 1)*datasize;
-  for (int i = len - 1; i > 0; i--, data -= datasize)
-    memmove (data + i*size, data, datasize);
-  datasize += size;
+  datasize += size;  
+  qrealloc (p->d, (p->n + 2)*(p->n + 2)*datasize, char);
 }
 
 Point locate (double xp = 0, double yp = 0, double zp = 0)
@@ -366,4 +356,6 @@ Point locate (double xp = 0, double yp = 0, double zp = 0)
   return point;
 }
 
+#if !_GPU
 #include "cartesian-common.h"
+#endif

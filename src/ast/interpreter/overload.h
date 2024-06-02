@@ -571,3 +571,8 @@ vec4 Vec4 (float r, float g, float b, float a)
 }
 
 void register_fpointer (void (* ptr) (void), const char * name, const void * nonlocals) {}
+
+void reset_gpu (void * alist, double val)
+{
+  reset (alist, val);
+}
