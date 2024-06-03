@@ -166,4 +166,24 @@ __NV_PRIME_RENDER_OFFLOAD=1 __GLX_VENDOR_LIBRARY_NAME=nvidia ./advection.gpu 204
 # Cartesian (GPU), 6163 steps, 4.66913 CPU, 4.672 real, 1.38e+09 points.step/s, 10 var
 # Cartesian (GPU), 12282 steps, 31.0837 CPU, 31.1 real, 1.66e+09 points.step/s, 10 var
 ~~~
+
+with SSBOs
+
+~~~
+./advection.gpu 2048 2> /dev/null | grep steps
+# Cartesian (GPU), 412 steps, 0.111555 CPU, 0.2013 real, 8.38e+06 points.step/s, 8 var
+# Cartesian (GPU), 796 steps, 0.222647 CPU, 0.4598 real, 2.84e+07 points.step/s, 8 var
+# Cartesian (GPU), 1566 steps, 0.551693 CPU, 1.495 real, 6.87e+07 points.step/s, 8 var
+# Cartesian (GPU), 3100 steps, 2.2869 CPU, 7.554 real, 1.08e+08 points.step/s, 8 var
+# Cartesian (GPU), 6163 steps, 7.69238 CPU, 46.9 real, 1.38e+08 points.step/s, 8 var
+# Cartesian (GPU), 12280 steps, 19.258 CPU, 336.8 real, 1.53e+08 points.step/s, 8 var
+
+__NV_PRIME_RENDER_OFFLOAD=1 __GLX_VENDOR_LIBRARY_NAME=nvidia ./advection.gpu 2048 2> /dev/null | grep steps
+# Cartesian (GPU), 412 steps, 0.137675 CPU, 0.1378 real, 1.22e+07 points.step/s, 8 var
+# Cartesian (GPU), 796 steps, 0.263014 CPU, 0.263 real, 4.96e+07 points.step/s, 8 var
+# Cartesian (GPU), 1566 steps, 0.571924 CPU, 0.572 real, 1.79e+08 points.step/s, 8 var
+# Cartesian (GPU), 3100 steps, 1.41964 CPU, 1.42 real, 5.72e+08 points.step/s, 8 var
+# Cartesian (GPU), 6163 steps, 5.58421 CPU, 5.588 real, 1.16e+09 points.step/s, 8 var
+# Cartesian (GPU), 12282 steps, 34.2597 CPU, 34.27 real, 1.5e+09 points.step/s, 8 var
+~~~
 */

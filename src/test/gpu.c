@@ -340,6 +340,59 @@ int main (int argc, char * argv[])
   }
 
   /**
+  ## Reduction on faces */
+
+  {
+    face vector f[];
+    double max = 0., sum = 0.;
+    foreach_face (reduction(max:max) reduction(+:sum)) {
+      f.x[] = f.x[]; // so that the loop is done on GPUs
+      if (x > max) max = x;
+      sum += x;
+    }
+    fprintf (stderr, "26) %g %g\n", sum, max);
+
+    max = 0., sum = 0.;
+    foreach_face (x, reduction(max:max) reduction(+:sum)) {
+      f.x[] = f.x[]; // so that the loop is done on GPUs
+      if (x > max) max = x;
+      sum += x;
+    }
+    fprintf (stderr, "26a) %g %g\n", sum, max);
+    
+    max = 0., sum = 0.;
+    foreach_face (y, reduction(max:max) reduction(+:sum)) {
+      f.x[] = f.x[]; // so that the loop is done on GPUs
+      if (x > max) max = x;
+      sum += x;
+    }
+    fprintf (stderr, "26b) %g %g\n", sum, max);
+    
+    init_grid (512);
+    max = 0., sum = 0.;
+    foreach_face (reduction(max:max) reduction(+:sum)) {
+      f.x[] = f.x[]; // so that the loop is done on GPUs
+      if (x > max) max = x;
+      sum += x;
+    }
+    fprintf (stderr, "26c) %g %g\n", sum, max);
+  }
+
+  /**
+  ## Reduction on vertices */
+
+  {
+    vertex scalar s[];
+    double max = 0., sum = 0.;
+    foreach_vertex (reduction(max:max) reduction(+:sum)) {
+      s[] = s[]; // so that the loop is done on GPUs
+      if (x > max) max = x;
+      sum += x;
+    }
+    fprintf (stderr, "26d) %g %g\n", sum, max);
+  }  
+
+  /**
   ## Other tests */
   
   init_grid (argc > 1 ? atoi(argv[1]) : 64);
@@ -370,7 +423,7 @@ int main (int argc, char * argv[])
     concurrent read/writes accesses are not possible on the GPU). The
     GPU version is then exactly identical to the first version. */
     
-#if 0    
+#if 1    
     foreach()
       tmp[] = (p[1] + p[-1] + p[0,1] + p[0,-1] - s[]*sq(Delta))/4.;
     swap (scalar, tmp, p);
