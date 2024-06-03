@@ -247,7 +247,7 @@ static char glsl_preproc[] =
   "#define val(s,i,j,k) ((s).is < _NVARMAX ? valt(s,i,j,k)"
   " : _constant[clamp((s).is -_NVARMAX,0,_nconst-1)])\n"
   "#define val_out_(s,i,j,k) valt(s,i,j,k)\n"
-  "#define val_red_(s) _data[(s).is*sq(N + 2) + (point.x - 1)*N + point.y - 1]\n"
+  "#define val_red_(s) _data[(s).is*sq(N + 2) + (point.x - 1)*NY + point.y - 1]\n"
   "#define _attr(s,member) (_attr[(s).index].member)\n"
   "#define forin(type,s,list) for (int _i = 0; _i < list.length() - 1; _i++) { type s = list[_i];\n"
   "#define endforin() }\n"
@@ -541,8 +541,12 @@ char * build_shader (const External * externals, const ForeachData * loop,
 	     strcmp (g->type, "tensor")) {
       if (!strcmp (g->name, "N") && !strcmp (g->type, "int")) {
 	char s[20];
-	snprintf (s, 19, "%d", N);	
-	fs = str_append (fs, "const int N = ", s, ";\n");
+	snprintf (s, 19, "%d", N);
+	fs = str_append (fs,
+			 "const int N = ", s, ";\n"
+			 "const int NY = ",
+			 loop->face > 1 || loop->vertex ? "N + 1" : "N",
+			 ";\n");
 	if (GPUContext.fragment_shader)
 	  fs = str_append (fs, "in vec2 vsPoint;\n"
 			   "Point point = ivec2((vsPoint*vsScale + vsOrigin)*N) + ivec2(1,1);\n"
@@ -1162,10 +1166,10 @@ static bool doloop_on_gpu (ForeachData * loop, const RegionParameters * region,
     if (loop->vertex)
       shader = str_append (shader, "  x -= Delta/2., y -= Delta/2.;\n");
     shader = str_append (shader, kernel);
-    shader = str_append (shader, "if (point.x < N + 1 && point.y < N + 1) {\n");
+    shader = str_append (shader, "\nif (point.y - 1 < NY) {");
     for (const External * g = externals; g; g = g->next)
       if (g->reduct) {
-	shader = str_append (shader, "\nval_red_(", g->name, "_out_) = ", g->name, ";");
+	shader = str_append (shader, "\n  val_red_(", g->name, "_out_) = ", g->name, ";");
 	scalar s = g->s;
 	s.gpu.stored = -1;
       }
@@ -1344,7 +1348,11 @@ static bool doloop_on_gpu (ForeachData * loop, const RegionParameters * region,
   for (const External * g = externals; g; g = g->next)
     if (g->reduct) {
       scalar s = g->s;
-      double result = gpu_reduction (s, g->reduct, region);
+      double result = gpu_reduction (s, g->reduct, region,
+				     loop->face == 1 || loop->face == 2 ?
+				     cartesian->n*(cartesian->n + 1) :
+				     loop->face == 3 || loop->vertex ? sq(cartesian->n + 1) - 1 :
+				     sq(cartesian->n));
 #if 0
       fprintf (stderr, "%s:%d: %s %c %g\n",
 	       loop->fname, loop->line, g->name, g->reduct, result);

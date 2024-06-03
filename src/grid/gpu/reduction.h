@@ -27,10 +27,10 @@ real cpu_reduction (GLuint src, size_t offset, size_t nb, const char op)
   return result;
 }
 
-real gpu_reduction (scalar s, const char op, const RegionParameters * region)
+real gpu_reduction (scalar s, const char op, const RegionParameters * region, size_t nb)
 {
   real result = 0.;
-  size_t nb = sq(cartesian->n), offset = s.i*sq(cartesian->n + 2);
+  size_t offset = s.i*sq(cartesian->n + 2);
 
   if (region->n.x == 1 && region->n.y == 1) {
     int i =  (region->p.x - X0)/L0*cartesian->n;
@@ -54,15 +54,14 @@ real gpu_reduction (scalar s, const char op, const RegionParameters * region)
   if (nb < nwgr*stride)
     return cpu_reduction (GPUContext.ssbo, offset, nb, op);
   
-  nb /= stride;
-  assert (nb >= nwgr);
-  
   GLuint * br = gpu_cartesian->reduct;
   if (!br[0]) {
     GL_C (glGenBuffers (2, br));
     for (int i = 0; i < 2; i++) {
       GL_C (glBindBuffer (GL_SHADER_STORAGE_BUFFER, br[i]));
-      GL_C (glBufferData (GL_SHADER_STORAGE_BUFFER, nb*sizeof(real), NULL, GL_DYNAMIC_READ));
+      GL_C (glBufferData (GL_SHADER_STORAGE_BUFFER,
+			  (sq(cartesian->n + 1)/stride + 1)*sizeof(real),
+			  NULL, GL_DYNAMIC_READ));
     }
     GL_C (glBindBuffer (GL_SHADER_STORAGE_BUFFER, 0));
   }
@@ -93,11 +92,14 @@ real gpu_reduction (scalar s, const char op, const RegionParameters * region)
 		" real _data[]; };\n"
 		"layout (std430, binding = 1) writeonly buffer _reduct_layout {"
 		" real _reduct[]; };\n"
-		"uniform uint offset;\n"
-		"const uint stride = ", strides, ";\n"
+		"uniform uint offset, nb, nbr;\n"
 		"layout (local_size_x = ", nwgrs, ") in;\n"
 		"void main() {\n"
-		"  uint index = offset + stride*gl_GlobalInvocationID.x;\n"
+		"if (gl_GlobalInvocationID.x < nb) {\n"
+		"  uint stride = ", strides, ";\n"
+		"  uint index = stride*gl_GlobalInvocationID.x;\n"
+		"  if (index + stride > nbr) stride = nbr - index;\n"
+		"  index += offset;\n"
 		"  real val = _data[index];\n"
 		"  real ", start, "\n"
 		"  for (uint j = 0; j < stride; j++) {\n"
@@ -105,29 +107,41 @@ real gpu_reduction (scalar s, const char op, const RegionParameters * region)
 		"    ", operation, "\n"
 		"  }\n"
 		"  _reduct[gl_GlobalInvocationID.x] = reduct;\n"
-		"}\n");
+		"}}\n");
   GLuint shader = load_shader (fs);
   assert (shader);
   GL_C (glUseProgram (shader));
   GLint loffset = glGetUniformLocation (shader, "offset");
   assert (loffset >= 0);
+  GLint lnb = glGetUniformLocation (shader, "nb");
+  assert (lnb >= 0);
+  GLint lnbr = glGetUniformLocation (shader, "nbr");
+  assert (lnbr >= 0);  
   GL_C (glUniform1ui (loffset, offset));
-  GL_C (glBindBufferBase (GL_SHADER_STORAGE_BUFFER, 0, GPUContext.ssbo));
-  GL_C (glBindBufferBase (GL_SHADER_STORAGE_BUFFER, 1, br[1]));
-  GL_C (glDispatchCompute (nb/nwgr, 1, 1));
-  GL_C (glMemoryBarrier (GL_ALL_BARRIER_BITS));
-
-  int src = 1, dst = 0;
-  if (nb/stride > nwgr) {
-    GL_C (glUniform1ui (loffset, 0));
-    while (nb/stride > nwgr) {
+  
+  int src = 0, dst = 1;
+  GL_C (glBindBufferBase (GL_SHADER_STORAGE_BUFFER, 0, GPUContext.ssbo));  
+  while (nb >= nwgr*stride) {
+    GL_C (glBindBufferBase (GL_SHADER_STORAGE_BUFFER, 1, br[dst]));      
+    GL_C (glUniform1ui (lnbr, nb));
+    if (nb % stride) {
       nb /= stride;
-      GL_C (glBindBufferBase (GL_SHADER_STORAGE_BUFFER, 0, br[src]));
-      GL_C (glBindBufferBase (GL_SHADER_STORAGE_BUFFER, 1, br[dst]));
-      GL_C (glDispatchCompute (nb/nwgr, 1, 1));
-      GL_C (glMemoryBarrier (GL_ALL_BARRIER_BITS));
-      swap (int, src, dst);
+      nb++;
     }
+    else
+      nb /= stride;
+    int ng = nb/nwgr;
+    if (ng*nwgr < nb)
+      ng++;
+    GL_C (glUniform1ui (lnb, nb));
+    GL_C (glDispatchCompute (ng, 1, 1));
+    GL_C (glMemoryBarrier (GL_ALL_BARRIER_BITS));
+    swap (int, src, dst);
+    if (offset) {
+      GL_C (glUniform1ui (loffset, 0));
+      offset = 0;
+    }
+    GL_C (glBindBufferBase (GL_SHADER_STORAGE_BUFFER, 0, br[src]));
   }
 
   return cpu_reduction (br[src], 0, nb, op);

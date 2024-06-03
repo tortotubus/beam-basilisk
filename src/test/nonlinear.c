@@ -221,4 +221,8 @@ with compute shaders:
 # Cartesian (GPU), 20565 steps, 24.8181 CPU, 24.82 real, 8.69e+08 points.step/s, 15 var
 # Cartesian (GPU), 20586 steps, 26.2472 CPU, 26.24 real, 8.22e+08 points.step/s, 15 var
 
+with SSBOs:
+
+# Cartesian (GPU), 20565 steps, 28.2163 CPU, 28.24 real, 7.64e+08 points.step/s, 14 var
+# Cartesian (GPU), 20585 steps, 29.4632 CPU, 29.48 real, 7.32e+08 points.step/s, 14 var
 */
