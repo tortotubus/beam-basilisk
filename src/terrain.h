@@ -92,6 +92,7 @@ static void delete_terrain (scalar zb)
 
 @define CHARP char * // fixme: workaround for va_arg macro
 
+trace
 void terrain (scalar zb, ...)
 {
   zb.kdt = qcalloc (NPROC, void *);

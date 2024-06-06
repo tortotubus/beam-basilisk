@@ -80,7 +80,7 @@ void output_ppm_gpu (OutputPPMGPU * display,
   if (display->frameStartTime < 0.) // window has been closed by user
     return;
 
-  if (!fps || fp != stdout || file || glfwGetTime() - display->frameStartTime > 1./fps) {
+  if (fp || file || (fps && glfwGetTime() - display->frameStartTime > 1./fps)) {
 
     /**
     This code should be the same as
@@ -106,7 +106,6 @@ void output_ppm_gpu (OutputPPMGPU * display,
     /**
     ... to here. */
     
-    GL_C (glBindFramebuffer (GL_FRAMEBUFFER, 0));
     if (!display->window) {
       glfwWindowHint (GLFW_VISIBLE, fps ? GL_TRUE : GL_FALSE);
       display->window = glfwCreateWindow (cn.x, cn.y, f.name, NULL, GPUContext.window);
@@ -118,12 +117,39 @@ void output_ppm_gpu (OutputPPMGPU * display,
       GL_C (glGenVertexArrays (1, &vao));
       GL_C (glBindVertexArray (vao));
 
+      // create vertices of fullscreen quad.
+      float vertices[] = {
+	+0.0f, +0.0f,
+	+1.0f, +0.0f,
+	+0.0f, +1.0f,
+	+1.0f, +0.0f,
+	+1.0f, +1.0f,
+	+0.0f, +1.0f
+      };
+      // upload geometry to GPU.
+      GLuint vbo;
+      GL_C (glGenBuffers (1, &vbo));
+      GL_C (glBindBuffer (GL_ARRAY_BUFFER, vbo));
+      GL_C (glBufferData (GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW));
+
+      // setup some reasonable default GL state.
+      GL_C (glDisable (GL_DEPTH_TEST));
+      GL_C (glDepthMask (false));
+      GL_C (glDisable (GL_BLEND));
+      GL_C (glColorMask (GL_TRUE, GL_TRUE, GL_TRUE, GL_TRUE));
+      GL_C (glEnable (GL_CULL_FACE));
+      GL_C (glFrontFace (GL_CCW));
+      GL_C (glBindFramebuffer (GL_FRAMEBUFFER, 0));
+      GL_C (glUseProgram (0));
+      GL_C (glBindTexture (GL_TEXTURE_2D, 0));
+      GL_C (glDepthFunc (GL_LESS));
+      GL_C (glPointSize (1));
+
       // enable vertex buffer used for full screen quad rendering. 
       // this buffer is used for all rendering, from now on.
       GL_C (glEnableVertexAttribArray ((GLuint)0));
-      GL_C (glBindBuffer (GL_ARRAY_BUFFER, GPUContext.vbo));
-      GL_C (glVertexAttribPointer ((GLuint)0, 2, GL_FLOAT, GL_FALSE,
-				   2*sizeof(float), (void*)0));
+      GL_C (glBindBuffer (GL_ARRAY_BUFFER, vbo));
+      GL_C (glVertexAttribPointer ((GLuint)0, 2, GL_FLOAT, GL_FALSE, 2*sizeof(float), (void*)0));
     }
     else {
       glfwSetWindowSize (display->window, cn.x, cn.y);
@@ -132,20 +158,9 @@ void output_ppm_gpu (OutputPPMGPU * display,
     
     GL_C (glViewport(0, 0, cn.x, cn.y));
     GL_C (glColorMask (GL_TRUE, GL_TRUE, GL_TRUE, GL_TRUE));
-    GL_C (glClearColor (0.0f, 0.0f, 0.0f, 0.0f));
+    GL_C (glClearColor (0., 0.0f, 0.0f, 0.0f));
     GL_C (glClear (GL_COLOR_BUFFER_BIT));
   
-    bool masked = mask.i >= 0;
-    GLuint sampler = 0;
-    if (linear) {
-      GL_C (glGenSamplers (1, &sampler));
-      GL_C (glSamplerParameteri (sampler, GL_TEXTURE_MAG_FILTER, GL_LINEAR));
-      GL_C (glSamplerParameteri (sampler, GL_TEXTURE_MIN_FILTER, GL_LINEAR));
-      GL_C (glBindSampler (0, sampler));
-      if (masked)
-	GL_C (glBindSampler (1, sampler));
-    }
-    
     double dmap[NCMAP][3];
     (* map) (dmap);
     vec4 cmap[NCMAP];
@@ -160,12 +175,31 @@ void output_ppm_gpu (OutputPPMGPU * display,
       
     coord p;
     foreach_region (p, box, cn, gpu) {
-      float m = masked ? mask[] : 0., v = m < 0. ? nodata : f[];
+      double v;
+      if (mask.i >= 0) { // masking
+	if (linear) {
+	  double m = interpolate_linear (point, mask, p.x, p.y, p.z);
+	  if (m < 0.)
+	    v = nodata;
+	  else
+	    v = interpolate_linear (point, f, p.x, p.y, p.z);
+	}
+	else {
+	  if (mask[] < 0.)
+	    v = nodata;
+	  else
+	    v = f[];
+	}
+      }
+      else if (linear)
+	v = interpolate_linear (point, f, p.x, p.y, p.z);
+      else
+	v = f[];
       if (v == nodata)
 	FragColor = (vec4){0,0,0,0};
       else {
 	int i;
-	float val = max != min ? (v - min)/(max - min) : 0., coef;
+	double val = max != min ? (v - min)/(max - min) : 0., coef;
 	if (val <= 0.) i = 0, coef = 0.;
 	else if (val >= 1.) i = NCMAP - 2, coef = 1.;
 	else {
@@ -178,13 +212,9 @@ void output_ppm_gpu (OutputPPMGPU * display,
 
     GPUContext.fragment_shader = false;
     
-    if (linear) {
-      GL_C (glBindSampler (0, 0));
-      if (masked)
-	GL_C (glBindSampler (1, 0));
-      GL_C (glDeleteSamplers (1, &sampler));
-    }
-
+    if (fps)
+      glfwSwapBuffers (display->window);
+    
     /**
     File output */
     
@@ -206,13 +236,8 @@ void output_ppm_gpu (OutputPPMGPU * display,
       else
 	fflush (fp);
     }
-
-    if (fps)
-    glfwSwapBuffers (display->window);
     
     glfwMakeContextCurrent (GPUContext.window);
-    GL_C (glBindFramebuffer (GL_FRAMEBUFFER, GPUContext.fbo0));
-    GL_C (glViewport (0, 0, cartesian->n, cartesian->n));
     
     display->frameStartTime = glfwGetTime();
   }
