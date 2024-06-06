@@ -2392,7 +2392,7 @@ bool ast_is_foreach_stencil (const Ast * n)
 {
   Ast * foreach = ast_schema (n, sym_foreach_statement,
 			      0, sym_FOREACH);
-  if (!foreach)
+  if (!foreach || !ast_terminal (foreach)->start)
     return false;
   int len = strlen (ast_terminal (foreach)->start) - 8;
   return len > 0 && !strcmp (ast_terminal (foreach)->start + len, "_stencil");
@@ -3625,38 +3625,19 @@ static void stencils (Ast * n, Stack * stack, void * data)
   switch (n->sym) {
     
   case sym_foreach_statement:
-    assert (ast_last_child(n)->sym == sym_statement); // make sure all stencils have been dealt with
     if (ast_is_foreach_stencil (n)) {
-      Ast * foreach = n->parent;
-      if (foreach->sym == sym_foreach_statement && ast_last_child (foreach) == n) {
-	Ast ** c;
-	for (c = foreach->child; *c; c++);
-	*(--c) = NULL;
-	Ast * statement = foreach->parent->parent;
-	Ast * item = ast_block_list_get_item (statement), * list = item->parent;
-	list = ast_block_list_append
-	  (list, item->sym,
-	   ast_new_children (ast_new (foreach, sym_statement),
-			     ast_new_children (ast_new (foreach,
-							sym_basilisk_statements),
-					       n)));
-	ast_set_child (item, 0, list->child[1]->child[0]);
-	ast_set_child (list->child[1], 0, statement);
-      }
-
+      assert (ast_last_child(n)->sym == sym_statement); // make sure all stencils have been dealt with
       Ast * parameters = ast_child (n, sym_foreach_parameters);
       if (parameters) {
 	ast_destroy (parameters);
 	for (Ast ** c = n->child + 2; *c; c++)
 	  *c = *(c + 1);
       }
-      
-      /**
-      ## Kernel for GPUs */
 
       Ast * params = ast_schema (n, sym_foreach_statement,
 				 1, token_symbol('('));
       assert (params);
+      Ast * foreach = n->parent;
       parameters = ast_child (foreach, sym_foreach_parameters);
       bool gpu = !((TranslateData *)data)->cpu;
       int parallel = (gpu ?
@@ -3686,6 +3667,10 @@ static void stencils (Ast * n, Stack * stack, void * data)
 	  }
 	}
       }
+      
+      /**
+      ## Kernel for GPUs */
+
       char sparallel[] = "0";
       sparallel[0] = '0' + parallel;
       ast_after (params, sparallel, ",{");
@@ -3695,6 +3680,10 @@ static void stencils (Ast * n, Stack * stack, void * data)
       }
       TranslateData * d = data;
       if (d->gpu) {
+	assert (foreach->sym == sym_foreach_statement && ast_last_child (foreach) == n);
+	Ast ** last;
+	for (last = foreach->child; *last; last++);
+	*(--last) = NULL;
 	char * references = ast_external_references (foreach, NULL, d->functions);
 	if (references) {
 	  ast_after (params, ".externals=(External[]){", references, "{0}},");
@@ -3702,8 +3691,36 @@ static void stencils (Ast * n, Stack * stack, void * data)
 	}
 	if (gpu)
 	  ast_kernel (foreach, params, NULL);
+	*last = n;
       }
       ast_after (params, "}");
+
+      /**
+      Cleanup loops and their stencils. */
+      
+      if (foreach->sym == sym_foreach_statement && ast_last_child (foreach) == n) {
+	if (parallel == 3) { // This can only run on the GPU so we discard the (CPU) loop
+	  Ast * statement = foreach->parent;
+	  ast_set_child (statement, 0, n);
+	  ast_destroy (foreach);
+	}
+	else { // This can be done either on the GPU or CPU so we keep both the stencil and loop
+	  Ast ** last;
+	  for (last = foreach->child; *last; last++);
+	  *(--last) = NULL;
+	  Ast * statement = foreach->parent->parent;
+	  Ast * item = ast_block_list_get_item (statement), * list = item->parent;
+	  list = ast_block_list_append
+	    (list, item->sym,
+	     ast_new_children (ast_new (foreach, sym_statement),
+			       ast_new_children (ast_new (foreach,
+							  sym_basilisk_statements),
+						 n)));
+	  ast_set_child (item, 0, list->child[1]->child[0]);
+	  ast_set_child (list->child[1], 0, statement);
+	}
+      }
+      
     }
 
     break;
