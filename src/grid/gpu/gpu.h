@@ -1,11 +1,15 @@
 #include <grid/gpu/glad.h>
 #include <GLFW/glfw3.h>
+#if DEBUG_OPENGL
+#include <grid/gpu/debug.h>
+#endif
+
 #pragma autolink -L$BASILISK/grid/gpu -lglfw -lgpu -ldl
 
 static struct {
   ///// GPU /////
   GLFWwindow * window;
-  GLuint vao, fbo0, vbo, ssbo;
+  GLuint ssbo;
   bool fragment_shader;
 } GPUContext = {0};
 
@@ -36,9 +40,6 @@ void gpu_free_solver (void)
   GL_C (glFinish());
   GL_C (glBindFramebuffer (GL_FRAMEBUFFER, 0));
   glDeleteBuffers (1, &GPUContext.ssbo);
-  glDeleteBuffers (1, &GPUContext.vbo);  
-  glDeleteVertexArrays (1, &GPUContext.vao);
-  glDeleteFramebuffers (1, &GPUContext.fbo0);  
   glfwTerminate();
   GPUContext.window = NULL;
 }

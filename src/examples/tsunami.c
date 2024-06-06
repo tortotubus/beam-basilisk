@@ -288,7 +288,7 @@ bilinearly onto a *n x n* regular grid and written on standard
 output. */
 
 event snapshots (t += 60; t <= 600) {
-
+#if !BENCHMARK
 #if !_MPI
   printf ("file: t-%g\n", t);
   output_field ({h, zb, hmax}, stdout, n = 1 << maxlevel, linear = true);
@@ -300,6 +300,7 @@ event snapshots (t += 60; t <= 600) {
 #if TREE
   dump (file = "dump");
 #endif
+#endif // !BENCHMARK
 }
 
 /**
@@ -355,6 +356,7 @@ We use the *mask* option of *output_ppm()* to mask out the dry
 topography. Any part of the image for which *m[]* is negative
 (i.e. for which *etam[] < zb[]*) will be masked out. */
 
+#if !BENCHMARK
 event movies (t++) {
   scalar m[], etam[];
   foreach() {
@@ -518,6 +520,7 @@ event kml (t += 15)
   if (t == 600)
     fprintf (fp, "</Folder></kml>\n");
 }
+#endif // !BENCHMARK
 
 /**
 ## Adaptivity
@@ -529,86 +532,107 @@ event do_adapt (i++) adapt();
 /**
 ## Benchmarks on GPUS
 
+Compile with `CFLAGS='-DTRACE=2 -DBENCHMARK' make tsunami.gpu.tst`
+
 Device: Mesa Intel(R) UHD Graphics (TGL GT1) (0x9a60)
 ...
 Video memory: 3072MB
 
-# Cartesian (GPU), 3603 steps, 26.5225 CPU, 114.4 real, 3.3e+07 points.step/s, 34 var
+# Cartesian (GPU), 3333 steps, 31.395 CPU, 136.9 real, 2.55e+07 points.step/s, 35 var
    calls    total     self   % total   function
-    7206    27.49    27.49     24.0%   foreach():/home/popinet/basilisk-gpu-devel/src/utils.h:268
-    7206    27.11    23.32     20.4%   foreach():/home/popinet/basilisk-gpu-devel/src/saint-venant.h:276
-    7206    15.37    15.37     13.4%   foreach():/home/popinet/basilisk-gpu-devel/src/saint-venant.h:322
-    7206    11.72    11.72     10.2%   foreach():/home/popinet/basilisk-gpu-devel/src/saint-venant.h:130
-       2     6.36     6.36      5.6%   foreach():/home/popinet/basilisk-gpu-devel/src/terrain.h:182
-    3604     4.88     4.88      4.3%   foreach():tsunami.gpu.c:306
-    3604     4.14     4.14      3.6%   gpu_reduction():/home/popinet/basilisk-gpu-devel/src/utils.h:167
-    3604     8.28     4.14      3.6%   foreach():/home/popinet/basilisk-gpu-devel/src/utils.h:175
-    7206     3.79     3.79      3.3%   gpu_reduction():/home/popinet/basilisk-gpu-devel/src/saint-venant.h:208
-    3604     5.88     2.98      2.6%   foreach():/home/popinet/basilisk-gpu-devel/src/utils.h:147
-    3604     2.90     2.90      2.5%   gpu_reduction():/home/popinet/basilisk-gpu-devel/src/utils.h:139
-    3604     2.20     2.20      1.9%   foreach():tsunami.gpu.c:314
-      10     1.53     1.53      1.3%   foreach():/home/popinet/basilisk-gpu-devel/src/okada.h:173
-    3604     3.96     0.97      0.8%   display_0():tsunami.gpu.c:316
-    1807     0.79     0.79      0.7%   foreach():/home/popinet/basilisk-gpu-devel/src/gpu/output.h:169
-       1     0.82     0.79      0.7%   output_field():/home/popinet/basilisk-gpu-devel/src/output.h:92
+    6666    42.55    35.54     26.0%   foreach():/src/saint-venant.h:275
+    6666    26.77    26.59     19.4%   foreach():/src/saint-venant.h:321
+    6666    25.04    22.61     16.5%   foreach():/src/utils.h:266
+    6666    11.20    10.94      8.0%   foreach():/src/saint-venant.h:129
+    3334     9.41     9.36      6.8%   gpu_reduction():/src/utils.h:167
+    3334     7.31     7.27      5.3%   gpu_reduction():/src/utils.h:139
+    3334     5.11     5.05      3.7%   foreach():tsunami.gpu.c:280
+    3334    14.02     4.52      3.3%   foreach():/src/utils.h:175
+    6666     4.28     4.24      3.1%   gpu_reduction():/src/saint-venant.h:207
+    3334     9.94     2.57      1.9%   foreach():/src/utils.h:147
+   26664     2.63     2.26      1.7%   foreach():/src/grid/gpu/cartesian.h:959
+   26664     2.05     1.74      1.3%   foreach():/src/grid/gpu/cartesian.h:962
+   90010     1.39     1.39      1.0%   build_shader():/src/grid/gpu/cartesian.h:650
+       2     0.96     0.96      0.7%   foreach():/src/terrain.h:182
 
 OpenGL renderer string: NVIDIA GeForce RTX 3050 Ti Laptop GPU/PCIe/SSE2
 Dedicated video memory: 4096 MB
 
-__NV_PRIME_RENDER_OFFLOAD=1 __GLX_VENDOR_LIBRARY_NAME=nvidia ./tsunami.gpu 2> /dev/null > out
+__NV_PRIME_RENDER_OFFLOAD=1 __GLX_VENDOR_LIBRARY_NAME=nvidia ./tsunami.gpu/tsunami.gpu 2> tsunami.gpu/log
 
-# Cartesian (GPU), 3603 steps, 22.7717 CPU, 22.9 real, 1.65e+08 points.step/s, 34 var
+# Cartesian (GPU), 3333 steps, 40.5748 CPU, 20.91 real, 1.67e+08 points.step/s, 35 var
    calls    total     self   % total   function
-       2     5.43     5.43     23.7%   foreach():/home/popinet/basilisk-gpu-devel/src/terrain.h:182
-    7206     4.09     3.41     14.9%   foreach():/home/popinet/basilisk-gpu-devel/src/saint-venant.h:276
-    7206     2.23     2.23      9.7%   foreach():/home/popinet/basilisk-gpu-devel/src/utils.h:268
-    7206     1.87     1.87      8.2%   foreach():/home/popinet/basilisk-gpu-devel/src/saint-venant.h:322
-    7206     1.75     1.75      7.7%   foreach():/home/popinet/basilisk-gpu-devel/src/saint-venant.h:130
-      10     1.43     1.43      6.2%   foreach():/home/popinet/basilisk-gpu-devel/src/okada.h:173
-    3604     1.34     1.34      5.8%   gpu_reduction():/home/popinet/basilisk-gpu-devel/src/utils.h:167
-    3604     1.03     1.03      4.5%   gpu_reduction():/home/popinet/basilisk-gpu-devel/src/utils.h:139
-       1     0.87     0.84      3.7%   output_field():/home/popinet/basilisk-gpu-devel/src/output.h:92
-    7206     0.69     0.69      3.0%   gpu_reduction():/home/popinet/basilisk-gpu-devel/src/saint-venant.h:208
-    3604     1.99     0.66      2.9%   foreach():/home/popinet/basilisk-gpu-devel/src/utils.h:175
-    3604     0.59     0.59      2.6%   foreach():tsunami.gpu.c:306
-    3604     1.54     0.50      2.2%   foreach():/home/popinet/basilisk-gpu-devel/src/utils.h:147
-    7206     8.52     0.33      1.4%   update_saint_venant():/home/popinet/basilisk-gpu-devel/src/saint-venant.h:332
-    3604     0.61     0.32      1.4%   display_0():tsunami.gpu.c:316
-    3604     0.26     0.26      1.1%   foreach():tsunami.gpu.c:314
-       6     0.05     0.05      0.2%   foreach():/home/popinet/basilisk-gpu-devel/src/grid/cartesian_gpu.h:823
-       1     5.78     0.04      0.2%   init_0():tsunami.gpu.c:225
-       2     0.03     0.03      0.1%   foreach():/home/popinet/basilisk-gpu-devel/src/grid/cartesian_gpu.h:1042
-     404     0.03     0.03      0.1%   foreach():/home/popinet/basilisk-gpu-devel/src/gpu/output.h:169
+    6666     5.57     3.86     18.5%   foreach():/src/saint-venant.h:275
+    6666     3.28     3.16     15.1%   foreach():/src/saint-venant.h:321
+    6666     3.08     2.15     10.3%   foreach():/src/utils.h:266
+    6666     2.08     1.91      9.1%   foreach():/src/saint-venant.h:129
+    3334     1.26     1.23      5.9%   gpu_reduction():/src/utils.h:167
+    3334     1.00     0.98      4.7%   gpu_reduction():/src/utils.h:139
+   90010     0.94     0.94      4.5%   build_shader():/src/grid/gpu/cartesian.h:650
+       2     0.88     0.88      4.2%   foreach():/src/terrain.h:182
+    3334     2.08     0.76      3.6%   foreach():/src/utils.h:175
+    3334     0.69     0.66      3.1%   foreach():tsunami.gpu.c:280
+   26664     0.88     0.66      3.1%   foreach():/src/grid/gpu/cartesian.h:959
+    6666    12.61     0.61      2.9%   update_saint_venant():/src/saint-venant.h:331
+    6666     0.59     0.58      2.8%   gpu_reduction():/src/saint-venant.h:207
+    3334     1.61     0.56      2.7%   foreach():/src/utils.h:147
+   26664     0.75     0.53      2.5%   foreach():/src/grid/gpu/cartesian.h:962
+      10     0.40     0.40      1.9%   foreach():/src/okada.h:173
+      52     0.34     0.34      1.6%   gpu_cpu_sync_scalar():/src/grid/gpu/cartesian.h:889
+  126640     0.29     0.29      1.4%   load_shader():/src/grid/gpu/cartesian.h:660
 
-__NV_PRIME_RENDER_OFFLOAD=1 __GLX_VENDOR_LIBRARY_NAME=nvidia ./tsunami.gpu 11 2> /dev/null > out
+__NV_PRIME_RENDER_OFFLOAD=1 __GLX_VENDOR_LIBRARY_NAME=nvidia ./tsunami.gpu/tsunami.gpu 11 2> tsunami.gpu/log
 
-# Cartesian (GPU), 6604 steps, 140.476 CPU, 141 real, 1.96e+08 points.step/s, 34 var
+# Cartesian (GPU), 6732 steps, 256.37 CPU, 147.2 real, 1.92e+08 points.step/s, 35 var
    calls    total     self   % total   function
-       2    36.45    36.45     25.8%   foreach():/home/popinet/basilisk-gpu-devel/src/terrain.h:182
-   13208    26.67    23.90     16.9%   foreach():/home/popinet/basilisk-gpu-devel/src/saint-venant.h:276
-   13208    16.40    16.40     11.6%   foreach():/home/popinet/basilisk-gpu-devel/src/utils.h:268
-   13208    12.35    12.35      8.8%   foreach():/home/popinet/basilisk-gpu-devel/src/saint-venant.h:322
-   13208    11.55    11.55      8.2%   foreach():/home/popinet/basilisk-gpu-devel/src/saint-venant.h:130
-    6605     5.90     5.90      4.2%   gpu_reduction():/home/popinet/basilisk-gpu-devel/src/utils.h:167
-      10     5.56     5.56      3.9%   foreach():/home/popinet/basilisk-gpu-devel/src/okada.h:173
-    6605    10.93     5.03      3.6%   foreach():/home/popinet/basilisk-gpu-devel/src/utils.h:175
-    6605     4.50     4.50      3.2%   gpu_reduction():/home/popinet/basilisk-gpu-devel/src/utils.h:139
-    6605     3.86     3.86      2.7%   foreach():tsunami.gpu.c:306
-    6605     8.18     3.68      2.6%   foreach():/home/popinet/basilisk-gpu-devel/src/utils.h:147
+   13464    39.70    32.06     21.8%   foreach():/src/saint-venant.h:275
+   13464    26.99    26.64     18.1%   foreach():/src/saint-venant.h:321
+   13464    20.49    17.92     12.2%   foreach():/src/utils.h:266
+   13464    15.50    15.03     10.2%   foreach():/src/saint-venant.h:129
+    6733     9.35     9.29      6.3%   gpu_reduction():/src/utils.h:167
+    6733     7.29     7.24      4.9%   gpu_reduction():/src/utils.h:139
+       2     5.93     5.93      4.0%   foreach():/src/terrain.h:182
+    6733    14.97     5.40      3.7%   foreach():/src/utils.h:175
+    6733     5.38     5.28      3.6%   foreach():tsunami.gpu.c:280
+    6733    11.71     4.32      2.9%   foreach():/src/utils.h:147
+   13464     4.24     4.21      2.9%   gpu_reduction():/src/saint-venant.h:207
+  181783     2.47     2.47      1.7%   build_shader():/src/grid/gpu/cartesian.h:650
+   13464    89.61     2.20      1.5%   update_saint_venant():/src/saint-venant.h:331
+   53856     2.76     2.03      1.4%   foreach():/src/grid/gpu/cartesian.h:959
+      10     1.55     1.55      1.1%   foreach():/src/okada.h:173
+   53856     2.05     1.51      1.0%   foreach():/src/grid/gpu/cartesian.h:962
+      52     1.48     1.48      1.0%   gpu_cpu_sync_scalar():/src/grid/gpu/cartesian.h:889
 
-__NV_PRIME_RENDER_OFFLOAD=1 __GLX_VENDOR_LIBRARY_NAME=nvidia ./tsunami.gpu 12 2> /dev/null > out
+__NV_PRIME_RENDER_OFFLOAD=1 __GLX_VENDOR_LIBRARY_NAME=nvidia ./tsunami.gpu/tsunami.gpu 12 2> tsunami.gpu/log
+
+# Cartesian (GPU), 13501 steps, 1918.92 CPU, 1295 real, 1.75e+08 points.step/s, 35 var
+   calls    total     self   % total   function
+   27002   411.53   353.63     27.3%   foreach():/src/saint-venant.h:275
+   27002   271.92   270.92     20.9%   foreach():/src/saint-venant.h:321
+   27002   158.28   144.87     11.2%   foreach():/src/utils.h:266
+   27002   119.76   118.45      9.1%   foreach():/src/saint-venant.h:129
+   13502    85.10    84.89      6.6%   gpu_reduction():/src/utils.h:167
+   13502    67.00    66.84      5.2%   gpu_reduction():/src/utils.h:139
+   13502   127.24    41.50      3.2%   foreach():/src/utils.h:175
+   13502    40.95    40.67      3.1%   foreach():tsunami.gpu.c:280
+       2    36.61    36.61      2.8%   foreach():/src/terrain.h:182
+   27002    36.56    36.48      2.8%   gpu_reduction():/src/saint-venant.h:207
+   13502   102.44    35.08      2.7%   foreach():/src/utils.h:147
+  108008    16.20    14.36      1.1%   foreach():/src/grid/gpu/cartesian.h:959
+  108008    14.91    13.37      1.0%   foreach():/src/grid/gpu/cartesian.h:962
+
 
 # Cartesian (GPU), 13204 steps, 910.882 CPU, 913.3 real, 2.43e+08 points.step/s, 34 var
    calls    total     self   % total   function
-       2   201.59   201.59     22.1%   foreach():/home/popinet/basilisk-gpu-devel/src/terrain.h:182
-   26408   196.85   182.77     20.0%   foreach():/home/popinet/basilisk-gpu-devel/src/saint-venant.h:276
-   26408   120.14   120.14     13.2%   foreach():/home/popinet/basilisk-gpu-devel/src/utils.h:268
-   26408    94.63    94.63     10.4%   foreach():/home/popinet/basilisk-gpu-devel/src/saint-venant.h:322
-   26408    85.97    85.97      9.4%   foreach():/home/popinet/basilisk-gpu-devel/src/saint-venant.h:130
-   13205    66.94    33.63      3.7%   foreach():/home/popinet/basilisk-gpu-devel/src/utils.h:175
-   13205    33.31    33.31      3.6%   gpu_reduction():/home/popinet/basilisk-gpu-devel/src/utils.h:167
+       2   201.59   201.59     22.1%   foreach():/src/terrain.h:182
+   26408   196.85   182.77     20.0%   foreach():/src/saint-venant.h:276
+   26408   120.14   120.14     13.2%   foreach():/src/utils.h:268
+   26408    94.63    94.63     10.4%   foreach():/src/saint-venant.h:322
+   26408    85.97    85.97      9.4%   foreach():/src/saint-venant.h:130
+   13205    66.94    33.63      3.7%   foreach():/src/utils.h:175
+   13205    33.31    33.31      3.6%   gpu_reduction():/src/utils.h:167
    13205    28.81    28.81      3.2%   foreach():tsunami.gpu.c:306
-   13205    52.86    26.73      2.9%   foreach():/home/popinet/basilisk-gpu-devel/src/utils.h:147
-   13205    26.13    26.13      2.9%   gpu_reduction():/home/popinet/basilisk-gpu-devel/src/utils.h:139
-      10    22.69    22.69      2.5%   foreach():/home/popinet/basilisk-gpu-devel/src/okada.h:173
+   13205    52.86    26.73      2.9%   foreach():/src/utils.h:147
+   13205    26.13    26.13      2.9%   gpu_reduction():/src/utils.h:139
+      10    22.69    22.69      2.5%   foreach():/src/okada.h:173
 */

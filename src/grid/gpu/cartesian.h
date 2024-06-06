@@ -21,6 +21,8 @@ GLSL: error: if-statement condition must be scalar boolean
 
 GLSL: error: value of type float cannot be assigned to variable of type int
 
+cartesian-common.h:872: GLSL: error: initializer of type float cannot be assigned to variable of type int (int i = sign(x);)
+
 */
 
 #include <grid/gpu/gpu.h>
@@ -71,7 +73,7 @@ typedef struct {
   _Attributes _backup[datasize/sizeof(real)];
   memcpy (_backup, _attribute, sizeof (_backup));
   static ForeachData _loop = {
-    .fname = S__FILE__, .line = S_LINENO, .first = 1, .parallel = 4
+    .fname = S__FILE__, .line = S_LINENO, .first = 1, .parallel = 3
   };
   struct {
     coord parameters;
@@ -229,25 +231,26 @@ static char * str_append_array (char * dst, const char * list[])
 #define str_append(dst, ...) str_append_array (dst, (const char *[]){__VA_ARGS__, NULL})
 
 static char glsl_preproc[] =
-  "// #line 189 \"" __FILE__ "\"\n"
+  "// #line 233 \"" __FILE__ "\"\n"
   "#define dimensional(x)\n"
   "#define real float\n"
   "#define coord vec3\n"
-  "struct scalar { int is, index; };\n"
+  "#define ivec ivec2\n"
+  "struct scalar { int i, index; };\n"
 #if dimension == 2
   "#define _coord vec2\n"
   "struct vector { scalar x, y; };\n"
   "struct tensor { vector x, y; };\n"
 #endif
   "#define Point ivec2\n"
-  "#define valt(s,i,j,k)"
-  "  _data[(point.x + i + (s).is*(N + 2))*(N + 2) + point.y + j]\n"
+  "#define valt(s,k,l,m)"
+  "  _data[(point.x + k + (s).i*(N + 2))*(N + 2) + point.y + l]\n"
   "#define _NVARMAX 65536\n"
   "#define NULL 0\n"
-  "#define val(s,i,j,k) ((s).is < _NVARMAX ? valt(s,i,j,k)"
-  " : _constant[clamp((s).is -_NVARMAX,0,_nconst-1)])\n"
+  "#define val(s,k,l,m) ((s).i < _NVARMAX ? valt(s,k,l,m)"
+  " : _constant[clamp((s).i -_NVARMAX,0,_nconst-1)])\n"
   "#define val_out_(s,i,j,k) valt(s,i,j,k)\n"
-  "#define val_red_(s) _data[(s).is*sq(N + 2) + (point.x - 1)*NY + point.y - 1]\n"
+  "#define val_red_(s) _data[(s).i*sq(N + 2) + (point.x - 1)*NY + point.y - 1]\n"
   "#define _attr(s,member) (_attr[(s).index].member)\n"
   "#define forin(type,s,list) for (int _i = 0; _i < list.length() - 1; _i++) { type s = list[_i];\n"
   "#define endforin() }\n"
@@ -304,7 +307,7 @@ static char * write_scalar (char * fs, scalar s)
 {
   char i[20], index[20];
   snprintf (i, 19, "%d", s.i);
-  snprintf (index, 19, "%d", is_constant(s) ? 0 : s.gpu.index - 1);
+  snprintf (index, 19, "%d", s.i < 0 || is_constant(s) ? 0 : s.gpu.index - 1);
   return str_append (fs, "{", i, ",", index, "}");
 }
 
@@ -420,7 +423,7 @@ char * build_shader (const External * externals, const ForeachData * loop,
     fs = str_append (fs, ",", a);
   }
   fs = str_append (fs, "};\n");
-  fs = str_append (fs, "layout(std430, binding = 1) buffer _data_layout { real _data[]; };\n");
+  fs = str_append (fs, "layout(std430, binding = 0) buffer _data_layout { real _data[]; };\n");
   
   /**
   Scalar field attributes */
@@ -443,10 +446,16 @@ char * build_shader (const External * externals, const ForeachData * loop,
   if (attributes) {
     fs = str_append (fs, "struct _Attributes {\n", attributes, "};\n");
     sysfree (attributes);
-    fs = str_append (fs, "const _Attributes _attr[]={");
+    int nindex = 0;
+    for (scalar s in baseblock)
+      if (s.gpu.index)
+	nindex++;
+    char s[20]; snprintf (s, 19, "%d", nindex);
+    fs = str_append (fs, "const _Attributes _attr[", s, "]={");
+    nindex = 0;
     for (scalar s in baseblock)
       if (s.gpu.index) {
-	fs = str_append (fs, "{");
+	fs = str_append (fs, nindex ? ",{" : "{"); nindex++;
 	bool first = true;
 	char * data = (char *) &_attribute[s.i];
 	for (const External * g = externals; g; g = g->next)
@@ -467,6 +476,11 @@ char * build_shader (const External * externals, const ForeachData * loop,
 	      char s[20]; snprintf (s, 19, "%g", *((double *)(data + g->nd)));
 	      fs = str_append (fs, s);
 	    }
+	    else if (!strcmp (g->type, "ivec")) {
+	      ivec * v = (ivec *)(data + g->nd);
+	      char s[20]; snprintf (s, 19, "{%d,%d}", v->x, v->y);
+	      fs = str_append (fs, s);
+	    }
 	    else if (!strcmp (g->type, "*func()")) {
 	      void * func = *((void **)(data + g->nd));
 	      if (!func)
@@ -480,8 +494,7 @@ char * build_shader (const External * externals, const ForeachData * loop,
 	    else
 	      fs = str_append (fs, "not implemented");
 	  }
-	// fs = str_append (fs, i < nvar - 1 ? "}," : "}");
-	fs = str_append (fs, "},");
+	fs = str_append (fs, "}");
       }
     fs = str_append (fs, "};\n");
   }
@@ -567,6 +580,15 @@ char * build_shader (const External * externals, const ForeachData * loop,
 	char nl[20];
 	snprintf (nl, 19, "%d", *((int *)g->pointer));
 	fs = str_append (fs, "const int nl = ", nl, ";\n");
+      }
+      else if (GPUContext.fragment_shader && (region->n.x > 1 || region->n.y > 1) &&
+	       !strcmp (g->type, "coord") && !strcmp (g->name, "p")) {
+
+	/**
+	'coord p' is assumed to be the parameter of a region. This is
+	not flexible (the parameter must be called 'p') and should be improved. */
+	
+	fs = str_append (fs, "coord p = vec3((vsPoint*vsScale + vsOrigin)*L0 + vec2(X0, Y0),0);\n");
       }
       else {
 	char * type = !strcmp (g->type, "float") || !strcmp (g->type, "double") ? "real" :
@@ -710,7 +732,10 @@ void gpu_init()
     glfwWindowHint (GLFW_SAMPLES, 0);
     glfwWindowHint (GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
     glfwWindowHint (GLFW_OPENGL_FORWARD_COMPAT, GL_TRUE);
-  
+#if DEBUG_OPENGL    
+    glfwWindowHint (GLFW_OPENGL_DEBUG_CONTEXT, GL_TRUE);
+#endif
+    
     GPUContext.window = glfwCreateWindow (1, 1, "Cartesian grid on GPU", NULL, NULL);
     if (!GPUContext.window) {
       glfwTerminate();
@@ -722,55 +747,23 @@ void gpu_init()
     // load GLAD.
     assert (gladLoadGLLoader ((GLADloadproc)glfwGetProcAddress));
     assert (glBindImageTexture);
-    
-    // Bind and create VAO, otherwise, we can't do anything in OpenGL.
-    GL_C (glGenVertexArrays (1, &GPUContext.vao));
-    GL_C (glBindVertexArray (GPUContext.vao));
 
+#if DEBUG_OPENGL    
+    GLint flags;
+    GL_C (glGetIntegerv (GL_CONTEXT_FLAGS, &flags));
+    if (flags & GL_CONTEXT_FLAG_DEBUG_BIT) {
+      GL_C (glEnable(GL_DEBUG_OUTPUT));
+      GL_C (glEnable(GL_DEBUG_OUTPUT_SYNCHRONOUS));
+      GL_C (glDebugMessageCallback (GLDebugMessageCallback, NULL));
+      GL_C (glDebugMessageControl (GL_DONT_CARE, GL_DONT_CARE, GL_DONT_CARE, 0, NULL, GL_TRUE));
+    }
+#endif // DEBUG_OPENGL
+    
     GL_C (glGenBuffers (1, &GPUContext.ssbo));
-    GL_C (glGenFramebuffers(1, &GPUContext.fbo0));
 
-    // create vertices of fullscreen quad.
-    float vertices[] = {
-      +0.0f, +0.0f,
-      +1.0f, +0.0f,
-      +0.0f, +1.0f,
-      +1.0f, +0.0f,
-      +1.0f, +1.0f,
-      +0.0f, +1.0f
-    };
-    // upload geometry to GPU.
-    GL_C (glGenBuffers (1, &GPUContext.vbo));
-    GL_C (glBindBuffer (GL_ARRAY_BUFFER, GPUContext.vbo));
-    GL_C (glBufferData (GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW));
-
-    // setup some reasonable default GL state.
-    GL_C (glDisable (GL_DEPTH_TEST));
-    GL_C (glDepthMask (false));
-    GL_C (glDisable (GL_BLEND));
-    GL_C (glColorMask (GL_TRUE, GL_TRUE, GL_TRUE, GL_TRUE));
-    GL_C (glEnable (GL_CULL_FACE));
-    GL_C (glFrontFace (GL_CCW));
-    GL_C (glBindFramebuffer (GL_FRAMEBUFFER, 0));
-    GL_C (glUseProgram (0));
-    GL_C (glBindTexture (GL_TEXTURE_2D, 0));
-    GL_C (glDepthFunc (GL_LESS));
-    GL_C (glPointSize (1));
-
-    // enable vertex buffer used for full screen quad rendering. 
-    // this buffer is used for all rendering, from now on.
-    GL_C (glEnableVertexAttribArray ((GLuint)0));
-    GL_C (glBindBuffer (GL_ARRAY_BUFFER, GPUContext.vbo));
-    GL_C (glVertexAttribPointer ((GLuint)0, 2, GL_FLOAT, GL_FALSE,
-				 2*sizeof(float), (void*)0));
-
-    GL_C (glBindFramebuffer (GL_FRAMEBUFFER, GPUContext.fbo0));
-    
     free_solver_func_add (gpu_free);
     free_solver_func_add (gpu_free_solver);
   }
-  
-  GL_C (glViewport (0, 0, cartesian->n, cartesian->n));
   
   gpu_cartesian->shaders = kh_init (STR);
   for (int i = 0; i < 2; i++)
@@ -1065,6 +1058,7 @@ static bool doloop_on_gpu (ForeachData * loop, const RegionParameters * region,
 	       strcmp (n->type, "int") &&
 	       strcmp (n->type, "bool") &&
 	       strcmp (n->type, "enum") &&
+	       strcmp (n->type, "ivec") &&
 	       strcmp (n->type, "*func()") &&
 	       strcmp (n->type, "func()")) {
 	if (loop->first)
@@ -1131,6 +1125,13 @@ static bool doloop_on_gpu (ForeachData * loop, const RegionParameters * region,
       g->s = s;
     }
 
+  /**
+  For the Intel driver, it looks like this is necessary so that the
+  compiled shader is independent from the exact location of the
+  storage buffer. */
+  
+  GL_C (glBindBufferBase (GL_SHADER_STORAGE_BUFFER, 0, 0));
+ 
   char * shader = build_shader (externals, loop, region);
   if (shader) {
 
@@ -1195,7 +1196,7 @@ static bool doloop_on_gpu (ForeachData * loop, const RegionParameters * region,
 
   GL_C (glUseProgram (shaderid));
 
-  GL_C (glBindBufferBase (GL_SHADER_STORAGE_BUFFER, 1, GPUContext.ssbo));
+  GL_C (glBindBufferBase (GL_SHADER_STORAGE_BUFFER, 0, GPUContext.ssbo));
 
   /**
   ## Set global variables */
@@ -1319,7 +1320,7 @@ static bool doloop_on_gpu (ForeachData * loop, const RegionParameters * region,
   /**
   This is a region */
   
-  else if (region->n.x && region->n.y) {
+  else if (region->n.x || region->n.y) {
     float vsScale[] = {
       (region->box[1].x - region->box[0].x)/L0,
       (region->box[1].y - region->box[0].y)/L0
@@ -1375,20 +1376,21 @@ bool gpu_end_stencil (ForeachData * loop,
 		      External * externals,
 		      const char * kernel)
 {
-  bool on_gpu = (loop->parallel == 1 || loop->parallel >= 3) && (loop->first || loop->data);
+  bool on_gpu = (loop->parallel == 1 || loop->parallel == 3) && (loop->first || loop->data);
   if (on_gpu) {
-#if 1    
-    if (loop->parallel <= 3) { // loop->parallel == 4 is a noauto and gpu loop, fixme: never equal to 4
+    if (!region->boundary) {
+      bool fragment_shader = GPUContext.fragment_shader;
+      GPUContext.fragment_shader = false;
       swap (Boundary **, boundaries, gpu_cartesian->boundaries);
       boundary_stencil (loop);
       swap (Boundary **, boundaries, gpu_cartesian->boundaries);
+      GPUContext.fragment_shader = fragment_shader;
     }
-#endif
     on_gpu = doloop_on_gpu (loop, region, externals, kernel);
     if (!on_gpu) {
       fprintf (stderr, "%s:%d: %s: foreach() done on CPU (see GLSL errors above)\n",
-	       loop->fname, loop->line, loop->parallel >= 3 ? "error" : "warning");
-      if (loop->parallel >= 3) // must run on GPU but cannot run
+	       loop->fname, loop->line, loop->parallel == 3 ? "error" : "warning");
+      if (loop->parallel == 3) // must run on GPU but cannot run
 	exit (1);
       loop->data = NULL;
     }

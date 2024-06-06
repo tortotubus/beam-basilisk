@@ -29,29 +29,10 @@ real cpu_reduction (GLuint src, size_t offset, size_t nb, const char op)
 
 real gpu_reduction (scalar s, const char op, const RegionParameters * region, size_t nb)
 {
-  real result = 0.;
   size_t offset = s.i*sq(cartesian->n + 2);
-
-  if (region->n.x == 1 && region->n.y == 1) {
-    int i =  (region->p.x - X0)/L0*cartesian->n;
-    int j =  (region->p.y - Y0)/L0*cartesian->n;
-    if (i >= 0 && i < cartesian->n && j >= 0 && j < cartesian->n) {
-      GL_C (glBindBuffer (GL_SHADER_STORAGE_BUFFER, GPUContext.ssbo));
-      real * a = glMapBufferRange (GL_SHADER_STORAGE_BUFFER,
-				   offset*sizeof(real), nb*sizeof(real),
-				   GL_MAP_READ_BIT);
-      assert (a);
-      result = a[i*cartesian->n + j];
-      assert (glUnmapBuffer (GL_SHADER_STORAGE_BUFFER));
-      GL_C (glBindBuffer (GL_SHADER_STORAGE_BUFFER, 0));
-    }
-    else
-      assert (false); // not implemented yet
-    return result;
-  }
-
   const int stride = 64, nwgr = 64;
-  if (nb < nwgr*stride)
+  bool is_foreach_point = (region->n.x == 1 && region->n.y == 1);
+  if (!is_foreach_point && nb < nwgr*stride)
     return cpu_reduction (GPUContext.ssbo, offset, nb, op);
   
   GLuint * br = gpu_cartesian->reduct;
@@ -116,11 +97,31 @@ real gpu_reduction (scalar s, const char op, const RegionParameters * region, si
   GLint lnb = glGetUniformLocation (shader, "nb");
   assert (lnb >= 0);
   GLint lnbr = glGetUniformLocation (shader, "nbr");
-  assert (lnbr >= 0);  
-  GL_C (glUniform1ui (loffset, offset));
+  assert (lnbr >= 0);
+
+  if (is_foreach_point) {
+    real result = 0.;
+    int i = (region->p.x - X0)/L0*cartesian->n;
+    int j = (region->p.y - Y0)/L0*cartesian->n;
+    if (i >= 0 && i < cartesian->n && j >= 0 && j < cartesian->n) {
+      offset += i*cartesian->n + j;
+      GL_C (glUniform1ui (loffset, offset));
+      GL_C (glBindBufferBase (GL_SHADER_STORAGE_BUFFER, 0, GPUContext.ssbo));
+      GL_C (glBindBufferBase (GL_SHADER_STORAGE_BUFFER, 1, br[0]));
+      GL_C (glUniform1ui (lnbr, 1));
+      GL_C (glUniform1ui (lnb, 1));
+      GL_C (glDispatchCompute (1, 1, 1));
+      GL_C (glMemoryBarrier (GL_ALL_BARRIER_BITS));
+      GL_C (glBindBuffer (GL_SHADER_STORAGE_BUFFER, br[0]));
+      GL_C (glGetBufferSubData (GL_SHADER_STORAGE_BUFFER, 0, sizeof (real), &result));
+      GL_C (glBindBuffer (GL_SHADER_STORAGE_BUFFER, 0));
+    }
+    return result;
+  }
   
-  int src = 0, dst = 1;
+  GL_C (glUniform1ui (loffset, offset));
   GL_C (glBindBufferBase (GL_SHADER_STORAGE_BUFFER, 0, GPUContext.ssbo));  
+  int src = 0, dst = 1;
   while (nb >= nwgr*stride) {
     GL_C (glBindBufferBase (GL_SHADER_STORAGE_BUFFER, 1, br[dst]));      
     GL_C (glUniform1ui (lnbr, nb));

@@ -14,10 +14,10 @@ int main (int argc, char * argv[])
   run();
 }
 
-#if 0 // _GPU
+#if 0
 event display (i++)
 {
-  output_ppm (h, map = blue_white_red, n = 1024, spread = -1, fps = 30, linear = true);
+  output_ppm (h, fp = NULL, map = blue_white_red, n = 1024, spread = -1, fps = 30, linear = true);
 }
 #endif
 
@@ -98,12 +98,12 @@ CFLAGS='-DTRACE=2 -grid=cartesian -fopenmp' make bump2D.tst
 cd bump2D
 OMP_NUM_THREADS=8 ./bump2D 10 2> /dev/null
 
-# Cartesian, 3615 steps, 3220.14 CPU, 402.8 real, 9.41e+06 points.step/s, 28 var
+# Cartesian, 3615 steps, 2115.91 CPU, 264.5 real, 1.43e+07 points.step/s, 27 var
    calls    total     self   % total   function
-    7230   303.74   301.49     74.8%   update_saint_venant():/src/saint-venant.h:335
-    7230    98.86    98.86     24.5%   advance_saint_venant():/src/saint-venant.h:133
-   14460     2.24     2.24      0.6%   boundary_internal():/src/grid/cartesian-common.h:531
-       1   402.81     0.20      0.1%   run():/src/predictor-corrector.h:75
+    7230   223.97   222.45     84.1%   update_saint_venant():/src/saint-venant.h:331
+    7230    40.40    40.40     15.3%   advance_saint_venant():/src/saint-venant.h:130
+   14460     1.52     1.52      0.6%   boundary_internal():/src/grid/cartesian-common.h:530
+       1   264.52     0.14      0.1%   run():/src/predictor-corrector.h:75
 ~~~
 
 with compute shaders
@@ -156,16 +156,15 @@ __NV_PRIME_RENDER_OFFLOAD=1 __GLX_VENDOR_LIBRARY_NAME=nvidia ./bump2D-gpu/bump2D
 
 ./bump2D-gpu/bump2D-gpu 10 2> /dev/null
 
-# Cartesian (GPU), 3615 steps, 26.8011 CPU, 137.2 real, 2.76e+07 points.step/s, 28 var
+# Cartesian (GPU), 3615 steps, 16.2424 CPU, 121.9 real, 3.11e+07 points.step/s, 28 var
    calls    total     self   % total   function
-    7230    61.99    45.11     32.9%   foreach():/src/saint-venant.h:275
-    7230    36.60    27.04     19.7%   foreach():/src/utils.h:266
-    7230    19.09    18.38     13.4%   foreach():/src/saint-venant.h:321
-    7230    17.43    16.37     11.9%   foreach():/src/saint-venant.h:129
-   28920     9.43     7.86      5.7%   foreach():/src/grid/gpu/cartesian.h:964
-    7230     6.95     6.88      5.0%   gpu_reduction():/src/saint-venant.h:207
-   28920     7.89     6.58      4.8%   foreach():/src/grid/gpu/cartesian.h:967
-   86763     5.20     5.20      3.8%   build_shader():/src/grid/gpu/cartesian.h:626
-    7230   119.27     1.58      1.2%   update_saint_venant():/src/saint-venant.h:331
+    7230    55.64    44.61     36.6%   foreach():/src/saint-venant.h:275
+    7230    31.14    25.77     21.1%   foreach():/src/utils.h:266
+    7230    18.19    17.83     14.6%   foreach():/src/saint-venant.h:321
+    7230    15.78    15.27     12.5%   foreach():/src/saint-venant.h:129
+    7230     5.57     5.53      4.5%   gpu_reduction():/src/saint-venant.h:207
+   28920     5.54     4.73      3.9%   foreach():/src/grid/gpu/cartesian.h:945
+   28920     4.25     3.62      3.0%   foreach():/src/grid/gpu/cartesian.h:948
+   86763     2.57     2.57      2.1%   build_shader():/src/grid/gpu/cartesian.h:650
 ~~~
 */

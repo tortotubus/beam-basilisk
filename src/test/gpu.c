@@ -390,8 +390,22 @@ int main (int argc, char * argv[])
       sum += x;
     }
     fprintf (stderr, "26d) %g %g\n", sum, max);
-  }  
+  }
 
+  /**
+  ## Staggering */
+
+  {
+    init_grid (1);
+    vertex scalar a[];
+    foreach() {
+      double b = a[]; b = b; // fixme: a needs to be used
+      v.x[] = a.d.x, v.y[] = a.d.y;
+    }
+    foreach (serial)
+      fprintf (stderr, "27) %g %g\n", v.x[], v.y[]);
+  }
+  
   /**
   ## Other tests */
   
@@ -447,7 +461,7 @@ int main (int argc, char * argv[])
 	   N, elapsed, grid->tn*iter/elapsed);
 
   stats sp = statsf (p);
-  fprintf (stderr, "27) sp: %g %g %g\n", sp.min, sp.sum, sp.max);
+  fprintf (stderr, "sp: %g %g %g\n", sp.min, sp.sum, sp.max);
   
 #if 0
   foreach (serial)

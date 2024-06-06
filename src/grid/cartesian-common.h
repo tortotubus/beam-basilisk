@@ -857,27 +857,27 @@ tensor init_symmetric_tensor (tensor t, const char * name)
   return init_tensor (t, name);
 }
 
-static double interpolate_linear_shifted (Point point, scalar v, coord shift,
-					  double xp = 0., double yp = 0., double zp = 0.)
+static double interpolate_linear (Point point, scalar v,
+				  double xp = 0., double yp = 0., double zp = 0.)
 {
 #if dimension == 1
-  x = (xp - x)/Delta - shift.x;
+  x = (xp - x)/Delta - v.d.x/2.;
   int i = sign(x);
   x = fabs(x);
   /* linear interpolation */
   return v[]*(1. - x) + v[i]*x;
 #elif dimension == 2
-  x = (xp - x)/Delta - shift.x;
-  y = (yp - y)/Delta - shift.y;
+  x = (xp - x)/Delta - v.d.x/2.;
+  y = (yp - y)/Delta - v.d.y/2.;
   int i = (int) sign(x), j = (int) sign(y);
   x = fabs(x); y = fabs(y);
   /* bilinear interpolation */
   return ((v[]*(1. - x) + v[i]*x)*(1. - y) + 
 	  (v[0,j]*(1. - x) + v[i,j]*x)*y);
 #else // dimension == 3
-  x = (xp - x)/Delta - shift.x;
-  y = (yp - y)/Delta - shift.y;
-  z = (zp - z)/Delta - shift.z;
+  x = (xp - x)/Delta - v.d.x/2.;
+  y = (yp - y)/Delta - v.d.y/2.;
+  z = (zp - z)/Delta - v.d.z/2.;
   int i = sign(x), j = sign(y), k = sign(z);
   x = fabs(x); y = fabs(y); z = fabs(z);
   /* trilinear interpolation */
@@ -888,25 +888,13 @@ static double interpolate_linear_shifted (Point point, scalar v, coord shift,
 #endif  
 }
 
-double interpolate_linear (Point point, scalar v,
-			   double xp = 0., double yp = 0., double zp = 0.)
-{
-  coord shift;
-  foreach_dimension()
-    shift.x = v.d.x/2.;
-  return interpolate_linear_shifted (point, v, shift, xp, yp, zp);
-}
-
 trace
 double interpolate (scalar v, double xp = 0., double yp = 0., double zp = 0.,
 		    bool linear = true)
 {
-  coord shift;
-  foreach_dimension()
-    shift.x = v.d.x/2.;
   double val = nodata;
   foreach_point (xp, yp, zp, reduction (min:val))
-    val = linear ? interpolate_linear_shifted (point, v, shift, xp, yp, zp) : v[];
+    val = linear ? interpolate_linear (point, v, xp, yp, zp) : v[];
   return val;
 }
 
@@ -922,12 +910,9 @@ void interpolate_array (scalar * list, coord * a, int n, double * v,
 #if _GPU
     coord p = a[i];
     for (scalar s in list) {
-      coord shift;
-      foreach_dimension()
-	shift.x = s.d.x/2.;
       double value = nodata;
       foreach_point (p.x, p.y, p.z, reduction(min:value))
-	value = !linear ? s[] : interpolate_linear_shifted (point, s, shift, p.x, p.y, 0.);
+	value = !linear ? s[] : interpolate_linear (point, s, p.x, p.y, 0.);
       *(w++) = value;
     }
 #else // !_GPU

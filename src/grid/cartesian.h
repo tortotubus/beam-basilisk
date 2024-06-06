@@ -12,7 +12,7 @@ typedef double real;
 
 #define _I     (point.i - 1)
 #define _J     (point.j - 1)
-#define _DELTA (1./point.n)
+#define _DELTA (1./N)
 
 typedef struct {
   Grid g;

@@ -141,20 +141,22 @@ typedef struct _Point Point;
 // attributes for each scalar
 
 typedef struct {
+  int x;
+#if dimension > 1
+  int y;
+#endif
+#if dimension > 2
+  int z;
+#endif  
+} ivec;
+
+typedef struct {
   double (** boundary)             (Point, Point, scalar, void *);
   double (** boundary_homogeneous) (Point, Point, scalar, void *);
   double (* gradient)              (double, double, double);
   void   (* delete)                (scalar);
   char * name;
-  struct {
-    int x;
-#if dimension > 1
-    int y;
-#endif
-#if dimension > 2
-    int z;
-#endif
-  } d; // staggering
+  ivec d; // staggering
   vector v;
   int face;
   bool   nodump, freed;
@@ -527,7 +529,6 @@ typedef struct {
   float r, g, b, a;
 } vec4;
 
-@define mix(a,b,c) (c=c,a)
 @define attroffset(x) (offsetof(_Attributes,x))
 
 #if dimension == 1
