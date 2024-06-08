@@ -1,10 +1,10 @@
 /**
-# Coupling of two solvers
+# Coupling two solvers
 
-This example illustrates how to couple two solvers. In this
-example we couple different versions of the Navier-Stokes solver: one
-with embedded boundaries and the other without, but the technique is
-applicable to any combination of solvers, grids, dimensions etc.
+In this example we couple different versions of the Navier-Stokes
+solver: one with embedded boundaries and the other without, but the
+technique is applicable to any combination of solvers, grids,
+dimensions etc.
 
 The goal of this example is to use the output of one solver (the
 "[slave](slave.c)"), which generates a well-known [von Karman vortex
