@@ -25,7 +25,7 @@ call	boundary		basilisk	boundary-conditions
 call	boundary_flux		basilisk	boundary-conditions-and-stencils
 call	diagonalize		basilisk	diagonalization
 call	event			basilisk	events
-call	einstein_sum		basilisk	einstein_sum
+call	einstein_sum		basilisk	einstein-summation
 call	foreach			basilisk	iterators
 call	foreach_boundary	basilisk	foreach_boundary
 call	foreach_dimension	basilisk	foreach_dimension
