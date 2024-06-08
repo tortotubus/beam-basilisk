@@ -56,18 +56,14 @@ void slave_step (double t0)
       }
     assert (slave);
 
-    double dtmax = DT;
-    DT = t0;
     iter = 0, t = 0., dt = 1.;
     events (true);
     iter = inext, t = tnext;
-    DT = dtmax;
   }
 
   slave->t = t0;
   while (t0 - t > TEPS*t0 && events (true))
     iter = inext, t = tnext;
-  assert (fabs(t - t0) <= TEPS*t0);
 }
 
 void slave_stop()

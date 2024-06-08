@@ -33,5 +33,5 @@ master.s: slave.o
 master.tst: CFLAGS = -Wall -O2 # fixme: does not work with OpenMP yet
 
 slave.o: $(QCC) slave.c ../slave.h
-	$(QCC) -Wall -O2 -D_OBJECT -c slave.c
+	$(QCC) -Wall -O2 -fno-common -D_OBJECT -c slave.c
 	objcopy -G slave_step -G slave_stop -G slave_interpolate slave.o
