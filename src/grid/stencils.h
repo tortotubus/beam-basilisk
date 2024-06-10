@@ -49,8 +49,9 @@ typedef struct {
 
 // fixme: this should be rewritten using better macros
 @def foreach_stencil(...) {
-  static ForeachData _loop = {
-    .fname = S__FILE__, .line = S_LINENO, .first = 1
+  static int _first = 1.;
+  ForeachData _loop = {
+    .fname = S__FILE__, .line = S_LINENO, .first = _first
   };
   if (baseblock) for (scalar s = baseblock[0], * i = baseblock;
 		s.i >= 0; i++, s = *i) {
@@ -64,7 +65,7 @@ typedef struct {
 @def end_foreach_stencil()
   check_stencil (&_loop);
   boundary_stencil (&_loop);
-  _loop.first = 0;
+  _first = 0;
 }
 @
 

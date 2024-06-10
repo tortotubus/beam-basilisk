@@ -30,8 +30,7 @@ shoal-ml.tst: CFLAGS += -DML=1
 # Coupled solvers
 
 master.s: slave.o
-master.tst: CFLAGS = -Wall -O2 # fixme: does not work with OpenMP yet
 
-slave.o: $(QCC) slave.c ../slave.h
-	$(QCC) -Wall -O2 -fno-common -D_OBJECT -c slave.c
+slave.o: $(QCC) slave.c ../slave.h Makefile
+	$(QCC) $(CFLAGS) -fno-common -D_OBJECT -c slave.c
 	objcopy -G slave_step -G slave_stop -G slave_interpolate slave.o
