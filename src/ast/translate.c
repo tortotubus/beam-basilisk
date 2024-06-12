@@ -3814,11 +3814,9 @@ static void stencils (Ast * n, Stack * stack, void * data)
 
   case sym_foreach_inner_statement: {
     AstTerminal * t = ast_left_terminal(n);
-    Ast * foreach = inforeach (n);
-    if (foreach) {
-      if (!strcmp (t->start, "foreach_block"))
-	str_append (t->start, "_inner");
-    }
+    if (!strcmp (t->start, "foreach_block") &&
+	(inforeach (n) || point_declaration (stack)))
+      str_append (t->start, "_inner");
     ast_before (n, "{");
     ast_after (n, "end_", t->start, "()}");
     break;
