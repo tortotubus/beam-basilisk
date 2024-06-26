@@ -146,9 +146,19 @@ Ast * implicit_type_cast (Ast * n, Stack * stack)
 
   case sym_function_call: {
     Ast * identifier = ast_function_call_identifier (n);
-    if (identifier && (!strcmp (ast_terminal (identifier)->start, "val") ||
-		       !strcmp (ast_terminal (identifier)->start, "val_out_")))
+    if (identifier) {
+      if (!strcmp (ast_terminal (identifier)->start, "val") ||
+	  !strcmp (ast_terminal (identifier)->start, "val_out_"))
       return (Ast *) &ast_double;
+      identifier = ast_identifier_declaration (stack, ast_terminal (identifier)->start);
+      Ast * declaration = ast_parent (identifier, sym_function_declaration);
+      if (!declaration)
+	declaration = ast_parent (identifier, sym_declaration);
+      if (declaration)
+	return implicit_type_cast (ast_child (declaration, sym_declaration_specifiers), stack);
+      else
+	return NULL;
+    }
     break;
   }
 
@@ -441,7 +451,7 @@ void kernel (Ast * n, Stack * stack, void * data)
   
     Kernels often need to know the type of access to fields (i.e. read
     or write). Here we append "_out" to stencil access functions linked
-    to assignments (i.e. "write" operations ). */
+    to assignments (i.e. "write" operations). */
     
     if (!strcmp (t->start, "val")) {
       if (ast_child (ast_parent (n, sym_assignment_expression), sym_assignment_operator))
