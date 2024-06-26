@@ -869,7 +869,7 @@ static double interpolate_linear (Point point, scalar v,
 #elif dimension == 2
   x = (xp - x)/Delta - v.d.x/2.;
   y = (yp - y)/Delta - v.d.y/2.;
-  int i = (int) sign(x), j = (int) sign(y);
+  int i = sign(x), j = sign(y);
   x = fabs(x); y = fabs(y);
   /* bilinear interpolation */
   return ((v[]*(1. - x) + v[i]*x)*(1. - y) + 
