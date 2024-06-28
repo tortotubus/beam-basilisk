@@ -1,7 +1,7 @@
 131 constraints, 131 unknowns
 [0]  /src/grid/array.h:25: '4096'
-[0]  /src/common.h:388: '1.[0]'
-[0]  /src/common.h:389: '1.[0]'
+[0]  /src/common.h:390: '1.[0]'
+[0]  /src/common.h:391: '1.[0]'
 [0]  /src/multilayer.h:142: '0'
 [0]  /src/multilayer.h:164: '1'
 [0]  /src/multilayer.h:206: 'sumjl = 0.'
