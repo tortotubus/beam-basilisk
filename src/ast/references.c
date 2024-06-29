@@ -74,36 +74,37 @@ void add_external_reference (const char * name, Stack * stack, Accelerator * a)
 static
 void external_references (Ast * n, Stack * stack, void * data)
 {
-  if (n->sym == sym_IDENTIFIER) {
-    if (n->parent->sym == sym_primary_expression)
-      add_external_reference (ast_terminal (n)->start, stack, data);
-    else if (ast_attribute_access (ast_ancestor (n, 3), stack)) {
+  if (ast_schema (n->parent, sym_primary_expression,
+		  0, sym_IDENTIFIER) &&
+      strcmp (ast_terminal (n)->start, "_attribute"))
+    add_external_reference (ast_terminal (n)->start, stack, data);
+  else if ((n->sym == sym_IDENTIFIER && ast_attribute_access (ast_ancestor (n, 3), stack)) ||
+	   (n = ast_attribute_array_access (ast_ancestor (n, 3)))) {
       
-      /**
-      Scalar attribute */
+    /**
+    Scalar attribute */
 
-      Accelerator * a = data;
-      Ast * found = fast_stack_find (a->attributes, ast_terminal (n)->start);
-      if (!found) {
-	Ast * attributes = ast_find (ast_ancestor (ast_identifier_declaration (stack, "_Attributes"), 6),
-				     sym_struct_declaration_list);
-	assert (attributes);
-	found = NULL;
-	foreach_item (attributes, 1, decl) {
-	  Ast * list = ast_schema (decl, sym_struct_declaration,
-				   1, sym_struct_declarator_list);
-	  foreach_item (list, 2, j) {
-	    Ast * identifier = ast_find (j, sym_IDENTIFIER);
-	    if (identifier && !strcmp (ast_terminal (identifier)->start, ast_terminal (n)->start)) {
-	      found = identifier; break;
-	    }
+    Accelerator * a = data;
+    Ast * found = fast_stack_find (a->attributes, ast_terminal (n)->start);
+    if (!found) {
+      Ast * attributes = ast_find (ast_ancestor (ast_identifier_declaration (stack, "_Attributes"), 6),
+				   sym_struct_declaration_list);
+      assert (attributes);
+      found = NULL;
+      foreach_item (attributes, 1, decl) {
+	Ast * list = ast_schema (decl, sym_struct_declaration,
+				 1, sym_struct_declarator_list);
+	foreach_item (list, 2, j) {
+	  Ast * identifier = ast_find (j, sym_IDENTIFIER);
+	  if (identifier && !strcmp (ast_terminal (identifier)->start, ast_terminal (n)->start)) {
+	    found = identifier; break;
 	  }
-	  if (found)
-	    break;
 	}
 	if (found)
-	  stack_push (a->attributes, &found);
+	  break;
       }
+      if (found)
+	stack_push (a->attributes, &found);
     }
   }
 }

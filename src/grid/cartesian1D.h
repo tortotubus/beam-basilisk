@@ -84,7 +84,7 @@ static void box_boundary_level_normal (const Boundary * b, scalar * list, int l)
   }
 }
 
-static double periodic_bc (Point point, Point neighbor, scalar s, void * data);
+static double periodic_bc (Point point, Point neighbor, scalar s, bool * data);
 
 static void box_boundary_level (const Boundary * b, scalar * list, int l)
 {

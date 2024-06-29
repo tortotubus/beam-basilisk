@@ -32,10 +32,6 @@ int main (int argc, char * argv[])
 {
   origin (-0.5, -0.5);
   DT = .1[0,1];
-#if _GPU  
-  periodic (right);
-  periodic (top);
-#endif
   
   /**
   The scalar field `cf` is a "vof concentration" associated with phase
@@ -250,33 +246,11 @@ Dedicated video memory: 4096 MB
 
 __NV_PRIME_RENDER_OFFLOAD=1 __GLX_VENDOR_LIBRARY_NAME=nvidia  ./reversed.gpu/reversed.gpu 10 2> /dev/null | grep -a steps
 
-# Cartesian (GPU), 963 steps, 0.608312 CPU, 0.6094 real, 1.62e+06 points.step/s, 13 var
-# Cartesian (GPU), 1880 steps, 0.877724 CPU, 0.8778 real, 8.77e+06 points.step/s, 15 var
-# Cartesian (GPU), 3720 steps, 1.85479 CPU, 1.855 real, 3.29e+07 points.step/s, 15 var
-# Cartesian (GPU), 7395 steps, 4.09398 CPU, 4.094 real, 1.18e+08 points.step/s, 15 var
-# Cartesian (GPU), 14735 steps, 10.7966 CPU, 10.8 real, 3.58e+08 points.step/s, 15 var
-# Cartesian (GPU), 29410 steps, 48.3212 CPU, 48.32 real, 6.38e+08 points.step/s, 15 var
-~~~
-
-with compute shaders
-
-~~~bash
-# Cartesian (GPU), 963 steps, 0.553183 CPU, 0.5886 real, 1.68e+06 points.step/s, 13 var
-# Cartesian (GPU), 1880 steps, 0.975595 CPU, 0.9773 real, 7.88e+06 points.step/s, 15 var
-# Cartesian (GPU), 3720 steps, 1.96949 CPU, 1.969 real, 3.09e+07 points.step/s, 15 var
-# Cartesian (GPU), 7395 steps, 4.18939 CPU, 4.189 real, 1.16e+08 points.step/s, 15 var
-# Cartesian (GPU), 14735 steps, 11.0764 CPU, 11.08 real, 3.49e+08 points.step/s, 15 var
-# Cartesian (GPU), 29410 steps, 48.8418 CPU, 48.84 real, 6.31e+08 points.step/s, 15 var
-~~~
-
-with SSBOs
-
-~~~bash
-# Cartesian (GPU), 963 steps, 0.792705 CPU, 0.7927 real, 1.24e+06 points.step/s, 13 var
-# Cartesian (GPU), 1880 steps, 1.635 CPU, 1.635 real, 4.71e+06 points.step/s, 13 var
-# Cartesian (GPU), 3720 steps, 3.15163 CPU, 3.152 real, 1.93e+07 points.step/s, 13 var
-# Cartesian (GPU), 7395 steps, 6.78455 CPU, 6.786 real, 7.14e+07 points.step/s, 13 var
-# Cartesian (GPU), 14735 steps, 17.0329 CPU, 17.04 real, 2.27e+08 points.step/s, 13 var
-# Cartesian (GPU), 29411 steps, 67.7968 CPU, 67.8 real, 4.55e+08 points.step/s, 13 var
+# Cartesian (GPU), 963 steps, 1.17407 CPU, 1.174 real, 8.4e+05 points.step/s, 13 var
+# Cartesian (GPU), 1880 steps, 2.48712 CPU, 2.487 real, 3.1e+06 points.step/s, 13 var
+# Cartesian (GPU), 3720 steps, 5.378 CPU, 5.379 real, 1.13e+07 points.step/s, 13 var
+# Cartesian (GPU), 7395 steps, 10.6565 CPU, 10.66 real, 4.55e+07 points.step/s, 13 var
+# Cartesian (GPU), 14735 steps, 23.8081 CPU, 23.82 real, 1.62e+08 points.step/s, 13 var
+# Cartesian (GPU), 29411 steps, 80.1454 CPU, 80.16 real, 3.85e+08 points.step/s, 13 var
 ~~~
 */

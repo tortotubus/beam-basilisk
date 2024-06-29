@@ -149,10 +149,10 @@ typedef struct {
   int z;
 #endif  
 } ivec;
-
+typedef double (* BoundaryFunc) (Point, Point, scalar, bool *);
 typedef struct {
-  double (** boundary)             (Point, Point, scalar, void *);
-  double (** boundary_homogeneous) (Point, Point, scalar, void *);
+  BoundaryFunc * boundary;
+  BoundaryFunc * boundary_homogeneous;
   double (* gradient)              (double, double, double);
   void   (* delete)                (scalar);
   char * name;

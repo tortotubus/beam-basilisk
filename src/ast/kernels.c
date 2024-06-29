@@ -197,7 +197,7 @@ void kernel (Ast * n, Stack * stack, void * data)
     ## Function pointers */
 
     if (ast_is_function_pointer (n, stack))
-      str_prepend (ast_terminal (n)->start, "_p_");
+      str_prepend (ast_terminal (n)->start, "_p");
 
     /**
     ## 'val'
@@ -231,6 +231,10 @@ void kernel (Ast * n, Stack * stack, void * data)
 
   /**
   ## Implicit type casts */
+
+  case sym_jump_statement:
+    implicit_type_cast (ast_child (n, sym_expression), stack);
+    break;
     
   case sym_assignment_expression:
     if (n->child[1])
@@ -286,7 +290,7 @@ void kernel (Ast * n, Stack * stack, void * data)
       ast_set_child (n, 2, list);
       ast_destroy (a);
     }
-    else if (ast_attribute_access (n, stack)) {
+    else if (ast_attribute_access (n, stack) || ast_attribute_array_access (n)) {
 
       /**
       ## Attribute access */
@@ -303,12 +307,26 @@ void kernel (Ast * n, Stack * stack, void * data)
 	ast_after (n->parent, ")");
       }
       else {
+	if (ast_schema (n, sym_postfix_expression,
+			0, sym_postfix_expression,
+			0, sym_array_access)) {
+	  Ast * scalar = ast_find (n, sym_unary_expression,
+				   0, sym_postfix_expression);
+	  ast_destroy (scalar->child[1]);
+	  ast_destroy (scalar->child[2]);
+	  scalar->child[1] = NULL;
+	  Ast * array = ast_find (n, sym_array_access);
+	  scalar = ast_find (array, sym_expression);
+	  ast_set_child (n, 0, scalar);
+	  ast_destroy (array);
+	}
 	ast_before (n, "_attr(");
 	ast_terminal (ast_schema (n, sym_postfix_expression,
 				  1, token_symbol('.')))->start[0] = ',';
 	ast_after (n, ")");
       }
     }
+    
     break;
   }
 
@@ -460,6 +478,17 @@ void kernel (Ast * n, Stack * stack, void * data)
     }
 
     /**
+    ## Dirichlet and Neumann boundary conditions */
+
+    if (!strcmp (t->start, "_dirichlet") ||
+	!strcmp (t->start, "_dirichlet_homogeneous") ||
+	!strcmp (t->start, "_dirichlet_face") ||
+	!strcmp (t->start, "_dirichlet_face_homogeneous") ||
+	!strcmp (t->start, "_neumann") ||
+	!strcmp (t->start, "_neumann_homogeneous"))
+      break;
+    
+    /**
     ## Undeclared or unsupported functions */
     
     if (!(identifier = ast_identifier_declaration (stack, t->start))) {
@@ -476,7 +505,7 @@ void kernel (Ast * n, Stack * stack, void * data)
 		    0, sym_pointer,
 		    0, token_symbol('*'))) {
       char * s = NULL;
-      str_append (s, "_f_", t->start);
+      str_append (s, "_f", t->start);
       free (t->start);
       t->start = s;
       AstTerminal * o = ast_terminal (ast_child (n, token_symbol('(')));

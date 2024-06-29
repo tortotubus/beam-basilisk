@@ -37,11 +37,6 @@ int main (int argc, char * argv[])
   if (argc > 1)
     maxlevel = atoi(argv[1]);
 
-#if !TREE
-  foreach_dimension()
-    periodic (right);
-#endif
-
   /**
   Here we setup the domain geometry. We choose to use metre as length
   unit, so we set the radius of the Earth (required for the [spherical
@@ -99,11 +94,9 @@ zero. The top boundary is always "dry" in this example so can be left
 alone. Note that the sign is important and needs to reflect the
 orientation of the boundary. */
 
-#if TREE
 u.n[left]   = - radiation(0);
 u.n[right]  = + radiation(0);
 u.n[bottom] = - radiation(0);
-#endif
 
 /**
 ## Adaptation
@@ -620,19 +613,4 @@ __NV_PRIME_RENDER_OFFLOAD=1 __GLX_VENDOR_LIBRARY_NAME=nvidia ./tsunami.gpu/tsuna
    13502   102.44    35.08      2.7%   foreach():/src/utils.h:147
   108008    16.20    14.36      1.1%   foreach():/src/grid/gpu/cartesian.h:959
   108008    14.91    13.37      1.0%   foreach():/src/grid/gpu/cartesian.h:962
-
-
-# Cartesian (GPU), 13204 steps, 910.882 CPU, 913.3 real, 2.43e+08 points.step/s, 34 var
-   calls    total     self   % total   function
-       2   201.59   201.59     22.1%   foreach():/src/terrain.h:182
-   26408   196.85   182.77     20.0%   foreach():/src/saint-venant.h:276
-   26408   120.14   120.14     13.2%   foreach():/src/utils.h:268
-   26408    94.63    94.63     10.4%   foreach():/src/saint-venant.h:322
-   26408    85.97    85.97      9.4%   foreach():/src/saint-venant.h:130
-   13205    66.94    33.63      3.7%   foreach():/src/utils.h:175
-   13205    33.31    33.31      3.6%   gpu_reduction():/src/utils.h:167
-   13205    28.81    28.81      3.2%   foreach():tsunami.gpu.c:306
-   13205    52.86    26.73      2.9%   foreach():/src/utils.h:147
-   13205    26.13    26.13      2.9%   gpu_reduction():/src/utils.h:139
-      10    22.69    22.69      2.5%   foreach():/src/okada.h:173
 */

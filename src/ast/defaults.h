@@ -96,6 +96,7 @@ double fabs(double x);
 double log (double x);
 double log2 (double x);
 double sq (double x);
+double cube (double x);
 double max (double a, double b);
 double min (double a, double b);
 double mix (double a, double b, double c);

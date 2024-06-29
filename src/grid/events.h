@@ -274,6 +274,7 @@ void event (const char * name)
 double dtnext (double dt)
 {
   if (tnext != HUGE && tnext > t) {
+    assert (dt > 0.);
     unsigned int n = (tnext - t)/dt;
     assert (n < INT_MAX); // check that dt is not too small
     if (n == 0)

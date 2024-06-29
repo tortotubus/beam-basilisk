@@ -276,6 +276,7 @@ Ast * ast_stencil (Ast * n, bool parallel, bool overflow, bool nowarning);
 Ast * ast_is_point_point (const Ast * identifier);
 void  ast_stencil_access (Ast * n, Stack * stack, int dimension);
 const Ast * ast_attribute_access (const Ast * n, Stack * stack);
+Ast * ast_attribute_array_access (Ast * n);
 Ast * ast_constant_postfix_expression (const Ast * n, Stack * stack);
 Ast * ast_is_function_pointer (const Ast * n, Stack * stack);
 
