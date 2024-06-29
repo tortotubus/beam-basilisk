@@ -99,7 +99,7 @@ int main (int argc, char * argv[])
 #define FROUDE 0.1
 
 double vtheta (double r) {
-  return r >= 0.4 ? 0. : FROUDE*(1. + cos((r - 0.2)/0.2*M_PI))/2.;
+  return FROUDE*(r < 0.4)*(1. + cos((r - 0.2)/0.2*M_PI))/2.;
 }
 
 double h0p (double r, void * p) {
@@ -134,7 +134,7 @@ event init (i = 0)
     u.x[] = - vt*y/r;
     u.y[] =   vt*x/r;
   }
-#elif 0 // fixme
+#else
   foreach_face(x) {
     double r = sqrt (x*x + y*y);
     u.x[] = - vtheta(r)*y/r;
@@ -142,12 +142,6 @@ event init (i = 0)
   foreach_face(y) {
     double r = sqrt (x*x + y*y);
     u.y[] =   vtheta(r)*x/r;
-  }
-#else
-  foreach_face() {
-    double r = sqrt (x*x + y*y);
-    coord p = { - y, x, 0 };
-    u.x[] = vtheta(r)*p.x/r;
   }
 #endif
 }
@@ -205,8 +199,8 @@ event plots (t = end)
 
 cd nonlinear.gpu/
 __NV_PRIME_RENDER_OFFLOAD=1 __GLX_VENDOR_LIBRARY_NAME=nvidia ./nonlinear.gpu 1024 2> /dev/null
-# Cartesian (GPU), 20565 steps, 24.322 CPU, 24.35 real, 8.86e+08 points.step/s, 16 var
-# Cartesian (GPU), 20586 steps, 25.7769 CPU, 25.8 real, 8.37e+08 points.step/s, 16 var
+# Cartesian (GPU), 20565 steps, 30.1621 CPU, 30.18 real, 7.14e+08 points.step/s, 14 var
+# Cartesian (GPU), 20585 steps, 31.6628 CPU, 31.68 real, 6.81e+08 points.step/s, 14 var
 
 On CPU:
 
@@ -215,14 +209,4 @@ cd ./nonlinear/
 OMP_NUM_THREADS=8 ./nonlinear 512 2> /dev/null
 # Cartesian, 10283 steps, 172.003 CPU, 21.52 real, 1.25e+08 points.step/s, 13 var
 # Cartesian, 10293 steps, 172.957 CPU, 21.67 real, 1.25e+08 points.step/s, 13 var
-
-with compute shaders:
-
-# Cartesian (GPU), 20565 steps, 24.8181 CPU, 24.82 real, 8.69e+08 points.step/s, 15 var
-# Cartesian (GPU), 20586 steps, 26.2472 CPU, 26.24 real, 8.22e+08 points.step/s, 15 var
-
-with SSBOs:
-
-# Cartesian (GPU), 20565 steps, 28.2163 CPU, 28.24 real, 7.64e+08 points.step/s, 14 var
-# Cartesian (GPU), 20585 steps, 29.4632 CPU, 29.48 real, 7.32e+08 points.step/s, 14 var
 */

@@ -546,11 +546,11 @@ void reset (void * alist, double val)
   
 @define neighborp(k,l,o) neighbor(k,l,o)
 
-static double periodic_bc (Point point, Point neighbor, scalar s, void * data);
+  static double periodic_bc (Point point, Point neighbor, scalar s, bool * data);
 
 static void box_boundary_level (const Boundary * b, scalar * scalars, int l)
 {
-  extern double (* default_scalar_bc[]) (Point, Point, scalar, void *);
+  extern double (* default_scalar_bc[]) (Point, Point, scalar, bool *);
   disable_fpe (FE_DIVBYZERO|FE_INVALID);
   for (int d = 0; d < 2*dimension; d++)
     if (default_scalar_bc[d] == periodic_bc)

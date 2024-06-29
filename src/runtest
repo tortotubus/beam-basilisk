@@ -529,7 +529,7 @@ elif ! test -f $test/fail.$ext || ! test -f $test/fail || ! checksum $test.s $te
 fi
 
 if test -f $test/fail; then
-    cat $test/fail
+    grep -v -E '.*:[0-9]*:.*(warning|error).*:' $test/fail
     if test -f $test.$ext; then
 	if test -n "$SANDBOX"; then
 	    mv -f $test.$ext $test/fail.tst

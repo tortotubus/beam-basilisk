@@ -168,7 +168,7 @@ void reset (void * alist, double val)
       reset_field_value (p + s->i, _attribute[s->i].name, 0.);
 }
 
-static double _dirichlet (double expr, Point point, Point neighbor, scalar _s, void * data)
+static double _dirichlet (double expr, Point point, Point neighbor, scalar _s, bool * data)
 {
   if (data) {
     *((bool *)data) = true;
@@ -177,7 +177,7 @@ static double _dirichlet (double expr, Point point, Point neighbor, scalar _s, v
   return 2.*expr - val(_s,0,0,0);
 }
 
-static double _dirichlet_homogeneous (double expr, Point point, Point neighbor, scalar _s, void * data)
+static double _dirichlet_homogeneous (double expr, Point point, Point neighbor, scalar _s, bool * data)
 {
   if (data) {
     *((bool *)data) = true;
@@ -186,17 +186,17 @@ static double _dirichlet_homogeneous (double expr, Point point, Point neighbor, 
   return - val(_s,0,0,0);
 }
 
-static double _dirichlet_face (double expr, Point point, Point neighbor, scalar _s, void * data)
+static double _dirichlet_face (double expr, Point point, Point neighbor, scalar _s, bool * data)
 {
   return expr;
 }
 
-static double _dirichlet_face_homogeneous (double expr, Point point, Point neighbor, scalar _s, void * data)
+static double _dirichlet_face_homogeneous (double expr, Point point, Point neighbor, scalar _s, bool * data)
 {
   return 0.;
 }
 
-static double _neumann (double expr, Point point, Point neighbor, scalar _s, void * data)
+static double _neumann (double expr, Point point, Point neighbor, scalar _s, bool * data)
 {
   if (data) {
     *((bool *)data) = false;
@@ -205,7 +205,7 @@ static double _neumann (double expr, Point point, Point neighbor, scalar _s, voi
   return Delta*expr + val(_s,0,0,0);
 }
 
-static double _neumann_homogeneous (double expr, Point point, Point neighbor, scalar _s, void * data)
+static double _neumann_homogeneous (double expr, Point point, Point neighbor, scalar _s, bool * data)
 {
   if (data) {
     *((bool *)data) = false;

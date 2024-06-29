@@ -201,7 +201,7 @@ static void box_boundary_level_tangent (const Boundary * b,
 @
 @define end_foreach_boundary() } end_foreach_boundary_dir()
 
-static double periodic_bc (Point point, Point neighbor, scalar s, void * data);
+static double periodic_bc (Point point, Point neighbor, scalar s, bool * data);
 
 static void box_boundary_level (const Boundary * b, scalar * list, int l)
 {

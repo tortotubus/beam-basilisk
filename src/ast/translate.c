@@ -1913,7 +1913,7 @@ static Ast * boundary_function (Ast * expr, Stack * stack, TranslateData * d,
   snprintf (ind, 19, "%d", d->nboundary++);
   str_append (src,
 	      "static double _boundary", ind,
-	      "(Point point,Point neighbor,scalar _s,void *data){{"); // The double brackets are important
+	      "(Point point,Point neighbor,scalar _s,bool *data){{"); // The double brackets are important
       
   char * index[] = {"i","j","k"}, * dir[] = {"x","y","z"};
   for (int i = 0; i < d->dimension; i++)
@@ -3899,20 +3899,36 @@ const Ast * ast_attribute_access (const Ast * n, Stack * stack)
 		   1, token_symbol('.')))
     return NULL;
   const char * typename = ast_typedef_name (ast_expression_type (n->child[0], stack, false));
-  if (typename && (!strcmp (typename, "scalar") ||
-		   !strcmp (typename, "vertex scalar"))) {
-    Ast * member = ast_find (n->child[2], sym_member_identifier,
-			     0, sym_generic_identifier,
-			     0, sym_IDENTIFIER);
-    Ast * type = ast_identifier_declaration (stack, "scalar");
-    assert (type);
-    while (type->sym != sym_declaration)
-      type = type->parent;
-    if (!find_struct_member (ast_find (type, sym_struct_declaration_list),
-			     ast_terminal (member)->start))
-      return n;
-  }
+  if (!typename || (strcmp (typename, "scalar") &&
+		    strcmp (typename, "vertex scalar")))
+    return NULL;
+  Ast * member = ast_find (n->child[2], sym_member_identifier,
+			   0, sym_generic_identifier,
+			   0, sym_IDENTIFIER);
+  Ast * type = ast_identifier_declaration (stack, "scalar");
+  assert (type);
+  while (type->sym != sym_declaration)
+    type = type->parent;
+  if (!find_struct_member (ast_find (type, sym_struct_declaration_list),
+			   ast_terminal (member)->start))
+    return n;
   return NULL;
+}
+
+Ast * ast_attribute_array_access (Ast * n)
+{
+  Ast * identifier = ast_schema (n, sym_postfix_expression,
+				 0, sym_postfix_expression,
+				 0, sym_array_access,
+				 0, sym_postfix_expression,
+				 0, sym_primary_expression,
+				 0, sym_IDENTIFIER);
+  if (identifier && !strcmp (ast_terminal (identifier)->start, "_attribute"))
+    return ast_schema (n, sym_postfix_expression,
+		       2, sym_member_identifier,
+		       0, sym_generic_identifier,
+		       0, sym_IDENTIFIER);
+  return NULL;  
 }
 
 static

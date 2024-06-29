@@ -21,8 +21,6 @@ GLSL: error: if-statement condition must be scalar boolean
 
 GLSL: error: value of type float cannot be assigned to variable of type int
 
-cartesian-common.h:872: GLSL: error: initializer of type float cannot be assigned to variable of type int (int i = sign(x);)
-
 */
 
 #include <grid/gpu/gpu.h>
@@ -195,13 +193,6 @@ void realloc_scalar_gpu (int size)
   
 #include "../cartesian-common.h"
 
-@undef POINT_VARIABLES
-@def POINT_VARIABLES
-  VARIABLES
-  vec4 FragColor;
-  NOT_UNUSED (FragColor);
-@
-
 #include <khash.h>
 
 KHASH_MAP_INIT_STR(STR, GLuint)
@@ -242,15 +233,15 @@ static char glsl_preproc[] =
   "struct vector { scalar x, y; };\n"
   "struct tensor { vector x, y; };\n"
 #endif
-  "#define Point ivec2\n"
+  "struct Point { int i, j; };\n"
   "#define valt(s,k,l,m)"
-  "  _data[(point.x + k + (s).i*(N + 2))*(N + 2) + point.y + l]\n"
+  "  _data[(point.i + k + (s).i*(N + 2))*(N + 2) + point.j + l]\n"
   "#define _NVARMAX 65536\n"
   "#define NULL 0\n"
   "#define val(s,k,l,m) ((s).i < _NVARMAX ? valt(s,k,l,m)"
   " : _constant[clamp((s).i -_NVARMAX,0,_nconst-1)])\n"
   "#define val_out_(s,i,j,k) valt(s,i,j,k)\n"
-  "#define val_red_(s) _data[(s).i*sq(N + 2) + (point.x - 1)*NY + point.y - 1]\n"
+  "#define val_red_(s) _data[(s).i*sq(N + 2) + (point.i - 1)*NY + point.j - 1]\n"
   "#define _attr(s,member) (_attr[(s).index].member)\n"
   "#define forin(type,s,list) for (int _i = 0; _i < list.length() - 1; _i++) { type s = list[_i];\n"
   "#define endforin() }\n"
@@ -260,20 +251,27 @@ static char glsl_preproc[] =
   "#define forin3(a,b,e,c,d,f) for (int _i = 0; _i < c.length() - 1; _i++)"
   "  { a = c[_i]; b = d[_i]; e = f[_i];\n"
   "#define endforin3() }\n"
-  "#define is_face_x() { if (point.y <= N) {"
+  "#define is_face_x() { if (point.j <= N) {"
   "  real Delta = L0/N, Delta_x = Delta, Delta_y = Delta,"
-  "  x = X0 + (point.x - 1.)*Delta, y = Y0 + (point.y - 0.5)*Delta;\n"
+  "  x = X0 + (point.i - 1.)*Delta, y = Y0 + (point.j - 0.5)*Delta;\n"
   "#define end_is_face_x() }}\n"
-  "#define is_face_y() { if (point.x <= N) {"
+  "#define is_face_y() { if (point.i <= N) {"
   "  real Delta = L0/N, Delta_x = Delta, Delta_y = Delta,"
-  "  x = X0 + (point.x - 0.5)*Delta, y = Y0 + (point.y - 1.)*Delta;\n"
+  "  x = X0 + (point.i - 0.5)*Delta, y = Y0 + (point.j - 1.)*Delta;\n"
   "#define end_is_face_y() }}\n"
   "#define VARIABLES\n"
   "#define NOT_UNUSED(x)\n"
   "#define pi 3.14159265359\n"
   "#define nodata (1e30)\n"
   "#define sq(x) ((x)*(x))\n"
+  "#define cube(x) ((x)*(x)*(x))\n"
   "#define fabs(x) abs(x)\n"
+  "#define _dirichlet(expr,p,n,_s,data)             (2.*(expr) - val(_s,0,0,0))\n"
+  "#define _dirichlet_homogeneous(p,n,_s,data)      (- val(_s,0,0,0))\n"
+  "#define _dirichlet_face(expr,p,n,_s,data)        (expr)\n"
+  "#define _dirichlet_face_homogeneous(p,n,_s,data) (0.)\n"
+  "#define _neumann(expr,p,n,_s,data)               (Delta*(expr) + val(_s,0,0,0))\n"
+  "#define _neumann_homogeneous(p,n,_s,data)        (val(_s,0,0,0))\n"
   "const real z = 0.;\n"
   "uniform ivec2 csOrigin = ivec2(0,0);\n"
   "uniform vec2 vsOrigin = vec2(0.,0.);\n"
@@ -357,8 +355,6 @@ static External * merge_external (External * externals, External ** end, Externa
 		     loop->fname, loop->line, g->name);
 	    return NULL;
 	  }
-	  if (!p)
-	    return NULL;
 	  if (!p->used) {
 	    p->used = true;
 	    for (External * i = p->externals; i && i->name; i++)
@@ -414,8 +410,8 @@ char * build_shader (const External * externals, const ForeachData * loop,
   char * fs = str_append (NULL, "#version 430\n", glsl_preproc,
 			  "#define POINT_VARIABLES real Delta = L0/N,"
 			  " Delta_x = Delta, Delta_y = Delta,",
-			  " x = X0 + (point.x - 0.5)*Delta,"
-			  " y = Y0 + (point.y - 0.5)*Delta;\n",
+			  " x = X0 + (point.i - 0.5)*Delta,"
+			  " y = Y0 + (point.j - 0.5)*Delta;\n",
 			  "const int _nconst = ", s, ";\n"
 			  "const real _constant[_nconst] = {", a);
   for (int i = 1; i < nconst; i++) {
@@ -541,13 +537,13 @@ char * build_shader (const External * externals, const ForeachData * loop,
       External * f = _get_function ((long) g->pointer);
       fs = str_append (fs, "\n", f->data, "\n");
       char s[20]; snprintf (s, 19, "%d", f->nd);
-      fs = str_append (fs, "const int _p_", g->name, " = ", s, ";\n");
+      fs = str_append (fs, "const int _p", g->name, " = ", s, ";\n");
     }
     else if (!strcmp (g->type, "*func()")) {
       External * f = _get_function ((long) g->pointer);
       char s[20]; snprintf (s, 19, "%d", f->nd);
       fs = str_append (fs, "const int ", g->name, " = ", s, ";\n",
-		       "#define _f_", g->name, "(args) (", f->name, " args)\n");      
+		       "#define _f", g->name, "(args) (", f->name, " args)\n");
     }
     else if (strcmp (g->type, "scalar") &&
 	     strcmp (g->type, "vector") &&
@@ -562,7 +558,8 @@ char * build_shader (const External * externals, const ForeachData * loop,
 			 ";\n");
 	if (GPUContext.fragment_shader)
 	  fs = str_append (fs, "in vec2 vsPoint;\n"
-			   "Point point = ivec2((vsPoint*vsScale + vsOrigin)*N) + ivec2(1,1);\n"
+			   "Point point = {int((vsPoint.x*vsScale.x + vsOrigin.x)*N) + 1,"
+			   "int((vsPoint.y*vsScale.y + vsOrigin.y)*N) + 1};\n"
 			   "out vec4 FragColor;\n");
 	else {
 	  char nwgx[20], nwgy[20];
@@ -806,20 +803,26 @@ static void box_boundary_level_gpu (const Boundary * b, scalar * list, int l)
 
 #if 1
   if (centered) {
-#if 0    
-    fprintf (stderr, "applying BC %d to ", d);
-    for (scalar s in centered)
-      fprintf (stderr, "%s:%d ", s.name, s.gpu.stored);
-    fputc ('\n', stderr);
-#endif
-#if 1 // symmetry
     int ig = - _ig[d], jg = - _jg[d];
-    foreach_boundary_gpu (d)
-      for (scalar s in centered)
-	s[] = s[ig,jg];
-#endif
+    for (scalar s in centered) {
+      scalar b = (s.v.x.i < 0 ? s :
+		  s.i == s.v.x.i && d < top ? s.v.x :
+		  s.i == s.v.y.i && d >= top ? s.v.x :
+		  s.v.y);
+      double (* sboundary) (Point, Point, scalar, bool *) = b.boundary[d];
+      foreach_boundary_gpu (gpu, nowarning, d) {
+	Point neighbor = { point.i + ig, point.j + jg };
+	bool data;
+	s[] = sboundary (neighbor, point, s, data);
+      }
+      s.gpu.stored = -1;
+    }
   }
   free (centered);
+#if 0  
+  assert (!normal); // fixme: not implemented yet
+  assert (!tangent); // fixme: not implemented yet
+#endif
   free (normal);
   free (tangent);
 #else
@@ -956,10 +959,10 @@ static void periodic_boundary_level_gpu_x (const Boundary * b, scalar * list, in
 
   gpu_cpu_sync (list1, GL_MAP_WRITE_BIT, __FILE__, __LINE__);
   
-  foreach_boundary_gpu (overflow, left)
+  foreach_boundary_gpu (gpu, overflow, left)
     for (scalar s in list1)
       s[] = s[N];
-  foreach_boundary_gpu (overflow, right)
+  foreach_boundary_gpu (gpu, overflow, right)
     for (scalar s in list1)
       s[] = s[- N];
   for (scalar s in list1)
@@ -994,10 +997,6 @@ void gpu_init_grid (int n)
   }
   swap (Boundary **, boundaries, gpu_cartesian->boundaries);
   gpu_init();
-#if 1
-  periodic (right);
-  periodic (top);
-#endif
 }
 
 // overload the default various functions
@@ -1144,30 +1143,31 @@ static bool doloop_on_gpu (ForeachData * loop, const RegionParameters * region,
       if (region->boundary)
 	switch (region->boundary - 1) {
 	case left:
-	  shader = str_append (shader, "ivec2(0, gl_GlobalInvocationID.x + 1);\n");
+	  shader = str_append (shader, "{0, int(gl_GlobalInvocationID.x) + 1};\n");
 	  break;
 	case right:
-	  shader = str_append (shader, "ivec2(N + 1, gl_GlobalInvocationID.x + 1);\n");
+	  shader = str_append (shader, "{N + 1, int(gl_GlobalInvocationID.x) + 1};\n");
 	  break;
 	case bottom:
-	  shader = str_append (shader, "ivec2(gl_GlobalInvocationID.x, 0);\n");
+	  shader = str_append (shader, "{int(gl_GlobalInvocationID.x), 0};\n");
 	  break;
 	case top:
-	  shader = str_append (shader, "ivec2(gl_GlobalInvocationID.x, N + 1);\n");
+	  shader = str_append (shader, "{int(gl_GlobalInvocationID.x), N + 1};\n");
 	  break;
 	default:
 	  assert (false);
 	}
       else
-	shader = str_append (shader, "csOrigin + ivec2(gl_GlobalInvocationID.yx) + ivec2(1,1);\n");
+	shader = str_append (shader, "{csOrigin.x + int(gl_GlobalInvocationID.y) + 1,"
+			     "csOrigin.y + int(gl_GlobalInvocationID.x) + 1};\n");
     }
     shader = str_append (shader,
-			 "if (point.x < N + 2 && point.y < N + 2) {\n"
+			 "if (point.i < N + 2 && point.j < N + 2) {\n"
 			 "POINT_VARIABLES\n");
     if (loop->vertex)
       shader = str_append (shader, "  x -= Delta/2., y -= Delta/2.;\n");
     shader = str_append (shader, kernel);
-    shader = str_append (shader, "\nif (point.y - 1 < NY) {");
+    shader = str_append (shader, "\nif (point.j - 1 < NY) {");
     for (const External * g = externals; g; g = g->next)
       if (g->reduct) {
 	shader = str_append (shader, "\n  val_red_(", g->name, "_out_) = ", g->name, ";");
@@ -1284,7 +1284,8 @@ static bool doloop_on_gpu (ForeachData * loop, const RegionParameters * region,
 	    fprintf (stderr, "uniform coord %s = {%g,%g,%g}\n", name,
 		     ((double *)p)[0], ((double *)p)[1], ((double *)p)[2]);
 #endif
-	    glUniform3f (location, ((double *)p)[0], ((double *)p)[1], ((double *)p)[2]); p = ((double *)p) + 3;
+	    glUniform3f (location, ((double *)p)[0], ((double *)p)[1], ((double *)p)[2]);
+	    p = ((double *)p) + 3;
 	  }
 	  else if (!strcmp(g->type, "_coord")) {
 #if PRINTUNIFORM
@@ -1408,7 +1409,7 @@ bool gpu_end_stencil (ForeachData * loop,
     if (s.output)
       s.gpu.stored = on_gpu ? -1 : 1;
 
-  return on_gpu;
+  return on_gpu && loop->parallel != 3;
 }
 
 static void gpu_cartesian_methods()

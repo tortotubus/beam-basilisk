@@ -336,9 +336,8 @@ vector new_const_vector (const char * name, int i, double * val)
 static void cartesian_scalar_clone (scalar clone, scalar src)
 {
   char * cname = clone.name;
-  double (** boundary) (Point, Point, scalar, void *) = clone.boundary;
-  double (** boundary_homogeneous) (Point, Point, scalar, void *) =
-    clone.boundary_homogeneous;
+  BoundaryFunc * boundary = clone.boundary;
+  BoundaryFunc * boundary_homogeneous = clone.boundary_homogeneous;
   assert (src.block > 0 && clone.block == src.block);
   free (clone.depends);
   _attribute[clone.i] = _attribute[src.i];
@@ -522,6 +521,12 @@ void boundary_internal (scalar * list, const char * fname, int line)
       free (listf.x);
   }
   if (listc) {
+#if PRINTBOUNDARY
+    fprintf (stderr, "boundary_internal: listc:");
+    for (scalar s in listc)
+      fprintf (stderr, " %d:%s", s.i, s.name);
+    fputc ('\n', stderr);
+#endif
     boundary_level (listc, -1);
     for (scalar s in listc)
       s.dirty = false;
@@ -541,17 +546,17 @@ void cartesian_boundary_face (vectorl list)
       s.dirty = 2;
 }
 
-static double symmetry (Point point, Point neighbor, scalar s, void * data)
+static double symmetry (Point point, Point neighbor, scalar s, bool * data)
 {
   return s[];
 }
 
-static double antisymmetry (Point point, Point neighbor, scalar s, void * data)
+static double antisymmetry (Point point, Point neighbor, scalar s, bool * data)
 {
   return -s[];
 }
 
-double (* default_scalar_bc[]) (Point, Point, scalar, void *) = {
+BoundaryFunc default_scalar_bc[] = {
   symmetry, symmetry, symmetry, symmetry, symmetry, symmetry
 };
 
@@ -566,21 +571,17 @@ scalar cartesian_init_scalar (scalar s, const char * name)
   else
     pname = s.name;
   int block = s.block;
-  double (** boundary) (Point, Point, scalar, void *) = s.boundary;
-  double (** boundary_homogeneous) (Point, Point, scalar, void *) =
-    s.boundary_homogeneous;
+  BoundaryFunc * boundary = s.boundary;
+  BoundaryFunc * boundary_homogeneous = s.boundary_homogeneous;
   s.name = pname;
   if (block < 0)
     s.block = block;
   else
     s.block = block > 0 ? block : 1;
   /* set default boundary conditions */  
-  s.boundary = boundary ? boundary :
-    (double (**)(Point, Point, scalar, void *))
-    malloc (nboundary*sizeof (void (*)()));
+  s.boundary = boundary ? boundary : (BoundaryFunc *) malloc (nboundary*sizeof (BoundaryFunc));
   s.boundary_homogeneous = boundary_homogeneous ? boundary_homogeneous :
-    (double (**)(Point, Point, scalar, void *))
-    malloc (nboundary*sizeof (void (*)()));
+    (BoundaryFunc *) malloc (nboundary*sizeof (BoundaryFunc));
   for (int b = 0; b < nboundary; b++)
     s.boundary[b] = s.boundary_homogeneous[b] =
       b < 2*dimension ? default_scalar_bc[b] : symmetry;
@@ -603,7 +604,7 @@ scalar cartesian_init_vertex_scalar (scalar s, const char * name)
   return s;
 }
   
-double (* default_vector_bc[]) (Point, Point, scalar, void *) = {
+BoundaryFunc default_vector_bc[] = {
   antisymmetry, antisymmetry,
   antisymmetry, antisymmetry,
   antisymmetry, antisymmetry
@@ -936,10 +937,9 @@ bid new_bid()
 {
   int b = nboundary++;
   for (scalar s in all) {
-    s.boundary = (double (**)(Point, Point, scalar, void *))
-      realloc (s.boundary, nboundary*sizeof (void (*)()));
-    s.boundary_homogeneous = (double (**)(Point, Point, scalar, void *))
-      realloc (s.boundary_homogeneous, nboundary*sizeof (void (*)()));
+    s.boundary = (BoundaryFunc *) realloc (s.boundary, nboundary*sizeof (BoundaryFunc));
+    s.boundary_homogeneous =  (BoundaryFunc *)
+      realloc (s.boundary_homogeneous, nboundary*sizeof (BoundaryFunc));
   }
   for (scalar s in all) {
     if (s.v.x.i < 0) // scalar
@@ -957,7 +957,7 @@ bid new_bid()
 
 // Periodic boundary conditions
 
-static double periodic_bc (Point point, Point neighbor, scalar s, void * data)
+static double periodic_bc (Point point, Point neighbor, scalar s, bool * data)
 {
   return nodata; // should not be used
 }
