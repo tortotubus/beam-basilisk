@@ -43,6 +43,15 @@ Ast * implicit_type_cast (Ast * n, Stack * stack)
       if (ref) {
 	AstDimensions dim = {0};
 	type = ast_identifier_type (ref, &dim, stack);
+	if (type && type->sym == sym_INT &&
+	    (ref = ast_schema (ast_ancestor (type, 5), sym_declaration,
+			       1, sym_init_declarator_list,
+			       0, sym_init_declarator,
+			       0, sym_declarator,
+			       0, sym_direct_declarator,
+			       0, sym_generic_identifier,
+			       0, sym_IDENTIFIER)) && !strcmp (ast_terminal (ref)->start, "bool"))
+	  type = (Ast *) &ast_bool;
 	if (dim.pointer)
 	  type = NULL;
       }
@@ -131,8 +140,14 @@ Ast * implicit_type_cast (Ast * n, Stack * stack)
     break;
 
   case sym_conditional_expression:
-    if (n->child[1])
+    if (n->child[1]) {
+      Ast * type = implicit_type_cast (n->child[0], stack);
+      if (!type || type->sym != sym_BOOL) {
+	str_prepend (ast_left_terminal (n->child[0])->before, "bool(");
+	ast_after (n->child[0], ")");
+      }
       return implicit_type_cast (n->child[2], stack);
+    }
     break;
 
   case sym_selection_statement: {
