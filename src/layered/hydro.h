@@ -300,9 +300,11 @@ void advect (scalar * tracers, face vector hu, face vector hf, double dt)
       if (hul != hu.x[]) {
 	if (point.l < nl - 1)
 	  hu.x[0,0,1] += hu.x[] - hul;
+#if !_GPU
 	else if (nl > 1)
 	  fprintf (stderr, "warning: could not conserve barotropic flux "
 		   "at %g,%g,%d\n", x, y, point.l);
+#endif
 	hu.x[] = hul;
       }
     }
@@ -360,10 +362,12 @@ void advect (scalar * tracers, face vector hu, face vector hf, double dt)
       double h1 = h[];
       foreach_dimension()
 	h1 += dt*(hu.x[] - hu.x[1])/(Delta*cm[]);
+#if !_GPU
       if (h1 < - dry)
 	fprintf (stderr, "warning: h1 = %g < - 1e-12 at %g,%g,%d,%g\n",
 		 h1, x, y, _layer, t);
-      h[] = fmax(h1, 0.);
+#endif
+      h[] = max(h1, 0.);
       if (h1 < dry) {
 	for (scalar f in tracers)
 	  f[] = 0.;

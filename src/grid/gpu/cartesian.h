@@ -233,7 +233,11 @@ static char glsl_preproc[] =
   "struct vector { scalar x, y; };\n"
   "struct tensor { vector x, y; };\n"
 #endif
-  "struct Point { int i, j; };\n"
+  "struct Point { int i, j;"
+#if LAYERS
+  " int l;"
+#endif
+  "};\n"
   "#define valt(s,k,l,m)"
   "  _data[(point.i + k + (s).i*(N + 2))*(N + 2) + point.j + l]\n"
   "#define _NVARMAX 65536\n"
@@ -245,6 +249,10 @@ static char glsl_preproc[] =
   "#define _attr(s,member) (_attr[(s).index].member)\n"
   "#define forin(type,s,list) for (int _i = 0; _i < list.length() - 1; _i++) { type s = list[_i];\n"
   "#define endforin() }\n"
+#if LAYERS
+  "#define foreach_block_inner() for (point.l = 0; point.l < nl; point.l++)\n"
+  "#define end_foreach_block_inner() point.l = 0;\n"
+#endif
   "#define forin2(a,b,c,d) for (int _i = 0; _i < c.length() - 1; _i++)"
   "  { a = c[_i]; b = d[_i];\n"
   "#define endforin2() }\n"
@@ -390,6 +398,11 @@ static External * merge_externals (External * externals, const ForeachData * loo
   merged = merge_external (merged, &end, &z0, loop);
   merged = merge_external (merged, &end, &l0, loop);
   merged = merge_external (merged, &end, &n, loop);
+#if LAYERS
+  assert (nl == 1); // fixme: not implemented yet for more than one layer
+  static External enl =  { .name = "nl",  .type = "int", .pointer = &nl };
+  merged = merge_external (merged, &end, &enl, loop);
+#endif
   for (External * g = externals; g->name; g++)
     merged = merge_external (merged, &end, g, loop);
 #if PRINTEXTERNAL  
@@ -559,7 +572,11 @@ char * build_shader (const External * externals, const ForeachData * loop,
 	if (GPUContext.fragment_shader)
 	  fs = str_append (fs, "in vec2 vsPoint;\n"
 			   "Point point = {int((vsPoint.x*vsScale.x + vsOrigin.x)*N) + 1,"
-			   "int((vsPoint.y*vsScale.y + vsOrigin.y)*N) + 1};\n"
+			   "int((vsPoint.y*vsScale.y + vsOrigin.y)*N) + 1"
+#if LAYERS
+			   ",0"
+#endif
+			   "};\n"
 			   "out vec4 FragColor;\n");
 	else {
 	  char nwgx[20], nwgy[20];
@@ -811,7 +828,11 @@ static void box_boundary_level_gpu (const Boundary * b, scalar * list, int l)
 		  s.v.y);
       double (* sboundary) (Point, Point, scalar, bool *) = b.boundary[d];
       foreach_boundary_gpu (gpu, nowarning, d) {
-	Point neighbor = { point.i + ig, point.j + jg };
+	Point neighbor = { point.i + ig, point.j + jg
+#if LAYERS
+	  ,0
+#endif
+	};
 	bool data;
 	s[] = sboundary (neighbor, point, s, data);
       }
@@ -936,7 +957,7 @@ void reset_gpu (void * alist, float val)
   GL_C (glBindBuffer (GL_SHADER_STORAGE_BUFFER, 0));
 }
 
-#define reset(alist, val) reset_gpu (alist, val)
+#define reset(...) reset_gpu (__VA_ARGS__)
 
 @define VT _attribute[s.i].v.y
 
@@ -1143,23 +1164,30 @@ static bool doloop_on_gpu (ForeachData * loop, const RegionParameters * region,
       if (region->boundary)
 	switch (region->boundary - 1) {
 	case left:
-	  shader = str_append (shader, "{0, int(gl_GlobalInvocationID.x) + 1};\n");
+	  shader = str_append (shader, "{0, int(gl_GlobalInvocationID.x) + 1");
 	  break;
 	case right:
-	  shader = str_append (shader, "{N + 1, int(gl_GlobalInvocationID.x) + 1};\n");
+	  shader = str_append (shader, "{N + 1, int(gl_GlobalInvocationID.x) + 1");
 	  break;
 	case bottom:
-	  shader = str_append (shader, "{int(gl_GlobalInvocationID.x), 0};\n");
+	  shader = str_append (shader, "{int(gl_GlobalInvocationID.x), 0");
 	  break;
 	case top:
-	  shader = str_append (shader, "{int(gl_GlobalInvocationID.x), N + 1};\n");
+	  shader = str_append (shader, "{int(gl_GlobalInvocationID.x), N + 1");
 	  break;
 	default:
 	  assert (false);
 	}
       else
 	shader = str_append (shader, "{csOrigin.x + int(gl_GlobalInvocationID.y) + 1,"
-			     "csOrigin.y + int(gl_GlobalInvocationID.x) + 1};\n");
+			     "csOrigin.y + int(gl_GlobalInvocationID.x) + 1");
+      shader = str_append (shader,
+#if LAYERS
+			   ",0};\n"
+#else
+			   "};\n"
+#endif
+			   );
     }
     shader = str_append (shader,
 			 "if (point.i < N + 2 && point.j < N + 2) {\n"
