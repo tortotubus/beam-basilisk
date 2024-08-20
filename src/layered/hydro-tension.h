@@ -1,23 +1,19 @@
 /**
 # Multilayer solver with surface tension
 
-This file adds surface tension to the [multilayer solver](/src/layered/README)
- i.e. the Laplace pressure and the Marangoni effect that intervenes in the 
- continuity of the surface stress continuity. They are respectively  added 
- as a pressure term and a top boundary condition in viscosity.
-
+This file adds surface tension to the [multilayer
+solver](/src/layered/README) i.e. the Laplace pressure applied on the free surface as
 $$
-(\mathbf{T_{liquid}} - \mathbf{T_{gas}}) \cdot \mathbf{n} 
-  = - \sigma \kappa\mathbf{n} + \mathbf{\nabla_S} \sigma
+(\mathbf{T_{liquid}} - \mathbf{T_{gas}}) \cdot \mathbf{n} = - \rho \sigma \kappa\mathbf{n}
 $$
-with $T$, the stress tensors respectively in the gas and in the liquid, $\sigma$
- the surface tension coefficient, $\kappa$ the curvature of the free-surface
- and $\mathbf{\nabla_S}$ a surface gradient.
+with $T$, the stress tensors respectively in the gas and in the
+liquid, $\rho \sigma$ the surface tension coefficient, and $\kappa$ the
+curvature of the free-surface.
 
 Note that this file is also compatible with the [implicit free-surface
 extension](/src/layered/implicit.h) and with the [non-hydrostatic
 extension](/src/layered/nh.h). In both cases the Laplace pressure term
-is treated implicitly and does not restrict the timestep. 
+is treated implicitly and does not restrict the timestep.
 
 The default surface tension coefficient $\sigma$ is constant and equal to
 unity. */
@@ -26,9 +22,10 @@ unity. */
 
 /**
 ## Laplace pressure
-The Laplace pressure corresponds to a barotropic pressure 
- $\phi(x) = - \sigma/\rho \kappa$ that is added to the hydrostatic
- equations (term in blue).
+
+The Laplace pressure corresponds to a barotropic pressure $\phi(x) = -
+\rho \sigma \kappa$ that is added to the hydrostatic equations (term
+in blue).
 $$
 \begin{aligned}
   \partial_t h_k + \mathbf{{\nabla}} \cdot \left( h \mathbf{u} \right)_k & =
@@ -174,62 +171,11 @@ event face_fields (i++)
 }
 
 /**
-At the end of the timestep we delete the auxilliary field. */
+At the end of the timestep we delete the auxilliary fields. */
 
 event pressure (i++) {
   delete ({sigma_n});
 #if dimension > 1
   delete ((scalar *){sigma_d});
 #endif  
-}
-
-/**
-# Marangoni stress 
-
-The [Marangoni effect](https://en.wikipedia.org/wiki/Marangoni_effect)
- is a mass transfert along an interface due to surface tension gradients. 
- The Marangoni stress intervenes in the continuity of the tangential surface
- stress (term in blue):
-$$ 
-  \frac{\rho\,\nu}{1 + \eta_{x}^2}(1-\eta_{x}^2) (\partial_z u + \partial_x w)_{top} 
-    - 4\,\eta_{x}\,\partial_x u|_{top} =
-    \color{blue} \frac{\partial_x \sigma}{\sqrt{1 + \eta_{x}^2}}
-$$
-
-The Marangoni stress can be seen as a boundary condition for the vertical
- viscosity. In the thin film approximation, we get:
-$$
-\partial_z u|_{top} = \frac{l}{\rho\,\nu} \partial_x\sigma
-$$
-
-with $l = \frac{\sqrt{1+\eta_x^2}}{1-\eta_x^2} \approx 1$, the factor of
- non-linearity. This factor is kept in order to stay consistent with the
- complete equations added in 
-[viscous_surface.h](/crobert/2_Implicit/viscous_srface.h).
-
-### Implementation
-
-The surface tension gradient is added as a boundary condition in the
- vertical viscosity solver, an auxilliary field $du_{Mrg}$ is needed to
- contain this condition.
-*/
-
-vector du_Mrg[];
-
-event viscous_term (i++)
-{
-  if (nu > 0 && !is_constant(sigma)) {
-    foreach()
-      foreach_dimension(){
-        double hx = (eta[1] - eta[-1])/(2.*Delta);
-        double l = sqrt(1. + sq(hx))/(1. - sq(hx));
-        du_Mrg.x[] = dut.x[] + (l/nu)*(sigma[1] - sigma[-1])/(2*Delta);
-      }
-    boundary ((scalar *){du_Mrg});
-    dut = du_Mrg;
-  }
-}
-
-event update_eta (i++) {
-  dut = zerof;
 }
