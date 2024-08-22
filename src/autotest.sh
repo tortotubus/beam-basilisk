@@ -24,13 +24,10 @@ EOF
 			echo $d/$f is up to date
 		    else
 			echo running $d/$f
-			if test -f $basename/fail; then
-			    status=fail
-			else
-			    status=pass
+			if test -f $basename/pass; then
+			    rm -r -f $basename-pass
+			    cp -ar $basename $basename-pass
 			fi
-			rm -r -f $basename-$status
-			cp -ar $basename $basename-$status
 			make -f $makefile $f.html $basename.tst
 		    fi
 		    cd /home/basilisk-wiki/wiki
