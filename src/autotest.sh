@@ -13,15 +13,26 @@ EOF
 	    for f in $alltests; do
 		basename=`basename $f .c`
 		if test -d $d/$basename -a -f $d/$basename.s.d; then
-		    while ssh $SANDBOX tsp | grep running > /dev/null; do sleep 60; done
+		    while test `ssh $SANDBOX tsp | grep running | wc -l` -ge 10; do sleep 60; done
 		    cd $d
 		    if test -f Makefile; then
 			makefile=Makefile
 		    else
 			makefile=/home/basilisk-wiki/wiki/sandbox/Makefile
 		    fi
-		    echo running $d/$f
-		    make -f $makefile $basename.tst
+		    if make -q -f $makefile $basename.tst; then
+			echo $d/$f is up to date
+		    else
+			echo running $d/$f
+			if test -f $basename/fail; then
+			    status=fail
+			else
+			    status=pass
+			fi
+			rm -r -f $basename-$status
+			cp -ar $basename $basename-$status
+			make -f $makefile $f.html $basename.tst
+		    fi
 		    cd /home/basilisk-wiki/wiki
 		    sleep 5
 		fi
