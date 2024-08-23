@@ -1,10 +1,10 @@
 #!/bin/bash
 
 while true; do
-    cd /home/basilisk-wiki/wiki
-    for d in `darcs show files --no-files`; do
+    cd $HOME/wiki
+    for d in `darcs show files --no-files | sort`; do
 	if test -d $d -a -f $d/Makefile.tests; then
-	    alltests=$(cat <<EOF | make -s -f - target
+	    alltests=$(cat <<EOF | make -s -f - target | sort
 include $d/Makefile.tests
 target:
 	echo \$(ALLTESTS)
@@ -18,19 +18,19 @@ EOF
 		    if test -f Makefile; then
 			makefile=Makefile
 		    else
-			makefile=/home/basilisk-wiki/wiki/sandbox/Makefile
+			makefile=$HOME/wiki/sandbox/Makefile
 		    fi
 		    if make -q -f $makefile $basename.tst; then
 			echo $d/$f is up to date
 		    else
 			echo running $d/$f
-			if test -f $basename/pass; then
+			if test -f $basename/pass -a ! -f $basename/fail; then
 			    rm -r -f $basename-pass
 			    cp -ar $basename $basename-pass
 			fi
 			make -f $makefile $f.html $basename.tst
 		    fi
-		    cd /home/basilisk-wiki/wiki
+		    cd $HOME/wiki
 		    sleep 5
 		fi
 	    done
