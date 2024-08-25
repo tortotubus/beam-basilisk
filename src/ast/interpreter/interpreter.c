@@ -1512,6 +1512,8 @@ Ast * struct_size (Ast * type,
   Ast * list = ast_child (type, sym_struct_declaration_list);
   while (!list) {
     type = base_type (ast_child (type, sym_generic_identifier)->child[0], d, stack);
+    if (!type)
+      return NULL;
     assert (type->sym == sym_struct_or_union_specifier);
     list = ast_child (type, sym_struct_declaration_list);
   }
@@ -2011,6 +2013,7 @@ Value * internal_functions (Ast * call, Ast * identifier, Ast ** parameters, boo
       value_set_flags (value, unset);
     else {
       long size = value_data (params[0], long);
+      if (size < 0) size = 0;
       value_data (value, void *) = memset (pmalloc (static_calloc (1, sizeof(pmdata) + size, stack), size), 0, size);
       value_data (value, Pointer).start = value_data (value, void *);
       value_data (value, Pointer).size = size;
@@ -2028,6 +2031,7 @@ Value * internal_functions (Ast * call, Ast * identifier, Ast ** parameters, boo
     else {
       long nmemb = value_data (params[0], long);
       long size = value_data (params[1], long);
+      if (size < 0) size = 0;
       value_data (value, void *) = memset (pmalloc (static_malloc (sizeof(pmdata) + nmemb*size, stack), nmemb*size),
 					   0, nmemb*size);
       value_data (value, Pointer).start = value_data (value, void *);
@@ -2050,6 +2054,7 @@ Value * internal_functions (Ast * call, Ast * identifier, Ast ** parameters, boo
       value_set_flags (value, unset);
     else {
       long size = value_data (params[1], long);
+      if (size < 0) size = 0;
       value_data (value, void *) = pmalloc (static_realloc (pfree (ptr, call, stack), sizeof (pmdata) + size, stack), size);
       long oldsize = value_data (params[0], Pointer).size;
       if (size > oldsize)

@@ -1027,7 +1027,8 @@ Ast * ast_is_point_point (const Ast * n)
 	    (decl = decl->parent)->sym != sym_function_declaration ||
 	    (decl = decl->parent)->sym != sym_function_definition)
 	  return NULL;
-	return ast_last_child (decl)->child[0];
+	decl = ast_last_child (decl);
+	return !decl || decl == ast_placeholder ? NULL : decl->child[0];
       }
     }
   }
@@ -2034,8 +2035,8 @@ Inserts `item` before `insert` in the (block) list containing `insert`. */
 
 Ast * ast_block_list_insert_before (Ast * insert, Ast * item)
 {
-  return ast_block_list_insert_after
-    (insert->parent->parent->child[0]->child[1]->child[0], item);
+  return insert->parent->parent->child[0]->child[1] && insert->parent->parent->child[0]->child[1]->child ?
+    ast_block_list_insert_after (insert->parent->parent->child[0]->child[1]->child[0], item) : NULL;
 }
 
 Ast * ast_block_list_insert_before2 (Ast * insert, Ast * item)
@@ -5035,6 +5036,7 @@ void kernel (Ast * n, Stack * stack, void * data)
 
   case sym_unary_operator: {
     Ast * identifier, * ref, * type;
+    char * before;
     if (n->child[0]->sym == token_symbol ('*') &&
 	(identifier = ast_schema (n->parent, sym_unary_expression,
 				  1, sym_cast_expression,
@@ -5047,7 +5049,9 @@ void kernel (Ast * n, Stack * stack, void * data)
 			    0, sym_declaration_specifiers,
 			    0, sym_type_specifier,
 			    0, sym_types)) &&
-	!strcmp (ast_terminal (type->child[0])->before + strlen (ast_terminal (type->child[0])->before) - 6, "inout ")) {
+	(before = ast_terminal (type->child[0])->before) &&
+	strlen (before) > 6 &&
+	!strcmp (before + strlen (before) - 6, "inout ")) {
       free (ast_terminal (n->child[0])->start);
       ast_terminal (n->child[0])->start = strdup("");
     }
