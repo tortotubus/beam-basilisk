@@ -145,6 +145,8 @@ static int count_lines (const char * s)
 
 void ast_set_child (Ast * parent, int index, Ast * child)
 {
+  if (!child)
+    return;
   if (child == ast_placeholder) {
     parent->child[index] = child;
     return;
