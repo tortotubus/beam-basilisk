@@ -198,7 +198,7 @@ LINKCHECKER = linkchecker --no-warnings --no-status --anchors	\
 	$(LINKCHECKER) -r 1 $<
 
 # generated makefiles
-Makefile.tests: $(BASILISK)/tests.sh
+Makefile.tests: $(BASILISK)/tests.sh $(wildcard Makefile)
 	sh $(BASILISK)/tests.sh
 
 %.s.d: %.c $(QCC)
