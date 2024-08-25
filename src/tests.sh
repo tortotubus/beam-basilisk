@@ -64,12 +64,12 @@ echo "updating Makefile.tests"
     echo ""
     echo "TESTS = \\"
     singleline < Makefile | 		                   \
-	grep '^check:' | tr ' ' '\n' |                     \
+	grep '^check:' | tr ' \t' '\n' |                     \
 	sed -n 's/[ 	]*\([a-zA-Z_0-9-]*\..tst\)[ 	]*/\1/p' |  \
 	sed 's/\(.*\)\..tst/	\1.c \\/g' | \
 	sed 's/.*$(wildcard//g'
     singleline < Makefile | 		                   \
-	grep -v '^check:' | grep '^[^.]*:.*' | tr ' ' '\n' |     \
+	grep -v '^check:' | grep '^[^.]*:.*' | tr ' \t' '\n' |     \
 	sed -n 's/[ 	]*\([a-zA-Z_0-9-]*\.tst\)[ 	]*/\1/p' |    \
 	sed 's/\(.*\)\.tst/	\1.c \\/g'
     echo ""
