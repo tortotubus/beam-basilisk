@@ -405,6 +405,56 @@ int main (int argc, char * argv[])
     foreach (serial)
       fprintf (stderr, "27) %g %g\n", v.x[], v.y[]);
   }
+
+  /**
+  ## Multigrid */
+
+  {
+    init_grid (16);
+    reset ({s}, 31.);
+    foreach_level (2)
+      s[] = x*y;
+  
+    foreach_level (2, serial)
+      fprintf (stderr, "28) %g %g %g\n", x, y, s[]);
+
+    boundary_level ({s}, 2);
+#if _GPU
+    assert (s.gpu.stored == -1);
+#endif
+  
+    scalar g[];
+    foreach_level_or_leaf (2)
+      g[] = s[] - s[-1];
+#if _GPU
+    assert (g.gpu.stored == -1);
+#endif
+    foreach_level (2, serial)
+      fprintf (stderr, "29) %g %g %g %g\n", x, y, g[], s[-1]);
+
+    foreach_coarse_level (1) {
+      double sum = 0.;
+      foreach_child()
+	sum += s[];
+      s[] = sum/(1 << dimension);
+    }
+#if _GPU
+    assert (s.gpu.stored == -1);
+#endif
+    foreach_level (1, serial)
+      fprintf (stderr, "30) %g %g %g\n", x, y, s[]);
+
+    foreach_level (3)
+      s[] = bilinear (point, s);
+    foreach_level (3, serial)
+      fprintf (stderr, "31) %g %g %g\n", x, y, s[]);
+
+    foreach()
+      s[] = x*y;
+    restriction ({s});
+    foreach_level (2, serial)
+      fprintf (stderr, "32) %g %g %g\n", x, y, s[]);
+  }
   
   /**
   ## Other tests */

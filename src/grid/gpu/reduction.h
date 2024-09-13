@@ -27,21 +27,20 @@ real cpu_reduction (GLuint src, size_t offset, size_t nb, const char op)
   return result;
 }
 
-real gpu_reduction (scalar s, const char op, const RegionParameters * region, size_t nb)
+real gpu_reduction (size_t offset, const char op, const RegionParameters * region, size_t nb)
 {
-  size_t offset = s.i*sq(cartesian->n + 2);
   const int stride = 64, nwgr = 64;
   bool is_foreach_point = (region->n.x == 1 && region->n.y == 1);
   if (!is_foreach_point && nb < nwgr*stride)
     return cpu_reduction (GPUContext.ssbo, offset, nb, op);
   
-  GLuint * br = gpu_cartesian->reduct;
+  GLuint * br = gpu_grid->reduct;
   if (!br[0]) {
     GL_C (glGenBuffers (2, br));
     for (int i = 0; i < 2; i++) {
       GL_C (glBindBuffer (GL_SHADER_STORAGE_BUFFER, br[i]));
       GL_C (glBufferData (GL_SHADER_STORAGE_BUFFER,
-			  (sq(cartesian->n + 1)/stride + 1)*sizeof(real),
+			  (sq(N + 1)/stride + 1)*sizeof(real),
 			  NULL, GL_DYNAMIC_READ));
     }
     GL_C (glBindBuffer (GL_SHADER_STORAGE_BUFFER, 0));
@@ -89,7 +88,7 @@ real gpu_reduction (scalar s, const char op, const RegionParameters * region, si
 		"  }\n"
 		"  _reduct[gl_GlobalInvocationID.x] = reduct;\n"
 		"}}\n");
-  GLuint shader = load_shader (fs);
+  GLuint shader = load_shader (fs, NULL);
   assert (shader);
   GL_C (glUseProgram (shader));
   GLint loffset = glGetUniformLocation (shader, "offset");
@@ -101,10 +100,10 @@ real gpu_reduction (scalar s, const char op, const RegionParameters * region, si
 
   if (is_foreach_point) {
     real result = 0.;
-    int i = (region->p.x - X0)/L0*cartesian->n;
-    int j = (region->p.y - Y0)/L0*cartesian->n;
-    if (i >= 0 && i < cartesian->n && j >= 0 && j < cartesian->n) {
-      offset += i*cartesian->n + j;
+    int i = (region->p.x - X0)/L0*N;
+    int j = (region->p.y - Y0)/L0*N;
+    if (i >= 0 && i < N && j >= 0 && j < N) {
+      offset += i*N + j;
       GL_C (glUniform1ui (loffset, offset));
       GL_C (glBindBufferBase (GL_SHADER_STORAGE_BUFFER, 0, GPUContext.ssbo));
       GL_C (glBindBufferBase (GL_SHADER_STORAGE_BUFFER, 1, br[0]));
