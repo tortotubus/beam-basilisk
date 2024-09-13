@@ -211,3 +211,204 @@ void printWorkGroupsCapabilities()
   glGetIntegerv (GL_MAX_COMPUTE_WORK_GROUP_INVOCATIONS, &workgroup_invocations);
   printf ("Nombre maximum d'invocation de workgroups:\n\t%u\n", workgroup_invocations);
 }
+
+static bool _gpu_done_ = false;
+@undef BEGIN_FOREACH
+@def BEGIN_FOREACH if (_gpu_done_)
+  _gpu_done_ = false;
+ else {
+   tracing ("foreach", S__FILE__, S_LINENO);
+@
+@undef END_FOREACH
+@define END_FOREACH end_tracing("foreach", S__FILE__, S_LINENO); }
+
+typedef struct {
+  coord p, * box, n; // region
+  int boundary; // boundary
+  int level; // level
+} RegionParameters;
+
+@undef foreach_stencil
+@def foreach_stencil(_parallel, ...) {
+  tracing ("foreach", S__FILE__, S_LINENO);
+  static ForeachData _loop = {
+    .fname = S__FILE__, .line = S_LINENO, .first = 1, .parallel = _parallel
+  };
+  struct {
+    RegionParameters parameters;
+    External * externals;
+    const char * funcs, * kernel;
+  } _params = S__VA_ARGS__;
+  RegionParameters * _region = &_params.parameters;
+  if (baseblock) for (scalar s = baseblock[0], * i = baseblock; s.i >= 0; i++, s = *i) {
+    _attribute[s.i].input = _attribute[s.i].output = false;
+    _attribute[s.i].width = 0;
+  }
+  int ig = 0, jg = 0, kg = 0; NOT_UNUSED(ig); NOT_UNUSED(jg); NOT_UNUSED(kg);
+  Point point = {0}; NOT_UNUSED (point);
+@
+
+@undef foreach_level_stencil
+@def foreach_level_stencil(_parallel, ...) {
+  tracing ("foreach", S__FILE__, S_LINENO);
+  static ForeachData _loop = {
+    .fname = S__FILE__, .line = S_LINENO, .first = 1, .parallel = _parallel
+  };
+  struct {
+    struct  { int level; } parameters;
+    External * externals;
+    const char * funcs, * kernel;
+  } _params = S__VA_ARGS__;
+  RegionParameters _region_ = { .level = _params.parameters.level + 1 }, * _region = &_region_;
+  if (baseblock) for (scalar s = baseblock[0], * i = baseblock; s.i >= 0; i++, s = *i) {
+    _attribute[s.i].input = _attribute[s.i].output = false;
+    _attribute[s.i].width = 0;
+  }
+  int ig = 0, jg = 0, kg = 0; NOT_UNUSED(ig); NOT_UNUSED(jg); NOT_UNUSED(kg);
+  Point point = {0}; NOT_UNUSED (point);
+@
+
+@undef foreach_boundary_gpu_stencil
+@def foreach_boundary_gpu_stencil(_parallel, ...) {
+  tracing ("foreach", S__FILE__, S_LINENO);
+  _Attributes _backup[datasize/sizeof(real)];
+  memcpy (_backup, _attribute, sizeof (_backup));
+  static ForeachData _loop = {
+    .fname = S__FILE__, .line = S_LINENO, .first = 1, .parallel = 3
+  };
+  struct {
+    struct { int level, direction; } parameters;
+    External * externals;
+    const char * funcs, * kernel;
+  } _params = S__VA_ARGS__;
+  RegionParameters _region_ = { .level = _params.parameters.level + 1,
+    .boundary = _params.parameters.direction + 1 }, * _region = &_region_;
+  if (baseblock) for (scalar s = baseblock[0], * i = baseblock; s.i >= 0; i++, s = *i) {
+    _attribute[s.i].input = _attribute[s.i].output = false;
+    _attribute[s.i].width = 0;
+  }
+  int ig = 0, jg = 0, kg = 0; NOT_UNUSED(ig); NOT_UNUSED(jg); NOT_UNUSED(kg);
+  Point point = {0}; NOT_UNUSED (point);
+@
+
+@undef foreach_point_stencil
+@def foreach_point_stencil(_parallel, ...) {
+  tracing ("foreach", S__FILE__, S_LINENO);
+  static ForeachData _loop = {
+    .fname = S__FILE__, .line = S_LINENO, .first = 1, .parallel = _parallel
+  };
+  struct {
+    coord parameters;
+    External * externals;
+    const char * kernel;
+  } _params = S__VA_ARGS__;
+  RegionParameters _region_ = { .p = _params.parameters, .n = {1,1} }, * _region = &_region_;
+  if (baseblock) for (scalar s = baseblock[0], * i = baseblock; s.i >= 0; i++, s = *i) {
+    _attribute[s.i].input = _attribute[s.i].output = false;
+    _attribute[s.i].width = 0;
+  }
+  int ig = 0, jg = 0, kg = 0; NOT_UNUSED(ig); NOT_UNUSED(jg); NOT_UNUSED(kg);
+  Point point = {0}; NOT_UNUSED (point);
+@
+
+@undef end_foreach_stencil
+@def end_foreach_stencil()
+#if PRINTIO
+  if (baseblock) {
+    fprintf (stderr, "%s:%d:", _loop.fname, _loop.line);
+    for (scalar s = baseblock[0], * i = baseblock; s.i >= 0; i++, s = *i)
+      if (_attribute[s.i].input || _attribute[s.i].output)
+	fprintf (stderr, " %s:%d:%c:%d", _attribute[s.i].name, s.i,
+		 _attribute[s.i].input && _attribute[s.i].output ? 'a' :
+		 _attribute[s.i].input ? 'r' : 'w',
+		 _attribute[s.i].width);
+    fprintf (stderr, "\n");
+  }
+#endif // PRINTIO
+  check_stencil (&_loop);
+  _gpu_done_ = gpu_end_stencil (&_loop, _region, _params.externals, _params.kernel);
+  boundary_stencil (&_loop);
+  _loop.first = 0;
+  end_tracing ("foreach", S__FILE__, S_LINENO);
+}
+@
+
+@undef end_foreach_level_stencil
+@def end_foreach_level_stencil()
+#if PRINTIO
+  if (baseblock) {
+    fprintf (stderr, "%s:%d:", _loop.fname, _loop.line);
+    for (scalar s = baseblock[0], * i = baseblock; s.i >= 0; i++, s = *i)
+      if (_attribute[s.i].input || _attribute[s.i].output)
+	fprintf (stderr, " %s:%d:%c:%d", _attribute[s.i].name, s.i,
+		 _attribute[s.i].input && _attribute[s.i].output ? 'a' :
+		 _attribute[s.i].input ? 'r' : 'w',
+		 _attribute[s.i].width);
+    fprintf (stderr, "\n");
+  }
+#endif // PRINTIO
+  check_stencil (&_loop);
+  _gpu_done_ = gpu_end_stencil (&_loop, _region, _params.externals, _params.kernel);
+  _loop.first = 0;
+  end_tracing ("foreach", S__FILE__, S_LINENO);
+}
+@
+  
+@undef end_foreach_boundary_gpu_stencil
+@def end_foreach_boundary_gpu_stencil()
+#if PRINTIO
+  if (baseblock) {
+    fprintf (stderr, "%s:%d:", _loop.fname, _loop.line);
+    for (scalar s = baseblock[0], * i = baseblock; s.i >= 0; i++, s = *i)
+      if (_attribute[s.i].input || _attribute[s.i].output)
+	fprintf (stderr, " %s:%d:%c:%d", _attribute[s.i].name, s.i,
+		 _attribute[s.i].input && _attribute[s.i].output ? 'a' :
+		 _attribute[s.i].input ? 'r' : 'w',
+		 _attribute[s.i].width);
+    fprintf (stderr, "\n");
+  }
+#endif // PRINTIO
+  check_stencil (&_loop);
+  _gpu_done_ = gpu_end_stencil (&_loop, _region, _params.externals, _params.kernel);
+  boundary_stencil (&_loop);
+  _loop.first = 0;
+  memcpy (_attribute, _backup, sizeof (_backup));
+  end_tracing ("foreach", S__FILE__, S_LINENO);
+}
+@
+
+@ifndef tracing
+  @ def tracing(func, file, line) do {
+    if (glFinish) glFinish();
+    tracing(func, file, line);
+  } while(0) @
+  @ def end_tracing(func, file, line) do {
+    if (glFinish) glFinish();
+    end_tracing(func, file, line);
+  } while(0) @
+@endif
+
+bool gpu_end_stencil (ForeachData * loop, const RegionParameters * region,
+		      External * externals, const char * kernel);
+
+void realloc_ssbo()
+{
+  GL_C (glBindBuffer (GL_SHADER_STORAGE_BUFFER, GPUContext.ssbo));
+  GL_C (glBufferData (GL_SHADER_STORAGE_BUFFER, grid_size()*datasize, grid_data(), GL_DYNAMIC_READ));
+  GL_C (glBindBuffer (GL_SHADER_STORAGE_BUFFER, 0));
+}
+
+static void gpu_cpu_sync_scalar (scalar s, char * sep, GLenum mode);
+
+void realloc_scalar_gpu (int size)
+{
+  realloc_scalar (size);
+  for (scalar s in baseblock)
+    if (s.gpu.stored < 0)
+      gpu_cpu_sync_scalar (s, NULL, GL_MAP_READ_BIT);
+  realloc_ssbo();
+}
+
+#define realloc_scalar(size) realloc_scalar_gpu (size)
+#define foreach_level_or_leaf(...) foreach_level(__VA_ARGS__)
+#define foreach_coarse_level(...) foreach_level(__VA_ARGS__)

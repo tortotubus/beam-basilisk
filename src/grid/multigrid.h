@@ -1,6 +1,12 @@
+#if _GPU
+typedef float real;
+#else
 typedef double real;
+#endif
 
-#define GRIDNAME "Multigrid"
+#ifndef GRIDNAME
+# define GRIDNAME "Multigrid"
+#endif
 #define GHOSTS 2
 
 /* By default only one layer of ghost cells is used on the boundary to
@@ -61,10 +67,14 @@ static size_t _size (size_t l)
 @def data(k,l,m)
   ((double *)&multigrid->d[point.level][(point.i + k)*datasize + (l) - (l)]) @
 #elif dimension == 2
-@def data(k,l,m)
-  ((double *)&multigrid->d[point.level][((point.i + k)*((1 << point.level) +
-							2*GHOSTS) +
-					 (point.j + l))*datasize]) @
+@undef val
+@def val(a,k,l,m) (((real *)multigrid->d[point.level])[(point.i + k + _index(a,m)*((1 << point.level) + 2*GHOSTS))*
+						       ((1 << point.level) + 2*GHOSTS) + point.j + l])
+@
+#if _GPU
+// ghost cell coordinates for each direction
+static int _ig[] = {1,-1,0,0}, _jg[] = {0,0,1,-1};
+#endif
 #elif dimension == 3
 @def data(l,m,o)
   ((double *)&multigrid->d[point.level][((point.i + l)*sq((1 << point.level) +
@@ -136,16 +146,12 @@ static size_t _size (size_t l)
 @
 #elif dimension == 2
 @def fine(a,k,l,m)
-  ((double *)
-   &multigrid->d[point.level+1][((2*point.i-GHOSTS+k)*2*((1 << point.level) +
-							 GHOSTS) +
-				 (2*point.j-GHOSTS+l))*datasize])[_index(a,m)]
+(((real *)multigrid->d[point.level+1])[(2*point.i - GHOSTS + k + _index(a,m)*((1 << point.level)*2 + 2*GHOSTS))*
+				       ((1 << point.level)*2 + 2*GHOSTS) + 2*point.j - GHOSTS + l])
 @
 @def coarse(a,k,l,m)
-  ((double *)
-   &multigrid->d[point.level-1][(((point.i+GHOSTS)/2+k)*((1 << point.level)/2 +
-							 2*GHOSTS) +
-				 (point.j+GHOSTS)/2+l)*datasize])[_index(a,m)]
+(((real *)multigrid->d[point.level-1])[((point.i + GHOSTS)/2 + k + _index(a,m)*((1 << point.level)/2 + 2*GHOSTS))*
+				       ((1 << point.level)/2 + 2*GHOSTS) + (point.j + GHOSTS)/2 + l])
 @
 @def POINT_VARIABLES
   VARIABLES
@@ -398,13 +404,14 @@ void reset (void * alist, double val)
   scalar * list = (scalar *) alist;
   Point p;
   p.level = depth(); p.n = 1 << p.level;
-  for (; p.level >= 0; p.n /= 2, p.level--)
-    for (int i = 0; i < dimpower(p.n + 2*GHOSTS); i++)
-      for (scalar s in list) {
-	if (!is_constant(s))
-	  for (int b = 0; b < s.block; b++)
-	    ((double *)(&multigrid->d[p.level][i*datasize]))[s.i + b] = val;
-      }
+  for (; p.level >= 0; p.n /= 2, p.level--) {
+    size_t len = dimpower(p.n + 2*GHOSTS);
+    for (scalar s in list)
+      if (!is_constant(s))
+	for (int b = 0; b < s.block; b++)
+	  for (int i = 0; i < len; i++)
+	    ((real *)multigrid->d[p.level])[i + (s.i + b)*len] = val;
+  }
 }
 
 // Boundaries
@@ -631,9 +638,9 @@ static void periodic_boundary_level_x (const Boundary * b, scalar * list, int l)
   if (l == 0) {
     foreach_level(0)
       for (scalar s in list1) {
-	double * v = &s[];
+	real * v = &s[];
 	foreach_neighbor()
-	  memcpy (&s[], v, s.block*sizeof(double));
+	  memcpy (&s[], v, s.block*sizeof(real));
       }
     free (list1);
     return;
@@ -643,10 +650,10 @@ static void periodic_boundary_level_x (const Boundary * b, scalar * list, int l)
   point.level = l < 0 ? depth() : l; point.n = 1 << point.level;
   for (int i = 0; i < GHOSTS; i++)
     for (scalar s in list1)
-      memcpy (&s[i], &s[i + point.n], s.block*sizeof(double));
+      memcpy (&s[i], &s[i + point.n], s.block*sizeof(real));
   for (int i = point.n + GHOSTS; i < point.n + 2*GHOSTS; i++)
     for (scalar s in list1)
-      memcpy (&s[i], &s[i - point.n], s.block*sizeof(double));
+      memcpy (&s[i], &s[i - point.n], s.block*sizeof(real));
 
   free (list1);
 }
@@ -675,9 +682,9 @@ static void periodic_boundary_level_x (const Boundary * b, scalar * list, int l)
   if (l == 0) {
     foreach_level(0)
       for (scalar s in list1) {
-	double * v = &s[];
+	real * v = &s[];
 	foreach_neighbor()
-	  memcpy (&s[], v, s.block*sizeof(double));
+	  memcpy (&s[], v, s.block*sizeof(real));
       }
     free (list1);
     return;
@@ -692,10 +699,10 @@ static void periodic_boundary_level_x (const Boundary * b, scalar * list, int l)
       for (j = 0; j < point.n + 2*GHOSTS; j++) {
 	for (int i = 0; i < GHOSTS; i++)
 	  for (scalar s in list1)
-	    memcpy (&s[i,j], &s[i + point.n,j], s.block*sizeof(double));
+	    memcpy (&s[i,j], &s[i + point.n,j], s.block*sizeof(real));
 	for (int i = point.n + GHOSTS; i < point.n + 2*GHOSTS; i++)
 	  for (scalar s in list1)
-	    memcpy (&s[i,j], &s[i - point.n,j], s.block*sizeof(double));
+	    memcpy (&s[i,j], &s[i - point.n,j], s.block*sizeof(real));
       }
 #else // dimension == 3
     int j;
@@ -704,10 +711,10 @@ static void periodic_boundary_level_x (const Boundary * b, scalar * list, int l)
 	for (int k = 0; k < point.n + 2*GHOSTS; k++) {
 	  for (int i = 0; i < GHOSTS; i++)
 	    for (scalar s in list1)
-	      memcpy (&s[i,j,k], &s[i + point.n,j,k], s.block*sizeof(double));
+	      memcpy (&s[i,j,k], &s[i + point.n,j,k], s.block*sizeof(real));
 	  for (int i = point.n + GHOSTS; i < point.n + 2*GHOSTS; i++)
 	    for (scalar s in list1)
-	      memcpy (&s[i,j,k], &s[i - point.n,j,k], s.block*sizeof(double));
+	      memcpy (&s[i,j,k], &s[i - point.n,j,k], s.block*sizeof(real));
 	}
 #endif
   }
@@ -769,11 +776,6 @@ void init_grid (int n)
   for (int l = 0; l <= depth(); l++) {
     size_t len = _size(l)*datasize;
     m->d[l] = (char *) malloc (len);
-    /* trash the data just to make sure it's either explicitly
-       initialised or never touched */
-    double * v = (double *) m->d[l];
-    for (int i = 0; i < len/sizeof(double); i++)
-      v[i] = undefined;
   }
   reset (all, 0.);
 }
@@ -781,14 +783,9 @@ void init_grid (int n)
 void realloc_scalar (int size)
 {
   Multigrid * p = multigrid;
-  for (int l = 0; l <= depth(); l++) {
-    size_t len = _size(l);
-    qrealloc (p->d[l], len*(datasize + size), char);
-    char * data = p->d[l] + (len - 1)*datasize;
-    for (int i = len - 1; i > 0; i--, data -= datasize)
-      memmove (data + i*size, data, datasize);  
-  }
   datasize += size;
+  for (int l = 0; l <= depth(); l++)
+    qrealloc (p->d[l], _size(l)*datasize, char);
 }
 
 #if _MPI
@@ -841,8 +838,10 @@ Point locate (double xp = 0, double yp = 0, double zp = 0)
   point.level = depth();
   return point;
 }
- 
-#include "multigrid-common.h"
+
+#if !_GPU
+# include "multigrid-common.h"
+#endif
 
 void dimensions (int nx = 0, int ny = 0, int nz = 0)
 {

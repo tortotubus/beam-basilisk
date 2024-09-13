@@ -82,6 +82,16 @@ typedef struct {
 @define foreach_visible_stencil(...) foreach_stencil(S__VA_ARGS__)
 @define end_foreach_visible_stencil() end_foreach_stencil()
 
+@define foreach_level_stencil(...) foreach_stencil(S__VA_ARGS__)
+@def end_foreach_level_stencil()
+  check_stencil (&_loop);
+  _first = 0;
+}
+@
+
+@define foreach_coarse_level_stencil(...) foreach_level_stencil(S__VA_ARGS__)
+@define end_foreach_coarse_level_stencil() end_foreach_level_stencil()
+
 @define foreach_point_stencil(...) foreach_stencil(S__VA_ARGS__)
 @define end_foreach_point_stencil() end_foreach_stencil()
 

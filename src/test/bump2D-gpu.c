@@ -1,4 +1,4 @@
-#include "grid/gpu/cartesian.h"
+#include "grid/gpu/multigrid.h"
 #include "saint-venant.h"
 
 int LEVEL = 7;

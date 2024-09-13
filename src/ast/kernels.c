@@ -492,6 +492,9 @@ void kernel (Ast * n, Stack * stack, void * data)
       break;
     }
 
+    if (!strcmp (t->start, "coarse") || !strcmp (t->start, "fine"))
+      break;
+    
     /**
     ## Dirichlet and Neumann boundary conditions */
 
