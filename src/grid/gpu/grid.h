@@ -29,13 +29,23 @@ GLSL: error: too few components to construct `vec3'
 
 #include <khash.h>
 
-KHASH_MAP_INIT_STR(STR, GLuint)
+#define HASHSHADER 1 // fixme: make default
 
+#if !HASHSHADER
+KHASH_MAP_INIT_STR(STR, GLuint)
+#else
+KHASH_MAP_INIT_INT(INT, GLuint)
+#endif
+  
 typedef struct {
   GRIDPARENT parent;
   Boundary ** boundaries;
   GLuint reduct[2], ng[2], nwg[2];
+#if !HASHSHADER
   khash_t(STR) * shaders;
+#else
+  khash_t(INT) * shaders;
+#endif
 } GridGPU;
 
 #define gpu_grid ((GridGPU *)grid)
@@ -247,6 +257,109 @@ static External * merge_externals (External * externals, const ForeachData * loo
     fprintf (stderr, "external %s %s\n", i->name, i->type);
 #endif
   return merged;
+}
+
+#if 0
+typedef struct {
+  uint32_t s1, s2;
+} Adler32Hash;
+
+static
+inline void a32_hash_init (Adler32Hash * hash)
+{
+  hash->s1 = 1;
+  hash->s2 = 0;
+}
+
+static
+inline void a32_hash_add_char (Adler32Hash * hash, uint8_t c)
+{
+  hash->s1 = (hash->s1 + c) % 65521;
+  hash->s2 = (hash->s2 + hash->s1) % 65521;
+}
+
+static
+inline void a32_hash_add (Adler32Hash * hash, const void * data, size_t size)
+{
+  const uint8_t * buffer = (const uint8_t*) data;
+  for (size_t n = 0; n < size; n++, buffer++)
+    a32_hash_add_char (hash, *buffer);
+}
+
+static
+inline uint32_t a32_hash (const Adler32Hash * hash)
+{
+  return (hash->s2 << 16) | hash->s1;
+}
+#else // SDBM
+typedef struct {
+  uint32_t s;
+} Adler32Hash;
+
+static
+inline void a32_hash_init (Adler32Hash * hash)
+{
+  hash->s = 0;
+}
+
+static
+inline void a32_hash_add (Adler32Hash * hash, const void * data, size_t size)
+{
+  const uint8_t * buffer = (const uint8_t*) data;
+  for (size_t n = 0; n < size; n++, buffer++)
+    hash->s = *buffer + (hash->s << 6) + (hash->s << 16) - hash->s;
+}
+
+static
+inline uint32_t a32_hash (const Adler32Hash * hash)
+{
+  return hash->s;
+}
+#endif
+
+trace
+uint32_t hash_shader (const External * externals, const ForeachData * loop,
+		      const RegionParameters * region, const char * kernel)
+{
+  Adler32Hash hash;
+  a32_hash_init (&hash);
+  a32_hash_add (&hash, &region->level, sizeof (region->level));
+  a32_hash_add (&hash, &region->boundary, sizeof (region->boundary));
+  a32_hash_add (&hash, &N, sizeof (N));
+  a32_hash_add (&hash, kernel, strlen (kernel));
+  a32_hash_add (&hash, &nconst, sizeof (nconst));
+  a32_hash_add (&hash, _constant, sizeof (*_constant)*nconst);
+  for (const External * g = externals; g; g = g->next) {
+    if (!strcmp (g->name, "nl") && !strcmp (g->type, "int"))
+      a32_hash_add (&hash, g->pointer, sizeof (int));
+    else if (!strcmp (g->type, "scalar") ||
+	     !strcmp (g->type, "vector") ||
+	     !strcmp (g->type, "tensor")) {
+      // scalar, vector and tensor fields
+      int size = list_size (g);
+      a32_hash_add (&hash, &size, sizeof (size));
+      for (int j = 0; j < size; j++)
+	if (g->nd == 0 || j < size - 1) {
+	  if (!strcmp (g->type, "scalar")) {
+	    scalar s = ((scalar *)g->pointer)[j];
+	    a32_hash_add (&hash, &s.i, sizeof (s.i));
+	  }
+	  else if (!strcmp (g->type, "vector")) {
+	    vector v = ((vector *)g->pointer)[j];
+	    for (scalar s in {v})
+	      a32_hash_add (&hash, &s.i, sizeof (s.i));
+	  }
+	  else if (!strcmp (g->type, "tensor")) {
+	    tensor t = ((tensor *)g->pointer)[j];
+	    for (scalar s in {t})
+	      a32_hash_add (&hash, &s.i, sizeof (s.i));
+	  }
+	  else
+	    assert (false);
+	}
+    }
+  }
+  return a32_hash (&hash);
 }
 
 trace
@@ -508,14 +621,22 @@ char * build_shader (const External * externals, const ForeachData * loop,
 }
 
 trace
-GLuint load_shader (const char * fs, const ForeachData * loop)
+GLuint load_shader (const char * fs, uint32_t hash, const ForeachData * loop)
 {
   assert (gpu_grid->shaders);
+#if !HASHSHADER
   khiter_t k = kh_get (STR, gpu_grid->shaders, fs);
   if (k != kh_end (gpu_grid->shaders)) {
     sysfree ((void *)fs);
     return kh_value (gpu_grid->shaders, k);
   }
+#else
+  khiter_t k = kh_get (INT, gpu_grid->shaders, hash);
+  if (k != kh_end (gpu_grid->shaders)) {
+    sysfree ((void *)fs);
+    return kh_value (gpu_grid->shaders, k);
+  }
+#endif
 #if PRINTSHADER
   {
     static int n = 1;
@@ -528,7 +649,7 @@ GLuint load_shader (const char * fs, const ForeachData * loop)
   if (!GPUContext.fragment_shader)
     id = loadNormalShader (NULL, fs);
   else {
-    char quad[] =
+    const char quad[] =
       "#version 430\n"
       "layout(location = 0) in vec3 vsPos;"
       "out vec2 vsPoint;"
@@ -538,6 +659,7 @@ GLuint load_shader (const char * fs, const ForeachData * loop)
       "}";
     id = loadNormalShader (quad, fs);
   }
+#if !HASHSHADER  
   if (id) {
     int ret;
     khiter_t k = kh_put (STR, gpu_grid->shaders, fs, &ret);
@@ -545,6 +667,14 @@ GLuint load_shader (const char * fs, const ForeachData * loop)
     kh_value (gpu_grid->shaders, k) = id;
   }
   else
+#else
+  if (id) {
+    int ret;
+    khiter_t k = kh_put (INT, gpu_grid->shaders, hash, &ret);
+    assert (ret > 0);
+    kh_value (gpu_grid->shaders, k) = id;
+  }
+#endif
     sysfree ((void *)fs);
   return id;
 }
@@ -566,10 +696,14 @@ void gpu_free()
     return;
   free_boundaries();
   swap (Boundary **, boundaries, gpu_grid->boundaries);
+#if !HASHSHADER
   const char * code;
   GLuint id;
   kh_foreach (gpu_grid->shaders, code, id, sysfree ((void *) code)); id = id;
   kh_destroy (STR, gpu_grid->shaders);
+#else
+  kh_destroy (INT, gpu_grid->shaders);
+#endif
   gpu_grid->shaders = NULL;
   if (gpu_grid->reduct[0]) {
     GL_C (glDeleteBuffers (2, gpu_grid->reduct));
@@ -623,8 +757,11 @@ void gpu_init()
     free_solver_func_add (gpu_free);
     free_solver_func_add (gpu_free_solver);
   }
-  
+#if !HASHSHADER
   gpu_grid->shaders = kh_init (STR);
+#else
+  gpu_grid->shaders = kh_init (INT);
+#endif
   for (int i = 0; i < 2; i++)
     gpu_grid->reduct[i] = 0;
     
@@ -1000,7 +1137,19 @@ static bool doloop_on_gpu (ForeachData * loop, const RegionParameters * region,
   storage buffer. */
   
   GL_C (glBindBufferBase (GL_SHADER_STORAGE_BUFFER, 0, 0));
- 
+
+#if HASHSHADER
+  shaderid = 0;
+  uint32_t hash = hash_shader (externals, loop, region, kernel);
+  {
+    assert (gpu_grid->shaders);
+    khiter_t k = kh_get (INT, gpu_grid->shaders, hash);
+    if (k != kh_end (gpu_grid->shaders))
+      shaderid = kh_value (gpu_grid->shaders, k);
+  }
+  if (!shaderid) {
+#endif
+  
   char * shader = build_shader (externals, loop, region);
   if (shader) {
 
@@ -1055,9 +1204,12 @@ static bool doloop_on_gpu (ForeachData * loop, const RegionParameters * region,
 	s.gpu.stored = -1;
       }
     shader = str_append (shader, "\n}}}\n");
-    shaderid = load_shader (shader, loop);
+    shaderid = load_shader (shader, hash, loop);
     loop->data = (void *) ((long) shaderid);
   }
+#if HASHSHADER
+  }
+#endif
     
   if (!shaderid) {
 
