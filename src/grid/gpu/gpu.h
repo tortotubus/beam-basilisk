@@ -250,7 +250,7 @@ typedef struct {
 
 @undef foreach_level_stencil
 @def foreach_level_stencil(_parallel, ...) {
-  tracing ("foreach", S__FILE__, S_LINENO);
+  tracing ("foreach_level", S__FILE__, S_LINENO);
   static ForeachData _loop = {
     .fname = S__FILE__, .line = S_LINENO, .first = 1, .parallel = _parallel
   };
@@ -270,9 +270,7 @@ typedef struct {
 
 @undef foreach_boundary_gpu_stencil
 @def foreach_boundary_gpu_stencil(_parallel, ...) {
-  tracing ("foreach", S__FILE__, S_LINENO);
-  _Attributes _backup[datasize/sizeof(real)];
-  memcpy (_backup, _attribute, sizeof (_backup));
+  tracing ("foreach_boundary_gpu", S__FILE__, S_LINENO);
   static ForeachData _loop = {
     .fname = S__FILE__, .line = S_LINENO, .first = 1, .parallel = 3
   };
@@ -283,12 +281,8 @@ typedef struct {
   } _params = S__VA_ARGS__;
   RegionParameters _region_ = { .level = _params.parameters.level + 1,
     .boundary = _params.parameters.direction + 1 }, * _region = &_region_;
-  if (baseblock) for (scalar s = baseblock[0], * i = baseblock; s.i >= 0; i++, s = *i) {
-    _attribute[s.i].input = _attribute[s.i].output = false;
-    _attribute[s.i].width = 0;
-  }
-  int ig = 0, jg = 0, kg = 0; NOT_UNUSED(ig); NOT_UNUSED(jg); NOT_UNUSED(kg);
   Point point = {0}; NOT_UNUSED (point);
+  if (0)
 @
 
 @undef foreach_point_stencil
@@ -350,30 +344,15 @@ typedef struct {
   check_stencil (&_loop);
   _gpu_done_ = gpu_end_stencil (&_loop, _region, _params.externals, _params.kernel);
   _loop.first = 0;
-  end_tracing ("foreach", S__FILE__, S_LINENO);
+  end_tracing ("foreach_level", S__FILE__, S_LINENO);
 }
 @
   
 @undef end_foreach_boundary_gpu_stencil
 @def end_foreach_boundary_gpu_stencil()
-#if PRINTIO
-  if (baseblock) {
-    fprintf (stderr, "%s:%d:", _loop.fname, _loop.line);
-    for (scalar s = baseblock[0], * i = baseblock; s.i >= 0; i++, s = *i)
-      if (_attribute[s.i].input || _attribute[s.i].output)
-	fprintf (stderr, " %s:%d:%c:%d", _attribute[s.i].name, s.i,
-		 _attribute[s.i].input && _attribute[s.i].output ? 'a' :
-		 _attribute[s.i].input ? 'r' : 'w',
-		 _attribute[s.i].width);
-    fprintf (stderr, "\n");
-  }
-#endif // PRINTIO
-  check_stencil (&_loop);
   _gpu_done_ = gpu_end_stencil (&_loop, _region, _params.externals, _params.kernel);
-  boundary_stencil (&_loop);
   _loop.first = 0;
-  memcpy (_attribute, _backup, sizeof (_backup));
-  end_tracing ("foreach", S__FILE__, S_LINENO);
+  end_tracing ("foreach_boundary_gpu", S__FILE__, S_LINENO);
 }
 @
 
