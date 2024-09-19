@@ -29,23 +29,17 @@ GLSL: error: too few components to construct `vec3'
 
 #include <khash.h>
 
-#define HASHSHADER 1 // fixme: make default
+typedef struct {
+  GLuint id;
+} Shader;
 
-#if !HASHSHADER
-KHASH_MAP_INIT_STR(STR, GLuint)
-#else
-KHASH_MAP_INIT_INT(INT, GLuint)
-#endif
+KHASH_MAP_INIT_INT(INT, Shader *)
   
 typedef struct {
   GRIDPARENT parent;
   Boundary ** boundaries;
   GLuint reduct[2], ng[2], nwg[2];
-#if !HASHSHADER
-  khash_t(STR) * shaders;
-#else
   khash_t(INT) * shaders;
-#endif
 } GridGPU;
 
 #define gpu_grid ((GridGPU *)grid)
@@ -128,9 +122,9 @@ static char glsl_preproc[] =
   "#define _neumann_homogeneous(expr,p,n,_s,data)   (val(_s,0,0,0))\n"
   "const real z = 0.;\n"
   "const int ig = 0, jg = 0;\n"
-  "uniform ivec2 csOrigin = ivec2(0,0);\n"
-  "uniform vec2 vsOrigin = vec2(0.,0.);\n"
-  "uniform vec2 vsScale = vec2(1.,1.);\n"
+  "layout (location = 0) uniform ivec2 csOrigin = ivec2(0,0);\n"
+  "layout (location = 1) uniform vec2 vsOrigin = vec2(0.,0.);\n"
+  "layout (location = 2) uniform vec2 vsScale = vec2(1.,1.);\n"
   ;
 
 static inline int list_size (const External * i)
@@ -228,6 +222,7 @@ static External * merge_external (External * externals, External ** end, Externa
   return append_external (externals, end, g);
 }
 
+trace
 static External * merge_externals (External * externals, const ForeachData * loop)
 {
   External * merged = NULL, * end = NULL;
@@ -363,7 +358,7 @@ uint32_t hash_shader (const External * externals, const ForeachData * loop,
 }
 
 trace
-char * build_shader (const External * externals, const ForeachData * loop,
+char * build_shader (External * externals, const ForeachData * loop,
 		     const RegionParameters * region)
 {
   int Nl = region->level > 0 ? 1 << (region->level - 1) : N;
@@ -410,6 +405,7 @@ char * build_shader (const External * externals, const ForeachData * loop,
     for (scalar s in baseblock)
       if (s.gpu.index)
 	nindex++;
+    assert (nindex > 0);
     char s[20]; snprintf (s, 19, "%d", nindex);
     fs = str_append (fs, "const _Attributes _attr[", s, "]={");
     nindex = 0;
@@ -468,7 +464,8 @@ char * build_shader (const External * externals, const ForeachData * loop,
   /**
   Non-local variables */
 
-  for (const External * g = externals; g; g = g->next) {
+  int location = 3; // 0,1 and 2 are reserved for csOrigin, vsOrigin and vsScale
+  for (External * g = externals; g; g = g->next) {
     if (g->name[0] == '.') {
       if (!strcmp (g->type, "*func()")) {
 	fs = str_append (fs, "#define _attr_", g->name + 1, "(s,args) (");
@@ -567,8 +564,14 @@ char * build_shader (const External * externals, const ForeachData * loop,
       else {
 	char * type = !strcmp (g->type, "float") || !strcmp (g->type, "double") ? "real" :
 	  !strcmp (g->type, "enum") ? "int" : g->type;
-	fs = str_append (fs, "uniform ", type, " ", g->name, g->reduct ? "_in_" : "");
-	for (int * d = g->data; d && *d > 0; d++) {
+	char loc[20];
+	snprintf (loc, 19, "%d", location);
+	fs = str_append (fs, "layout (location = ", loc, ") uniform ",
+			 type, " ", g->name, g->reduct ? "_in_" : "");
+	g->location = location;
+	int * d = g->data;
+	location += d && *d > 0 ? *d : 1;
+	for (; d && *d > 0; d++) {
 	  char s[20]; snprintf (s, 19, "%d", *d);
 	  fs = str_append (fs, "[", s, "]");
 	}
@@ -627,22 +630,14 @@ char * build_shader (const External * externals, const ForeachData * loop,
 }
 
 trace
-GLuint load_shader (const char * fs, uint32_t hash, const ForeachData * loop)
+Shader * load_shader (const char * fs, uint32_t hash, const ForeachData * loop)
 {
   assert (gpu_grid->shaders);
-#if !HASHSHADER
-  khiter_t k = kh_get (STR, gpu_grid->shaders, fs);
-  if (k != kh_end (gpu_grid->shaders)) {
-    sysfree ((void *)fs);
-    return kh_value (gpu_grid->shaders, k);
-  }
-#else
   khiter_t k = kh_get (INT, gpu_grid->shaders, hash);
   if (k != kh_end (gpu_grid->shaders)) {
     sysfree ((void *)fs);
     return kh_value (gpu_grid->shaders, k);
   }
-#endif
 #if PRINTSHADER
   {
     static int n = 1;
@@ -665,24 +660,17 @@ GLuint load_shader (const char * fs, uint32_t hash, const ForeachData * loop)
       "}";
     id = loadNormalShader (quad, fs);
   }
-#if !HASHSHADER  
+  Shader * shader = NULL;
   if (id) {
-    int ret;
-    khiter_t k = kh_put (STR, gpu_grid->shaders, fs, &ret);
-    assert (ret > 0);
-    kh_value (gpu_grid->shaders, k) = id;
-  }
-  else
-#else
-  if (id) {
+    shader = malloc (sizeof (Shader));
+    shader->id = id;
     int ret;
     khiter_t k = kh_put (INT, gpu_grid->shaders, hash, &ret);
     assert (ret > 0);
-    kh_value (gpu_grid->shaders, k) = id;
+    kh_value (gpu_grid->shaders, k) = shader;
   }
-#endif
-    sysfree ((void *)fs);
-  return id;
+  sysfree ((void *)fs);
+  return shader;
 }
 
 void gpu_limits (FILE * fp)
@@ -702,14 +690,10 @@ void gpu_free()
     return;
   free_boundaries();
   swap (Boundary **, boundaries, gpu_grid->boundaries);
-#if !HASHSHADER
-  const char * code;
-  GLuint id;
-  kh_foreach (gpu_grid->shaders, code, id, sysfree ((void *) code)); id = id;
-  kh_destroy (STR, gpu_grid->shaders);
-#else
+  uint32_t hash;
+  Shader * shader;
+  kh_foreach (gpu_grid->shaders, hash, shader, free (shader)); hash = hash;
   kh_destroy (INT, gpu_grid->shaders);
-#endif
   gpu_grid->shaders = NULL;
   if (gpu_grid->reduct[0]) {
     GL_C (glDeleteBuffers (2, gpu_grid->reduct));
@@ -763,11 +747,7 @@ void gpu_init()
     free_solver_func_add (gpu_free);
     free_solver_func_add (gpu_free_solver);
   }
-#if !HASHSHADER
-  gpu_grid->shaders = kh_init (STR);
-#else
   gpu_grid->shaders = kh_init (INT);
-#endif
   for (int i = 0; i < 2; i++)
     gpu_grid->reduct[i] = 0;
     
@@ -791,6 +771,10 @@ attribute {
 
 static void boundary_level_gpu (const Boundary * b, scalar * list, int l)
 {
+#if PRINTIO  
+  fprintf (stderr, "boundary_level_gpu (%d)\n", l);
+#endif
+  
   scalar * centered = NULL;
 
   for (scalar s in list)
@@ -808,6 +792,9 @@ static void boundary_level_gpu (const Boundary * b, scalar * list, int l)
       s.boundary_top    = s.boundary[top];
       s.boundary_bottom = s.boundary[bottom];
     }
+#if 1
+    for (scalar s in centered)
+      s.input = true;
     foreach_boundary_gpu (gpu, nowarning, l, left) {
       Point neighbor = { point.i, point.j, point.level
 #if LAYERS
@@ -834,12 +821,51 @@ static void boundary_level_gpu (const Boundary * b, scalar * list, int l)
 	s[] = b.boundary_top (neighbor, point, s, data);
       }
     }
+#else
+    foreach_boundary_gpu (gpu, nowarning, l, left) {
+      Point neighbor = point;
+      bool data;
+      if (point.i == GHOSTS) {
+	point.i--;
+	for (scalar s in centered) {
+	  scalar b = (s.v.x.i < 0 ? s : s.i == s.v.x.i ? s.v.x : s.v.y);
+	  s[] = b.boundary_left (neighbor, point, s, data);
+	}
+	point.i++;
+      }
+      else if (point.i == N + GHOSTS - 1) {
+	point.i++;
+	for (scalar s in centered) {
+	  scalar b = (s.v.x.i < 0 ? s : s.i == s.v.x.i ? s.v.x : s.v.y);
+	  s[] = b.boundary_right (neighbor, point, s, data);
+	}
+	point.i--;
+      }
+      if (point.j == GHOSTS) {
+	point.j--;
+	for (scalar s in centered) {
+	  scalar b = (s.v.x.i < 0 ? s : s.i == s.v.y.i ? s.v.x : s.v.y);
+	  s[] = b.boundary_bottom (neighbor, point, s, data);
+	}
+	point.j++;
+      }
+      else if (point.j == N + GHOSTS - 1) {
+	point.j++;
+	for (scalar s in centered) {
+	  scalar b = (s.v.x.i < 0 ? s : s.i == s.v.y.i ? s.v.x : s.v.y);	
+	  s[] = b.boundary_top (neighbor, point, s, data);
+	}
+	point.j--;
+      }
+    }
+#endif
     for (scalar s in centered)
       s.gpu.stored = -1;
     free (centered);
   }
 }
 
+#if 0
 static void box_boundary_level_gpu (const Boundary * b, scalar * list, int l)
 {
   int d = ((BoxBoundary *)b)->d;
@@ -922,6 +948,7 @@ static void box_boundary_level_gpu (const Boundary * b, scalar * list, int l)
   free (tangent);
 #endif
 }
+#endif
 
 /**
 The `stored` attibute tracks where the up-to-date field is stored:
@@ -1025,7 +1052,8 @@ static void periodic_boundary_level_gpu_x (const Boundary * b, scalar * list, in
     return;
 
   gpu_cpu_sync (list1, GL_MAP_WRITE_BIT, __FILE__, __LINE__);
-  
+
+  assert (false); // not implemented yet
   foreach_boundary_gpu (gpu, overflow, l, left)
     for (scalar s in list1)
       s[] = s[N];
@@ -1063,11 +1091,13 @@ void gpu_init_grid (int n)
   }
 #endif
   // periodic boundaries
+#if 0  
   foreach_dimension() {
     Boundary * b = qcalloc (1, Boundary);
     b->level = periodic_boundary_level_gpu_x;
     add_boundary (b);
   }
+#endif
   gpu_init();
 }
 
@@ -1082,21 +1112,134 @@ void gpu_init_grid (int n)
 const char _double[] = "double";
 
 trace
-static GLuint setup_shader (ForeachData * loop, const RegionParameters * region,
-			    External * externals,
-			    const char * kernel)
+static Shader * compile_shader (ForeachData * loop, const RegionParameters * region,
+				External * externals,
+				const char * kernel)
 {
-  GLuint shaderid = (long)loop->data;
+  assert (gpu_grid->shaders);
   
+  uint32_t hash = hash_shader (externals, loop, region, kernel);
+  khiter_t k = kh_get (INT, gpu_grid->shaders, hash);
+  if (k != kh_end (gpu_grid->shaders))
+    return kh_value (gpu_grid->shaders, k);
+
   const char * error = strstr (kernel, "@error ");
   if (error) {
     for (const char * s = error + 7; *s != '\n' && *s != '\0'; s++)
       fputc (*s, stderr);
     fputc ('\n', stderr);
     loop->data = NULL;
-    return false;
+    return NULL;
   }
 
+  for (const External * g = externals; g; g = g->next)
+    if (strcmp(g->type, "scalar") && strcmp(g->type, "vector") && strcmp(g->type, "tensor")) {
+      if (g->reduct && !strchr ("+mM", g->reduct)) {
+	if (loop->first)
+	  fprintf (stderr,
+		   "%s:%d: GLSL: error: unknown reduction operation '%c'\n",
+		   loop->fname, loop->line, g->reduct);
+	return NULL;
+      }
+      if (!strcmp(g->type, "coord") || !strcmp(g->type, "_coord") || !strcmp(g->type, "vec4")) {
+	if (g->reduct) {
+	  if (loop->first)
+	    fprintf (stderr,
+		     "%s:%d: GLSL: error: reductions not implemented for '%s' type\n",
+		     loop->fname, loop->line, g->type);
+	  return NULL;	
+	}
+      }
+      else if (strcmp (g->type, "float") &&
+	       strcmp (g->type, "double") &&
+	       strcmp (g->type, "int") &&
+	       strcmp (g->type, "bool") &&
+	       strcmp (g->type, "enum") &&
+	       strcmp (g->type, "ivec") &&
+	       strcmp (g->type, "*func()") &&
+	       strcmp (g->type, "func()")) {
+	if (loop->first)
+	  fprintf (stderr, "%s:%d: GLSL: error: unknown type '%s' for '%s'\n",
+		   loop->fname, loop->line, g->type, g->name);
+	return NULL;
+      }
+    }
+
+  char * shader = build_shader (externals, loop, region);
+  if (!shader)
+    return NULL;
+
+  /**
+  ## main() */
+    
+  shader = str_append (shader, "void main() {\n");
+  if (!GPUContext.fragment_shader) {
+    shader = str_append (shader, "Point point = ");
+#if 1    
+    if (region->boundary)
+      switch (region->boundary - 1) {
+      case left:
+	shader = str_append (shader, "{GHOSTS - 1, int(gl_GlobalInvocationID.x) + GHOSTS");
+	break;
+      case right:
+	shader = str_append (shader, "{N + GHOSTS, int(gl_GlobalInvocationID.x) + GHOSTS");
+	break;
+      case bottom:
+	shader = str_append (shader, "{int(gl_GlobalInvocationID.x) + GHOSTS - 1, GHOSTS - 1");
+	break;
+      case top:
+	shader = str_append (shader, "{int(gl_GlobalInvocationID.x) + GHOSTS - 1, N + GHOSTS");
+	break;
+      default:
+	assert (false);
+      }
+    else
+#endif
+      shader = str_append (shader, "{csOrigin.x + int(gl_GlobalInvocationID.y) + GHOSTS,"
+			   "csOrigin.y + int(gl_GlobalInvocationID.x) + GHOSTS");
+    char d[20];
+    snprintf (d, 19, "%d", region->level > 0 ? region->level - 1 : depth());
+    shader = str_append (shader,
+			 ",", d,
+#if LAYERS
+			 ",0};\n"
+#else
+			 "};\n"
+#endif
+			 );
+  }
+  shader = str_append (shader,
+		       "if (point.i < N + 2*GHOSTS && point.j < N + 2*GHOSTS) {\n"
+		       "POINT_VARIABLES\n");
+  if (loop->vertex)
+    shader = str_append (shader, "  x -= Delta/2., y -= Delta/2.;\n");
+  shader = str_append (shader, kernel);
+  shader = str_append (shader, "\nif (point.j - GHOSTS < NY) {");
+  for (const External * g = externals; g; g = g->next)
+    if (g->reduct) {
+      shader = str_append (shader, "\n  val_red_(", g->name, "_out_) = ", g->name, ";");
+      scalar s = g->s;
+      s.gpu.stored = -1;
+    }
+  shader = str_append (shader, "\n}}}\n");
+
+  /**
+  For the Intel driver, it looks like this is necessary so that the
+  compiled shader is independent from the exact location of the
+  storage buffer. */
+  
+  GL_C (glBindBufferBase (GL_SHADER_STORAGE_BUFFER, 0, 0));
+    
+  Shader * s = load_shader (shader, hash, loop);
+  loop->data = s;
+  return s;
+}
+
+trace
+static Shader * setup_shader (ForeachData * loop, const RegionParameters * region,
+			      External * externals,
+			      const char * kernel)
+{
   int index = 1;
   for (scalar s in baseblock)
     if (s.input || s.output)
@@ -1107,44 +1250,12 @@ static GLuint setup_shader (ForeachData * loop, const RegionParameters * region,
   if (!(externals = merge_externals (externals, loop)))
     return false;
   
-  for (const External * n = externals; n; n = n->next)
-    if (strcmp(n->type, "scalar") && strcmp(n->type, "vector") && strcmp(n->type, "tensor")) {
-      if (n->reduct && !strchr ("+mM", n->reduct)) {
-	if (loop->first)
-	  fprintf (stderr,
-		   "%s:%d: GLSL: error: unknown reduction operation '%c'\n",
-		   loop->fname, loop->line, n->reduct);
-	return false;
-      }
-      if (!strcmp(n->type, "coord") || !strcmp(n->type, "_coord") || !strcmp(n->type, "vec4")) {
-	if (n->reduct) {
-	  if (loop->first)
-	    fprintf (stderr,
-		     "%s:%d: GLSL: error: reductions not implemented for '%s' type\n",
-		     loop->fname, loop->line, n->type);
-	  return false;	
-	}
-      }
-      else if (strcmp (n->type, "float") &&
-	       strcmp (n->type, "double") &&
-	       strcmp (n->type, "int") &&
-	       strcmp (n->type, "bool") &&
-	       strcmp (n->type, "enum") &&
-	       strcmp (n->type, "ivec") &&
-	       strcmp (n->type, "*func()") &&
-	       strcmp (n->type, "func()")) {
-	if (loop->first)
-	  fprintf (stderr, "%s:%d: GLSL: error: unknown type '%s' for '%s'\n",
-		   loop->fname, loop->line, n->type, n->name);
-	return false;
-      }
-    }
-    
   /**
   ## Number of compute shader work groups and groups */
 
-  static const int NWG[2] = {16, 16}, NWGB = 64;
+  static const int NWG[2] = {16, 16}, NWGB = 16;
   int Nl = region->level > 0 ? 1 << (region->level - 1) : N;
+#if 1  
   if (region->boundary) {
     gpu_grid->nwg[1] = 1;
     gpu_grid->ng[1] = 1;
@@ -1172,7 +1283,9 @@ static GLuint setup_shader (ForeachData * loop, const RegionParameters * region,
 	     gpu_grid->nwg[0], gpu_grid->ng[0]);
 #endif
   }
-  else {
+  else
+#endif
+  {
     if (loop->face || loop->vertex) {
       for (int i = 0; i < 2; i++)
 	if (Nl > NWG[i]) {
@@ -1202,88 +1315,10 @@ static GLuint setup_shader (ForeachData * loop, const RegionParameters * region,
       g->s = s;
     }
 
-  /**
-  For the Intel driver, it looks like this is necessary so that the
-  compiled shader is independent from the exact location of the
-  storage buffer. */
+  Shader * shader = compile_shader (loop, region, externals, kernel);
   
-  GL_C (glBindBufferBase (GL_SHADER_STORAGE_BUFFER, 0, 0));
-
-#if HASHSHADER
-  shaderid = 0;
-  uint32_t hash = hash_shader (externals, loop, region, kernel);
-  {
-    assert (gpu_grid->shaders);
-    khiter_t k = kh_get (INT, gpu_grid->shaders, hash);
-    if (k != kh_end (gpu_grid->shaders))
-      shaderid = kh_value (gpu_grid->shaders, k);
-  }
-  if (!shaderid) {
-#endif
-  
-  char * shader = build_shader (externals, loop, region);
-  if (shader) {
-
-    /**
-    ## main() */
-    
-    shader = str_append (shader, "void main() {\n");
-    if (!GPUContext.fragment_shader) {
-      shader = str_append (shader, "Point point = ");
-      if (region->boundary)
-	switch (region->boundary - 1) {
-	case left:
-	  shader = str_append (shader, "{GHOSTS - 1, int(gl_GlobalInvocationID.x) + GHOSTS");
-	  break;
-	case right:
-	  shader = str_append (shader, "{N + GHOSTS, int(gl_GlobalInvocationID.x) + GHOSTS");
-	  break;
-	case bottom:
-	  shader = str_append (shader, "{int(gl_GlobalInvocationID.x) + GHOSTS - 1, GHOSTS - 1");
-	  break;
-	case top:
-	  shader = str_append (shader, "{int(gl_GlobalInvocationID.x) + GHOSTS - 1, N + GHOSTS");
-	  break;
-	default:
-	  assert (false);
-	}
-      else
-	shader = str_append (shader, "{csOrigin.x + int(gl_GlobalInvocationID.y) + GHOSTS,"
-			     "csOrigin.y + int(gl_GlobalInvocationID.x) + GHOSTS");
-      char d[20];
-      snprintf (d, 19, "%d", region->level > 0 ? region->level - 1 : depth());
-      shader = str_append (shader,
-			   ",", d,
-#if LAYERS
-			   ",0};\n"
-#else
-			   "};\n"
-#endif
-			   );
-    }
-    shader = str_append (shader,
-			 "if (point.i < N + 2*GHOSTS && point.j < N + 2*GHOSTS) {\n"
-			 "POINT_VARIABLES\n");
-    if (loop->vertex)
-      shader = str_append (shader, "  x -= Delta/2., y -= Delta/2.;\n");
-    shader = str_append (shader, kernel);
-    shader = str_append (shader, "\nif (point.j - GHOSTS < NY) {");
-    for (const External * g = externals; g; g = g->next)
-      if (g->reduct) {
-	shader = str_append (shader, "\n  val_red_(", g->name, "_out_) = ", g->name, ";");
-	scalar s = g->s;
-	s.gpu.stored = -1;
-      }
-    shader = str_append (shader, "\n}}}\n");
-    shaderid = load_shader (shader, hash, loop);
-    loop->data = (void *) ((long) shaderid);
-  }
-#if HASHSHADER
-  }
-#endif
-  
-  if (!shaderid) {
-
+  if (!shader) {
+      
     /**
     ## Free reduction fields */
     
@@ -1292,32 +1327,41 @@ static GLuint setup_shader (ForeachData * loop, const RegionParameters * region,
 	scalar s = g->s;
 	delete ({s});
       }
+      
     return 0;
   }
   
   gpu_cpu_sync (baseblock, GL_MAP_WRITE_BIT, loop->fname, loop->line);
 
-  GL_C (glUseProgram (shaderid));
+  GL_C (glUseProgram (shader->id));
 
   GL_C (glBindBufferBase (GL_SHADER_STORAGE_BUFFER, 0, GPUContext.ssbo));
 
+  tracing ("setup0", S__FILE__, S_LINENO);
+  
   /**
   ## Set global variables */
 
   for (const External * g = externals; g; g = g->next) {
     if (g->name[0] == '.') continue;
     if (!strcmp (g->type, "*func()") || !strcmp (g->type, "func()")) continue;
+    if ((!strcmp (g->name, "N") || !strcmp (g->name, "nl")) && !strcmp (g->type, "int"))
+      continue;
     if (!strcmp (g->type, "int") ||
 	!strcmp (g->type, "float") ||
 	!strcmp (g->type, "vec4")) {
       // not an array or just a one-dimensional array
       assert (!g->data || ((int *)g->data)[1] == 0);
       GLint location;
-      char name[strlen(g->name) + strlen ("_in_[]") + 20];
-      strcpy (name, g->name);
-      if (g->reduct)
-	strcat (name, "_in_");
-      location = glGetUniformLocation (shaderid, name);
+      if (g->location)
+	location = g->location;
+      else {
+	char name[strlen(g->name) + strlen ("_in_[]") + 20];
+	strcpy (name, g->name);
+	if (g->reduct)
+	  strcat (name, "_in_");
+	location = glGetUniformLocation (shader->id, name);
+      }
       if (!strcmp (g->type, "int")) {
 #if PRINTUNIFORM
 	int * p = g->pointer;
@@ -1346,18 +1390,23 @@ static GLuint setup_shader (ForeachData * loop, const RegionParameters * region,
       void * p = g->pointer;
       // not an array or just a one-dimensional array
       assert (!g->data || ((int *)g->data)[1] == 0);
-      int nd = g->data ? ((int *)g->data)[0] : 1;
+      int nd = g->data ? ((int *)g->data)[0] : 1;      
       for (int d = 0; d < nd; d++) {
-	char name[strlen(g->name) + strlen ("_in_[]") + 20];
-	strcpy (name, g->name);
-	if (g->reduct)
-	  strcat (name, "_in_");
-	if (d > 0) {
-	  char s[22];
-	  snprintf (s, 21, "[%d]", d);
-	  strcat (name, s);
+	GLint location;
+	if (!g->data && g->location)
+	  location = g->location;
+	else {
+	  char name[strlen(g->name) + strlen ("_in_[]") + 20];
+	  strcpy (name, g->name);
+	  if (g->reduct)
+	    strcat (name, "_in_");
+	  if (d > 0) {
+	    char s[22];
+	    snprintf (s, 21, "[%d]", d);
+	    strcat (name, s);
+	  }
+	  location = glGetUniformLocation (shader->id, name);
 	}
-	GLint location = glGetUniformLocation (shaderid, name);
 	if (!strcmp (g->type, "enum")) {
 #if PRINTUNIFORM
 	  fprintf (stderr, "uniform enum %s = %d\n", name, g->nd);
@@ -1395,7 +1444,7 @@ static GLuint setup_shader (ForeachData * loop, const RegionParameters * region,
 	    glUniform2f (location, ((double *)p)[0], ((double *)p)[1]); p = ((double *)p) + 2;
 	  }
 	  else {
-	    fprintf (stderr, "type: %s name: %s\n", g->type, name);
+	    fprintf (stderr, "type: %s name: %s\n", g->type, g->name);
 	    assert (false);
 	  }
 	}
@@ -1404,16 +1453,18 @@ static GLuint setup_shader (ForeachData * loop, const RegionParameters * region,
       }
     }
   }
+
+  end_tracing ("setup0", S__FILE__, S_LINENO);
   
-  return shaderid;
+  return shader;
 }
-  
+
 static bool doloop_on_gpu (ForeachData * loop, const RegionParameters * region,
 			   External * externals,
 			   const char * kernel)
 {
-  GLuint shaderid = setup_shader (loop, region, externals, kernel);
-  if (!shaderid)
+  Shader * shader = setup_shader (loop, region, externals, kernel);
+  if (!shader)
     return false;
   
   /**
@@ -1424,8 +1475,7 @@ static bool doloop_on_gpu (ForeachData * loop, const RegionParameters * region,
   int Nl = region->level > 0 ? 1 << (region->level - 1) : N;  
   if (region->n.x == 1 && region->n.y == 1) {
     int csOrigin[] = { (region->p.x - X0)/L0*Nl, (region->p.y - Y0)/L0*Nl };
-    GLint location = glGetUniformLocation (shaderid, "csOrigin");
-    GL_C (glUniform2iv (location, 1, csOrigin));
+    GL_C (glUniform2iv (0, 1, csOrigin));
     assert (!GPUContext.fragment_shader);
     GL_C (glDispatchCompute (1, 1, 1));
   }
@@ -1439,17 +1489,17 @@ static bool doloop_on_gpu (ForeachData * loop, const RegionParameters * region,
       (region->box[1].y - region->box[0].y)/L0
     };
     float vsOrigin[] = { (region->box[0].x - X0)/L0, (region->box[0].y - Y0)/L0 };
-    GLint location = glGetUniformLocation (shaderid, "vsOrigin");
-    GL_C (glUniform2fv (location, 1, vsOrigin));
-    location = glGetUniformLocation (shaderid, "vsScale");
-    GL_C (glUniform2fv (location, 1, vsScale));
+    GL_C (glUniform2fv (1, 1, vsOrigin));
+    GL_C (glUniform2fv (2, 1, vsScale));
     assert (GPUContext.fragment_shader);
     GL_C (glDrawArrays (GL_TRIANGLES, 0, 6));
   }
 
   else {
     assert (!GPUContext.fragment_shader);
+    //    tracing ("glDispatchCompute", __FILE__, __LINE__);
     GL_C (glDispatchCompute (gpu_grid->ng[0], gpu_grid->ng[1], 1));
+    //    end_tracing ("glDispatchCompute", __FILE__, __LINE__);
   }
   
   GL_C (glMemoryBarrier (GL_ALL_BARRIER_BITS));
@@ -1500,6 +1550,10 @@ bool gpu_end_stencil (ForeachData * loop,
     if (!region->boundary) {
       bool fragment_shader = GPUContext.fragment_shader;
       GPUContext.fragment_shader = false;
+#if PRINTIO
+      fprintf (stderr, "%s:%d: boundary_stencil (%p, %p, %p)\n", loop->fname, loop->line,
+	       loop->listc, loop->listf.x, loop->dirty);
+#endif
       boundary_stencil (loop);
       GPUContext.fragment_shader = fragment_shader;
     }

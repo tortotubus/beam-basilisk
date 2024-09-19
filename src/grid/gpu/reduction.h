@@ -88,17 +88,18 @@ real gpu_reduction (size_t offset, const char op, const RegionParameters * regio
 		"  }\n"
 		"  _reduct[gl_GlobalInvocationID.x] = reduct;\n"
 		"}}\n");
+  Shader * shader;
   Adler32Hash hash;
   a32_hash_init (&hash);
   a32_hash_add (&hash, fs, strlen (fs));
-  GLuint shader = load_shader (fs, a32_hash (&hash), NULL);
+  shader = load_shader (fs, a32_hash (&hash), NULL);
   assert (shader);
-  GL_C (glUseProgram (shader));
-  GLint loffset = glGetUniformLocation (shader, "offset");
+  GL_C (glUseProgram (shader->id));
+  GLint loffset = glGetUniformLocation (shader->id, "offset");
   assert (loffset >= 0);
-  GLint lnb = glGetUniformLocation (shader, "nb");
+  GLint lnb = glGetUniformLocation (shader->id, "nb");
   assert (lnb >= 0);
-  GLint lnbr = glGetUniformLocation (shader, "nbr");
+  GLint lnbr = glGetUniformLocation (shader->id, "nbr");
   assert (lnbr >= 0);
 
   if (is_foreach_point) {

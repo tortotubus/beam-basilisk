@@ -321,7 +321,7 @@ typedef struct {
 #endif // PRINTIO
   check_stencil (&_loop);
   _gpu_done_ = gpu_end_stencil (&_loop, _region, _params.externals, _params.kernel);
-  boundary_stencil (&_loop);
+  boundary_stencil (&_loop); // fixme: not necessary?
   _loop.first = 0;
   end_tracing ("foreach", S__FILE__, S_LINENO);
 }
@@ -342,6 +342,9 @@ typedef struct {
   }
 #endif // PRINTIO
   check_stencil (&_loop);
+  /*free (_loop.listc), */_loop.listc = NULL;
+  /*free (_loop.listf.x),*/ _loop.listf.x = NULL;
+  /*free (_loop.listf.y),*/ _loop.listf.y = NULL;
   _gpu_done_ = gpu_end_stencil (&_loop, _region, _params.externals, _params.kernel);
   _loop.first = 0;
   end_tracing ("foreach_level", S__FILE__, S_LINENO);
@@ -350,6 +353,9 @@ typedef struct {
   
 @undef end_foreach_boundary_gpu_stencil
 @def end_foreach_boundary_gpu_stencil()
+#if PRINTIO
+  fprintf (stderr, "%s:%d: foreach_boundary_gpu\n", _loop.fname, _loop.line);
+#endif // PRINTIO
   _gpu_done_ = gpu_end_stencil (&_loop, _region, _params.externals, _params.kernel);
   _loop.first = 0;
   end_tracing ("foreach_boundary_gpu", S__FILE__, S_LINENO);
