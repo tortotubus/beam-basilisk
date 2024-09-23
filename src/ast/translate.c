@@ -828,7 +828,7 @@ static Ast * in_stencil_point_function (Ast * n)
 
 static int stencil_access_function (const char * name)
 {
-  if (!strcmp (name, "val") ||
+  if (!strcmp (name, "val") || !strcmp (name, "val_diagonal") ||
       !strcmp (name, "val_a") || !strcmp (name, "val_r") || !strcmp (name, "val_o") ||
       !strcmp (name, "fine") ||
       !strcmp (name, "coarse"))
@@ -2296,9 +2296,10 @@ static void global_boundaries_and_stencils (Ast * n, Stack * stack, void * data)
 	!strcmp (ast_terminal (n->child[0])->start, "foreach_face") ||
 	!strcmp (ast_terminal (n->child[0])->start, "foreach_visible") ||
 	!strcmp (ast_terminal (n->child[0])->start, "foreach_level") ||
+	!strcmp (ast_terminal (n->child[0])->start, "foreach_level_or_leaf") ||
+	!strcmp (ast_terminal (n->child[0])->start, "foreach_coarse_level") ||
 	!strcmp (ast_terminal (n->child[0])->start, "foreach_point") ||
-	!strcmp (ast_terminal (n->child[0])->start, "foreach_region") ||
-	!strcmp (ast_terminal (n->child[0])->start, "foreach_boundary_gpu")) {
+	!strcmp (ast_terminal (n->child[0])->start, "foreach_region")) {
       bool overflow = false, nowarning = false, gpu = false;
       Ast * parameters = ast_child (n, sym_foreach_parameters);
       foreach_item (parameters, 2, item) {

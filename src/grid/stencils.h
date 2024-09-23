@@ -92,6 +92,9 @@ typedef struct {
 @define foreach_coarse_level_stencil(...) foreach_level_stencil(S__VA_ARGS__)
 @define end_foreach_coarse_level_stencil() end_foreach_level_stencil()
 
+@define foreach_level_or_leaf_stencil(...) foreach_level_stencil(S__VA_ARGS__)
+@define end_foreach_level_or_leaf_stencil() end_foreach_level_stencil()
+
 @define foreach_point_stencil(...) foreach_stencil(S__VA_ARGS__)
 @define end_foreach_point_stencil() end_foreach_stencil()
 
@@ -124,6 +127,7 @@ void stencil_val_a (Point p, scalar s, int i, int j, int k, bool input,
 @
 
 @define _stencil_fine(a,_i,_j,_k) _stencil_val(a,_i,_j,_k)
+@define _stencil_fine(a,_i,_j,_k) _stencil_val(a,_i,_j,_k)
 @define _stencil_fine_a(a,_i,_j,_k) _stencil_val_a(a,_i,_j,_k)
 @define _stencil_fine_r(a,_i,_j,_k) _stencil_val_r(a,_i,_j,_k)
 
@@ -145,6 +149,7 @@ void stencil_val_a (Point p, scalar s, int i, int j, int k, bool input,
 int _stencil_nop;
 @define _stencil_val_higher_dimension (_stencil_nop = 1)
 @define _stencil__val_constant(a,_i,_j,_k) (_stencil_nop = 1)
+@define _stencil_val_diagonal(a,_i,_j,_k) (_stencil_nop = 1)
 
 typedef void _stencil_undefined;
 

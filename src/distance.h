@@ -488,7 +488,7 @@ void distance (scalar d, coord * p)
   array_append (a, &p, sizeof (coord *));
   p = (coord *) array_shrink (a);
 
-  foreach_level(0)
+  foreach_level (0, noauto)
     update_distance (point, (coord **) p, d);
   free (p);
   

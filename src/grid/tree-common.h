@@ -707,7 +707,7 @@ static void tree_boundary_level (scalar * list, int l)
   if (listdef || listc) {
     boundary_iterate (restriction, list2, depth);
     for (int l = depth - 1; l >= 0; l--) {
-      foreach_coarse_level(l) {
+      foreach_coarse_level(l, nowarning) {
 	for (scalar s in listdef)
 	  restriction_average (point, s);
 	for (scalar s in listc)

@@ -171,7 +171,7 @@ static void relax_nh (scalar * phil, scalar * rhsl, int lev, void * data)
   scalar phi = phil[0], rhs = rhsl[0];
   scalar eta = phil[1], rhs_eta = rhsl[1];
   face vector alpha = *((vector *)data);
-  foreach_level_or_leaf (lev) {
+  foreach_level_or_leaf (lev, noauto) {
 
     /**
     The updated values of $\phi$ in a column are obtained as
