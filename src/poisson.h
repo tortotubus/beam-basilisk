@@ -29,6 +29,7 @@ Here we implement the multigrid cycle proper. Given an initial guess
 function *relax*, we will provide an improved guess at the end of the
 cycle. */
 
+trace
 void mg_cycle (scalar * a, scalar * res, scalar * da,
 	       void (* relax) (scalar * da, scalar * res, 
 			       int depth, void * data),
@@ -61,20 +62,21 @@ void mg_cycle (scalar * a, scalar * res, scalar * da,
     On all other grids, we take as initial guess the approximate solution
     on the coarser grid bilinearly interpolated onto the current grid. */
 
-    else
+    else {
+      boundary_level (da, l - 1);
       foreach_level (l)
 	for (scalar s in da)
 	  foreach_blockf (s)
 	    s[] = bilinear (point, s);
+    }
     
     /**
     We then apply homogeneous boundary conditions and do several
     iterations of the relaxation function to refine the initial guess. */
 
-    boundary_level (da, l);
     for (int i = 0; i < nrelax; i++) {
-      relax (da, res, l, data);
       boundary_level (da, l);
+      relax (da, res, l, data);
     }
   }
 
@@ -122,6 +124,7 @@ an optional list of fields used to store the residuals. The minimum
 level of the hierarchy can be set (default is zero i.e. the root
 cell). */
 
+trace
 mgstats mg_solve (scalar * a, scalar * b,
 		  double (* residual) (scalar * a, scalar * b, scalar * res,
 				       void * data),
@@ -293,7 +296,7 @@ static void relax (scalar * al, scalar * bl, int l, void * data)
   We use the face values of $\alpha$ to weight the gradients of the
   5-points Laplacian operator. We get the relaxation function. */
 
-  foreach_level_or_leaf (l) {
+  foreach_level_or_leaf (l, nowarning) {
     double n = - sq(Delta)*b[], d = - lambda[]*sq(Delta);
     foreach_dimension() {
       n += alpha.x[1]*a[1] + alpha.x[]*a[-1];
@@ -389,6 +392,7 @@ $$
 \nabla\cdot (\alpha\nabla a) + \lambda a = b
 $$ */
 
+trace
 mgstats poisson (scalar a, scalar b,
 		 (const) face vector alpha = {{-1}},
 		 (const) scalar lambda = {-1},

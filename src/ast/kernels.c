@@ -448,10 +448,11 @@ void kernel (Ast * n, Stack * stack, void * data)
     break;
   }
 
-  /**
-  ## Dereference of "inout" parameters */
-
   case sym_unary_operator: {
+    
+    /**
+    ## Dereference of "inout" parameters */
+
     Ast * identifier, * ref, * type;
     if (n->child[0]->sym == token_symbol ('*') &&
 	(identifier = ast_schema (n->parent, sym_unary_expression,
@@ -469,6 +470,21 @@ void kernel (Ast * n, Stack * stack, void * data)
 	!strcmp (ast_terminal (type->child[0])->before + strlen (ast_terminal (type->child[0])->before) - 6, "inout ")) {
       free (ast_terminal (n->child[0])->start);
       ast_terminal (n->child[0])->start = strdup("");
+    }
+
+    /**
+    ## References 
+
+    We replace the '&' with the 'ast_pointer()' macro. */
+    
+    Ast * ampersand;
+    if ((ampersand = ast_schema (n, sym_unary_operator,
+				 0, token_symbol ('&')))) {
+      free (ast_terminal (ampersand)->start);
+      ast_terminal (ampersand)->start = strdup ("ast_pointer(");
+      Ast * cast = ast_schema (n->parent, sym_unary_expression,
+			       1, sym_cast_expression);
+      ast_after (cast, ")");
     }
     break;
   }
@@ -511,7 +527,8 @@ void kernel (Ast * n, Stack * stack, void * data)
     
     if (!(identifier = ast_identifier_declaration (stack, t->start))) {
       char s[1000];
-      snprintf (s, 999, "\\n@error %s:%d: GLSL: error: unknown function '%s'\\n", t->file, t->line, t->start);
+      snprintf (s, 999, "\\n@error %s:%d: GLSL: error: unknown function '%s'\\n",
+		t->file, t->line, t->start);
       d->error = strdup (s);
       return;
     }
@@ -533,54 +550,6 @@ void kernel (Ast * n, Stack * stack, void * data)
       break;
     }
     
-    /**
-    ## Function calls */
-    
-    Ast * definition = ast_parent (identifier, sym_function_definition);
-    if (!(identifier = ast_find (definition, sym_direct_declarator,
-				 0, sym_direct_declarator,
-				 0, sym_generic_identifier,
-				 0, sym_IDENTIFIER)) ||
-	strcmp (ast_terminal (identifier)->start, t->start))
-      break;
-
-    /**
-    Here we check for "inout" arguments (i.e. pointers taken using '&'). */
-    
-    Ast * parameters = ast_find (ast_schema (definition, sym_function_definition,
-					     0, sym_function_declaration,
-					     1, sym_declarator),
-				 sym_direct_declarator,
-				 2, sym_parameter_type_list,
-				 0, sym_parameter_list);
-    Ast * arguments = ast_schema (n, sym_function_call,
-				  2, sym_argument_expression_list);
-    if (arguments) {
-      while (parameters->child[0]->sym == parameters->sym)
-	parameters = parameters->child[0];
-      Ast * parameter = ast_child (parameters, sym_parameter_declaration);
-      foreach_item_r (arguments, sym_argument_expression_list_item, argument) {
-	Ast * ampersand, * type, * pointer;
-	if ((ampersand = ast_schema (ast_is_unary_expression (argument->child[0]), sym_unary_expression,
-				     0, sym_unary_operator,
-				     0, token_symbol ('&'))) &&
-	    (pointer = ast_schema (parameter, sym_parameter_declaration,
-				   1, sym_declarator,
-				   0, sym_pointer,
-				   0, token_symbol ('*'))) &&
-	    (type = ast_schema (parameter, sym_parameter_declaration,
-				0, sym_declaration_specifiers,
-				0, sym_type_specifier,
-				0, sym_types)) &&
-	    (type->child[0]->sym == sym_DOUBLE ||
-	     type->child[0]->sym == sym_FLOAT ||
-	     type->child[0]->sym == sym_INT))
-	  ast_terminal (ampersand)->start[0] = '\0';
-	parameters = parameters->parent, parameter = ast_child (parameters, sym_parameter_declaration);
-	if (!parameter) break;
-      }
-    }
-
     break;
   }
     

@@ -78,6 +78,7 @@ static bool is_field_access (Ast * n, Stack * stack)
     AstTerminal * t;
     if (identifier && (t = ast_terminal (identifier)) &&
 	(!strcmp (t->start, "val") ||
+	 !strcmp (t->start, "val_diagonal") ||
 	 !strcmp (t->start, "fine") ||
 	 !strcmp (t->start, "coarse") ||
 	 !strcmp (t->start, "neighbor") ||
