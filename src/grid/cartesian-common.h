@@ -959,7 +959,7 @@ bid new_bid()
 
 static double periodic_bc (Point point, Point neighbor, scalar s, bool * data)
 {
-  return nodata; // should not be used
+  return s[];
 }
 
 static void periodic_boundary (int d)

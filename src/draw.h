@@ -1460,7 +1460,7 @@ bool box (bool notics = false, float lc[3] = {0}, float lw = 1.)
     }
   
 #if dimension == 2
-    foreach_level (0) {
+    foreach_level (0, serial) {
       glBegin (GL_LINE_LOOP);
       glvertex2d (view, x - Delta_x/2., y - Delta_y/2.);
       glvertex2d (view, x + Delta_x/2., y - Delta_y/2.);
@@ -1470,7 +1470,7 @@ bool box (bool notics = false, float lc[3] = {0}, float lw = 1.)
       view->ni++;
     }  
 #else // dimension != 2
-    foreach_level (0) {
+    foreach_level (0, serial) {
       for (int i = -1; i <= 1; i += 2) {
 	glBegin (GL_LINE_LOOP);
 	glvertex3d (view, x - Delta_x/2., y - Delta_y/2., z + i*Delta/2.);

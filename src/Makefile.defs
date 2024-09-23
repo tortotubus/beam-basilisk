@@ -40,13 +40,13 @@ clean:
 
 %.gpu.c: %.c
 	ln -s -f $< $@
-%.gpu.s:   CFLAGS += -grid=gpu/cartesian
+%.gpu.s:   CFLAGS += -grid=gpu/multigrid
 %.gpu.s: $(BASILISK)/libgpu.a
-%.gpu.s.d: CFLAGS += -grid=gpu/cartesian
-%.gpu.tst: CFLAGS += -grid=gpu/cartesian
+%.gpu.s.d: CFLAGS += -grid=gpu/multigrid
+%.gpu.tst: CFLAGS += -grid=gpu/multigrid
 
 %.CADNA.c: %.c
-	ln -s $< $@
+	ln -s -f $< $@
 
 %.CADNA.tst: %.CADNA.s %.CADNA.c
 	@CFLAGS="$(CFLAGS) -cadna" LIBS="$(LIBS) $(CADNALIBS)" OPENGLIBS="$(OPENGLIBS)"\

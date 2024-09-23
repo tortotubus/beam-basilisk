@@ -35,7 +35,7 @@ struct _External {
   void * data;    // the dimensions (int *) for arrays or the code (char *) for functions
   scalar s;       // used for reductions on GPUs
   External * externals, * next;
-  int used;
+  int used, location;
 };
 
 typedef struct {
@@ -82,12 +82,13 @@ typedef struct {
 @define foreach_visible_stencil(...) foreach_stencil(S__VA_ARGS__)
 @define end_foreach_visible_stencil() end_foreach_stencil()
 
-@define foreach_level_stencil(...) foreach_stencil(S__VA_ARGS__)
-@def end_foreach_level_stencil()
-  check_stencil (&_loop);
-  _first = 0;
-}
+@def foreach_level_stencil(...) {
+  if (0) {
+    // automatic boundary conditions are not implemented yet so we don't do anything for the moment
+    int ig = 0, jg = 0, kg = 0; NOT_UNUSED(ig); NOT_UNUSED(jg); NOT_UNUSED(kg);
+    Point point = {0}; NOT_UNUSED (point);
 @
+@define end_foreach_level_stencil() }}
 
 @define foreach_coarse_level_stencil(...) foreach_level_stencil(S__VA_ARGS__)
 @define end_foreach_coarse_level_stencil() end_foreach_level_stencil()
