@@ -197,10 +197,13 @@ event plots (t = end)
 /**
 ## Benchmark on GPUs
 
-cd nonlinear.gpu/
-__NV_PRIME_RENDER_OFFLOAD=1 __GLX_VENDOR_LIBRARY_NAME=nvidia ./nonlinear.gpu 1024 2> /dev/null
-# Cartesian (GPU), 20565 steps, 30.1621 CPU, 30.18 real, 7.14e+08 points.step/s, 14 var
-# Cartesian (GPU), 20585 steps, 31.6628 CPU, 31.68 real, 6.81e+08 points.step/s, 14 var
+__NV_PRIME_RENDER_OFFLOAD=1 __GLX_VENDOR_LIBRARY_NAME=nvidia ./nonlinear.gpu/nonlinear.gpu 1024 2> /dev/null
+
+# Multigrid (GPU), 20565 steps, 25.5064 CPU, 25.52 real, 8.45e+08 points.step/s, 14 var
+# Multigrid (GPU), 20585 steps, 26.8643 CPU, 26.88 real, 8.03e+08 points.step/s, 14 var
+
+# Multigrid (GPU), 20565 steps, 26.1821 CPU, 26.2 real, 8.23e+08 points.step/s, 14 var
+# Multigrid (GPU), 20585 steps, 27.8986 CPU, 27.91 real, 7.73e+08 points.step/s, 14 var
 
 On CPU:
 
