@@ -7,18 +7,18 @@ real cpu_reduction (GLuint src, size_t offset, size_t nb, const char op)
   assert (a);
   switch (op) {
   case '+':
-    for (int i = 0; i < nb; i++)
-      result += a[i];
+    for (int i = 0; i < nb; i++, a++)
+      result += *a;
     break;
   case 'M':
-    result = a[0];
-    for (int i = 1; i < nb; i++)
-      result = max (result, a[i]);
+    result = *a++;
+    for (int i = 1; i < nb; i++, a++)
+      result = max (result, *a);
     break;
   case 'm':
-    result = a[0];
-    for (int i = 1; i < nb; i++)
-      result = min (result, a[i]);
+    result = *a++;
+    for (int i = 1; i < nb; i++, a++)
+      result = min (result, *a);
     break;
   default: assert (false);
   }

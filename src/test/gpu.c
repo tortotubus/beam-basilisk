@@ -419,9 +419,6 @@ int main (int argc, char * argv[])
       fprintf (stderr, "28) %g %g %g\n", x, y, s[]);
 
     boundary_level ({s}, 2);
-#if _GPU
-    assert (s.gpu.stored == -1);
-#endif
   
     scalar g[];
     foreach_level_or_leaf (2)
@@ -454,6 +451,18 @@ int main (int argc, char * argv[])
     restriction ({s});
     foreach_level (2, serial)
       fprintf (stderr, "32) %g %g %g\n", x, y, s[]);
+  }
+
+  /**
+  ## Boundary conditions on faces */
+
+  {    
+    init_grid (2);
+    face vector uf[];
+    foreach_face()
+      uf.x[] = x*y;
+    foreach_face (x, serial)
+      fprintf (stderr, "33) %g %g %g %g %g\n", x, y, uf.x[], uf.x[0,1], uf.x[0,-1]);
   }
   
   /**

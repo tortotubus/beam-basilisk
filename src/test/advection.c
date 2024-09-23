@@ -108,25 +108,32 @@ Device: Mesa Intel(R) UHD Graphics (TGL GT1) (0x9a60)
 ...
 Video memory: 3072MB
 
-./advection.gpu 2048 2> /dev/null | grep steps
+./advection.gpu/advection.gpu 2048 2> /dev/null | grep steps
 
-# Cartesian (GPU), 412 steps, 0.139341 CPU, 0.195 real, 8.65e+06 points.step/s, 8 var
-# Cartesian (GPU), 796 steps, 0.259941 CPU, 0.4264 real, 3.06e+07 points.step/s, 8 var
-# Cartesian (GPU), 1566 steps, 0.584771 CPU, 1.415 real, 7.25e+07 points.step/s, 8 var
-# Cartesian (GPU), 3100 steps, 1.2612 CPU, 6.387 real, 1.27e+08 points.step/s, 8 var
-# Cartesian (GPU), 6163 steps, 8.70273 CPU, 47.74 real, 1.35e+08 points.step/s, 8 var
-# Cartesian (GPU), 12280 steps, 23.852 CPU, 338.8 real, 1.52e+08 points.step/s, 8 var
+# Multigrid (GPU), 412 steps, 0.041317 CPU, 0.07295 real, 2.31e+07 points.step/s, 8 var
+# Multigrid (GPU), 796 steps, 0.062611 CPU, 0.1866 real, 6.99e+07 points.step/s, 8 var
+# Multigrid (GPU), 1566 steps, 0.188348 CPU, 0.8819 real, 1.16e+08 points.step/s, 8 var
+# Multigrid (GPU), 3100 steps, 0.935142 CPU, 5.815 real, 1.4e+08 points.step/s, 8 var
+# Multigrid (GPU), 6163 steps, 3.65141 CPU, 39.36 real, 1.64e+08 points.step/s, 8 var
+# Multigrid (GPU), 12280 steps, 8.63733 CPU, 313.3 real, 1.64e+08 points.step/s, 8 var
 
 OpenGL renderer string: NVIDIA GeForce RTX 3050 Ti Laptop GPU/PCIe/SSE2
 Dedicated video memory: 4096 MB
 
-__NV_PRIME_RENDER_OFFLOAD=1 __GLX_VENDOR_LIBRARY_NAME=nvidia ./advection.gpu 2048 2> /dev/null | grep steps
+__NV_PRIME_RENDER_OFFLOAD=1 __GLX_VENDOR_LIBRARY_NAME=nvidia ./advection.gpu/advection.gpu 2048 2> /dev/null | grep steps
 
-# Cartesian (GPU), 412 steps, 0.165451 CPU, 0.1655 real, 1.02e+07 points.step/s, 8 var
-# Cartesian (GPU), 796 steps, 0.318862 CPU, 0.3189 real, 4.09e+07 points.step/s, 8 var
-# Cartesian (GPU), 1566 steps, 0.680115 CPU, 0.6801 real, 1.51e+08 points.step/s, 8 var
-# Cartesian (GPU), 3100 steps, 1.68878 CPU, 1.695 real, 4.8e+08 points.step/s, 8 var
-# Cartesian (GPU), 6163 steps, 6.13393 CPU, 6.14 real, 1.05e+09 points.step/s, 8 var
-# Cartesian (GPU), 12282 steps, 36.0357 CPU, 36.04 real, 1.43e+09 points.step/s, 8 var
+# Multigrid (GPU), 412 steps, 0.053072 CPU, 0.05309 real, 3.18e+07 points.step/s, 8 var
+# Multigrid (GPU), 796 steps, 0.09939 CPU, 0.09939 real, 1.31e+08 points.step/s, 8 var
+# Multigrid (GPU), 1566 steps, 0.252559 CPU, 0.2526 real, 4.06e+08 points.step/s, 8 var
+# Multigrid (GPU), 3100 steps, 0.829254 CPU, 0.8297 real, 9.79e+08 points.step/s, 8 var
+# Multigrid (GPU), 6163 steps, 4.60561 CPU, 4.609 real, 1.4e+09 points.step/s, 8 var
+# Multigrid (GPU), 12282 steps, 33.5036 CPU, 33.5 real, 1.54e+09 points.step/s, 8 var
+
+# Cartesian (GPU), 412 steps, 0.053788 CPU, 0.05393 real, 3.13e+07 points.step/s, 8 var
+# Cartesian (GPU), 796 steps, 0.099883 CPU, 0.09993 real, 1.31e+08 points.step/s, 8 var
+# Cartesian (GPU), 1566 steps, 0.251522 CPU, 0.2517 real, 4.08e+08 points.step/s, 8 var
+# Cartesian (GPU), 3100 steps, 0.826971 CPU, 0.8277 real, 9.82e+08 points.step/s, 8 var
+# Cartesian (GPU), 6163 steps, 4.63577 CPU, 4.649 real, 1.39e+09 points.step/s, 8 var
+# Cartesian (GPU), 12282 steps, 34.2162 CPU, 34.22 real, 1.51e+09 points.step/s, 8 var
 ~~~
 */

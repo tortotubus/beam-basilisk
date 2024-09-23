@@ -577,4 +577,7 @@ dimensions-tests: bump2D.s capwave.s lid.s rising-axi.s		\
 gpu-tests: gpu.gpu.tst gpu-reduce.gpu.tst nonlinear.gpu.tst \
 	advection.gpu.tst bump2D-gpu.tst reversed.gpu.tst
 
+gpu.s: CFLAGS += -grid=multigrid
+gpu.tst: CFLAGS += -grid=multigrid
+
 include ../Makefile.defs
