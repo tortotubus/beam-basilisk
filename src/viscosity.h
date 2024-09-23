@@ -106,17 +106,11 @@ and $\lambda^* = 0$. */
 
 #if AXI
 # define lambda ((coord){1., 1. + dt/rho[]*(mu.x[] + mu.x[1] + \
-					    mu.y[] + mu.y[0,1])/2./sq(y)})
+					    mu.y[] + mu.y[0,1])/2./sq(y), 0})
 #elif SPHERISYM
-# define lambda ((coord){1. + 2.*dt/rho[]*(mu.x[] + mu.x[1])/sq(x)})
+# define lambda ((coord){1. + 2.*dt/rho[]*(mu.x[] + mu.x[1])/sq(x), 0})
 #else // !AXI && !SPHERISYM
-# if dimension == 1
-#   define lambda ((coord){1.})
-# elif dimension == 2
-#   define lambda ((coord){1.,1.})
-# elif dimension == 3
-#   define lambda ((coord){1.,1.,1.})
-#endif
+# define lambda ((coord){1.,1.,1.})
 #endif
 
 /**

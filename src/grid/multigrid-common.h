@@ -87,7 +87,7 @@ void wavelet (scalar s, scalar w)
 {
   restriction ({s});
   for (int l = grid->maxdepth - 1; l >= 0; l--) {
-    foreach_coarse_level (l) {
+    foreach_coarse_level (l, nowarning) {
       foreach_child()
         w[] = s[];
       s.prolongation (point, s);
@@ -112,7 +112,7 @@ void inverse_wavelet (scalar s, scalar w)
     s[] = w[];
   boundary_level ({s}, 0);
   for (int l = 0; l <= grid->maxdepth - 1; l++) {
-    foreach_coarse_level (l) {
+    foreach_coarse_level (l, nowarning) {
       s.prolongation (point, s);
       foreach_child()
         s[] += w[];
@@ -409,7 +409,7 @@ static void multigrid_restriction (scalar * list)
 
   if (listdef || listc) {
     for (int l = depth() - 1; l >= 0; l--) {
-      foreach_coarse_level(l) {
+      foreach_coarse_level(l, nowarning) {
 	for (scalar s in listdef)
 	  foreach_block()
 	    restriction_average (point, s);
