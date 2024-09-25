@@ -1,3 +1,8 @@
+#if DOUBLE_PRECISION
+# define SINGLE_PRECISION 0
+#else
+# define SINGLE_PRECISION 1
+#endif
 #define _GPU 1
 #define GRIDNAME "Multigrid (GPU)"
 #define GRIDPARENT Multigrid
@@ -18,7 +23,8 @@
   "#define valt(s,k,l,m)"						\
   "  _data[(s).i*field_size() + point.j + (l) + (point.i + (k))*((1 << point.level) + 2*GHOSTS) +" \
   " _shift (point.level)]\n"		\
-  "#define val_red_(s) _data[(s).i*field_size() + point.j - GHOSTS + (point.i - GHOSTS)*NY + _shift (point.level)]\n" \
+  "#define val_red_(s) _data[(s).i*field_size() + point.j - GHOSTS +"	\
+  "  (point.i - GHOSTS)*NY + _shift (point.level)]\n"			\
   "#define foreach_child() {"						\
   "  int _i = 2*point.i - GHOSTS, _j = 2*point.j - GHOSTS;"		\
   "  point.level++;"							\

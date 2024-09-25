@@ -1,4 +1,4 @@
-#if _GPU
+#if SINGLE_PRECISION
 typedef float real;
 #else
 typedef double real;

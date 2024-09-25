@@ -199,14 +199,14 @@ void output_ppm_gpu (OutputPPMGPU * display,
 	FragColor = (vec4){0,0,0,0};
       else {
 	int i;
-	double val = max != min ? (v - min)/(max - min) : 0., coef;
+	float val = max != min ? (v - min)/(max - min) : 0., coef;
 	if (val <= 0.) i = 0, coef = 0.;
 	else if (val >= 1.) i = NCMAP - 2, coef = 1.;
 	else {
 	  i = (int)(val*(NCMAP - 1));
 	  coef = val*(NCMAP - 1) - i;
 	}
-	FragColor = mix (cmap[i], cmap[i + 1], coef);
+	FragColor = (vec4) mix (cmap[i], cmap[i + 1], coef);
       }
     }
 

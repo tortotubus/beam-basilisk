@@ -138,7 +138,7 @@ ES     (\\([\'\"\?\\abfnrtv]|[0-7]{1,3}|x[a-fA-F0-9]+))
 }
 
 @[^@]*@ {
-  if (!strncmp (yytext, "@error ", 7))
+  if (0) // !strncmp (yytext, "@error ", 7))
     yytext += 6;
   else {
     if (fname)
