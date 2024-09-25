@@ -1169,7 +1169,7 @@ case 2:
 YY_RULE_SETUP
 #line 140 "errors.lex"
 {
-  if (!strncmp (yytext, "@error ", 7))
+  if (0) // !strncmp (yytext, "@error ", 7))
     yytext += 6;
   else {
     if (fname)

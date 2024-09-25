@@ -1,3 +1,8 @@
+#if DOUBLE_PRECISION
+# define SINGLE_PRECISION 0
+#else
+# define SINGLE_PRECISION 1
+#endif
 #define _GPU 1
 #define GRIDNAME "Cartesian (GPU)"
 #define GRIDPARENT Cartesian

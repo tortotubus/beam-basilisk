@@ -487,27 +487,22 @@ int main (int argc, char * argv[])
   for (iter = 0; iter < 40000*64/N; iter++) {
 
     /**
-    There are two versions: the first one (commented out) used an
-    explicit temporary field to avoid concurrent read/write accesses
-    to 'p'. 
+    There are two versions: the first one uses an explicit temporary
+    field to avoid concurrent read/write accesses to 'p'.
     
-    The second one will use concurrent read/write accesses on the CPU
-    but will automatically use a temporary texture on the GPU (because
-    concurrent read/writes accesses are not possible on the GPU). The
-    GPU version is then exactly identical to the first version. */
+    The second one uses concurrent read/write accesses, which usually
+    does not work well on the GPU but works OK on the CPU. This is
+    because in this case the convergence rate of the relaxation
+    depends on the order of traversal of the cells, which will be
+    different between the GPU and the CPU. */
     
 #if 1    
     foreach()
       tmp[] = (p[1] + p[-1] + p[0,1] + p[0,-1] - s[]*sq(Delta))/4.;
     swap (scalar, tmp, p);
-#elif 1
+#else
     foreach()
       p[] = (p[1] + p[-1] + p[0,1] + p[0,-1] - s[]*sq(Delta))/4.;
-#else
-    scalar * list = {p};
-    foreach()
-      for (int i = 0; i < 1; i++) { scalar p = list[i];
-	p[] = (p[1] + p[-1] + p[0,1] + p[0,-1] - s[]*sq(Delta))/4.; }
 #endif
   }
 

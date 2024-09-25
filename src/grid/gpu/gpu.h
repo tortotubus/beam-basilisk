@@ -87,6 +87,7 @@ static GLuint createShaderFromString (const char * shaderSource,
     char * info = getShaderLogInfo (shader);
 #if PRINTSHADERERROR
     fputs (shaderSource, stderr);
+    fputs (info, stderr);
 #endif
     char * error = gpu_errors (info, shaderSource, NULL);
     fputs (error, stderr);

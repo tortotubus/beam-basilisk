@@ -18,6 +18,7 @@ __NV_PRIME_RENDER_OFFLOAD=1 __GLX_VENDOR_LIBRARY_NAME=nvidia  glxinfo -B | \
 * boolean type casts i.e.   float a = (b > 0);  ... if (a) ...
 * no pointers....
 * local scalar lists are not really supported, but external lists are OK
+* comments on "double precision" math functions (CFLAGS='-DDOUBLE_PRECISION')
 
 GLSL: error: if-statement condition must be scalar boolean
 
@@ -65,15 +66,27 @@ static char * str_append_array (char * dst, const char * list[])
 static char glsl_preproc[] =
   "// #line " xstr(__LINE__) " \"" __FILE__ "\"\n"
   "#define dimensional(x)\n"
+#if SINGLE_PRECISION
   "#define real float\n"
   "#define coord vec3\n"
+#else // !SINGLE_PRECISION
+  "#define real double\n"
+  "#define coord dvec3\n"
+  "#define cos(x) cos(float(x))\n"
+  "#define sin(x) sin(float(x))\n"
+  "#define exp(x) exp(float(x))\n"
+#endif // !SINGLE_PRECISION
   "#define ivec ivec2\n"
   "struct scalar { int i, index; };\n"
 #if dimension == 2
+#if SINGLE_PRECISION
   "#define _coord vec2\n"
+#else
+  "#define _coord dvec2\n"
+#endif
   "struct vector { scalar x, y; };\n"
   "struct tensor { vector x, y; };\n"
-#endif
+#endif // dimension == 2
   "#define GHOSTS " xstr(GHOSTS) "\n"
   "struct Point { int i, j; uint level;"
 #if LAYERS
@@ -190,7 +203,7 @@ void apply_bc (Point point)
 {
   if (point.i == GHOSTS) { // left
     Point neighbor = point;
-    bool data;
+    bool data = false;
     point.i += bc_period_x;
     for (scalar s in apply_bc_list) {
       scalar b = (s.v.x.i < 0 ? s : s.i == s.v.x.i ? s.v.x : s.v.y);
@@ -216,7 +229,7 @@ void apply_bc (Point point)
   }
   if (point.i == N + GHOSTS - 1) { // right
     Point neighbor = point;
-    bool data;
+    bool data = false;
     point.i -= bc_period_x;
     for (scalar s in apply_bc_list)
       if (s.face == 0 || s.i != s.v.x.i) { // fixme: bool(!s.face) not correct
@@ -243,7 +256,7 @@ void apply_bc (Point point)
   }
   if (point.j == GHOSTS) { // bottom
     Point neighbor = point;
-    bool data;
+    bool data = false;
     point.j += bc_period_y;
     for (scalar s in apply_bc_list) {
       scalar b = (s.v.x.i < 0 ? s : s.i == s.v.y.i ? s.v.x : s.v.y);
@@ -253,7 +266,7 @@ void apply_bc (Point point)
   }
   if (point.j == N + GHOSTS - 1) { // top
     Point neighbor = point;
-    bool data;
+    bool data = false;
     point.j -= bc_period_y;
     for (scalar s in apply_bc_list)
       if (s.face == 0 || s.i != s.v.y.i) { // fixme: bool(!s.face) not correct
@@ -308,7 +321,6 @@ static External * merge_external (External * externals, External ** end, Externa
   return append_external (externals, end, g);
 }
 
-trace
 static External * merge_externals (External * externals, const ForeachData * loop)
 {
   External * merged = NULL, * end = NULL;
@@ -411,7 +423,6 @@ inline uint32_t a32_hash (const Adler32Hash * hash)
 }
 #endif
 
-trace
 uint32_t hash_shader (const External * externals, const ForeachData * loop,
 		      const RegionParameters * region, const char * kernel)
 {
@@ -486,9 +497,10 @@ char * build_shader (External * externals, const ForeachData * loop,
   for (const External * g = externals; g; g = g->next)
     if (g->name[0] == '.') {
       char * type =
-	!strcmp (g->type, "float") || !strcmp (g->type, "double") ? "real" :
-	!strcmp (g->type, "*func()") ? "int" :
-	g->type;
+#if SINGLE_PRECISION
+	!strcmp (g->type, "double") ? "float" :
+#endif
+	!strcmp (g->type, "*func()") ? "int" : g->type;
       attributes = str_append (attributes, "  ", type, " ", g->name + 1);
       for (int * d = g->data; d && *d > 0; d++) {
 	char s[20]; snprintf (s, 19, "%d", *d);
@@ -666,7 +678,10 @@ char * build_shader (External * externals, const ForeachData * loop,
 	fs = str_append (fs, "coord p = vec3((vsPoint*vsScale + vsOrigin)*L0 + vec2(X0, Y0),0);\n");
       }
       else {
-	char * type = !strcmp (g->type, "float") || !strcmp (g->type, "double") ? "real" :
+	char * type =
+#if SINGLE_PRECISION
+	  !strcmp (g->type, "double") ? "float" :
+#endif
 	  !strcmp (g->type, "enum") ? "int" : g->type;
 	char loc[20];
 	snprintf (loc, 19, "%d", location);
@@ -943,16 +958,23 @@ static void gpu_cpu_sync (scalar * list, GLenum mode, const char * fname, int li
 }
 
 trace
-void reset_gpu (void * alist, float val)
+void reset_gpu (void * alist, double val)
 {
   size_t size = field_size()*sizeof(real);
   GL_C (glBindBuffer (GL_SHADER_STORAGE_BUFFER, GPUContext.ssbo));
   scalar * list = alist;
   for (scalar s in list)
     if (!is_constant(s)) {
+#if SINGLE_PRECISION
+      float fval = val;
       GL_C (glClearBufferSubData (GL_SHADER_STORAGE_BUFFER, GL_R32F,
 				  s.i*size, size,
-				  GL_RED, GL_FLOAT, &val));
+				  GL_RED, GL_FLOAT, &fval));
+#else
+      GL_C (glClearBufferSubData (GL_SHADER_STORAGE_BUFFER, GL_RG32UI,
+				  s.i*size, size,
+				  GL_RG_INTEGER, GL_UNSIGNED_INT, &val));      
+#endif
       s.gpu.stored = -1;
     }
   GL_C (glBindBuffer (GL_SHADER_STORAGE_BUFFER, 0));
@@ -1161,10 +1183,16 @@ static Shader * setup_shader (ForeachData * loop, const RegionParameters * regio
   for (const External * g = externals; g; g = g->next) {
     if (g->name[0] == '.') continue;
     if (!strcmp (g->type, "*func()") || !strcmp (g->type, "func()")) continue;
-    if ((!strcmp (g->name, "N") || !strcmp (g->name, "nl")) && !strcmp (g->type, "int"))
+    if (!strcmp (g->type, "int") && (!strcmp (g->name, "N") ||
+				     !strcmp (g->name, "nl") ||
+				     !strcmp (g->name, "bc_period_x") ||
+				     !strcmp (g->name, "bc_period_y")))
       continue;
     if (!strcmp (g->type, "int") ||
 	!strcmp (g->type, "float") ||
+#if !SINGLE_PRECISION
+	!strcmp (g->type, "double") ||
+#endif
 	!strcmp (g->type, "vec4")) {
       // not an array or just a one-dimensional array
       assert (!g->data || ((int *)g->data)[1] == 0);
@@ -1191,6 +1219,13 @@ static Shader * setup_shader (ForeachData * loop, const RegionParameters * regio
 	fprintf (stderr, "uniform float %s = %g\n", g->name, *p);
 #endif
 	glUniform1fv (location, g->data ? ((int *)g->data)[0] : 1, g->pointer);
+      }
+      else if (!strcmp (g->type, "double")) {
+#if PRINTUNIFORM
+	double * p = g->pointer;
+	fprintf (stderr, "uniform double %s = %g\n", g->name, *p);
+#endif
+	glUniform1dv (location, g->data ? ((int *)g->data)[0] : 1, g->pointer);
       }
       else if (!strcmp (g->type, "vec4")) {
 #if PRINTUNIFORM
@@ -1225,7 +1260,7 @@ static Shader * setup_shader (ForeachData * loop, const RegionParameters * regio
 	}
 	if (!strcmp (g->type, "enum")) {
 #if PRINTUNIFORM
-	  fprintf (stderr, "uniform enum %s = %d\n", name, g->nd);
+	  fprintf (stderr, "uniform enum %s = %d\n", g->name, g->nd);
 #endif
 	  assert (nd == 1);
 	  glUniform1i (location, g->nd);
@@ -1233,31 +1268,39 @@ static Shader * setup_shader (ForeachData * loop, const RegionParameters * regio
 	else if (g->nd == 0) {
 	  if (!strcmp (g->type, "double")) {
 #if PRINTUNIFORM
-	    fprintf (stderr, "uniform double %s = %g\n", name, *((double *)p));
+	    fprintf (stderr, "uniform double %s = %g\n", g->name, *((double *)p));
 #endif
 	    glUniform1f (location, *((double *)p)); p = ((double *)p) + 1;
 	  }
 	  else if (!strcmp (g->type, "bool")) {
 #if PRINTUNIFORM
 	    bool * p = g->pointer;
-	    fprintf (stderr, "uniform bool %s = %d\n", name, *p);
+	    fprintf (stderr, "uniform bool %s = %d\n", g->name, *p);
 #endif
 	    glUniform1i (location, *((bool *)p)); p = ((bool *)p) + 1;
 	  }
 	  else if (!strcmp (g->type, "coord")) {
 #if PRINTUNIFORM
-	    fprintf (stderr, "uniform coord %s = {%g,%g,%g}\n", name,
+	    fprintf (stderr, "uniform coord %s = {%g,%g,%g}\n", g->name,
 		     ((double *)p)[0], ((double *)p)[1], ((double *)p)[2]);
 #endif
+#if SINGLE_PRECISION
 	    glUniform3f (location, ((double *)p)[0], ((double *)p)[1], ((double *)p)[2]);
+#else
+	    glUniform3d (location, ((double *)p)[0], ((double *)p)[1], ((double *)p)[2]);
+#endif
 	    p = ((double *)p) + 3;
 	  }
 	  else if (!strcmp(g->type, "_coord")) {
 #if PRINTUNIFORM
-	    fprintf (stderr, "uniform _coord %s = {%g,%g}\n", name,
+	    fprintf (stderr, "uniform _coord %s = {%g,%g}\n", g->name,
 		     ((double *)p)[0], ((double *)p)[1]);
 #endif
+#if SINGLE_PRECISION
 	    glUniform2f (location, ((double *)p)[0], ((double *)p)[1]); p = ((double *)p) + 2;
+#else
+	    glUniform2d (location, ((double *)p)[0], ((double *)p)[1]); p = ((double *)p) + 2;
+#endif
 	  }
 	  else {
 	    fprintf (stderr, "type: %s name: %s\n", g->type, g->name);
@@ -1414,4 +1457,6 @@ bool gpu_end_stencil (ForeachData * loop,
 * [Slides on using Array or Bindless Textures](https://www.slideshare.net/CassEveritt/beyond-porting)
 * [Optimizing Compute Shaders for L2 Locality using Thread-Group ID Swizzling](https://developer.nvidia.com/blog/optimizing-compute-shaders-for-l2-locality-using-thread-group-id-swizzling/)
 * [Optimizing GPU occupancy and resource usage with large thread groups](https://gpuopen.com/learn/optimizing-gpu-occupancy-resource-usage-large-thread-groups/)
+* https://www.reddit.com/r/CUDA/comments/lkhcbv/is_there_a_list_of_gpus_ranked_by_fp64/
+* https://www.techpowerup.com/gpu-specs/
 */
