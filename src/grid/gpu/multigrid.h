@@ -37,9 +37,16 @@
   "  point.i = (_i + GHOSTS)/2; point.j = (_j + GHOSTS)/2;"		\
   "  point.level--;"							\
   "}\n"									\
+  "#define fine(a,k,l,m)"						\
+  "  _data[2*point.j - GHOSTS + (l) +"					\
+  "        (2*point.i - GHOSTS + (k))*((1 << point.level)*2 + 2*GHOSTS) +" \
+  "        _shift (point.level + 1) +"					\
+  "        (a).i*field_size()]\n"					\
   "#define coarse(a,k,l,m)"						\
-  "  _data[(point.j + GHOSTS)/2 + l + ((point.i + GHOSTS)/2 + k)*((1 << point.level)/2 + 2*GHOSTS)" \
-  "  + _shift (point.level - 1) + (s).i*field_size()]\n"
+  "  _data[(point.j + GHOSTS)/2 + (l) +"				\
+  "        ((point.i + GHOSTS)/2 + (k))*((1 << point.level)/2 + 2*GHOSTS) +" \
+  "        _shift (point.level - 1) +"					\
+  "        (a).i*field_size()]\n"
 
 #include "../multigrid.h"
 #include "gpu.h"
@@ -48,6 +55,7 @@
 static void gpu_multigrid_methods()
 {
   multigrid_methods();
+  boundary_level = gpu_boundary_level;
 }
 
 #include "grid.h"

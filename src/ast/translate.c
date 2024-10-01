@@ -4170,7 +4170,7 @@ static void macros (Ast * n, Stack * stack, void * data)
     ## Foreach stencils */
     
     if (ast_is_foreach_stencil (n)) {
-      ast_after (n, "end_", ast_left_terminal(n)->start, "();");
+      ast_after (n, "end_", ast_left_terminal(n)->start, "()");
       break;
     }
 
