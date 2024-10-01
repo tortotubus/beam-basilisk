@@ -45,7 +45,6 @@ Without any outputs (logfile() commented out).
 ~~~bash
 rm -f bump2D-gpu.tst && CFLAGS='-DBENCHMARK -DTRACE=2' make bump2D-gpu.tst
 # Ignore diff error since the log has not been generated
-cd bump2D-gpu
 
 OpenGL renderer string: NVIDIA GeForce RTX 3050 Ti Laptop GPU/PCIe/SSE2
 Dedicated video memory: 4096 MB

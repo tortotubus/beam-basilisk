@@ -46,6 +46,7 @@ attribute {
 
 int main (int argc, char * argv[])
 {
+  size (1[0]);
   init_grid (1);
 
 #if 0  
@@ -423,9 +424,7 @@ int main (int argc, char * argv[])
     scalar g[];
     foreach_level_or_leaf (2)
       g[] = s[] - s[-1];
-#if _GPU
-    assert (g.gpu.stored == -1);
-#endif
+    
     foreach_level (2, serial)
       fprintf (stderr, "29) %g %g %g %g\n", x, y, g[], s[-1]);
 
@@ -435,9 +434,7 @@ int main (int argc, char * argv[])
 	sum += s[];
       s[] = sum/(1 << dimension);
     }
-#if _GPU
-    assert (s.gpu.stored == -1);
-#endif
+
     foreach_level (1, serial)
       fprintf (stderr, "30) %g %g %g\n", x, y, s[]);
 
@@ -457,12 +454,18 @@ int main (int argc, char * argv[])
   ## Boundary conditions on faces */
 
   {    
-    init_grid (2);
+    init_grid (4);
     face vector uf[];
+    uf.n[left] = x;
+    uf.n[right] = x;
+    uf.n[top] = y;
+    uf.n[bottom] = y;
     foreach_face()
-      uf.x[] = x*y;
+      uf.x[] = (x + 1)*(y + 1);
     foreach_face (x, serial)
       fprintf (stderr, "33) %g %g %g %g %g\n", x, y, uf.x[], uf.x[0,1], uf.x[0,-1]);
+    foreach_face (y, serial)
+      fprintf (stderr, "34) %g %g %g %g %g\n", x, y, uf.y[], uf.y[1], uf.y[-1]);    
   }
   
   /**

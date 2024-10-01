@@ -79,6 +79,7 @@ bool is_face_z();
 bool is_constant();
 void dimensional();
 void NOT_UNUSED();
+void neighborp();
 
 double abs (double x);
 double acos (double x);

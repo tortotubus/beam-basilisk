@@ -16,12 +16,14 @@
   "#define val_red_(s) _data[(s).i*field_size() + (point.i - 1)*NY + point.j - 1]\n"
 
 #include "../cartesian.h"
+@define neighborp(k,l,o) neighbor(k,l,o)
 #include "gpu.h"
 #include "../cartesian-common.h"
 
 static void gpu_cartesian_methods()
 {
   cartesian_methods();
+  boundary_level = gpu_boundary_level;
 }
 
 #include "grid.h"

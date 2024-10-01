@@ -39,7 +39,6 @@ KHASH_MAP_INIT_INT(INT, Shader *)
   
 typedef struct {
   GRIDPARENT parent;
-  Boundary ** boundaries;
   GLuint reduct[2], ng[2], nwg[2];
   khash_t(INT) * shaders;
 } GridGPU;
@@ -64,17 +63,14 @@ static char * str_append_array (char * dst, const char * list[])
 #define str(a) #a
 
 static char glsl_preproc[] =
-  "// #line " xstr(__LINE__) " \"" __FILE__ "\"\n"
+  "// #line " xstr(__LINE__) " " __FILE__ "\n"
   "#define dimensional(x)\n"
-#if SINGLE_PRECISION
-  "#define real float\n"
-  "#define coord vec3\n"
-#else // !SINGLE_PRECISION
+#if !SINGLE_PRECISION
   "#define real double\n"
   "#define coord dvec3\n"
-  "#define cos(x) cos(float(x))\n"
-  "#define sin(x) sin(float(x))\n"
-  "#define exp(x) exp(float(x))\n"
+#else // !SINGLE_PRECISION
+  "#define real float\n"
+  "#define coord vec3\n"
 #endif // !SINGLE_PRECISION
   "#define ivec ivec2\n"
   "struct scalar { int i, index; };\n"
@@ -83,6 +79,10 @@ static char glsl_preproc[] =
   "#define _coord vec2\n"
 #else
   "#define _coord dvec2\n"
+  "#define cos(x) cos(float(x))\n"
+  "#define sin(x) sin(float(x))\n"
+  "#define exp(x) exp(float(x))\n"
+  "#define pow(x,y) pow(float(x), float(y))\n"
 #endif
   "struct vector { scalar x, y; };\n"
   "struct tensor { vector x, y; };\n"
@@ -130,12 +130,18 @@ static char glsl_preproc[] =
   "#define sq(x) ((x)*(x))\n"
   "#define cube(x) ((x)*(x)*(x))\n"
   "#define fabs(x) abs(x)\n"
+  "#define sign(x) ((x) > 0 ? 1 : -1)\n"
   "#define _dirichlet(expr,p,n,_s,data)                  (2.*(expr) - val(_s,0,0,0))\n"
   "#define _dirichlet_homogeneous(expr,p,n,_s,data)      (- val(_s,0,0,0))\n"
   "#define _dirichlet_face(expr,p,n,_s,data)             (expr)\n"
   "#define _dirichlet_face_homogeneous(expr,p,n,_s,data) (0.)\n"
   "#define _neumann(expr,p,n,_s,data)               (Delta*(expr) + val(_s,0,0,0))\n"
   "#define _neumann_homogeneous(expr,p,n,_s,data)   (val(_s,0,0,0))\n"
+  "#define neighborp(_i,_j,_k) Point(point.i+_i,point.j+_j,point.level"
+  #if LAYERS
+  ",point.l"
+  #endif
+  ")\n"
   "const real z = 0.;\n"
   "const int ig = 0, jg = 0;\n"
   "layout (location = 0) uniform ivec2 csOrigin = ivec2(0,0);\n"
@@ -198,83 +204,76 @@ static scalar * apply_bc_list;
 
 static int bc_period_x = -1, bc_period_y = -1;
 
+static void boundary_top (Point point, int i)
+{
+  bool data = false;
+  for (scalar s in apply_bc_list)
+    if (s.face == 0 || s.i != s.v.y.i) {
+      scalar b = (s.v.x.i < 0 ? s : s.i == s.v.y.i ? s.v.x : s.v.y);
+      s[i,-bc_period_y] = b.boundary_top (neighborp(i), neighborp(i,-bc_period_y), s, &data);
+    }
+}
+
+static void boundary_bottom (Point point, int i)
+{
+  bool data = false;
+  for (scalar s in apply_bc_list)
+    if (s.face == 0 || s.i != s.v.y.i) {
+      scalar b = (s.v.x.i < 0 ? s : s.i == s.v.y.i ? s.v.x : s.v.y);
+      s[i,bc_period_y] = b.boundary_bottom (neighborp(i), neighborp(i,bc_period_y), s, &data);
+    }
+}
+
 static
 void apply_bc (Point point)
 {
+  bool data = false;
+  // face BCs
+  if (point.i == GHOSTS)
+    for (scalar s in apply_bc_list)
+      if (s.face != 0 && s.i == s.v.x.i && s.boundary_left != 0)
+	s[] = s.boundary_left (point, neighborp(bc_period_x), s, &data);
+  if (point.i == N + GHOSTS)
+    for (scalar s in apply_bc_list)
+      if (s.face != 0 && s.i == s.v.x.i && s.boundary_right != 0)
+	s[] = s.boundary_right (neighborp(bc_period_x), point, s, &data);
+  if (point.j == GHOSTS)
+    for (scalar s in apply_bc_list)
+      if (s.face != 0 && s.i == s.v.y.i) {
+	scalar b = s.v.x;
+	if (b.boundary_bottom != 0)
+	  s[] = b.boundary_bottom (point, neighborp(0,bc_period_y), s, &data);
+      }
+  if (point.j == N + GHOSTS)
+    for (scalar s in apply_bc_list)
+      if (s.face != 0 && s.i == s.v.y.i) {
+	scalar b = s.v.x;
+	if (b.boundary_top != 0)
+	  s[] = b.boundary_top (neighborp(0,bc_period_y), point, s, &data);
+      }
+  // centered BCs
   if (point.i == GHOSTS) { // left
-    Point neighbor = point;
-    bool data = false;
-    point.i += bc_period_x;
-    for (scalar s in apply_bc_list) {
-      scalar b = (s.v.x.i < 0 ? s : s.i == s.v.x.i ? s.v.x : s.v.y);
-      s[] = b.boundary_left (neighbor, point, s, &data);
-    }
-    if (point.j == GHOSTS) { // bottom-left corner
-      point.j += bc_period_y, neighbor.i += bc_period_x;
-      for (scalar s in apply_bc_list) {
-	scalar b = (s.v.x.i < 0 ? s : s.i == s.v.y.i ? s.v.x : s.v.y);
-	s[] = b.boundary_bottom (neighbor, point, s, &data);
-      }
-      point.j -= bc_period_y, neighbor.i -= bc_period_x;
-    }
-    if (point.j == N + GHOSTS - 1) { // top-left corner
-      point.j -= bc_period_y, neighbor.i += bc_period_x;
-      for (scalar s in apply_bc_list) {
-	scalar b = (s.v.x.i < 0 ? s : s.i == s.v.y.i ? s.v.x : s.v.y);
-	s[] = b.boundary_top (neighbor, point, s, &data);
-      }
-      point.j += bc_period_y, neighbor.i -= bc_period_x;
-    }
-    point.i -= bc_period_x;
+    for (scalar s in apply_bc_list)
+      if (s.face == 0 || s.i != s.v.x.i)
+	s[bc_period_x] = s.boundary_left (point, neighborp(bc_period_x), s, &data);
+    if (point.j == GHOSTS)
+      boundary_bottom (point, bc_period_x); // bottom-left
+    if (point.j == N + GHOSTS - 1)
+      boundary_top (point, bc_period_x);    // top-left
   }
   if (point.i == N + GHOSTS - 1) { // right
-    Point neighbor = point;
-    bool data = false;
-    point.i -= bc_period_x;
     for (scalar s in apply_bc_list)
-      if (s.face == 0 || s.i != s.v.x.i) { // fixme: bool(!s.face) not correct
-	scalar b = (s.v.x.i < 0 ? s : s.i == s.v.x.i ? s.v.x : s.v.y);
-	s[] = b.boundary_right (neighbor, point, s, &data);
-      }
-    if (point.j == GHOSTS) { // bottom-right corner
-      point.j += bc_period_y, neighbor.i -= bc_period_x;
-      for (scalar s in apply_bc_list) {
-	scalar b = (s.v.x.i < 0 ? s : s.i == s.v.y.i ? s.v.x : s.v.y);
-	s[] = b.boundary_bottom (neighbor, point, s, &data);
-      }
-      point.j -= bc_period_y, neighbor.i += bc_period_x;
-    }
-    if (point.j == N + GHOSTS - 1) { // top-right corner
-      point.j -= bc_period_y, neighbor.i -= bc_period_x;
-      for (scalar s in apply_bc_list) {
-	scalar b = (s.v.x.i < 0 ? s : s.i == s.v.y.i ? s.v.x : s.v.y);
-	s[] = b.boundary_top (neighbor, point, s, &data);
-      }
-      point.j += bc_period_y, neighbor.i += bc_period_x;
-    }
-    point.i += bc_period_x;
+      if (s.face == 0 || s.i != s.v.x.i)
+	s[- bc_period_x] = s.boundary_right (point, neighborp(- bc_period_x), s, &data);
+    if (point.j == GHOSTS)
+      boundary_bottom (point, - bc_period_x); // bottom-right
+    if (point.j == N + GHOSTS - 1)
+      boundary_top (point, - bc_period_x);    // top-right
   }
-  if (point.j == GHOSTS) { // bottom
-    Point neighbor = point;
-    bool data = false;
-    point.j += bc_period_y;
-    for (scalar s in apply_bc_list) {
-      scalar b = (s.v.x.i < 0 ? s : s.i == s.v.y.i ? s.v.x : s.v.y);
-      s[] = b.boundary_bottom (neighbor, point, s, &data);
-    }
-    point.j -= bc_period_y;
-  }
-  if (point.j == N + GHOSTS - 1) { // top
-    Point neighbor = point;
-    bool data = false;
-    point.j -= bc_period_y;
-    for (scalar s in apply_bc_list)
-      if (s.face == 0 || s.i != s.v.y.i) { // fixme: bool(!s.face) not correct
-	scalar b = (s.v.x.i < 0 ? s : s.i == s.v.y.i ? s.v.x : s.v.y);	
-	s[] = b.boundary_top (neighbor, point, s, &data);
-      }
-    point.j += bc_period_y;
-  }
+  if (point.j == GHOSTS)
+    boundary_bottom (point, 0);  // bottom
+  if (point.j == N + GHOSTS - 1)
+    boundary_top (point, 0);     // top
 }
 
 static External * append_external (External * externals, External ** end, External * g)
@@ -467,6 +466,16 @@ uint32_t hash_shader (const External * externals, const ForeachData * loop,
   return a32_hash (&hash);
 }
 
+static
+bool is_void_function (char * code)
+{
+  while (*code != '/') code++; code++;
+  while (*code != '/') code++; code++;
+  while (*code != '\n') code++; code++;
+  while (strchr ("\n\r\t ", *code)) code++;
+  return !strncmp (code, "void ", 5);
+}
+
 trace
 char * build_shader (External * externals, const ForeachData * loop,
 		     const RegionParameters * region)
@@ -488,7 +497,8 @@ char * build_shader (External * externals, const ForeachData * loop,
     fs = str_append (fs, ",", a);
   }
   fs = str_append (fs, "};\n");
-  fs = str_append (fs, "layout(std430, binding = 0) buffer _data_layout { real _data[]; };\n");
+  fs = str_append (fs, "layout(std430, binding = 0)"
+		   " restrict buffer _data_layout { real _data[]; };\n");
 
   /**
   Scalar field attributes */
@@ -590,13 +600,14 @@ char * build_shader (External * externals, const ForeachData * loop,
 	      External * f = _get_function ((long) func);
 	      if (!f->used) {
 		f->used = true;
+		char * args = is_void_function (f->data) ? " args,0" : " args";
 		if (!expr)
-		  expr = str_append (NULL, "(", f->name, " args)");
+		  expr = str_append (NULL, "(", f->name, args, ")");
 		else {
 		  char index[20];
 		  snprintf (index, 19, "%d", f->nd);
 		  char * s = str_append (NULL, "_attr(s,", g->name + 1, ")==", index,
-					 "?(", f->name, " args):", expr);
+					 "?(", f->name, args, "):", expr);
 		  sysfree (expr);
 		  expr = s;
 		}
@@ -808,7 +819,6 @@ void gpu_free()
   if (!grid)
     return;
   free_boundaries();
-  swap (Boundary **, boundaries, gpu_grid->boundaries);
   uint32_t hash;
   Shader * shader;
   kh_foreach (gpu_grid->shaders, hash, shader, free (shader)); hash = hash;
@@ -907,11 +917,8 @@ static void gpu_cpu_sync_scalar (scalar s, char * sep, GLenum mode)
 {
   assert ((mode == GL_MAP_READ_BIT && s.gpu.stored < 0) ||
 	  (mode == GL_MAP_WRITE_BIT && s.gpu.stored > 0));
-  if (s.gpu.stored > 0 && s.dirty) {
-    swap (Boundary **, boundaries, gpu_grid->boundaries);
+  if (s.gpu.stored > 0 && s.dirty)
     boundary ({s});
-    swap (Boundary **, boundaries, gpu_grid->boundaries);
-  }
   GL_C (glBindBuffer (GL_SHADER_STORAGE_BUFFER, GPUContext.ssbo));
   size_t size = field_size()*sizeof(real);
   char * gd = glMapBufferRange (GL_SHADER_STORAGE_BUFFER, s.i*size, size, mode);
@@ -989,8 +996,6 @@ void gpu_init_grid (int n)
   gpu_free_grid();
   init_grid (n);
   grid = realloc (grid, sizeof (GridGPU));
-  gpu_grid->boundaries = NULL;
-  swap (Boundary **, boundaries, gpu_grid->boundaries);
   gpu_init();
 }
 
@@ -1112,13 +1117,21 @@ static Shader * setup_shader (ForeachData * loop, const RegionParameters * regio
 			      External * externals,
 			      const char * kernel)
 {
+  for (scalar s in baseblock)
+    s.gpu.index = 0;
   int index = 1;
   for (scalar s in baseblock)
-    if (s.input || s.output)
-      s.gpu.index = index++;
-    else
-      s.gpu.index = 0;
-  
+    if ((s.input || s.output) && !s.gpu.index) {
+      if (s.v.x.i == -1) // scalar
+	s.gpu.index = index++;
+      else { // vector
+	vector v = s.v;
+	for (scalar c in {v})
+	  if (!c.gpu.index)
+	    c.gpu.index = index++;
+      }
+    }
+
   if (!(externals = merge_externals (externals, loop)))
     return false;
   
@@ -1422,8 +1435,10 @@ bool gpu_end_stencil (ForeachData * loop,
       s.dirty = false;
     free (loop->dirty), loop->dirty = NULL;
   }
-  else
+  else {
     gpu_cpu_sync (baseblock, GL_MAP_READ_BIT, loop->fname, loop->line);
+    boundary_stencil (loop);
+  }
   
   for (scalar s in baseblock)
     if (s.output)

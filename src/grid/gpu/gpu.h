@@ -304,7 +304,6 @@ typedef struct {
 #endif // PRINTIO
   check_stencil (&_loop);
   _gpu_done_ = gpu_end_stencil (&_loop, _region, _params.externals, _params.kernel);
-  boundary_stencil (&_loop);
   _loop.first = 0;
   end_tracing ("foreach", S__FILE__, S_LINENO);
 }
@@ -344,6 +343,19 @@ void realloc_scalar_gpu (int size)
     if (s.gpu.stored < 0)
       gpu_cpu_sync_scalar (s, NULL, GL_MAP_READ_BIT);
   realloc_ssbo();
+}
+
+void gpu_boundary_level (scalar * list, int l)
+{
+  scalar * list1 = NULL;
+  for (scalar s in list)
+    if (s.gpu.stored > 0)
+      list1 = list_prepend (list1, s);
+  if (list1) {
+    void cartesian_boundary_level (scalar * list, int l); 
+    cartesian_boundary_level (list1, l);
+    free (list1);
+  }
 }
 
 #define realloc_scalar(size) realloc_scalar_gpu (size)
