@@ -170,6 +170,10 @@ poiseuille-oldroydb.tst: poiseuille-fenep.tst
 
 poisson.tst: poisson.ctst
 
+axi.s.d: CFLAGS += -grid=multigrid
+axi.s: CFLAGS += -grid=multigrid
+axi.tst: CFLAGS += -grid=multigrid
+
 rising-axi.c: rising.c
 	ln -sf rising.c rising-axi.c
 rising-axi.s: CFLAGS += -DAXIS=1
@@ -574,10 +578,17 @@ dimensions-tests: bump2D.s capwave.s lid.s rising-axi.s		\
 
 # GPUs
 # fixme: the dependencies *.gpu.s.d are not created automatically
-gpu-tests: gpu.gpu.tst gpu-reduce.gpu.tst nonlinear.gpu.tst \
-	advection.gpu.tst bump2D-gpu.tst reversed.gpu.tst
+gpu-tests: gpu.gpu.tst gpu-cpu.tst gpu-reduce.gpu.tst nonlinear.gpu.tst \
+	advection.gpu.tst bump2D-gpu.tst reversed.gpu.tst axi.gpu.tst lid.gpu.tst
 
+gpu.s.d: CFLAGS += -grid=multigrid
 gpu.s: CFLAGS += -grid=multigrid
 gpu.tst: CFLAGS += -grid=multigrid
+
+gpu-cpu.c: gpu.c
+	ln -sf gpu.c gpu-cpu.c
+gpu-cpu.s.d: CFLAGS += -grid=multigrid
+gpu-cpu.s: CFLAGS += -grid=gpu/multigrid -cpu
+gpu-cpu.tst: CFLAGS += -grid=gpu/multigrid -cpu
 
 include ../Makefile.defs
