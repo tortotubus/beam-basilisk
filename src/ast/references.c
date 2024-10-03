@@ -177,6 +177,12 @@ char * add_reference (Ast * ref, char * references, Ast * scope, Stack * stack, 
     default:
       str_append (references, ",.type=\"not implemented yet\""); break;
     }
+
+  /**
+  Is this a global variable? */
+
+  if (!attributes && !ast_parent (ref, sym_compound_statement) && !ast_parent (ref, sym_parameter_declaration))
+    str_append (references, ",.global=1");
   
   /**
   Assumes 'double *' are references to arrays with 'nl'

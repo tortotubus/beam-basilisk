@@ -314,8 +314,12 @@ static External * merge_external (External * externals, External ** end, Externa
       }
 
   for (External * i = externals; i; i = i->next)
-    if (!strcmp (i->name, g->name))
-      return externals;
+    if (!strcmp (g->name, i->name)) {
+      if (g->global == 0 && i->global == 1) g->global = 2;
+      else if (g->global == 1 && i->global == 0) i->global = 2;
+      else
+	return externals;
+    }
 
   return append_external (externals, end, g);
 }
@@ -324,27 +328,28 @@ static External * merge_externals (External * externals, const ForeachData * loo
 {
   External * merged = NULL, * end = NULL;
   static External ext[] = {
-    { .name = "X0", .type = "double", .pointer = &X0 },
-    { .name = "Y0", .type = "double", .pointer = &Y0 },
-    { .name = "Z0", .type = "double", .pointer = &Z0 },
-    { .name = "L0", .type = "double", .pointer = &L0 },
-    { .name = "N",  .type = "int",    .pointer = &N },
-    { .name = "apply_bc_list", .type="scalar", .nd = 1},
+    { .name = "X0", .type = "double", .pointer = &X0, .global = 1 },
+    { .name = "Y0", .type = "double", .pointer = &Y0, .global = 1  },
+    { .name = "Z0", .type = "double", .pointer = &Z0, .global = 1  },
+    { .name = "L0", .type = "double", .pointer = &L0, .global = 1  },
+    { .name = "N",  .type = "int",    .pointer = &N, .global = 1  },
+    { .name = "apply_bc_list", .type="scalar", .nd = 1, .global = 1 },
     { .name = "apply_bc",      .type = "func()", .pointer = (void *)(long)apply_bc},
     { .name = NULL }
   };
 
-  assert (!strcmp (ext[5].name, "apply_bc_list"));
-  ext[5].pointer = loop->dirty;
-  for (scalar s in ext[5].pointer) {
+  ext[5].pointer = NULL;
+  for (scalar s in loop->dirty) {
     s.boundary_left   = s.boundary[left];
     s.boundary_right  = s.boundary[right];
     s.boundary_top    = s.boundary[top];
     s.boundary_bottom = s.boundary[bottom];
   }
 
-  for (External * g = externals; g->name; g++)
+  for (External * g = externals; g->name; g++) {
     g->used = false;
+    if (g->global == 2) g->global = 0;
+  }
   foreach_function (f, f->used = false);
   for (External * g = ext; g->name; g++) {
     g->used = false;
@@ -361,6 +366,8 @@ static External * merge_externals (External * externals, const ForeachData * loo
   for (External * i = merged; i; i = i->next)
     fprintf (stderr, "external %s %s %p\n", i->name, i->type, i->pointer);
 #endif
+  assert (!strcmp (ext[5].name, "apply_bc_list"));
+  ext[5].pointer = loop->dirty;
   return merged;
 }
 
@@ -475,6 +482,8 @@ bool is_void_function (char * code)
   while (strchr ("\n\r\t ", *code)) code++;
   return !strncmp (code, "void ", 5);
 }
+
+#define EXTERNAL_NAME(g) (g)->global == 2 ? "_loc_" : "", (g)->name, (g)->reduct ? "_in_" : ""
 
 trace
 char * build_shader (External * externals, const ForeachData * loop,
@@ -697,7 +706,7 @@ char * build_shader (External * externals, const ForeachData * loop,
 	char loc[20];
 	snprintf (loc, 19, "%d", location);
 	fs = str_append (fs, "layout (location = ", loc, ") uniform ",
-			 type, " ", g->name, g->reduct ? "_in_" : "");
+			 type, " ", EXTERNAL_NAME (g));
 	g->location = location;
 	int * d = g->data;
 	location += d && *d > 0 ? *d : 1;
@@ -707,7 +716,8 @@ char * build_shader (External * externals, const ForeachData * loop,
 	}
 	fs = str_append (fs, ";\n");
 	if (g->reduct) {
-	  fs = str_append (fs, type, " ", g->name, " = ", g->name, "_in_;\n");
+	  fs = str_append (fs, type, " ", g->global == 2 ? "_loc_" : "", g->name, " = ",
+			   EXTERNAL_NAME (g), ";\n");
 	  fs = str_append (fs, "const scalar ", g->name, "_out_ = ");
 	  fs = write_scalar (fs, g->s);
 	  fs = str_append (fs, ";\n");
@@ -718,7 +728,7 @@ char * build_shader (External * externals, const ForeachData * loop,
       int size = list_size (g);
       for (int j = 0; j < size; j++) {
 	if (j == 0) {
-	  fs = str_append (fs, "const ", g->type, " ", g->name);
+	  fs = str_append (fs, "const ", g->type, " ", EXTERNAL_NAME (g));
 	  if (g->nd == 0)
 	    fs = str_append (fs, " = ");
 	  else {
@@ -1030,7 +1040,10 @@ static Shader * compile_shader (ForeachData * loop, const RegionParameters * reg
     return NULL;
   }
 
-  for (const External * g = externals; g; g = g->next)
+  int local = false;
+  for (const External * g = externals; g; g = g->next) {
+    if (g->global == 2)
+      local = true;
     if (strcmp(g->type, "scalar") && strcmp(g->type, "vector") && strcmp(g->type, "tensor")) {
       if (g->reduct && !strchr ("+mM", g->reduct)) {
 	if (loop->first)
@@ -1062,6 +1075,7 @@ static Shader * compile_shader (ForeachData * loop, const RegionParameters * reg
 	return NULL;
       }
     }
+  }
 
   char * shader = build_shader (externals, loop, region);
   if (!shader)
@@ -1069,8 +1083,31 @@ static Shader * compile_shader (ForeachData * loop, const RegionParameters * reg
 
   /**
   ## main() */
-    
-  shader = str_append (shader, "void main() {\n");
+
+  if (local) {
+    shader = str_append (shader, "void _loop (");
+    for (const External * g = externals; g; g = g->next)
+      if (g->global == 2) {
+	shader = str_append (shader, local++ == 1 ? "" : ", ",
+#if SINGLE_PRECISION
+			     !strcmp (g->type, "double") ? "float" : g->type,
+#else
+			     g->type,
+#endif
+			     " ", g->name);
+	if (g->nd) {
+	  int size = list_size (g);
+	  if (size > 0) {
+	    char s[20]; snprintf (s, 19, "%d", size);
+	    shader = str_append (shader, "[", s, "]");
+	  }
+	}
+      }
+    shader = str_append (shader, ") {\n");
+  }
+  else  
+    shader = str_append (shader, "void main() {\n");
+  
   if (!GPUContext.fragment_shader) {
     char d[20];
     snprintf (d, 19, "%d", region->level > 0 ? region->level - 1 : depth());
@@ -1100,6 +1137,15 @@ static Shader * compile_shader (ForeachData * loop, const RegionParameters * reg
 		       loop->dirty ? "apply_bc(point);" : "",
 		       "}}\n");
 
+  if (local) {
+    shader = str_append (shader, "void main(){_loop(");
+    local = 1;
+    for (const External * g = externals; g; g = g->next)
+      if (g->global == 2)
+	shader = str_append (shader, local++ == 1 ? "" : ",", EXTERNAL_NAME (g));
+    shader = str_append (shader, ");}\n");
+  }
+    
   /**
   For the Intel driver, it looks like this is necessary so that the
   compiled shader is independent from the exact location of the
