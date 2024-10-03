@@ -32,6 +32,7 @@ struct _External {
   void * pointer; // a pointer to the data
   int nd;         // the number of pointer dereferences or attribute offset or enum constant
   char reduct;    // the reduction operation
+  char global;    // is it a global variable?
   void * data;    // the dimensions (int *) for arrays or the code (char *) for functions
   scalar s;       // used for reductions on GPUs
   External * externals, * next;

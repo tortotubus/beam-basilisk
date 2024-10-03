@@ -40,6 +40,18 @@ double myfunc5 (double x)
   return x*x;
 }
 
+void myfunc6 (Point point, scalar s)
+{
+  s[] = v.x[];
+}
+
+double vv = 3;
+
+void myfunc7 (Point point, scalar s, double a)
+{
+  s[] = a/vv;
+}
+
 attribute {
   double (* func) (double x);
 }
@@ -466,6 +478,18 @@ int main (int argc, char * argv[])
       fprintf (stderr, "33) %g %g %g %g %g\n", x, y, uf.x[], uf.x[0,1], uf.x[0,-1]);
     foreach_face (y, serial)
       fprintf (stderr, "34) %g %g %g %g %g\n", x, y, uf.y[], uf.y[1], uf.y[-1]);    
+  }
+
+  /**
+  ## Local and global variables */
+
+  {
+    scalar v[]; // same name as the global vector field 'v' above
+    double vv = 2; // same name as the global double above
+    foreach() {
+      myfunc6 (point, v);
+      myfunc7 (point, v, vv);
+    }
   }
   
   /**
