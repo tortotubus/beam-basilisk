@@ -131,9 +131,13 @@ laplacian.tst: laplacian.ctst
 
 lidmac.c: lid.c
 	ln -sf lid.c lidmac.c
-lidmac.s: CFLAGS += -DMAC=1
-lidmac.tst: CFLAGS += -DMAC=1
+lidmac.s: CFLAGS += -DMAC=1 -grid=multigrid
+lidmac.s.d: CFLAGS += -DMAC=1 -grid=multigrid
+lidmac.tst: CFLAGS += -DMAC=1 -grid=multigrid
 
+lid.s: CFLAGS += -grid=multigrid
+lid.s.d: CFLAGS += -grid=multigrid
+lid.tst: CFLAGS += -grid=multigrid
 lid.tst: lidmac.tst
 
 lid-restore.c: lid.c

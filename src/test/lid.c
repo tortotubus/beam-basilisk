@@ -5,11 +5,10 @@ We use the multigrid implementation (rather than the default tree
 implementation) and either the MAC or the centered Navier--Stokes
 solver. */
 
-#include "grid/multigrid.h"
 #if MAC
-#  include "navier-stokes/mac.h"
+# include "navier-stokes/mac.h"
 #else
-#  include "navier-stokes/centered.h"
+# include "navier-stokes/centered.h"
 #endif
 
 /**
@@ -17,12 +16,12 @@ Here we define the domain geometry: a square box of size unity
 centered on (0,0). We also set the viscosity and some parameters 
 controlling the numerical scheme. */
 
-int main()
+int main (int argc, char * argv[])
 {
   // coordinates of lower-left corner
   origin (-0.5, -0.5);
   // number of grid points
-  init_grid (64);
+  init_grid (argc > 1 ? atoi (argv[1]) : 64);
   // viscosity
 #if MAC
   nu = 1e-3;
@@ -109,14 +108,16 @@ event logfile (t += 0.1; i <= 10000) {
   double du = change (u.x, un);
   if (i > 0 && du < 1e-5)
     return 1; /* stop */
-  fprintf (stderr, "%f %.9f %g\n", t, energy(), du);
+  fprintf (stderr, "%f %.4g %.3g\n", t, energy(), du);
 }
 
 /**
 Every 100 timesteps we output a binary representation of `u.x`
 bilinearly-interpolated on an N x N grid. */
 
+#if 0
 event outputfile (i += 100) output_matrix (u.x, stdout, N, linear = true);
+#endif
 
 /**
 We dump a snapshot which can be used to restart the simulation. */
