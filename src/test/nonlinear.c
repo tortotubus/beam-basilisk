@@ -199,11 +199,8 @@ event plots (t = end)
 
 __NV_PRIME_RENDER_OFFLOAD=1 __GLX_VENDOR_LIBRARY_NAME=nvidia ./nonlinear.gpu/nonlinear.gpu 1024 2> /dev/null
 
-# Multigrid (GPU), 20565 steps, 25.5064 CPU, 25.52 real, 8.45e+08 points.step/s, 14 var
-# Multigrid (GPU), 20585 steps, 26.8643 CPU, 26.88 real, 8.03e+08 points.step/s, 14 var
-
-# Multigrid (GPU), 20565 steps, 26.1821 CPU, 26.2 real, 8.23e+08 points.step/s, 14 var
-# Multigrid (GPU), 20585 steps, 27.8986 CPU, 27.91 real, 7.73e+08 points.step/s, 14 var
+# Multigrid (GPU), 20565 steps, 26.5547 CPU, 26.58 real, 8.11e+08 points.step/s, 14 var
+# Multigrid (GPU), 20585 steps, 28.3083 CPU, 28.32 real, 7.62e+08 points.step/s, 14 var
 
 On CPU:
 

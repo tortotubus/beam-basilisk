@@ -33,6 +33,7 @@ GLSL: error: too few components to construct `vec3'
 
 typedef struct {
   GLuint id;
+  External * externals;
 } Shader;
 
 KHASH_MAP_INIT_INT(INT, Shader *)
@@ -287,12 +288,21 @@ static External * append_external (External * externals, External ** end, Extern
   return externals;
 }
 
+static bool is_boundary_attribute (const External * g)
+{
+  return (!strcmp (g->name, ".boundary_left") ||
+	  !strcmp (g->name, ".boundary_right") ||
+	  !strcmp (g->name, ".boundary_bottom") ||
+	  !strcmp (g->name, ".boundary_top"));    
+}
+  
 static External * merge_external (External * externals, External ** end, External * g,
 				  const ForeachData * loop)
 {
-  if (!strcmp (g->type, "*func()") || !strcmp (g->type, "func()"))
+  if (!strcmp (g->type, "*func()") || !strcmp (g->type, "func()")) {
+    bool boundary = is_boundary_attribute (g);
     for (scalar s in baseblock)
-      if (g->name[0] != '.' || s.gpu.index) {
+      if (g->name[0] != '.' || (!boundary && s.gpu.index) || (boundary && s.output)) {
 	void * ptr = g->name[0] != '.' ? g->pointer :
 	  *((void **)(((char *) &_attribute[s.i]) + g->nd));
 	if (ptr) {
@@ -312,12 +322,17 @@ static External * merge_external (External * externals, External ** end, Externa
 	if (g->name[0] != '.')
 	    break;
       }
-
+  }
   for (External * i = externals; i; i = i->next)
     if (!strcmp (g->name, i->name)) {
+
+      /**
+      Check whether a local *g* (resp. *i*) shadows a global *i* (resp
+      *g*). */
+      
       if (g->global == 0 && i->global == 1) g->global = 2;
       else if (g->global == 1 && i->global == 0) i->global = 2;
-      else
+      else // already in the list
 	return externals;
     }
 
@@ -598,6 +613,7 @@ char * build_shader (External * externals, const ForeachData * loop,
   for (External * g = externals; g; g = g->next) {
     if (g->name[0] == '.') {
       if (!strcmp (g->type, "*func()")) {
+	bool boundary = is_boundary_attribute (g);
 	fs = str_append (fs, "#define _attr_", g->name + 1, "(s,args) (");
 	foreach_function (f, f->used = false);
 	char * expr = NULL;
@@ -607,7 +623,7 @@ char * build_shader (External * externals, const ForeachData * loop,
 	    void * func = *((void **)(data + g->nd));
 	    if (func) {
 	      External * f = _get_function ((long) func);
-	      if (!f->used) {
+	      if (!f->used && (!boundary || s.output)) {
 		f->used = true;
 		char * args = is_void_function (f->data) ? " args,0" : " args";
 		if (!expr)
@@ -1179,7 +1195,7 @@ static Shader * setup_shader (ForeachData * loop, const RegionParameters * regio
     }
 
   if (!(externals = merge_externals (externals, loop)))
-    return false;
+    return NULL;
   
   /**
   ## Number of compute shader work groups and groups */
@@ -1212,6 +1228,10 @@ static Shader * setup_shader (ForeachData * loop, const RegionParameters * regio
       scalar s = new scalar;
       s.output = 1;
       g->s = s;
+#if PRINTREDUCT
+      fprintf (stderr, "%s:%d: new reduction field %d for %s\n",
+	       loop->fname, loop->line, s.i, g->name);
+#endif
     }
 
   Shader * shader = compile_shader (loop, region, externals, kernel);
@@ -1227,7 +1247,7 @@ static Shader * setup_shader (ForeachData * loop, const RegionParameters * regio
 	delete ({s});
       }
       
-    return 0;
+    return NULL;
   }
   
   gpu_cpu_sync (baseblock, GL_MAP_WRITE_BIT, loop->fname, loop->line);
@@ -1371,7 +1391,8 @@ static Shader * setup_shader (ForeachData * loop, const RegionParameters * regio
       }
     }
   }
-  
+
+  shader->externals = externals;
   return shader;
 }
 
@@ -1382,7 +1403,8 @@ static bool doloop_on_gpu (ForeachData * loop, const RegionParameters * region,
   Shader * shader = setup_shader (loop, region, externals, kernel);
   if (!shader)
     return false;
-  
+  externals = shader->externals;
+
   /**
   ## Render 
 
@@ -1439,7 +1461,7 @@ static bool doloop_on_gpu (ForeachData * loop, const RegionParameters * region,
 				     Nl*(Nl + 1) :
 				     loop->face == 3 || loop->vertex ? sq(Nl + 1) - 1 :
 				     sq(Nl));
-#if 0
+#if PRINTREDUCT
       fprintf (stderr, "%s:%d: %s %c %g\n",
 	       loop->fname, loop->line, g->name, g->reduct, result);
 #endif
