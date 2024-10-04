@@ -246,18 +246,11 @@ Dedicated video memory: 4096 MB
 
 __NV_PRIME_RENDER_OFFLOAD=1 __GLX_VENDOR_LIBRARY_NAME=nvidia  ./reversed.gpu/reversed.gpu 10 2> /dev/null | grep -a steps
 
-# Multigrid (GPU), 963 steps, 0.233983 CPU, 0.2342 real, 4.21e+06 points.step/s, 13 var
-# Multigrid (GPU), 1880 steps, 0.549237 CPU, 0.5493 real, 1.4e+07 points.step/s, 13 var
-# Multigrid (GPU), 3720 steps, 1.10857 CPU, 1.109 real, 5.5e+07 points.step/s, 13 var
-# Multigrid (GPU), 7395 steps, 2.56945 CPU, 2.571 real, 1.89e+08 points.step/s, 13 var
-# Multigrid (GPU), 14735 steps, 10.4735 CPU, 10.48 real, 3.68e+08 points.step/s, 13 var
-# Multigrid (GPU), 29411 steps, 54.6774 CPU, 54.68 real, 5.64e+08 points.step/s, 13 var
-
-# Multigrid (GPU), 963 steps, 0.346136 CPU, 0.3462 real, 2.85e+06 points.step/s, 13 var
-# Multigrid (GPU), 1880 steps, 0.756411 CPU, 0.7565 real, 1.02e+07 points.step/s, 13 var
-# Multigrid (GPU), 3720 steps, 1.5037 CPU, 1.504 real, 4.05e+07 points.step/s, 13 var
-# Multigrid (GPU), 7395 steps, 3.35285 CPU, 3.358 real, 1.44e+08 points.step/s, 13 var
-# Multigrid (GPU), 14735 steps, 10.902 CPU, 10.91 real, 3.54e+08 points.step/s, 13 var
-# Multigrid (GPU), 29411 steps, 58.2433 CPU, 58.26 real, 5.29e+08 points.step/s, 13 var
+# Multigrid (GPU), 963 steps, 0.26271 CPU, 0.2628 real, 3.75e+06 points.step/s, 13 var
+# Multigrid (GPU), 1880 steps, 0.62065 CPU, 0.6206 real, 1.24e+07 points.step/s, 13 var
+# Multigrid (GPU), 3720 steps, 1.25402 CPU, 1.254 real, 4.86e+07 points.step/s, 13 var
+# Multigrid (GPU), 7395 steps, 2.87108 CPU, 2.871 real, 1.69e+08 points.step/s, 13 var
+# Multigrid (GPU), 14735 steps, 10.8199 CPU, 10.86 real, 3.56e+08 points.step/s, 13 var
+# Multigrid (GPU), 29411 steps, 58.2786 CPU, 58.29 real, 5.29e+08 points.step/s, 13 var
 ~~~
 */
