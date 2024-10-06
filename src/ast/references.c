@@ -129,7 +129,7 @@ char * add_reference (Ast * ref, char * references, Ast * scope, Stack * stack, 
 		    1, sym_declarator,
 		    0, sym_pointer)) {
       str_append (references, "{.name=\"", attributes ? "." : "", start,
-		  "\",.type=\"*func()\"");
+		  "\",.type=sym_function_declaration");
       if (attributes)
 	str_append (references, ",.nd=attroffset(", start, ")},");
       else
@@ -141,7 +141,7 @@ char * add_reference (Ast * ref, char * references, Ast * scope, Stack * stack, 
     
     else if (ast_ancestor (ref, 6)->sym == sym_function_definition) {
       str_append (references, "{.name=\"", attributes ? "." : "", start,
-		  "\",.type=\"func()\",.pointer=(void *)(long)", start, "},");
+		  "\",.type=sym_function_definition,.pointer=(void *)(long)", start, "},");
       if (!fast_stack_find (functions, ast_terminal (ref)->start))
 	stack_push (functions, &ref);
     }
@@ -165,18 +165,33 @@ char * add_reference (Ast * ref, char * references, Ast * scope, Stack * stack, 
 			 0, sym_declarator,
 			 0, sym_direct_declarator,
 			 0, sym_generic_identifier,
-			 0, sym_IDENTIFIER)))
+			 0, sym_IDENTIFIER))) {
     // typedef
-    str_append (references, ",.type=\"", ast_terminal (def)->start, "\"");
+    if (!strcmp (ast_terminal (def)->start, "scalar"))
+      str_append (references, ",.type=sym_SCALAR");
+    else if (!strcmp (ast_terminal (def)->start, "vector"))
+      str_append (references, ",.type=sym_VECTOR");
+    else if (!strcmp (ast_terminal (def)->start, "tensor"))
+      str_append (references, ",.type=sym_TENSOR");
+    else if (!strcmp (ast_terminal (def)->start, "coord"))
+      str_append (references, ",.type=sym_COORD");
+    else if (!strcmp (ast_terminal (def)->start, "_coord"))
+      str_append (references, ",.type=sym__COORD");
+    else if (!strcmp (ast_terminal (def)->start, "vec4"))
+      str_append (references, ",.type=sym_VEC4");
+    else if (!strcmp (ast_terminal (def)->start, "ivec"))
+      str_append (references, ",.type=sym_IVEC");
+    else if (!strcmp (ast_terminal (def)->start, "bool"))
+      str_append (references, ",.type=sym_BOOL");
+    else
+      str_append (references, ",.type=sym_TYPEDEF");
+  }
   else if (ref->parent->sym == sym_enumeration_constant)
-    str_append (references, ",.type=\"enum\"");
-  else switch (type->sym) {
-    case sym_INT: case sym_DOUBLE: case sym_FLOAT:
-      str_append (references, ",.type=\"", ast_terminal (type)->start, "\""); break;
-	
-    default:
-      str_append (references, ",.type=\"not implemented yet\""); break;
-    }
+    str_append (references, ",.type=sym_enumeration_constant");
+  else {
+    char s[20]; snprintf (s, 19, "%d", type->sym);
+    str_append (references, ",.type=", s);
+  }
 
   /**
   Is this a global variable? */

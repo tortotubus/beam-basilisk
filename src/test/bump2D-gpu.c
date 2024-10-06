@@ -51,15 +51,15 @@ Dedicated video memory: 4096 MB
 
 __NV_PRIME_RENDER_OFFLOAD=1 __GLX_VENDOR_LIBRARY_NAME=nvidia bump2D-gpu/bump2D-gpu 10
 
-# Cartesian (GPU), 3615 steps, 13.5135 CPU, 13.51 real, 2.81e+08 points.step/s, 28 var
+# Cartesian (GPU), 3615 steps, 13.3367 CPU, 13.34 real, 2.84e+08 points.step/s, 28 var
    calls    total     self   % total   function
-    7230     5.18     4.24     31.4%   foreach():/src/saint-venant.h:275
-    7230     2.62     2.56     19.0%   foreach():/src/utils.h:266
-    7230     2.54     2.47     18.2%   foreach():/src/saint-venant.h:321
-    7230     2.46     2.38     17.6%   foreach():/src/saint-venant.h:129
+    7230     5.12     4.23     31.7%   foreach():/src/saint-venant.h:275
+    7230     2.60     2.57     19.2%   foreach():/src/utils.h:266
+    7230     2.50     2.47     18.5%   foreach():/src/saint-venant.h:321
+    7230     2.41     2.38     17.8%   foreach():/src/saint-venant.h:129
     7230     0.69     0.69      5.1%   gpu_reduction():/src/saint-venant.h:207
-    7230    10.97     0.60      4.4%   update_saint_venant():/src/saint-venant.h:331
-   28923     0.45     0.28      2.1%   setup_shader():/src/grid/gpu/grid.h:1396
+    7230    10.84     0.59      4.4%   update_saint_venant():/src/saint-venant.h:331
+   28923     0.31     0.18      1.4%   setup_shader():/src/grid/gpu/grid.h:1403
 
 glxinfo -B
 ...

@@ -108,24 +108,24 @@ Device: Mesa Intel(R) UHD Graphics (TGL GT1) (0x9a60)
 ...
 Video memory: 3072MB
 
-./advection.gpu/advection.gpu 2048 2> /dev/null | grep steps
+./advection.gpu/advection.gpu 1024 2> /dev/null | grep steps
 
-# Multigrid (GPU), 412 steps, 0.064315 CPU, 0.1119 real, 1.51e+07 points.step/s, 8 var
-# Multigrid (GPU), 796 steps, 0.086363 CPU, 0.258 real, 5.05e+07 points.step/s, 8 var
-# Multigrid (GPU), 1566 steps, 0.218996 CPU, 0.9957 real, 1.03e+08 points.step/s, 8 var
-# Multigrid (GPU), 3100 steps, 1.24108 CPU, 6.538 real, 1.24e+08 points.step/s, 8 var
-# Multigrid (GPU), 6163 steps, 4.01258 CPU, 43.59 real, 1.48e+08 points.step/s, 8 var
+# Multigrid (GPU), 412 steps, 0.05744 CPU, 0.1066 real, 1.58e+07 points.step/s, 8 var
+# Multigrid (GPU), 796 steps, 0.071283 CPU, 0.2083 real, 6.26e+07 points.step/s, 8 var
+# Multigrid (GPU), 1566 steps, 0.193343 CPU, 0.9687 real, 1.06e+08 points.step/s, 8 var
+# Multigrid (GPU), 3100 steps, 0.881404 CPU, 6.278 real, 1.29e+08 points.step/s, 8 var
+# Multigrid (GPU), 6163 steps, 3.45753 CPU, 43.12 real, 1.5e+08 points.step/s, 8 var
 
 OpenGL renderer string: NVIDIA GeForce RTX 3050 Ti Laptop GPU/PCIe/SSE2
 Dedicated video memory: 4096 MB
 
 __NV_PRIME_RENDER_OFFLOAD=1 __GLX_VENDOR_LIBRARY_NAME=nvidia ./advection.gpu/advection.gpu 2048 2> /dev/null | grep steps
 
-# Multigrid (GPU), 412 steps, 0.058513 CPU, 0.05867 real, 2.88e+07 points.step/s, 8 var
-# Multigrid (GPU), 796 steps, 0.108939 CPU, 0.109 real, 1.2e+08 points.step/s, 8 var
-# Multigrid (GPU), 1566 steps, 0.27631 CPU, 0.2764 real, 3.71e+08 points.step/s, 8 var
-# Multigrid (GPU), 3100 steps, 0.8745 CPU, 0.8758 real, 9.28e+08 points.step/s, 8 var
-# Multigrid (GPU), 6163 steps, 4.78215 CPU, 4.785 real, 1.35e+09 points.step/s, 8 var
-# Multigrid (GPU), 12282 steps, 34.6086 CPU, 34.65 real, 1.49e+09 points.step/s, 8 var
+# Multigrid (GPU), 412 steps, 0.050899 CPU, 0.05093 real, 3.31e+07 points.step/s, 8 var
+# Multigrid (GPU), 796 steps, 0.093955 CPU, 0.09396 real, 1.39e+08 points.step/s, 8 var
+# Multigrid (GPU), 1566 steps, 0.242224 CPU, 0.2424 real, 4.23e+08 points.step/s, 8 var
+# Multigrid (GPU), 3100 steps, 0.820219 CPU, 0.8202 real, 9.91e+08 points.step/s, 8 var
+# Multigrid (GPU), 6163 steps, 4.69821 CPU, 4.7 real, 1.38e+09 points.step/s, 8 var
+# Multigrid (GPU), 12282 steps, 34.4176 CPU, 34.43 real, 1.5e+09 points.step/s, 8 var
 ~~~
 */

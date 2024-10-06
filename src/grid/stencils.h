@@ -28,8 +28,8 @@ typedef struct _External External;
 
 struct _External {
   char * name;    // the name of the variable
-  char * type;    // the type of the variable
   void * pointer; // a pointer to the data
+  int type;       // the type of the variable
   int nd;         // the number of pointer dereferences or attribute offset or enum constant
   char reduct;    // the reduction operation
   char global;    // is it a global variable?

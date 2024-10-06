@@ -604,3 +604,15 @@ FILE * lfopen (const char * name, const char * mode)
   sprintf (fname, "%s-%d", name, pid());
   return fopen (fname, mode);
 }
+
+#include "../ast/symbols.h"
+
+enum typedef_kind_t {
+  sym_SCALAR = sym_root + 1,
+  sym_VECTOR,
+  sym_TENSOR,
+  sym_COORD,
+  sym__COORD,
+  sym_VEC4,
+  sym_IVEC
+};
