@@ -106,8 +106,12 @@ static void register_function (void (* ptr) (void), const char * name,
   }
   int ret;
   khiter_t k = kh_put(PTR, _functions, (long) ptr, &ret);
-  External p = { .name = (char *) name, .type = "func()", .pointer = (void *)(long) ptr, .nd = index++,
-    .data = (void *) kernel, .externals = copy };
+  External p = {
+    .name = (char *) name,
+    .type = sym_function_definition,
+    .pointer = (void *)(long) ptr, .nd = index++,
+    .data = (void *) kernel, .externals = copy
+  };
   kh_value(_functions, k) = p;
 }
 

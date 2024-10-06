@@ -153,17 +153,17 @@ static char glsl_preproc[] =
 static inline int list_size (const External * i)
 {
   int size = 0;
-  if (!strcmp (i->type, "scalar")) {
+  if (i->type == sym_SCALAR) {
     size = 1;
     if (i->nd == 1)
       for (scalar s in i->pointer) size++;
   }
-  else if (!strcmp (i->type, "vector")) {
+  else if (i->type == sym_VECTOR) {
     size = 1;
     if (i->nd == 1)
       for (vector v in i->pointer) size++;
   }
-  else if (!strcmp (i->type, "tensor")) {
+  else if (i->type == sym_TENSOR) {
     size = 1;
     if (i->nd == 1)
       for (tensor t in i->pointer) size++;
@@ -295,11 +295,11 @@ static bool is_boundary_attribute (const External * g)
 	  !strcmp (g->name, ".boundary_bottom") ||
 	  !strcmp (g->name, ".boundary_top"));    
 }
-  
+
 static External * merge_external (External * externals, External ** end, External * g,
 				  const ForeachData * loop)
 {
-  if (!strcmp (g->type, "*func()") || !strcmp (g->type, "func()")) {
+  if (g->type == sym_function_declaration || g->type == sym_function_definition) {
     bool boundary = is_boundary_attribute (g);
     for (scalar s in baseblock)
       if (g->name[0] != '.' || (!boundary && s.gpu.index) || (boundary && s.output)) {
@@ -343,13 +343,13 @@ static External * merge_externals (External * externals, const ForeachData * loo
 {
   External * merged = NULL, * end = NULL;
   static External ext[] = {
-    { .name = "X0", .type = "double", .pointer = &X0, .global = 1 },
-    { .name = "Y0", .type = "double", .pointer = &Y0, .global = 1  },
-    { .name = "Z0", .type = "double", .pointer = &Z0, .global = 1  },
-    { .name = "L0", .type = "double", .pointer = &L0, .global = 1  },
-    { .name = "N",  .type = "int",    .pointer = &N, .global = 1  },
-    { .name = "apply_bc_list", .type="scalar", .nd = 1, .global = 1 },
-    { .name = "apply_bc",      .type = "func()", .pointer = (void *)(long)apply_bc},
+    { .name = "X0", .type = sym_DOUBLE, .pointer = &X0, .global = 1 },
+    { .name = "Y0", .type = sym_DOUBLE, .pointer = &Y0, .global = 1  },
+    { .name = "Z0", .type = sym_DOUBLE, .pointer = &Z0, .global = 1  },
+    { .name = "L0", .type = sym_DOUBLE, .pointer = &L0, .global = 1  },
+    { .name = "N",  .type = sym_INT,    .pointer = &N, .global = 1  },
+    { .name = "apply_bc_list", .type = sym_SCALAR, .nd = 1, .global = 1 },
+    { .name = "apply_bc",      .type = sym_function_definition, .pointer = (void *)(long)apply_bc},
     { .name = NULL }
   };
 
@@ -372,7 +372,7 @@ static External * merge_externals (External * externals, const ForeachData * loo
   }
 #if LAYERS
   assert (nl == 1); // fixme: not implemented yet for more than one layer
-  static External enl =  { .name = "nl",  .type = "int", .pointer = &nl };
+  static External enl =  { .name = "nl",  .type = sym_INT, .pointer = &nl };
   merged = merge_external (merged, &end, &enl, loop);
 #endif
   for (External * g = externals; g->name; g++)
@@ -456,26 +456,26 @@ uint32_t hash_shader (const External * externals, const ForeachData * loop,
   a32_hash_add (&hash, &nconst, sizeof (nconst));
   a32_hash_add (&hash, _constant, sizeof (*_constant)*nconst);
   for (const External * g = externals; g; g = g->next) {
-    if (!strcmp (g->name, "nl") && !strcmp (g->type, "int"))
+    if (g->type == sym_INT && !strcmp (g->name, "nl"))
       a32_hash_add (&hash, g->pointer, sizeof (int));
-    else if (!strcmp (g->type, "scalar") ||
-	     !strcmp (g->type, "vector") ||
-	     !strcmp (g->type, "tensor")) {
+    else if (g->type == sym_SCALAR ||
+	     g->type == sym_VECTOR ||
+	     g->type == sym_TENSOR) {
       // scalar, vector and tensor fields
       int size = list_size (g);
       a32_hash_add (&hash, &size, sizeof (size));
       for (int j = 0; j < size; j++)
 	if (g->nd == 0 || j < size - 1) {
-	  if (!strcmp (g->type, "scalar")) {
+	  if (g->type == sym_SCALAR) {
 	    scalar s = ((scalar *)g->pointer)[j];
 	    a32_hash_add (&hash, &s.i, sizeof (s.i));
 	  }
-	  else if (!strcmp (g->type, "vector")) {
+	  else if (g->type == sym_VECTOR) {
 	    vector v = ((vector *)g->pointer)[j];
 	    for (scalar s in {v})
 	      a32_hash_add (&hash, &s.i, sizeof (s.i));
 	  }
-	  else if (!strcmp (g->type, "tensor")) {
+	  else if (g->type == sym_TENSOR) {
 	    tensor t = ((tensor *)g->pointer)[j];
 	    for (scalar s in {t})
 	      a32_hash_add (&hash, &s.i, sizeof (s.i));
@@ -496,6 +496,28 @@ bool is_void_function (char * code)
   while (*code != '\n') code++; code++;
   while (strchr ("\n\r\t ", *code)) code++;
   return !strncmp (code, "void ", 5);
+}
+
+static char * type_string (const External * g)
+{
+  switch (g->type) {
+  case sym_DOUBLE:
+#if !SINGLE_PRECISION
+    return "double"; break;
+#endif
+  case sym_FLOAT: return "float";
+  case sym_function_declaration: case sym_enumeration_constant: case sym_INT:
+    return "int";
+  case sym_BOOL: return "bool";
+  case sym_SCALAR: return "scalar";
+  case sym_VECTOR: return "vector";
+  case sym_TENSOR: return "tensor";
+  case sym_COORD:  return "coord";
+  case sym__COORD: return "_coord";
+  case sym_VEC4:   return "vec4";
+  case sym_IVEC:   return "ivec";
+  }
+  return "unknown_type";
 }
 
 #define EXTERNAL_NAME(g) (g)->global == 2 ? "_loc_" : "", (g)->name, (g)->reduct ? "_in_" : ""
@@ -530,12 +552,7 @@ char * build_shader (External * externals, const ForeachData * loop,
   char * attributes = NULL;
   for (const External * g = externals; g; g = g->next)
     if (g->name[0] == '.') {
-      char * type =
-#if SINGLE_PRECISION
-	!strcmp (g->type, "double") ? "float" :
-#endif
-	!strcmp (g->type, "*func()") ? "int" : g->type;
-      attributes = str_append (attributes, "  ", type, " ", g->name + 1);
+      attributes = str_append (attributes, "  ", type_string (g), " ", g->name + 1);
       for (int * d = g->data; d && *d > 0; d++) {
 	char s[20]; snprintf (s, 19, "%d", *d);
 	attributes = str_append (attributes, "[", s, "]");
@@ -563,26 +580,26 @@ char * build_shader (External * externals, const ForeachData * loop,
 	  if (g->name[0] == '.') {
 	    if (!first) fs = str_append (fs, ",");
 	    first = false;
-	    if (!strcmp (g->type, "int")) {
+	    if (g->type == sym_INT) {
 	      char s[20]; snprintf (s, 19, "%d", *((int *)(data + g->nd)));
 	      fs = str_append (fs, s);
 	    }
-	    else if (!strcmp (g->type, "bool"))
+	    else if (g->type == sym_BOOL)
 	      fs = str_append (fs, *((bool *)(data + g->nd)) ? "true" : "false");
-	    else if (!strcmp (g->type, "float")) {
+	    else if (g->type == sym_FLOAT) {
 	      char s[20]; snprintf (s, 19, "%g", *((float *)(data + g->nd)));
 	      fs = str_append (fs, s);
 	    }
-	    else if (!strcmp (g->type, "double")) {
+	    else if (g->type == sym_DOUBLE) {
 	      char s[20]; snprintf (s, 19, "%g", *((double *)(data + g->nd)));
 	      fs = str_append (fs, s);
 	    }
-	    else if (!strcmp (g->type, "ivec")) {
+	    else if (g->type == sym_IVEC) {
 	      ivec * v = (ivec *)(data + g->nd);
 	      char s[20]; snprintf (s, 19, "{%d,%d}", v->x, v->y);
 	      fs = str_append (fs, s);
 	    }
-	    else if (!strcmp (g->type, "*func()")) {
+	    else if (g->type == sym_function_declaration) {
 	      void * func = *((void **)(data + g->nd));
 	      if (!func)
 		fs = str_append (fs, "0");
@@ -592,11 +609,11 @@ char * build_shader (External * externals, const ForeachData * loop,
 		fs = str_append (fs, s);
 	      }
 	    }
-	    else if (!strcmp (g->type, "scalar"))
+	    else if (g->type == sym_SCALAR)
 	      fs = write_scalar (fs, *((scalar *)(data + g->nd)));
-	    else if (!strcmp (g->type, "vector"))
+	    else if (g->type == sym_VECTOR)
 	      fs = write_vector (fs, *((vector *)(data + g->nd)));
-	    else if (!strcmp (g->type, "tensor"))
+	    else if (g->type == sym_TENSOR)
 	      fs = write_tensor (fs, *((tensor *)(data + g->nd)));
 	    else
 	      fs = str_append (fs, "not implemented");
@@ -612,7 +629,7 @@ char * build_shader (External * externals, const ForeachData * loop,
   int location = 3; // 0,1 and 2 are reserved for csOrigin, vsOrigin and vsScale
   for (External * g = externals; g; g = g->next) {
     if (g->name[0] == '.') {
-      if (!strcmp (g->type, "*func()")) {
+      if (g->type == sym_function_declaration) {
 	bool boundary = is_boundary_attribute (g);
 	fs = str_append (fs, "#define _attr_", g->name + 1, "(s,args) (");
 	foreach_function (f, f->used = false);
@@ -647,22 +664,22 @@ char * build_shader (External * externals, const ForeachData * loop,
 	  fs = str_append (fs, "0)\n");
       }
     }
-    else if (!strcmp (g->type, "func()")) {
+    else if (g->type == sym_function_definition) {
       External * f = _get_function ((long) g->pointer);
       fs = str_append (fs, "\n", f->data, "\n");
       char s[20]; snprintf (s, 19, "%d", f->nd);
       fs = str_append (fs, "const int _p", g->name, " = ", s, ";\n");
     }
-    else if (!strcmp (g->type, "*func()")) {
+    else if (g->type == sym_function_declaration) {
       External * f = _get_function ((long) g->pointer);
       char s[20]; snprintf (s, 19, "%d", f->nd);
       fs = str_append (fs, "const int ", g->name, " = ", s, ";\n",
 		       "#define _f", g->name, "(args) (", f->name, " args)\n");
     }
-    else if (strcmp (g->type, "scalar") &&
-	     strcmp (g->type, "vector") &&
-	     strcmp (g->type, "tensor")) {
-      if (!strcmp (g->name, "N") && !strcmp (g->type, "int")) {
+    else if (g->type != sym_SCALAR &&
+	     g->type != sym_VECTOR &&
+	     g->type != sym_TENSOR) {
+      if (g->type == sym_INT && !strcmp (g->name, "N")) {
 	int level = region->level > 0 ? region->level - 1 : depth();
 	char s[20], d[20], l[20], size[30];
 	snprintf (s, 19, "%d", Nl);
@@ -691,7 +708,7 @@ char * build_shader (External * externals, const ForeachData * loop,
 			   ", local_size_y = ", nwgy, ") in;\n");
 	}
       }
-      else if (!strcmp (g->name, "nl") && !strcmp (g->type, "int")) {
+      else if (g->type == sym_INT && !strcmp (g->name, "nl")) {
 
 	/**
 	'int nl' gets special treatment. */
@@ -700,12 +717,12 @@ char * build_shader (External * externals, const ForeachData * loop,
 	snprintf (nl, 19, "%d", *((int *)g->pointer));
 	fs = str_append (fs, "const int nl = ", nl, ";\n");
       }
-      else if (!strcmp (g->name, "bc_period_x") && !strcmp (g->type, "int"))
+      else if (g->type == sym_INT && !strcmp (g->name, "bc_period_x"))
 	fs = str_append (fs, "const int bc_period_x = ", Period.x ? "int(N)" : "-1", ";\n");
-      else if (!strcmp (g->name, "bc_period_y") && !strcmp (g->type, "int"))
+      else if (g->type == sym_INT && !strcmp (g->name, "bc_period_y"))
 	fs = str_append (fs, "const int bc_period_y = ", Period.y ? "int(N)" : "-1", ";\n");
       else if (GPUContext.fragment_shader && (region->n.x > 1 || region->n.y > 1) &&
-	       !strcmp (g->type, "coord") && !strcmp (g->name, "p")) {
+	       g->type == sym_COORD && !strcmp (g->name, "p")) {
 
 	/**
 	'coord p' is assumed to be the parameter of a region. This is
@@ -714,11 +731,7 @@ char * build_shader (External * externals, const ForeachData * loop,
 	fs = str_append (fs, "coord p = vec3((vsPoint*vsScale + vsOrigin)*L0 + vec2(X0, Y0),0);\n");
       }
       else {
-	char * type =
-#if SINGLE_PRECISION
-	  !strcmp (g->type, "double") ? "float" :
-#endif
-	  !strcmp (g->type, "enum") ? "int" : g->type;
+	char * type = type_string (g);
 	char loc[20];
 	snprintf (loc, 19, "%d", location);
 	fs = str_append (fs, "layout (location = ", loc, ") uniform ",
@@ -744,7 +757,7 @@ char * build_shader (External * externals, const ForeachData * loop,
       int size = list_size (g);
       for (int j = 0; j < size; j++) {
 	if (j == 0) {
-	  fs = str_append (fs, "const ", g->type, " ", EXTERNAL_NAME (g));
+	  fs = str_append (fs, "const ", type_string (g), " ", EXTERNAL_NAME (g));
 	  if (g->nd == 0)
 	    fs = str_append (fs, " = ");
 	  else {
@@ -753,21 +766,21 @@ char * build_shader (External * externals, const ForeachData * loop,
 	  }
 	}
 	if (g->nd == 0 || j < size - 1) {
-	  if (!strcmp (g->type, "scalar"))
+	  if (g->type == sym_SCALAR)
 	    fs = write_scalar (fs, ((scalar *)g->pointer)[j]);
-	  else if (!strcmp (g->type, "vector"))
+	  else if (g->type == sym_VECTOR)
 	    fs = write_vector (fs, ((vector *)g->pointer)[j]);
-	  else if (!strcmp (g->type, "tensor"))
+	  else if (g->type == sym_TENSOR)
 	    fs = write_tensor (fs, ((tensor *)g->pointer)[j]);
 	  else
 	    assert (false);
 	}
 	else { // last element of a list is always ignored (this is necessary for empty lists)
-	  if (!strcmp (g->type, "scalar"))
+	  if (g->type == sym_SCALAR)
 	    fs = str_append (fs, "{0,0}");
-	  else if (!strcmp (g->type, "vector"))
+	  else if (g->type == sym_VECTOR)
 	    fs = str_append (fs, "{{0,0},{0,0}}");
-	  else if (!strcmp (g->type, "tensor"))
+	  else if (g->type == sym_TENSOR)
 	    fs = str_append (fs, "{{{0,0},{0,0}},{{0,0},{0,0}}}");
 	  else
 	    assert (false);
@@ -1060,7 +1073,7 @@ static Shader * compile_shader (ForeachData * loop, const RegionParameters * reg
   for (const External * g = externals; g; g = g->next) {
     if (g->global == 2)
       local = true;
-    if (strcmp(g->type, "scalar") && strcmp(g->type, "vector") && strcmp(g->type, "tensor")) {
+    if (g->type != sym_SCALAR && g->type != sym_VECTOR && g->type != sym_TENSOR) {
       if (g->reduct && !strchr ("+mM", g->reduct)) {
 	if (loop->first)
 	  fprintf (stderr,
@@ -1068,25 +1081,25 @@ static Shader * compile_shader (ForeachData * loop, const RegionParameters * reg
 		   loop->fname, loop->line, g->reduct);
 	return NULL;
       }
-      if (!strcmp(g->type, "coord") || !strcmp(g->type, "_coord") || !strcmp(g->type, "vec4")) {
+      if (g->type == sym_COORD || g->type == sym__COORD || g->type == sym_VEC4) {
 	if (g->reduct) {
 	  if (loop->first)
 	    fprintf (stderr,
 		     "%s:%d: GLSL: error: reductions not implemented for '%s' type\n",
-		     loop->fname, loop->line, g->type);
+		     loop->fname, loop->line, type_string (g));
 	  return NULL;	
 	}
       }
-      else if (strcmp (g->type, "float") &&
-	       strcmp (g->type, "double") &&
-	       strcmp (g->type, "int") &&
-	       strcmp (g->type, "bool") &&
-	       strcmp (g->type, "enum") &&
-	       strcmp (g->type, "ivec") &&
-	       strcmp (g->type, "*func()") &&
-	       strcmp (g->type, "func()")) {
+      else if (g->type != sym_FLOAT &&
+	       g->type != sym_DOUBLE &&
+	       g->type != sym_INT &&
+	       g->type != sym_BOOL &&
+	       g->type != sym_enumeration_constant &&
+	       g->type != sym_IVEC &&
+	       g->type != sym_function_declaration &&
+	       g->type != sym_function_definition) {
 	if (loop->first)
-	  fprintf (stderr, "%s:%d: GLSL: error: unknown type '%s' for '%s'\n",
+	  fprintf (stderr, "%s:%d: GLSL: error: unknown type %d for '%s'\n",
 		   loop->fname, loop->line, g->type, g->name);
 	return NULL;
       }
@@ -1104,13 +1117,7 @@ static Shader * compile_shader (ForeachData * loop, const RegionParameters * reg
     shader = str_append (shader, "void _loop (");
     for (const External * g = externals; g; g = g->next)
       if (g->global == 2) {
-	shader = str_append (shader, local++ == 1 ? "" : ", ",
-#if SINGLE_PRECISION
-			     !strcmp (g->type, "double") ? "float" : g->type,
-#else
-			     g->type,
-#endif
-			     " ", g->name);
+	shader = str_append (shader, local++ == 1 ? "" : ", ", type_string (g), " ", g->name);
 	if (g->nd) {
 	  int size = list_size (g);
 	  if (size > 0) {
@@ -1261,18 +1268,18 @@ static Shader * setup_shader (ForeachData * loop, const RegionParameters * regio
 
   for (const External * g = externals; g; g = g->next) {
     if (g->name[0] == '.') continue;
-    if (!strcmp (g->type, "*func()") || !strcmp (g->type, "func()")) continue;
-    if (!strcmp (g->type, "int") && (!strcmp (g->name, "N") ||
-				     !strcmp (g->name, "nl") ||
-				     !strcmp (g->name, "bc_period_x") ||
-				     !strcmp (g->name, "bc_period_y")))
+    if (g->type == sym_function_declaration || g->type == sym_function_definition) continue;
+    if (g->type == sym_INT && (!strcmp (g->name, "N") ||
+			       !strcmp (g->name, "nl") ||
+			       !strcmp (g->name, "bc_period_x") ||
+			       !strcmp (g->name, "bc_period_y")))
       continue;
-    if (!strcmp (g->type, "int") ||
-	!strcmp (g->type, "float") ||
+    if (g->type == sym_INT ||
+	g->type == sym_FLOAT ||
 #if !SINGLE_PRECISION
-	!strcmp (g->type, "double") ||
+	g->type == sym_DOUBLE ||
 #endif
-	!strcmp (g->type, "vec4")) {
+	g->type == sym_VEC4) {
       // not an array or just a one-dimensional array
       assert (!g->data || ((int *)g->data)[1] == 0);
       GLint location;
@@ -1285,28 +1292,28 @@ static Shader * setup_shader (ForeachData * loop, const RegionParameters * regio
 	  strcat (name, "_in_");
 	location = glGetUniformLocation (shader->id, name);
       }
-      if (!strcmp (g->type, "int")) {
+      if (g->type == sym_INT) {
 #if PRINTUNIFORM
 	int * p = g->pointer;
 	fprintf (stderr, "uniform int %s = %d\n", g->name, *p);
 #endif
 	glUniform1iv (location, g->data ? ((int *)g->data)[0] : 1, g->pointer);
       }
-      else if (!strcmp (g->type, "float")) {
+      else if (g->type == sym_FLOAT) {
 #if PRINTUNIFORM
 	float * p = g->pointer;
 	fprintf (stderr, "uniform float %s = %g\n", g->name, *p);
 #endif
 	glUniform1fv (location, g->data ? ((int *)g->data)[0] : 1, g->pointer);
       }
-      else if (!strcmp (g->type, "double")) {
+      else if (g->type == sym_DOUBLE) {
 #if PRINTUNIFORM
 	double * p = g->pointer;
 	fprintf (stderr, "uniform double %s = %g\n", g->name, *p);
 #endif
 	glUniform1dv (location, g->data ? ((int *)g->data)[0] : 1, g->pointer);
       }
-      else if (!strcmp (g->type, "vec4")) {
+      else if (g->type == sym_VEC4) {
 #if PRINTUNIFORM
 	float * p = g->pointer;
 	fprintf (stderr, "uniform vec4 %s = {%g,%g,%g,%g}\n", g->name, p[0], p[1], p[2], p[3]);
@@ -1314,9 +1321,9 @@ static Shader * setup_shader (ForeachData * loop, const RegionParameters * regio
 	glUniform4fv (location, g->data ? ((int *)g->data)[0] : 1, g->pointer);
       }
     }
-    else if (strcmp(g->type, "scalar") &&
-	     strcmp(g->type, "vector") &&
-	     strcmp(g->type, "tensor")) {
+    else if (g->type != sym_SCALAR &&
+	     g->type != sym_VECTOR &&
+	     g->type != sym_TENSOR) {
       void * p = g->pointer;
       // not an array or just a one-dimensional array
       assert (!g->data || ((int *)g->data)[1] == 0);
@@ -1337,7 +1344,7 @@ static Shader * setup_shader (ForeachData * loop, const RegionParameters * regio
 	  }
 	  location = glGetUniformLocation (shader->id, name);
 	}
-	if (!strcmp (g->type, "enum")) {
+	if (g->type == sym_enumeration_constant) {
 #if PRINTUNIFORM
 	  fprintf (stderr, "uniform enum %s = %d\n", g->name, g->nd);
 #endif
@@ -1345,20 +1352,20 @@ static Shader * setup_shader (ForeachData * loop, const RegionParameters * regio
 	  glUniform1i (location, g->nd);
 	}
 	else if (g->nd == 0) {
-	  if (!strcmp (g->type, "double")) {
+	  if (g->type == sym_DOUBLE) {
 #if PRINTUNIFORM
 	    fprintf (stderr, "uniform double %s = %g\n", g->name, *((double *)p));
 #endif
 	    glUniform1f (location, *((double *)p)); p = ((double *)p) + 1;
 	  }
-	  else if (!strcmp (g->type, "bool")) {
+	  else if (g->type == sym_BOOL) {
 #if PRINTUNIFORM
 	    bool * p = g->pointer;
 	    fprintf (stderr, "uniform bool %s = %d\n", g->name, *p);
 #endif
 	    glUniform1i (location, *((bool *)p)); p = ((bool *)p) + 1;
 	  }
-	  else if (!strcmp (g->type, "coord")) {
+	  else if (g->type == sym_COORD) {
 #if PRINTUNIFORM
 	    fprintf (stderr, "uniform coord %s = {%g,%g,%g}\n", g->name,
 		     ((double *)p)[0], ((double *)p)[1], ((double *)p)[2]);
@@ -1370,7 +1377,7 @@ static Shader * setup_shader (ForeachData * loop, const RegionParameters * regio
 #endif
 	    p = ((double *)p) + 3;
 	  }
-	  else if (!strcmp(g->type, "_coord")) {
+	  else if (g->type == sym__COORD) {
 #if PRINTUNIFORM
 	    fprintf (stderr, "uniform _coord %s = {%g,%g}\n", g->name,
 		     ((double *)p)[0], ((double *)p)[1]);
@@ -1382,7 +1389,7 @@ static Shader * setup_shader (ForeachData * loop, const RegionParameters * regio
 #endif
 	  }
 	  else {
-	    fprintf (stderr, "type: %s name: %s\n", g->type, g->name);
+	    fprintf (stderr, "type: %d name: %s\n", g->type, g->name);
 	    assert (false);
 	  }
 	}
@@ -1465,9 +1472,9 @@ static bool doloop_on_gpu (ForeachData * loop, const RegionParameters * region,
       fprintf (stderr, "%s:%d: %s %c %g\n",
 	       loop->fname, loop->line, g->name, g->reduct, result);
 #endif
-      if (!strcmp (g->type, "double")) *((double *)g->pointer) = result;
-      else if (!strcmp (g->type, "float")) *((float *)g->pointer) = result;
-      else if (!strcmp (g->type, "int")) *((int *)g->pointer) = result;
+      if (g->type == sym_DOUBLE) *((double *)g->pointer) = result;
+      else if (g->type == sym_FLOAT) *((float *)g->pointer) = result;
+      else if (g->type == sym_INT) *((int *)g->pointer) = result;
       else
 	assert (false);
       delete ({s});
