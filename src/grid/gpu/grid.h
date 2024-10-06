@@ -1169,13 +1169,6 @@ static Shader * compile_shader (ForeachData * loop, const RegionParameters * reg
     shader = str_append (shader, ");}\n");
   }
     
-  /**
-  For the Intel driver, it looks like this is necessary so that the
-  compiled shader is independent from the exact location of the
-  storage buffer. */
-  
-  GL_C (glBindBufferBase (GL_SHADER_STORAGE_BUFFER, 0, 0));
-    
   Shader * s = load_shader (shader, hash, loop);
   loop->data = s;
   return s;
@@ -1259,8 +1252,14 @@ static Shader * setup_shader (ForeachData * loop, const RegionParameters * regio
   
   gpu_cpu_sync (baseblock, GL_MAP_WRITE_BIT, loop->fname, loop->line);
 
+  /**
+  For the Intel driver, it looks like the next line is necessary to
+  ensure proper synchronisation of the compute shader and fragment
+  shader (for example when using output_ppm() for interactive
+  display). The nvidia driver somehow does not need this... */
+    
+  GL_C (glBindBufferBase (GL_SHADER_STORAGE_BUFFER, 0, 0));
   GL_C (glUseProgram (shader->id));
-
   GL_C (glBindBufferBase (GL_SHADER_STORAGE_BUFFER, 0, GPUContext.ssbo));
 
   /**
