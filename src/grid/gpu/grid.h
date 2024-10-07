@@ -209,7 +209,7 @@ static void boundary_top (Point point, int i)
 {
   bool data = false;
   for (scalar s in apply_bc_list)
-    if (s.face == 0 || s.i != s.v.y.i) {
+    if (!s.face || s.i != s.v.y.i) {
       scalar b = (s.v.x.i < 0 ? s : s.i == s.v.y.i ? s.v.x : s.v.y);
       s[i,-bc_period_y] = b.boundary_top (neighborp(i), neighborp(i,-bc_period_y), s, &data);
     }
@@ -219,7 +219,7 @@ static void boundary_bottom (Point point, int i)
 {
   bool data = false;
   for (scalar s in apply_bc_list)
-    if (s.face == 0 || s.i != s.v.y.i) {
+    if (!s.face || s.i != s.v.y.i) {
       scalar b = (s.v.x.i < 0 ? s : s.i == s.v.y.i ? s.v.x : s.v.y);
       s[i,bc_period_y] = b.boundary_bottom (neighborp(i), neighborp(i,bc_period_y), s, &data);
     }
@@ -232,30 +232,30 @@ void apply_bc (Point point)
   // face BCs
   if (point.i == GHOSTS)
     for (scalar s in apply_bc_list)
-      if (s.face != 0 && s.i == s.v.x.i && s.boundary_left != 0)
+      if (s.face && s.i == s.v.x.i && s.boundary_left)
 	s[] = s.boundary_left (point, neighborp(bc_period_x), s, &data);
   if (point.i == N + GHOSTS)
     for (scalar s in apply_bc_list)
-      if (s.face != 0 && s.i == s.v.x.i && s.boundary_right != 0)
+      if (s.face && s.i == s.v.x.i && s.boundary_right)
 	s[] = s.boundary_right (neighborp(bc_period_x), point, s, &data);
   if (point.j == GHOSTS)
     for (scalar s in apply_bc_list)
-      if (s.face != 0 && s.i == s.v.y.i) {
+      if (s.face && s.i == s.v.y.i) {
 	scalar b = s.v.x;
-	if (b.boundary_bottom != 0)
+	if (b.boundary_bottom)
 	  s[] = b.boundary_bottom (point, neighborp(0,bc_period_y), s, &data);
       }
   if (point.j == N + GHOSTS)
     for (scalar s in apply_bc_list)
-      if (s.face != 0 && s.i == s.v.y.i) {
+      if (s.face && s.i == s.v.y.i) {
 	scalar b = s.v.x;
-	if (b.boundary_top != 0)
+	if (b.boundary_top)
 	  s[] = b.boundary_top (neighborp(0,bc_period_y), point, s, &data);
       }
   // centered BCs
   if (point.i == GHOSTS) { // left
     for (scalar s in apply_bc_list)
-      if (s.face == 0 || s.i != s.v.x.i)
+      if (!s.face || s.i != s.v.x.i)
 	s[bc_period_x] = s.boundary_left (point, neighborp(bc_period_x), s, &data);
     if (point.j == GHOSTS)
       boundary_bottom (point, bc_period_x); // bottom-left
@@ -264,7 +264,7 @@ void apply_bc (Point point)
   }
   if (point.i == N + GHOSTS - 1) { // right
     for (scalar s in apply_bc_list)
-      if (s.face == 0 || s.i != s.v.x.i)
+      if (!s.face || s.i != s.v.x.i)
 	s[- bc_period_x] = s.boundary_right (point, neighborp(- bc_period_x), s, &data);
     if (point.j == GHOSTS)
       boundary_bottom (point, - bc_period_x); // bottom-right

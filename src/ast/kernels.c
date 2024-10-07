@@ -17,6 +17,22 @@ GLSL does not support implicit type casting, so we insert the
 necessary explicit casts using the function below. */
 
 static
+Ast * type_cast (Ast * n, const char * type)
+{
+  Ast * parent = n->parent;
+  int child = ast_child_index (n);
+  Ast * call = NN(n, sym_function_call,
+		  NN(n, sym_postfix_expression,
+		     NN(n, sym_primary_expression,
+			NA(n, sym_IDENTIFIER, type))),
+		  NCA(n, "("),
+		  n,
+		  NCA(n, ")"));
+  ast_set_child (parent, child, call);
+  return call;
+}
+
+static
 Ast * implicit_type_cast (Ast * n, Stack * stack)
 {
   if (!n) return NULL;
@@ -77,19 +93,29 @@ Ast * implicit_type_cast (Ast * n, Stack * stack)
 				 stack);
     break;
 
+  case sym_unary_expression:
+    switch (n->child[0]->sym) {
+    case sym_SIZEOF: case sym_ALIGNOF:
+      return (Ast *) &ast_int;
+    case sym_unary_operator:
+      if (n->child[0]->child[0]->sym == token_symbol('!')) {
+	Ast * a = implicit_type_cast (n->child[1], stack);
+	if (!a || a->sym != sym_BOOL)
+	  type_cast (n->child[1], "bool");
+	return (Ast *) &ast_bool;
+      }
+    }
+    break;
+    
   case sym_additive_expression:
   case sym_multiplicative_expression:
     if (n->child[1]) {
       Ast * a = implicit_type_cast (n->child[0], stack);
-      if (a && a->sym == sym_BOOL) {
-	ast_before (n->child[0], "int(");
-	ast_after (n->child[0], ")");
-      }
+      if (a && a->sym == sym_BOOL)
+	type_cast (n->child[0], "int");
       Ast * b = implicit_type_cast (n->child[2], stack);
-      if (b && b->sym == sym_BOOL) {
-	ast_before (n->child[2], "int(");
-	ast_after (n->child[2], ")");
-      }
+      if (b && b->sym == sym_BOOL)
+	type_cast (n->child[2], "int");
       if (b && (b->sym == sym_DOUBLE || b->sym == sym_FLOAT))
 	return b;
       return a;
@@ -101,12 +127,8 @@ Ast * implicit_type_cast (Ast * n, Stack * stack)
     if (n->child[1]) {
       Ast * a = implicit_type_cast (n->child[0], stack);
       Ast * b = implicit_type_cast (n->child[2], stack);
-      if (a && b && a->sym != b->sym) {
-	if (a->sym == sym_INT || b->sym == sym_BOOL) {
-	  ast_before (n->child[2], "int(");
-	  ast_after (n->child[2], ")");
-	}
-      }
+      if (a && b && a->sym != b->sym && (a->sym == sym_INT || b->sym == sym_BOOL))
+	type_cast (n->child[2], "int");
       return a;
     }
     break;
@@ -126,15 +148,11 @@ Ast * implicit_type_cast (Ast * n, Stack * stack)
   case sym_logical_or_expression:
     if (n->child[1]) {
       Ast * a = implicit_type_cast (n->child[0], stack);
-      if (a && a->sym != sym_BOOL) {
-	ast_before (n->child[0], "bool(");
-	ast_after (n->child[0], ")");
-      }
+      if (!a || a->sym != sym_BOOL)
+	type_cast (n->child[0], "bool");
       Ast * b = implicit_type_cast (n->child[2], stack);
-      if (b && b->sym != sym_BOOL) {
-	ast_before (n->child[2], "bool(");
-	ast_after (n->child[2], ")");
-      }
+      if (!b || b->sym != sym_BOOL)
+	type_cast (n->child[2], "bool");
       return (Ast *)&ast_bool;
     }
     break;
@@ -152,10 +170,8 @@ Ast * implicit_type_cast (Ast * n, Stack * stack)
 
   case sym_selection_statement: {
     Ast * type = implicit_type_cast (n->child[2], stack);
-    if (!type || type->sym != sym_BOOL) {
-      ast_after (n->child[1], "bool(");
-      ast_before (n->child[3], ")");
-    }
+    if (!type || type->sym != sym_BOOL)
+      type_cast (n->child[2], "bool");
     return type;
   }
 
@@ -165,6 +181,8 @@ Ast * implicit_type_cast (Ast * n, Stack * stack)
       if (!strcmp (ast_terminal (identifier)->start, "val") ||
 	  !strcmp (ast_terminal (identifier)->start, "val_out_"))
       return (Ast *) &ast_double;
+      if (!strcmp (ast_terminal (identifier)->start, "_attr"))
+	return implicit_type_cast (n->child[2], stack);
       identifier = ast_identifier_declaration (stack, ast_terminal (identifier)->start);
       Ast * declaration = ast_parent (identifier, sym_function_declaration);
       if (!declaration)
@@ -335,10 +353,9 @@ void kernel (Ast * n, Stack * stack, void * data)
 	  ast_set_child (n, 0, scalar);
 	  ast_destroy (array);
 	}
-	ast_before (n, "_attr(");
 	ast_terminal (ast_schema (n, sym_postfix_expression,
 				  1, token_symbol('.')))->start[0] = ',';
-	ast_after (n, ")");
+	type_cast (n, "_attr");
       }
     }
     
