@@ -80,6 +80,7 @@ void output_ppm_gpu (OutputPPMGPU * display,
   if (display->frameStartTime < 0.) // window has been closed by user
     return;
 
+  glFinish(); // synchronize CPU and GPU
   if (fp || file || (fps && glfwGetTime() - display->frameStartTime > 1./fps)) {
 
     /**
@@ -213,7 +214,8 @@ void output_ppm_gpu (OutputPPMGPU * display,
     GPUContext.fragment_shader = false;
     
     if (fps)
-      glfwSwapBuffers (display->window);
+      glfwSwapBuffers (display->window);    
+    display->frameStartTime = glfwGetTime();
     
     /**
     File output */
@@ -238,8 +240,6 @@ void output_ppm_gpu (OutputPPMGPU * display,
     }
     
     glfwMakeContextCurrent (GPUContext.window);
-    
-    display->frameStartTime = glfwGetTime();
   }
 
   if (fps) {
