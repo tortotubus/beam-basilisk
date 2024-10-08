@@ -3675,11 +3675,13 @@ static void stencils (Ast * n, Stack * stack, void * data)
 
       char sparallel[] = "0";
       sparallel[0] = '0' + parallel;
-      ast_after (params, sparallel, ",{");
+      ast_after (params, sparallel, ",");
       if (args) {
-	ast_after (params, ".parameters={", args, "},");
+	ast_after (params, "DEPAREN({", args, "}),");
 	free (args);
       }
+      else
+	ast_after (params, "{0},");
       TranslateData * d = data;
       if (d->gpu) {
 	assert (foreach->sym == sym_foreach_statement && ast_last_child (foreach) == n);
@@ -3688,14 +3690,17 @@ static void stencils (Ast * n, Stack * stack, void * data)
 	*(--last) = NULL;
 	char * references = ast_external_references (foreach, NULL, d->functions);
 	if (references) {
-	  ast_after (params, ".externals=(External[]){", references, "{0}},");
+	  ast_after (params, "DEPAREN({", references, "{0}}),");
 	  free (references);
 	}
+	else
+	  ast_after (params, "{0},");
 	if (gpu)
 	  ast_kernel (foreach, params, NULL);
+	else
+	  ast_after (params, "NULL");
 	*last = n;
       }
-      ast_after (params, "}");
 
       /**
       Cleanup loops and their stencils. */
