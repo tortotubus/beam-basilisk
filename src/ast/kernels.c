@@ -611,13 +611,13 @@ char * ast_kernel (Ast * n, Ast * argument, char * s)
 
   if (d.error) {
     if (argument)
-      ast_after (argument, ".kernel=$(\"", d.error, "\")");
+      ast_after (argument, "$(\"", d.error, "\")");
     else
       str_append (s, "$(\"", d.error, "\")");
   }
   else {
     if (argument)
-      ast_after (argument, ".kernel=$(\"");
+      ast_after (argument, "$(\"");
     else
       str_append (s, "$(\"");
     s = stringify (statement, s);

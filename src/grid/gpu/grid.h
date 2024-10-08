@@ -27,6 +27,23 @@ GLSL: error: value of type float cannot be assigned to variable of type int
 ((coord){0}} # need 3 components
 
 GLSL: error: too few components to construct `vec3'
+
+## Installation
+
+~~~bash
+sudo apt install libglfw3-dev
+cd $BASILISK/grid/gpu
+make
+~~~
+
+## Running on remote server
+
+~~~bash
+ssh user@remoteserver.,org
+export DISPLAY=:0
+xrandr
+glxinfo -B | grep 'renderer string'
+~~~
 */
 
 #include <khash.h>
@@ -344,12 +361,15 @@ static External * merge_externals (External * externals, const ForeachData * loo
   External * merged = NULL, * end = NULL;
   static External ext[] = {
     { .name = "X0", .type = sym_DOUBLE, .pointer = &X0, .global = 1 },
-    { .name = "Y0", .type = sym_DOUBLE, .pointer = &Y0, .global = 1  },
-    { .name = "Z0", .type = sym_DOUBLE, .pointer = &Z0, .global = 1  },
-    { .name = "L0", .type = sym_DOUBLE, .pointer = &L0, .global = 1  },
-    { .name = "N",  .type = sym_INT,    .pointer = &N, .global = 1  },
+    { .name = "Y0", .type = sym_DOUBLE, .pointer = &Y0, .global = 1 },
+    { .name = "Z0", .type = sym_DOUBLE, .pointer = &Z0, .global = 1 },
+    { .name = "L0", .type = sym_DOUBLE, .pointer = &L0, .global = 1 },
+    { .name = "N",  .type = sym_INT,    .pointer = &N, .global = 1 },
     { .name = "apply_bc_list", .type = sym_SCALAR, .nd = 1, .global = 1 },
     { .name = "apply_bc",      .type = sym_function_definition, .pointer = (void *)(long)apply_bc},
+#if LAYERS
+    { .name = "nl",  .type = sym_INT, .pointer = &nl },
+#endif
     { .name = NULL }
   };
 
@@ -372,8 +392,6 @@ static External * merge_externals (External * externals, const ForeachData * loo
   }
 #if LAYERS
   assert (nl == 1); // fixme: not implemented yet for more than one layer
-  static External enl =  { .name = "nl",  .type = sym_INT, .pointer = &nl };
-  merged = merge_external (merged, &end, &enl, loop);
 #endif
   for (External * g = externals; g->name; g++)
     merged = merge_external (merged, &end, g, loop);
