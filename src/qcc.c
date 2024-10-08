@@ -468,8 +468,11 @@ int main (int argc, char ** argv)
       fin = dopen (file, "r");
       char line[1024];
       // rest of the file
-      while (fgets (line, 1024, fin))
+      while (fgets (line, 1024, fin)) {
+	if (!strncmp (line, "#line 0 ", 8))
+	  line[6] = '1';
 	fputs (line, fout);
+      }
       fclose (fin);
       fclose (fout);
 
