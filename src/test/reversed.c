@@ -99,7 +99,7 @@ event velocity (i++) {
   non-divergent. */
   
   trash ({u});
-  struct { double x, y; } f = {-1.,1.};
+  coord f = {-1.,1.};
   foreach_face()
     u.x[] = f.x*(psi[0,1] - psi[])/Delta;
 }

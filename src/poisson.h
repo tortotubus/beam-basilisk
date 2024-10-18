@@ -275,13 +275,13 @@ static void relax (scalar * al, scalar * bl, int l, void * data)
   (const) scalar lambda = p->lambda;
 
   /**
-  We use either Jacobi (under)relaxation or we directly reuse values
-  as soon as they are updated. For Jacobi, we need to allocate space
-  for the new field *c*. Jacobi is useful mostly as it gives results
-  which are independent of the order in which the cells are
-  traversed. This is not the case for the simple traversal, which
-  means for example that results will depend on whether a tree or
-  a multigrid is used (because cells will be traversed in a different
+  We use either Jacobi (under)relaxation, Gauss-Seidel or we directly
+  reuse values as soon as they are updated. For Jacobi, we need to
+  allocate space for the new field *c*. Jacobi is useful mostly as it
+  gives results which are independent of the order in which the cells
+  are traversed. This is not the case for the simple traversal, which
+  means for example that results will depend on whether a tree or a
+  multigrid is used (because cells will be traversed in a different
   order). The same comment applies to OpenMP or MPI parallelism. In
   practice however Jacobi convergence tends to be slower than simple
   reuse. */
@@ -291,12 +291,25 @@ static void relax (scalar * al, scalar * bl, int l, void * data)
 #else
   scalar c = a;
 #endif
-  
-  /**
-  We use the face values of $\alpha$ to weight the gradients of the
-  5-points Laplacian operator. We get the relaxation function. */
 
-  foreach_level_or_leaf (l, nowarning) {
+  /**
+  On GPUs, we use red/black Gauss-Seidel relaxation, which requires
+  two loops (for odd/even indices). Note also that, unlike the other
+  option, red/black relaxation should be deterministic. */
+  
+#if GAUSS_SEIDEL || _GPU
+  for (int parity = 0; parity < 2; parity++)
+    foreach_level_or_leaf (l, nowarning)
+      if (level == 0 || ((point.i + parity) % 2) != (point.j % 2))
+#else
+  foreach_level_or_leaf (l, nowarning)
+#endif
+  {
+
+    /**
+    We use the face values of $\alpha$ to weight the gradients of the
+    5-points Laplacian operator. We get the relaxation function. */
+
     double n = - sq(Delta)*b[], d = - lambda[]*sq(Delta);
     foreach_dimension() {
       n += alpha.x[1]*a[1] + alpha.x[]*a[-1];
