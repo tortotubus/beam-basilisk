@@ -35,21 +35,21 @@ void tracer_fluxes (scalar f,
     conditions (when using narrow '1 ghost cell' stencils)). */
 
     double un = dt*uf.x[]/(fm.x[]*Delta + SEPS), s = sign(un);
-    int i = -((int) s + 1)/2;
+    int i = -(s + 1.)/2.;
     double f2 = f[i] + (src[] + src[-1])*dt/4. + s*(1. - s*un)*g.x[i]*Delta/2.;
 
     /**
     and tangential components... */
 
     #if dimension > 1
-    if (fm.y[i] != 0. && fm.y[i,1] != 0.) {
+    if (fm.y[i] && fm.y[i,1]) {
       double vn = (uf.y[i] + uf.y[i,1])/(fm.y[i] + fm.y[i,1]);
       double fyy = vn < 0. ? f[i,1] - f[i] : f[i] - f[i,-1];
       f2 -= dt*vn*fyy/(2.*Delta);
     }
     #endif
     #if dimension > 2
-    if (fm.z[i] != 0. && fm.z[i,0,1] != 0.) {
+    if (fm.z[i] && fm.z[i,0,1]) {
       double wn = (uf.z[i] + uf.z[i,0,1])/(fm.z[i] + fm.z[i,0,1]);
       double fzz = wn < 0. ? f[i,0,1] - f[i] : f[i] - f[i,0,-1];
       f2 -= dt*wn*fzz/(2.*Delta);

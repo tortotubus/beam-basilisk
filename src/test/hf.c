@@ -39,7 +39,7 @@ int main()
   scalar kappa[];
   curvature (c, kappa);
 #if dimension == 2
-  foreach() {
+  foreach (serial) {
     for (int i = -1; i <= 1; i++) {
       if (h.x[0,i] != nodata)
 	fprintf (stderr, "%g %g %g %g hx\n",

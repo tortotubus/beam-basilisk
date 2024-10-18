@@ -144,7 +144,7 @@ static void relax_viscosity (scalar * a, scalar * b, int l, void * data)
   We have the option of using red/black Gauss-Seidel relaxation or
   "re-use as soon as computed" relaxation. On GPUs (and probably also
   with OpenMP) red/black Gauss-Seidel converges much better (but
-  requires two foreach() iterations). Not also that, unlike the other
+  requires two foreach() iterations). Note also that, unlike the other
   option, red/black relaxation should be deterministic. */
   
 #if GAUSS_SEIDEL || _GPU
@@ -157,7 +157,9 @@ static void relax_viscosity (scalar * a, scalar * b, int l, void * data)
     foreach_level_or_leaf (l, nowarning)
       if (level == 0 || ((point.i + parity) % 2) != (point.j % 2))
 #else
+#if dimension > 1
   vector ua = u;
+#endif
   foreach_level_or_leaf (l)
 #endif
   {

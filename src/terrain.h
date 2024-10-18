@@ -147,7 +147,7 @@ void terrain (scalar zb, ...)
 #endif
 
   trash ({zb});
-#if MULTIGRID
+#if MULTIGRID && !_GPU
   for (int l = 0; l <= depth(); l++) {
     foreach_level (l)
       reconstruct_terrain (point, zb);

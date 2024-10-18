@@ -509,7 +509,7 @@ the volume fraction field, which results in a piecewise continuous
 trace
 void output_facets (scalar c, FILE * fp = stdout, face vector s = {{-1}})
 {
-  foreach()
+  foreach (serial)
     if (c[] > 1e-6 && c[] < 1. - 1e-6) {
       coord n = facet_normal (point, c, s);
       double alpha = plane_alpha (c[], n);

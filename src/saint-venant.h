@@ -116,10 +116,9 @@ static void advance_saint_venant (scalar * soutput, scalar * sinput,
       In the case of [multiple
       layers](multilayer.h#viscous-friction-between-layers) we add the
       viscous friction between layers. */
-#if !GPU // fixme
+
       if (nl > 1)
 	vertical_viscosity (point, ho[], uol, dt);
-#endif
     }
     else // dry
       for (int l = 0; l < nl; l++) {
