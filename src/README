@@ -265,6 +265,7 @@ $$
 * [qcc](qcc.c): the command line preprocessor/compiler
 * [The Abstract Syntax Tree (AST) library](ast/README)
 * [Dimensional Analysis](ast/interpreter/dimension.c)
+* [Running on GPUs](grid/gpu/grid.h)
 
 # General orthogonal coordinates
 

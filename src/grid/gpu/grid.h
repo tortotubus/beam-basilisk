@@ -1,34 +1,67 @@
 /**
 # Grids on GPUs
 
-## Useful commands
+The files in this directory implement Cartesian and Multigrid grids on
+[Graphics Processing
+Units](https://en.wikipedia.org/wiki/Graphics_processing_unit)
+(GPUs). The ultimate goal is to allow running any [Basilisk
+solver](/src/README#solvers) on GPUs without any modification to the
+original source code (or only [minor
+modifications](/src/?changes=20241018142827)).
 
-~~~bash
-nvidia-settings
-sudo lshw -c display
-__NV_PRIME_RENDER_OFFLOAD=1 __GLX_VENDOR_LIBRARY_NAME=nvidia  glxinfo -B | \
-   grep "OpenGL vendor string"
+To do so the [Basilisk preprocessor](/src/ast/README) automatically
+generates "computation kernels" for each [loop
+iterator](/Basilisk%20C#iterators). These kernels are then dynamically
+compiled (at runtime) by the [OpenGL Shading
+Language](https://en.wikipedia.org/wiki/OpenGL_Shading_Language)
+(GLSL) compiler which is part of the (OpenGL) graphics card driver. If
+compilation is successful, the corresponding loop is performed on the
+GPU, otherwise the CPU is used. If this hybrid GPU/CPU hybrid mode of
+operation is used, synchronisation between the GPU and CPU memory is
+necessary and is done automatically.
+
+OpenGL is an open standard (unlike
+e.g. [CUDA](https://en.wikipedia.org/wiki/CUDA)) and is widely
+supported by graphics cards (with the notable exception of Apple
+graphics card and some high-end "professional" Nvidia cards).
+
+## Running on GPUs
+
+As described above, from a Basilisk perspective GPUs are just another
+type of grid. Selecting a "GPU grid" can simply be done using either
+
+~~~literatec
+#include "grid/gpu/multigrid.h"
 ~~~
 
-## Tips etc.
+in the source code, or using the `-grid` command line option of
+[qcc](/src/qcc.c) like this
 
-* gpu/cpu keyword
-* if 'gpu' is specified and the loop cannot run on the GPU, the code exits
-* type casts in GLSL i.e. (int)... etc.
-* boolean type casts i.e.   float a = (b > 0);  ... if (a) ...
-* no pointers....
-* local scalar lists are not really supported, but external lists are OK
-* comments on "double precision" math functions (CFLAGS='-DDOUBLE_PRECISION')
+~~~bash
+qcc -autolink -Wall -O2 -grid=gpu/multigrid code.c -o code -lm
+~~~
 
-GLSL: error: if-statement condition must be scalar boolean
+(where `code.c` does not specify the grid).
 
-GLSL: error: value of type float cannot be assigned to variable of type int
+The standard Basilisk [Makefile](/Tutorial#using-makefiles) also
+includes the handy recipe
 
-((coord){0}} # need 3 components
+~~~bash
+make code.gpu.tst
+~~~
 
-GLSL: error: too few components to construct `vec3'
+which will compile and run `code.c` using the `gpu/multigrid` grid.
+
+Note that for all this to work properly you first need to
+[install](#installation) the Basilisk GPU libraries.
 
 ## Installation
+
+Basilisk uses the [GLFW](https://www.glfw.org/) library to configure
+and access the graphics card and [OpenGL](https://www.opengl.org/)
+(version >= 4.3) for the rest. These libraries and the associated
+Basilisk libraries can be easily installed on Debian-like systems
+using
 
 ~~~bash
 sudo apt install libglfw3-dev
@@ -36,15 +69,229 @@ cd $BASILISK/grid/gpu
 make
 ~~~
 
-## Running on remote server
+Note that you will also need the appropriate graphics card drivers
+(often proprietary for Nvidia). Note also that (reasonably high-end)
+laptop computers often have two graphics cards: a low-power, slow one
+and a high-power, fast one. To check which one you are currently using
+you can use something like
 
 ~~~bash
-ssh user@remoteserver.,org
-export DISPLAY=:0
-xrandr
-glxinfo -B | grep 'renderer string'
+sudo apt install mesa-utils
+glxinfo -B
 ~~~
-*/
+
+On my Dell XPS laptop I can switch to the (proprietary driver of the)
+fast Nvidia graphics card using
+
+~~~bash
+__NV_PRIME_RENDER_OFFLOAD=1 __GLX_VENDOR_LIBRARY_NAME=nvidia glxinfo -B
+~~~
+
+## Tests
+
+There are several [test cases for GPUs](/src/test/README#gpu-tests)
+you can try. For example
+
+~~~bash
+cd $BASILISK/test
+CFLAGS=-DPRINTNSHADERS make gpu.gpu.tst
+~~~
+
+If this worked, you can then try a more interesting example
+
+~~~bash
+CFLAGS='-DSHOW' make bump2D-gpu.tst
+__NV_PRIME_RENDER_OFFLOAD=1 __GLX_VENDOR_LIBRARY_NAME=nvidia ./bump2D-gpu/bump2D-gpu
+~~~
+
+## Writing code compatible with GPUs
+
+GPUs are fast compared to CPUs because they use specialised hardware
+which relies on highly-parallel (tens of thousands of execution
+threads) asynchronous accesses to fast video memory channels. This
+imposes strong constraints on programs which can run efficiently on
+these systems, in particular regarding memory allocation and
+accesses. These constraints are reflected in the programming languages
+usable on GPUs, for example the [OpenGL Shading
+Language](https://www.khronos.org/opengl/wiki/Core_Language_(GLSL))
+(GLSL) which underlies the GPU grid in Basilisk.
+
+GLSL is mostly a subset of C99 and the good news is that this subset
+happens to be what is used within most `foreach` loops in Basilisk
+(this is not a coincidence...). Thus, in many cases, simple and
+efficient Basilisk code will also run transparently and efficiently on
+GPUs.
+
+### GPU/CPU hybrid mode
+
+There are obvious cases where foreach loops will not run on GPUs (see
+the [next section](#what-cannot-be-done-on-gpus)). In theses cases,
+Basilisk will automatically switch to running the loop on the CPU and
+will synchronize the CPU and GPU memories. Note that this also means
+that the memory (i.e. scalar fields etc.) for a program is always
+allocated twice: once on the CPU and once on the GPU.
+
+As an example, consider the following simple code
+
+~~~literatec
+int main()
+{
+  init_grid (16);
+  scalar s[];
+  double k = 2.;
+  foreach()
+    s[] = cos(k*x)*sin(k*y);
+  foreach()
+    printf ("%g %g %g\n", x, y, s[]);
+}
+~~~
+
+this can be run on the CPU using e.g.
+
+~~~bash
+make test.tst
+~~~
+
+If we now run on the GPU using
+
+~~~bash
+make test.gpu.tst
+~~~
+
+we get
+
+~~~bash
+test.gpu.c:9: GLSL: error: strings are not supported
+test.gpu.c:8: warning: foreach() done on CPU (see GLSL errors above)
+~~~
+
+Basilisk warns us that "strings are not supported" in GLSL (at line 9)
+and that, as a consequence, the loop at line 8 (i.e. the second loop
+which includes "printf") was run on the CPU. Note that the first
+message is a "GLSL: error" but that the code still ran OK on the
+CPU. Note also that this error happened at runtime and not during
+compilation. That's because foreach loops are compiled dynamically at
+runtime by the graphics card driver.
+
+Since GPUs have a very limited access to the operating system
+(i.e. only through the OpenGL interface) we cannot expect the loop
+including "printf" (or any other output) to run on the GPU (in
+addition to the fact that "strings are not supported"). Note also that
+the second loop should be "serial" rather than parallel (see [Parallel
+Programming](/Basilisk C#parallel-programming)). So we need to modify
+the code to
+
+~~~literatec
+...
+  foreach (serial)
+    printf ("%g %g %g\n", x, y, s[]);
+...
+~~~
+
+If we now recompile and run with `make test.gpu.tst`, the GLSL error
+and warnings are gone since we explicitely specified that the second
+loop should run on the CPU (and in serial mode).
+
+Another way to specify that a given loop should run on the CPU (either
+in serial or parallel mode) is to use
+
+~~~literatec
+foreach (cpu)
+  ...
+~~~
+
+Similarly one could use `foreach (gpu)` to force running on the
+GPU, in which case the GLSL warning above would become an error. This
+can be useful when debugging GPU codes and used in combination with
+the `-cpu` [compilation flag](/src/qcc.c) which will force loops to
+run on the CPU by default.
+
+### What cannot be done on GPUs
+
+* Inputs/Outputs: The only possible direct output on GPUs is the screen (see
+  [output_ppm on GPUs](output.h)). All other inputs or outputs must go through
+  the CPU.
+* Complex memory allocation and access: There is no notion of "memory
+  stack" on GPUs, all memory requirements are ***static*** and must be
+  defined at compilation time. This means that variable/dynamical
+  arrays, dynamic memory allocation (malloc etc.) and ***pointers***
+  do not exist on GPUs (and in GLSL). Using any of these in a foreach
+  loop will give you a GLSL error as above.
+* Limited support for function pointers: function pointers are
+  fundamentally different from memory pointers.  Basilisk includes
+  limited support for function pointers i.e. what is sufficient for
+  *field attributes* implementing custom boundary conditions or
+  coarsening/refinement functions.
+* Using external libraries: GPUs cannot (obviously) use functions defined in
+  external (CPU) libraries.
+
+## Current limitations
+
+Aside from the fundamental constraints above, the current
+implementation also has the following limitations, some of which will
+be lifted in the (not-too-distant) future. In rough order of "lifting
+priority" these are:
+
+* [Multilayer](/Basilisk%20C#layers) is currently limited to a single layer
+* Only 2D Cartesian and Multigrid grids for now: 3D multigrid will
+  follow easily, quadtrees and octrees are more difficult.
+* Access to video memories largers than 2^32^ bytes i.e. 4GB is
+  currently impossible. This will be lifted soon (once I have found a
+  solution...)
+* At this stage only a few solvers [have been
+  tested](/src/test/README#gpu-tests). Other solvers may or may not
+  work. In particular [surface tension](/src/tension.h) will not work
+  yet because the [estimation of curvature](/src/curvature.h) relies
+  on [code which is not portable to GPUs](/src/parabola.h).
+* Only simple external types (`int`, `bool`, `float`, `double`,
+  `coord` etc.) are currently supported: for example custom `typedefs`
+  are not supported yet for external variables. Loop-local variables
+  and functions can use (locally-defined) custom types.
+* Loop-local [lists](/Basilisk%20C#lists) of scalars have very limited
+  support (but are not used much anyway): external loops support is
+  OK.
+* Double precision (64-bits floats) is supported by Basilisk (use
+  `CFLAGS='-DDOUBLE_PRECISION'`) but depends on the (often limited)
+  support by graphics cards and their drivers (see also
+  [performance](#performance)). Note also that using single precision
+  can have an important impact on the convergence and accuracy of
+  [multigrid solvers](/src/poisson.h).
+
+## Performance
+
+To convince yourself that GPUs are worth the trouble, see the [GPU
+Benchmarks](Benchmarks): speedups of one to two orders of magnitude
+compared to CPUs are perfectly achievable.
+
+To maximize performance, here are a few tips and observations:
+
+* Make sure that you are using the correct graphics card and driver
+ (see [glxinfo](#installation) above).
+* GPUs are highly parallel so will only provide speedups for large
+  enough simulations (e.g. larger than 128^2^), increasingly so as
+  resolution is increased.
+* Frequent CPU/GPU memory synchronisation will kill performance. Be
+  careful to control how often you output data for example, much more
+  so than when running on CPUs. An exception is [graphical
+  outputs](output.h) which are much cheaper on GPUs and can be done
+  often with little overhead. Loops done on the CPU within
+  e.g. timestep iterations will generally kill performance.
+* Use [built-in profiling](/src/README.trace) to check where time is
+  spent. Use the `-DTRACE=3` compilation flag to get profiling
+  information at the level of foreach loops.
+* While double precision (64-bits floats i.e. `double`) is supported
+  by GLSL, graphics cards and their drivers can have very poor support
+  and the performances of standard "gamers" graphics cards [are usually
+  terrible](https://www.reddit.com/r/CUDA/comments/lkhcbv/is_there_a_list_of_gpus_ranked_by_fp64/).
+
+## See also
+
+* [Test cases on GPUs](/src/test/README#gpu-tests)
+* [GPU benchmarks](Benchmarks)
+* [Minor GPU adaptations for solvers](/src/?changes=20241018142827)
+* [Computation kernels](/src/ast/kernels.c)
+
+# Implementation */
 
 #include <khash.h>
 
@@ -1584,12 +1831,10 @@ bool gpu_end_stencil (ForeachData * loop,
 }
 
 /**
-## Useful links
+## Useful (and not so useful) links
 
 * [Core Language (GLSL)](https://www.khronos.org/opengl/wiki/Core_Language_(GLSL))
 * [Image Load Store](https://www.khronos.org/opengl/wiki/Image_Load_Store)
-* [OpenGL* Performance Tips: Avoid OpenGL Calls that Synchronize CPU and GPU](https://www.intel.com/content/www/us/en/developer/articles/technical/opengl-performance-tips-avoid-opengl-calls-that-synchronize-cpu-and-gpu.html)
-* [Read pixel data from default framebuffer in OpenGL: Performance of FBO vs. PBO](https://coderedirect.com/questions/611796/read-pixel-data-from-default-framebuffer-in-opengl-performance-of-fbo-vs-pbo)
 * [Persistent Mapped Buffers in OpenGL](https://www.cppstories.com/2015/01/persistent-mapped-buffers-in-opengl/)
 * [Best Practices for Working with Texture Data (OpenGL Programming Guide for Mac)](https://developer.apple.com/library/archive/documentation/GraphicsImaging/Conceptual/OpenGL-MacProgGuide/opengl_texturedata/opengl_texturedata.html)
 * [https://github.com/Erkaman/fluid_sim]()
@@ -1608,6 +1853,6 @@ bool gpu_end_stencil (ForeachData * loop,
 * [Slides on using Array or Bindless Textures](https://www.slideshare.net/CassEveritt/beyond-porting)
 * [Optimizing Compute Shaders for L2 Locality using Thread-Group ID Swizzling](https://developer.nvidia.com/blog/optimizing-compute-shaders-for-l2-locality-using-thread-group-id-swizzling/)
 * [Optimizing GPU occupancy and resource usage with large thread groups](https://gpuopen.com/learn/optimizing-gpu-occupancy-resource-usage-large-thread-groups/)
-* https://www.reddit.com/r/CUDA/comments/lkhcbv/is_there_a_list_of_gpus_ranked_by_fp64/
-* https://www.techpowerup.com/gpu-specs/
+* [https://www.reddit.com/r/CUDA/comments/lkhcbv/is_there_a_list_of_gpus_ranked_by_fp64/]()
+* [https://www.techpowerup.com/gpu-specs/]()
 */
