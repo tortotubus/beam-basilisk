@@ -116,6 +116,14 @@ clean:
 	python plots.py || rm -f plots
 	@test -f $*/plots || exit 1
 
+%/plots: %.md $(BASILISK)/gnuplot.awk $(BASILISK)/python.awk \
+		$(BASILISK)/gnuplot.sh
+	mkdir -p $* && cd $* && $(AWK) -f $(BASILISK)/gnuplot.awk < ../$*.md > plots && \
+	PNG=$(PNG) sh $(BASILISK)/gnuplot.sh || rm -f plots
+	cd $* && $(AWK) -f $(BASILISK)/python.awk < ../$*.md > plots.py && \
+	python plots.py || rm -f plots
+	@test -f $*/plots || exit 1
+
 %/pdf-plots: %.c $(BASILISK)/gnuplot.awk $(BASILISK)/python.awk \
 		$(BASILISK)/gnuplot.sh
 	cd $* && \

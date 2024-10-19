@@ -104,6 +104,14 @@ CFLAGS='-DSHOW' make bump2D-gpu.tst
 __NV_PRIME_RENDER_OFFLOAD=1 __GLX_VENDOR_LIBRARY_NAME=nvidia ./bump2D-gpu/bump2D-gpu
 ~~~
 
+and also
+
+~~~bash
+cd $BASILISK/examples
+CFLAGS='-DSHOW -DBENCHMARK' make turbulence.gpu.tst
+__NV_PRIME_RENDER_OFFLOAD=1 __GLX_VENDOR_LIBRARY_NAME=nvidia ./turbulence.gpu/turbulence.gpu 1024
+~~~
+
 ## Writing code compatible with GPUs
 
 GPUs are fast compared to CPUs because they use specialised hardware
@@ -260,8 +268,8 @@ priority" these are:
 ## Performance
 
 To convince yourself that GPUs are worth the trouble, see the [GPU
-Benchmarks](Benchmarks): speedups of one to two orders of magnitude
-compared to CPUs are perfectly achievable.
+Benchmarks](Benchmarks.md): speedups of one to two orders of magnitude
+compared to CPUs are achievable.
 
 To maximize performance, here are a few tips and observations:
 
@@ -287,7 +295,7 @@ To maximize performance, here are a few tips and observations:
 ## See also
 
 * [Test cases on GPUs](/src/test/README#gpu-tests)
-* [GPU benchmarks](Benchmarks)
+* [GPU benchmarks](Benchmarks.md)
 * [Minor GPU adaptations for solvers](/src/?changes=20241018142827)
 * [Computation kernels](/src/ast/kernels.c)
 
