@@ -94,50 +94,7 @@ event display (i++)
 #endif
 
 /**
-## Benchmark on GPUs
+## See also
 
-~~~bash
-cd $BASILISK/src/test/
-make advection.gpu.tst
-
-cd advection.gpu
-glxinfo -B
-
-...
-Device: Mesa Intel(R) UHD Graphics (TGL GT1) (0x9a60)
-...
-Video memory: 3072MB
-
-./advection.gpu/advection.gpu 1024 2> /dev/null | grep steps
-
-# Multigrid (GPU), 412 steps, 0.05744 CPU, 0.1066 real, 1.58e+07 points.step/s, 8 var
-# Multigrid (GPU), 796 steps, 0.071283 CPU, 0.2083 real, 6.26e+07 points.step/s, 8 var
-# Multigrid (GPU), 1566 steps, 0.193343 CPU, 0.9687 real, 1.06e+08 points.step/s, 8 var
-# Multigrid (GPU), 3100 steps, 0.881404 CPU, 6.278 real, 1.29e+08 points.step/s, 8 var
-# Multigrid (GPU), 6163 steps, 3.45753 CPU, 43.12 real, 1.5e+08 points.step/s, 8 var
-
-OpenGL renderer string: NVIDIA GeForce RTX 3050 Ti Laptop GPU/PCIe/SSE2
-Dedicated video memory: 4096 MB
-
-__NV_PRIME_RENDER_OFFLOAD=1 __GLX_VENDOR_LIBRARY_NAME=nvidia ./advection.gpu/advection.gpu 2048 2> /dev/null | grep steps
-
-# Multigrid (GPU), 412 steps, 0.048498 CPU, 0.04853 real, 3.48e+07 points.step/s, 8 var
-# Multigrid (GPU), 796 steps, 0.090262 CPU, 0.09033 real, 1.44e+08 points.step/s, 8 var
-# Multigrid (GPU), 1566 steps, 0.23626 CPU, 0.2363 real, 4.34e+08 points.step/s, 8 var
-# Multigrid (GPU), 3100 steps, 0.799822 CPU, 0.7999 real, 1.02e+09 points.step/s, 8 var
-# Multigrid (GPU), 6163 steps, 4.69821 CPU, 4.7 real, 1.38e+09 points.step/s, 8 var
-# Multigrid (GPU), 12282 steps, 34.4176 CPU, 34.43 real, 1.5e+09 points.step/s, 8 var
-
-OpenGL renderer string: Quadro RTX 6000/PCIe/SSE2
-Dedicated video memory: 24576 MB
-
-./advection.gpu/advection.gpu 2048 2> /dev/null | grep steps
-
-# Multigrid (GPU), 412 steps, 0.039619 CPU, 0.03962 real, 4.26e+07 points.step/s, 8 var
-# Multigrid (GPU), 796 steps, 0.053955 CPU, 0.05396 real, 2.42e+08 points.step/s, 8 var
-# Multigrid (GPU), 1566 steps, 0.131985 CPU, 0.132 real, 7.78e+08 points.step/s, 8 var
-# Multigrid (GPU), 3100 steps, 0.314964 CPU, 0.315 real, 2.58e+09 points.step/s, 8 var
-# Multigrid (GPU), 6163 steps, 1.51581 CPU, 1.516 real, 4.26e+09 points.step/s, 8 var
-# Multigrid (GPU), 12282 steps, 10.7082 CPU, 10.71 real, 4.81e+09 points.step/s, 8 var
-~~~
+[Benchmark on GPUs](/src/grid/gpu/Benchmarks.md#time-reversed-advection-in-a-vortex)
 */

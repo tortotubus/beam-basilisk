@@ -1,0 +1,51 @@
+~~~bash
+cd $BASILISK/src/test/
+
+CFLAGS=-fopenmp make advection.ctst
+OMP_NUM_THREADS=8 ./advection/advection 1024 2> /dev/null | grep steps
+
+OpenGL renderer string: Intel Core i7
+
+# Multigrid, 412 steps, 0.295415 CPU, 0.03878 real, 4.35e+07 points.step/s, 7 var
+# Multigrid, 796 steps, 0.928406 CPU, 0.1164 real, 1.12e+08 points.step/s, 7 var
+# Multigrid, 1566 steps, 5.6364 CPU, 0.7167 real, 1.43e+08 points.step/s, 7 var
+# Multigrid, 3100 steps, 39.7444 CPU, 4.969 real, 1.64e+08 points.step/s, 7 var
+# Multigrid, 6163 steps, 548.55 CPU, 68.58 real, 9.42e+07 points.step/s, 7 var
+
+make advection.gpu.tst
+
+OpenGL renderer string: Mesa Intel(R) UHD Graphics (TGL GT1) (0x9a60)
+Video memory: 3072MB
+
+./advection.gpu/advection.gpu 1024 2> /dev/null | grep steps
+
+# Multigrid (GPU), 412 steps, 0.05744 CPU, 0.1066 real, 1.58e+07 points.step/s, 8 var
+# Multigrid (GPU), 796 steps, 0.071283 CPU, 0.2083 real, 6.26e+07 points.step/s, 8 var
+# Multigrid (GPU), 1566 steps, 0.193343 CPU, 0.9687 real, 1.06e+08 points.step/s, 8 var
+# Multigrid (GPU), 3100 steps, 0.881404 CPU, 6.278 real, 1.29e+08 points.step/s, 8 var
+# Multigrid (GPU), 6163 steps, 3.45753 CPU, 43.12 real, 1.5e+08 points.step/s, 8 var
+
+OpenGL renderer string: NVIDIA GeForce RTX 3050 Ti Laptop GPU/PCIe/SSE2
+Dedicated video memory: 4096 MB
+
+__NV_PRIME_RENDER_OFFLOAD=1 __GLX_VENDOR_LIBRARY_NAME=nvidia ./advection.gpu/advection.gpu 2048 2> /dev/null | grep steps
+
+# Multigrid (GPU), 412 steps, 0.048498 CPU, 0.04853 real, 3.48e+07 points.step/s, 8 var
+# Multigrid (GPU), 796 steps, 0.090262 CPU, 0.09033 real, 1.44e+08 points.step/s, 8 var
+# Multigrid (GPU), 1566 steps, 0.23626 CPU, 0.2363 real, 4.34e+08 points.step/s, 8 var
+# Multigrid (GPU), 3100 steps, 0.799822 CPU, 0.7999 real, 1.02e+09 points.step/s, 8 var
+# Multigrid (GPU), 6163 steps, 4.69821 CPU, 4.7 real, 1.38e+09 points.step/s, 8 var
+# Multigrid (GPU), 12282 steps, 34.4176 CPU, 34.43 real, 1.5e+09 points.step/s, 8 var
+
+OpenGL renderer string: Quadro RTX 6000/PCIe/SSE2
+Dedicated video memory: 24576 MB
+
+./advection.gpu/advection.gpu 2048 2> /dev/null | grep steps
+
+# Multigrid (GPU), 412 steps, 0.031947 CPU, 0.03195 real, 5.28e+07 points.step/s, 8 var
+# Multigrid (GPU), 796 steps, 0.049988 CPU, 0.04999 real, 2.61e+08 points.step/s, 8 var
+# Multigrid (GPU), 1566 steps, 0.124451 CPU, 0.1245 real, 8.25e+08 points.step/s, 8 var
+# Multigrid (GPU), 3100 steps, 0.289842 CPU, 0.2898 real, 2.8e+09 points.step/s, 8 var
+# Multigrid (GPU), 6163 steps, 1.49181 CPU, 1.492 real, 4.33e+09 points.step/s, 8 var
+# Multigrid (GPU), 12282 steps, 10.7582 CPU, 10.76 real, 4.79e+09 points.step/s, 8 var
+~~~

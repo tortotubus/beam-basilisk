@@ -104,12 +104,16 @@ Every 0.1 time units we check whether $u$ has changed by more than
 simulation. We also output the evolution of the kinetic energy on
 standard error. */
 
+#if !BENCHMARK
 event logfile (t += 0.1; i <= 10000) {
   double du = change (u.x, un);
   if (i > 0 && du < 1e-5)
     return 1; /* stop */
   fprintf (stderr, "%f %.4g %.3g\n", t, energy(), du);
 }
+#else
+event logfile (i++; i <= 300);
+#endif
 
 /**
 Every 100 timesteps we output a binary representation of `u.x`
@@ -122,7 +126,7 @@ event outputfile (i += 100) output_matrix (u.x, stdout, N, linear = true);
 /**
 We dump a snapshot which can be used to restart the simulation. */
 
-#if !MAC
+#if !MAC && !BENCHMARK
 event snapshot (i = 1700)
   dump (file = "dump");
 #endif
@@ -155,4 +159,8 @@ plot [-0.5:0.5]'../yprof.ghia' u 1:2 title "Ghia et al." w p pt 7, \
      'yprof' w l lw 2 title "Basilisk (centered)",		   \
      '../lidmac/yprof' w l lw 2 title "Basilisk (MAC)"
 ~~~
+
+## See also
+
+[Benchmark on GPUs](/src/grid/gpu/Benchmarks.md#lid-driven-cavity)
 */
