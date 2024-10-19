@@ -14,7 +14,7 @@ int main (int argc, char * argv[])
   run();
 }
 
-#if 0
+#if _GPU && SHOW
 event display (i++)
 {
   output_ppm (h, fp = NULL, map = blue_white_red, n = 1024, spread = -1, fps = 30, linear = true);
@@ -46,6 +46,8 @@ Without any outputs (logfile() commented out).
 rm -f bump2D-gpu.tst && CFLAGS='-DBENCHMARK -DTRACE=2' make bump2D-gpu.tst
 # Ignore diff error since the log has not been generated
 
+glxinfo -B
+
 OpenGL renderer string: NVIDIA GeForce RTX 3050 Ti Laptop GPU/PCIe/SSE2
 Dedicated video memory: 4096 MB
 
@@ -61,7 +63,22 @@ __NV_PRIME_RENDER_OFFLOAD=1 __GLX_VENDOR_LIBRARY_NAME=nvidia bump2D-gpu/bump2D-g
     7230    10.84     0.59      4.4%   update_saint_venant():/src/saint-venant.h:331
    28923     0.31     0.18      1.4%   setup_shader():/src/grid/gpu/grid.h:1403
 
-glxinfo -B
+OpenGL renderer string: Quadro RTX 6000/PCIe/SSE2
+Dedicated video memory: 24576 MB
+
+bump2D-gpu/bump2D-gpu 10
+
+# Cartesian (GPU), 3615 steps, 4.54817 CPU, 4.548 real, 8.33e+08 points.step/s, 28 var
+   calls    total     self   % total   function
+    7230     1.75     1.29     28.3%   foreach():/home/user/basilisk/src/saint-venant.h:275
+    7230     0.93     0.91     20.0%   foreach():/home/user/basilisk/src/utils.h:266
+    7230     0.77     0.75     16.4%   foreach():/home/user/basilisk/src/saint-venant.h:321
+    7230     0.74     0.70     15.4%   foreach():/home/user/basilisk/src/saint-venant.h:129
+    7230     0.32     0.32      7.0%   gpu_reduction():/home/user/basilisk/src/saint-venant.h:207
+    7230     3.78     0.27      6.0%   update_saint_venant():/home/user/basilisk/src/saint-venant.h:331
+   28923     0.23     0.12      2.7%   setup_shader():/home/user/basilisk/src/grid/gpu/grid.h:1402
+      27     0.12     0.12      2.5%   gpu_cpu_sync_scalar():/home/user/basilisk/src/grid/gpu/grid.h:977
+
 ...
 Device: Mesa Intel(R) UHD Graphics (TGL GT1) (0x9a60)
 ...

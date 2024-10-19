@@ -584,6 +584,7 @@ dimensions-tests: bump2D.s capwave.s lid.s rising-axi.s		\
 # fixme: the dependencies *.gpu.s.d are not created automatically
 gpu-tests: gpu.gpu.tst gpu-cpu.tst gpu-reduce.gpu.tst nonlinear.gpu.tst \
 	advection.gpu.tst bump2D-gpu.tst reversed.gpu.tst axi.gpu.tst lid.gpu.tst
+gpu-tests: CFLAGS += -DPRINTNSHADERS
 
 gpu.s.d: CFLAGS += -grid=multigrid
 gpu.s: CFLAGS += -grid=multigrid

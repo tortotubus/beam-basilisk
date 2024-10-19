@@ -210,15 +210,23 @@ void printWorkGroupsCapabilities()
   printf ("Maximum workgroup invocations:\n\t%u\n", workgroup_invocations);
 }
 
+#if TRACE == 3
+# define tracing_foreach(name, file, line) tracing(name, file, line)
+# define end_tracing_foreach(name, file, line) end_tracing(name, file, line)
+#else
+# define tracing_foreach(name, file, line)
+# define end_tracing_foreach(name, file, line)
+#endif
+
 static bool _gpu_done_ = false;
 @undef BEGIN_FOREACH
 @def BEGIN_FOREACH if (_gpu_done_)
   _gpu_done_ = false;
  else {
-   tracing ("foreach", S__FILE__, S_LINENO);
+   tracing_foreach ("foreach", S__FILE__, S_LINENO);
 @
 @undef END_FOREACH
-@define END_FOREACH end_tracing("foreach", S__FILE__, S_LINENO); }
+@define END_FOREACH end_tracing_foreach ("foreach", S__FILE__, S_LINENO); }
 
 typedef struct {
   coord p, * box, n; // region
@@ -228,7 +236,7 @@ typedef struct {
 @define DEPAREN(...) S__VA_ARGS__
 
 @def foreach_stencil_generic(_parallel, _parameters, _externals, _kernel) {
-  tracing ("foreach", S__FILE__, S_LINENO);
+  tracing_foreach ("foreach", S__FILE__, S_LINENO);
   static ForeachData _loop = {
     .fname = S__FILE__, .line = S_LINENO, .first = 1, .parallel = _parallel
   };
@@ -293,7 +301,7 @@ typedef struct {
   check_stencil (&_loop);
   _gpu_done_ = gpu_end_stencil (&_loop, _region, _externals_, _kernel_);
   _loop.first = 0;
-  end_tracing ("foreach", S__FILE__, S_LINENO);
+  end_tracing_foreach ("foreach", S__FILE__, S_LINENO);
 }
 @
 

@@ -52,6 +52,12 @@ void myfunc7 (Point point, scalar s, double a)
   s[] = a/vv;
 }
 
+void myfunc8 (scalar s)
+{
+  foreach()
+    s[] = 0;
+}
+
 attribute {
   double (* func) (double x);
 }
@@ -491,6 +497,22 @@ int main (int argc, char * argv[])
       myfunc7 (point, v, vv);
     }
   }
+
+  /**
+  ## Changing boundary conditions */
+
+  {
+    init_grid (1);
+    reset ({s, s1}, 1);
+    s[left] = neumann (0);
+    myfunc8 (s);
+    foreach (serial)
+      assert (s[-1] == 0);
+    s[left] = 1;
+    myfunc8 (s);
+    foreach (serial)
+      assert (s[-1] == 1);
+  }
   
   /**
   ## Other tests */
@@ -542,7 +564,7 @@ int main (int argc, char * argv[])
 	   N, elapsed, grid->tn*iter/elapsed);
 
   stats sp = statsf (p);
-  fprintf (stderr, "sp: %g %g %g\n", sp.min, sp.sum, sp.max);
+  fprintf (stderr, "sp: %g %.5f %g\n", sp.min, fabs(sp.sum), sp.max);
   
 #if 0
   foreach (serial)

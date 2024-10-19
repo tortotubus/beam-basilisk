@@ -49,20 +49,25 @@ glxinfo -B | grep 'renderer string'
 #include <khash.h>
 
 typedef struct {
-  GLuint id;
-  External * externals;
+  int location, type, nd, local;
+  void * pointer;
+} MyUniform;
+
+typedef struct {
+  GLuint id, ng[2];
+  MyUniform * uniforms;
 } Shader;
 
 KHASH_MAP_INIT_INT(INT, Shader *)
   
 typedef struct {
   GRIDPARENT parent;
-  GLuint reduct[2], ng[2], nwg[2];
+  GLuint reduct[2];
   khash_t(INT) * shaders;
 } GridGPU;
 
 #define gpu_grid ((GridGPU *)grid)
-  
+
 static char * str_append_array (char * dst, const char * list[])
 {
   int empty = (dst == NULL);
@@ -127,6 +132,8 @@ static char glsl_preproc[] =
 #if LAYERS
   "#define foreach_block_inner() for (point.l = 0; point.l < nl; point.l++)\n"
   "#define end_foreach_block_inner() point.l = 0;\n"
+  "#define foreach_blockf(_f) for (point.l = 0; point.l < _attr(_f,block); point.l++)\n"
+  "#define end_foreach_blockf() point.l = 0;\n"
 #endif
   "#define forin2(a,b,c,d) for (int _i = 0; _i < c.length() - 1; _i++)"
   "  { a = c[_i]; b = d[_i];\n"
@@ -294,116 +301,6 @@ void apply_bc (Point point)
     boundary_top (point, 0);     // top
 }
 
-static External * append_external (External * externals, External ** end, External * g)
-{
-  if (externals)
-    (*end)->next = g;
-  else
-    externals = g;
-  *end = g;
-  (*end)->next = NULL;
-  return externals;
-}
-
-static bool is_boundary_attribute (const External * g)
-{
-  return (!strcmp (g->name, ".boundary_left") ||
-	  !strcmp (g->name, ".boundary_right") ||
-	  !strcmp (g->name, ".boundary_bottom") ||
-	  !strcmp (g->name, ".boundary_top"));    
-}
-
-static External * merge_external (External * externals, External ** end, External * g,
-				  const ForeachData * loop)
-{
-  if (g->type == sym_function_declaration || g->type == sym_function_definition) {
-    bool boundary = is_boundary_attribute (g);
-    for (scalar s in baseblock)
-      if (g->name[0] != '.' || (!boundary && s.gpu.index) || (boundary && s.output)) {
-	void * ptr = g->name[0] != '.' ? g->pointer :
-	  *((void **)(((char *) &_attribute[s.i]) + g->nd));
-	if (ptr) {
-	  External * p = _get_function ((long) ptr);
-	  if (!p) {
-	    fprintf (stderr, "%s:%d: GLSL: error: unregistered function pointer '%s'\n",
-		     loop->fname, loop->line, g->name);
-	    return NULL;
-	  }
-	  if (!p->used) {
-	    p->used = true;
-	    for (External * i = p->externals; i && i->name; i++)
-	      externals = merge_external (externals, end, i, loop);
-	    externals = append_external (externals, end, p);
-	  }
-	}
-	if (g->name[0] != '.')
-	    break;
-      }
-  }
-  for (External * i = externals; i; i = i->next)
-    if (!strcmp (g->name, i->name)) {
-
-      /**
-      Check whether a local *g* (resp. *i*) shadows a global *i* (resp
-      *g*). */
-      
-      if (g->global == 0 && i->global == 1) g->global = 2;
-      else if (g->global == 1 && i->global == 0) i->global = 2;
-      else // already in the list
-	return externals;
-    }
-
-  return append_external (externals, end, g);
-}
-
-static External * merge_externals (External * externals, const ForeachData * loop)
-{
-  External * merged = NULL, * end = NULL;
-  static External ext[] = {
-    { .name = "X0", .type = sym_DOUBLE, .pointer = &X0, .global = 1 },
-    { .name = "Y0", .type = sym_DOUBLE, .pointer = &Y0, .global = 1 },
-    { .name = "Z0", .type = sym_DOUBLE, .pointer = &Z0, .global = 1 },
-    { .name = "L0", .type = sym_DOUBLE, .pointer = &L0, .global = 1 },
-    { .name = "N",  .type = sym_INT,    .pointer = &N, .global = 1 },
-    { .name = "apply_bc_list", .type = sym_SCALAR, .nd = 1, .global = 1 },
-    { .name = "apply_bc",      .type = sym_function_definition, .pointer = (void *)(long)apply_bc},
-#if LAYERS
-    { .name = "nl",  .type = sym_INT, .pointer = &nl },
-#endif
-    { .name = NULL }
-  };
-
-  ext[5].pointer = NULL;
-  for (scalar s in loop->dirty) {
-    s.boundary_left   = s.boundary[left];
-    s.boundary_right  = s.boundary[right];
-    s.boundary_top    = s.boundary[top];
-    s.boundary_bottom = s.boundary[bottom];
-  }
-
-  for (External * g = externals; g->name; g++) {
-    g->used = false;
-    if (g->global == 2) g->global = 0;
-  }
-  foreach_function (f, f->used = false);
-  for (External * g = ext; g->name; g++) {
-    g->used = false;
-    merged = merge_external (merged, &end, g, loop);
-  }
-#if LAYERS
-  assert (nl == 1); // fixme: not implemented yet for more than one layer
-#endif
-  for (External * g = externals; g->name; g++)
-    merged = merge_external (merged, &end, g, loop);
-#if PRINTEXTERNAL  
-  for (External * i = merged; i; i = i->next)
-    fprintf (stderr, "external %s %s %p\n", i->name, i->type, i->pointer);
-#endif
-  assert (!strcmp (ext[5].name, "apply_bc_list"));
-  ext[5].pointer = loop->dirty;
-  return merged;
-}
-
 #if 0
 typedef struct {
   uint32_t s1, s2;
@@ -462,46 +359,108 @@ inline uint32_t a32_hash (const Adler32Hash * hash)
 }
 #endif
 
-uint32_t hash_shader (const External * externals, const ForeachData * loop,
+static bool is_boundary_attribute (const External * g)
+{
+  return (g->name[0] == '.' &&
+	  (!strcmp (g->name, ".boundary_left") ||
+	   !strcmp (g->name, ".boundary_right") ||
+	   !strcmp (g->name, ".boundary_bottom") ||
+	   !strcmp (g->name, ".boundary_top")));
+}
+
+static
+void hash_external (Adler32Hash * hash, const External * g, const ForeachData * loop, int indent)
+{
+  if (g->type == sym_function_declaration || g->type == sym_function_definition) {
+    bool boundary = is_boundary_attribute (g);
+    for (scalar s in baseblock)
+      if (g->name[0] != '.' || (!boundary && s.gpu.index) || (boundary && s.output)) {
+	void * ptr = g->name[0] != '.' ? g->pointer :
+	  *((void **)(((char *) &_attribute[s.i]) + g->nd));
+	if (ptr) {
+	  External * p = _get_function ((long) ptr);
+	  if (p && !p->used) {
+	    p->used = true;
+	    a32_hash_add (hash, &ptr, sizeof (void *));
+	    for (const External * e = p->externals; e && e->name; e++)
+	      hash_external (hash, e, loop, indent + 2);
+	  }
+	}
+	if (g->name[0] != '.')
+	    break;
+      }
+  }
+  else if (g->name[0] == '.') {
+    int size = 0;
+    switch (g->type) {
+    case sym_INT: size = sizeof (int); break;
+    case sym_BOOL: size = sizeof (bool); break;
+    case sym_FLOAT: size = sizeof (float); break;
+    case sym_DOUBLE: size = sizeof (double); break;
+    case sym_IVEC: size = sizeof (ivec); break;
+    case sym_SCALAR: size = sizeof (scalar); break;
+    case sym_VECTOR: size = sizeof (vector); break;
+    case sym_TENSOR: size = sizeof (tensor); break;
+    default: return;
+    }
+    for (scalar s in baseblock)
+      if (s.gpu.index) {
+	char * data = (char *) &_attribute[s.i];
+	a32_hash_add (hash, data + g->nd, size);
+      }
+  }
+  else if (g->type == sym_SCALAR || g->type == sym_VECTOR || g->type == sym_TENSOR) {
+    assert (g->nd == 0 || g->nd == 1);
+    void * pointer = g->pointer;
+    int size;
+    if (g->nd == 1) {
+      size = 0;
+      for (scalar s in pointer)
+	size += sizeof (scalar);
+    }
+    else if (g->type == sym_SCALAR)
+      size = sizeof (scalar);
+    else if (g->type == sym_VECTOR)
+      size = sizeof (vector);
+    else // sym_TENSOR
+      size = sizeof (tensor);
+    a32_hash_add (hash, pointer, size);
+  }
+}
+
+static
+uint32_t hash_shader (const External * externals,
+		      const ForeachData * loop,
 		      const RegionParameters * region, const char * kernel)
 {
   Adler32Hash hash;
   a32_hash_init (&hash);
   a32_hash_add (&hash, &region->level, sizeof (region->level));
   a32_hash_add (&hash, &N, sizeof (N));
+#if LAYERS
+  a32_hash_add (&hash, &nl, sizeof (nl));
+#endif
   a32_hash_add (&hash, &Period, sizeof (Period));
   a32_hash_add (&hash, kernel, strlen (kernel));
   a32_hash_add (&hash, &nconst, sizeof (nconst));
   a32_hash_add (&hash, _constant, sizeof (*_constant)*nconst);
-  for (const External * g = externals; g; g = g->next) {
-    if (g->type == sym_INT && !strcmp (g->name, "nl"))
-      a32_hash_add (&hash, g->pointer, sizeof (int));
-    else if (g->type == sym_SCALAR ||
-	     g->type == sym_VECTOR ||
-	     g->type == sym_TENSOR) {
-      // scalar, vector and tensor fields
-      int size = list_size (g);
-      a32_hash_add (&hash, &size, sizeof (size));
-      for (int j = 0; j < size; j++)
-	if (g->nd == 0 || j < size - 1) {
-	  if (g->type == sym_SCALAR) {
-	    scalar s = ((scalar *)g->pointer)[j];
-	    a32_hash_add (&hash, &s.i, sizeof (s.i));
-	  }
-	  else if (g->type == sym_VECTOR) {
-	    vector v = ((vector *)g->pointer)[j];
-	    for (scalar s in {v})
-	      a32_hash_add (&hash, &s.i, sizeof (s.i));
-	  }
-	  else if (g->type == sym_TENSOR) {
-	    tensor t = ((tensor *)g->pointer)[j];
-	    for (scalar s in {t})
-	      a32_hash_add (&hash, &s.i, sizeof (s.i));
-	  }
-	  else
-	    assert (false);
-	}
-    }
+  static External ext[] = {
+    { .name = ".boundary_left",   .type = sym_function_declaration, .nd = attroffset (boundary_left) },
+    { .name = ".boundary_right",  .type = sym_function_declaration, .nd = attroffset (boundary_right) },
+    { .name = ".boundary_top",    .type = sym_function_declaration, .nd = attroffset (boundary_top) },
+    { .name = ".boundary_bottom", .type = sym_function_declaration, .nd = attroffset (boundary_bottom) },
+#if LAYERS
+    { .name = ".block", .type = sym_INT, .nd = attroffset (block) },
+#endif
+    { .name = NULL }
+  };
+  foreach_function (f, f->used = false);
+  for (const External * g = loop->dirty ? ext : ext + 4; g->name; g++)
+    hash_external (&hash, g, loop, 2);
+  for (const External * g = externals; g && g->name; g++) {
+    if (g->reduct)
+      a32_hash_add (&hash, &g->s, sizeof (scalar));
+    hash_external (&hash, g, loop, 2);
   }
   return a32_hash (&hash);
 }
@@ -542,7 +501,7 @@ static char * type_string (const External * g)
 
 trace
 char * build_shader (External * externals, const ForeachData * loop,
-		     const RegionParameters * region)
+		     const RegionParameters * region, const GLuint nwg[2])
 {
   int Nl = region->level > 0 ? 1 << (region->level - 1) : N;
   char s[20];
@@ -644,7 +603,6 @@ char * build_shader (External * externals, const ForeachData * loop,
   /**
   Non-local variables */
 
-  int location = 3; // 0,1 and 2 are reserved for csOrigin, vsOrigin and vsScale
   for (External * g = externals; g; g = g->next) {
     if (g->name[0] == '.') {
       if (g->type == sym_function_declaration) {
@@ -720,8 +678,8 @@ char * build_shader (External * externals, const ForeachData * loop,
 			   "out vec4 FragColor;\n");
 	else {
 	  char nwgx[20], nwgy[20];
-	  snprintf (nwgx, 19, "%d", gpu_grid->nwg[0]);
-	  snprintf (nwgy, 19, "%d", gpu_grid->nwg[1]);
+	  snprintf (nwgx, 19, "%d", nwg[0]);
+	  snprintf (nwgy, 19, "%d", nwg[1]);
 	  fs = str_append (fs, "layout (local_size_x = ", nwgx,
 			   ", local_size_y = ", nwgy, ") in;\n");
 	}
@@ -750,14 +708,8 @@ char * build_shader (External * externals, const ForeachData * loop,
       }
       else {
 	char * type = type_string (g);
-	char loc[20];
-	snprintf (loc, 19, "%d", location);
-	fs = str_append (fs, "layout (location = ", loc, ") uniform ",
-			 type, " ", EXTERNAL_NAME (g));
-	g->location = location;
-	int * d = g->data;
-	location += d && *d > 0 ? *d : 1;
-	for (; d && *d > 0; d++) {
+	fs = str_append (fs, "uniform ", type, " ", EXTERNAL_NAME (g));
+	for (int * d = g->data; d && *d > 0; d++) {
 	  char s[20]; snprintf (s, 19, "%d", *d);
 	  fs = str_append (fs, "[", s, "]");
 	}
@@ -849,7 +801,7 @@ Shader * load_shader (const char * fs, uint32_t hash, const ForeachData * loop)
   }
   Shader * shader = NULL;
   if (id) {
-    shader = malloc (sizeof (Shader));
+    shader = calloc (1, sizeof (Shader));
     shader->id = id;
     int ret;
     khiter_t k = kh_put (INT, gpu_grid->shaders, hash, &ret);
@@ -876,9 +828,15 @@ void gpu_free()
   if (!grid)
     return;
   free_boundaries();
-  uint32_t hash;
   Shader * shader;
-  kh_foreach (gpu_grid->shaders, hash, shader, free (shader)); hash = hash;
+  int nshaders = 0;
+  kh_foreach_value (gpu_grid->shaders, shader,
+		    free (shader->uniforms);
+		    free (shader);
+		    nshaders++; );
+#if PRINTNSHADERS  
+  fprintf (stderr, "# %d shaders\n", nshaders);
+#endif
   kh_destroy (INT, gpu_grid->shaders);
   gpu_grid->shaders = NULL;
   if (gpu_grid->reduct[0]) {
@@ -977,6 +935,7 @@ static void gpu_cpu_sync_scalar (scalar s, char * sep, GLenum mode)
   if (s.gpu.stored > 0 && s.dirty)
     boundary ({s});
   GL_C (glBindBuffer (GL_SHADER_STORAGE_BUFFER, GPUContext.ssbo));
+  GL_C (glMemoryBarrier (GL_BUFFER_UPDATE_BARRIER_BIT));
   size_t size = field_size()*sizeof(real);
   char * gd = glMapBufferRange (GL_SHADER_STORAGE_BUFFER, s.i*size, size, mode);
   assert (gd);
@@ -1064,20 +1023,112 @@ void gpu_init_grid (int n)
 
 #include "reduction.h"
 
-const char _double[] = "double";
+static External * append_external (External * externals, External ** end, External * g)
+{
+  if (externals)
+    (*end)->next = g;
+  else
+    externals = g;
+  *end = g;
+  (*end)->next = NULL;
+  return externals;
+}
+
+static External * merge_external (External * externals, External ** end, External * g,
+				  const ForeachData * loop)
+{
+  if (g->type == sym_function_declaration || g->type == sym_function_definition) {
+    bool boundary = is_boundary_attribute (g);
+    for (scalar s in baseblock)
+      if (g->name[0] != '.' || (!boundary && s.gpu.index) || (boundary && s.output)) {
+	void * ptr = g->name[0] != '.' ? g->pointer :
+	  *((void **)(((char *) &_attribute[s.i]) + g->nd));
+	if (ptr) {
+	  External * p = _get_function ((long) ptr);
+	  if (!p) {
+	    fprintf (stderr, "%s:%d: GLSL: error: unregistered function pointer '%s'\n",
+		     loop->fname, loop->line, g->name);
+	    return NULL;
+	  }
+	  if (!p->used) {
+	    p->used = true;
+	    for (External * i = p->externals; i && i->name; i++)
+	      externals = merge_external (externals, end, i, loop);
+	    externals = append_external (externals, end, p);
+	  }
+	}
+	if (g->name[0] != '.')
+	    break;
+      }
+  }
+  for (External * i = externals; i; i = i->next)
+    if (!strcmp (g->name, i->name)) {
+
+      /**
+      Check whether a local *g* (resp. *i*) shadows a global *i* (resp
+      *g*). */
+      
+      if (g->global == 0 && i->global == 1) g->global = 2;
+      else if (g->global == 1 && i->global == 0) i->global = 2;
+      else // already in the list
+	return externals;
+    }
+  return append_external (externals, end, g);
+}
+
+static External * merge_externals (External * externals, const ForeachData * loop)
+{
+  External * merged = NULL, * end = NULL;
+  static External ext[] = {
+    { .name = "X0", .type = sym_DOUBLE, .pointer = &X0, .global = 1 },
+    { .name = "Y0", .type = sym_DOUBLE, .pointer = &Y0, .global = 1 },
+    { .name = "Z0", .type = sym_DOUBLE, .pointer = &Z0, .global = 1 },
+    { .name = "L0", .type = sym_DOUBLE, .pointer = &L0, .global = 1 },
+    { .name = "N",  .type = sym_INT,    .pointer = &N, .global = 1 },
+#if LAYERS
+    { .name = "nl",  .type = sym_INT, .pointer = &nl },
+    { .name = ".block", .type = sym_INT, .nd = attroffset (block) },
+#endif
+    { .name = NULL }
+  };
+  static External bc = { .name = "apply_bc", .type = sym_function_declaration, .pointer = (void *)(long)apply_bc };
+
+  for (External * g = externals; g->name; g++) {
+    g->used = false;
+    if (g->global == 2) g->global = 0;
+  }
+  foreach_function (f, f->used = false);
+  for (External * g = ext; g->name; g++) {
+    g->used = false;
+    merged = merge_external (merged, &end, g, loop);
+  }
+  if (loop->dirty) {
+    bc.used = false;
+    merged = merge_external (merged, &end, &bc, loop);
+  }
+#if LAYERS
+  assert (nl == 1); // fixme: not implemented yet for more than one layer
+#endif
+  for (External * g = externals; g->name; g++)
+    merged = merge_external (merged, &end, g, loop);
+#if PRINTEXTERNAL  
+  for (External * i = merged; i; i = i->next)
+    fprintf (stderr, "external %s %d %p %d\n", i->name, i->type, i->pointer, i->global);
+#endif
+  if (loop->dirty)
+    for (External * g = merged; g; g = g->next)
+      if (g->global && !strcmp (g->name, "apply_bc_list"))
+	g->pointer = loop->dirty;
+  return merged;
+}
 
 trace
-static Shader * compile_shader (ForeachData * loop, const RegionParameters * region,
+static Shader * compile_shader (ForeachData * loop,
+				uint32_t hash,
+				const RegionParameters * region,
 				External * externals,
 				const char * kernel)
-{
-  assert (gpu_grid->shaders);
-  
-  uint32_t hash = hash_shader (externals, loop, region, kernel);
-  khiter_t k = kh_get (INT, gpu_grid->shaders, hash);
-  if (k != kh_end (gpu_grid->shaders))
-    return kh_value (gpu_grid->shaders, k);
-
+{  
   const char * error = strstr (kernel, "@error ");
   if (error) {
     for (const char * s = error + 7; *s != '\n' && *s != '\0'; s++)
@@ -1087,8 +1138,14 @@ static Shader * compile_shader (ForeachData * loop, const RegionParameters * reg
     return NULL;
   }
 
+  External * merged = merge_externals (externals, loop);
+  if (!merged) {
+    loop->data = NULL;
+    return NULL;
+  }
+  
   int local = false;
-  for (const External * g = externals; g; g = g->next) {
+  for (const External * g = merged; g; g = g->next) {
     if (g->global == 2)
       local = true;
     if (g->type != sym_SCALAR && g->type != sym_VECTOR && g->type != sym_TENSOR) {
@@ -1124,7 +1181,31 @@ static Shader * compile_shader (ForeachData * loop, const RegionParameters * reg
     }
   }
 
-  char * shader = build_shader (externals, loop, region);
+  /**
+  ## Number of compute shader work groups and groups */
+
+  static const int NWG[2] = {16, 16};
+  GLuint ng[2], nwg[2];
+  int Nl = region->level > 0 ? 1 << (region->level - 1) : N;
+  if (loop->face || loop->vertex) {
+    for (int i = 0; i < 2; i++)
+      if (Nl > NWG[i]) {
+	nwg[i] = NWG[i] + 1;
+	ng[i] = Nl/NWG[i];
+	assert (nwg[i]*ng[i] >= Nl + 1);
+      }
+      else {
+	nwg[i] = Nl + 1;
+	ng[i] = 1;
+      }
+  }
+  else
+    for (int i = 0; i < 2; i++) {
+      nwg[i] = Nl > NWG[i] ? NWG[i] : Nl;
+      ng[i] = Nl/nwg[i];
+    }
+ 
+  char * shader = build_shader (merged, loop, region, nwg);
   if (!shader)
     return NULL;
 
@@ -1133,7 +1214,7 @@ static Shader * compile_shader (ForeachData * loop, const RegionParameters * reg
 
   if (local) {
     shader = str_append (shader, "void _loop (");
-    for (const External * g = externals; g; g = g->next)
+    for (const External * g = merged; g; g = g->next)
       if (g->global == 2) {
 	shader = str_append (shader, local++ == 1 ? "" : ", ", type_string (g), " ", g->name);
 	if (g->nd) {
@@ -1168,7 +1249,7 @@ static Shader * compile_shader (ForeachData * loop, const RegionParameters * reg
     shader = str_append (shader, "  x -= Delta/2., y -= Delta/2.;\n");
   shader = str_append (shader, kernel);
   shader = str_append (shader, "\nif (point.j - GHOSTS < NY) {");
-  for (const External * g = externals; g; g = g->next)
+  for (const External * g = merged; g; g = g->next)
     if (g->reduct) {
       shader = str_append (shader, "\n  val_red_(", g->name, "_out_) = ", g->name, ";");
       scalar s = g->s;
@@ -1181,7 +1262,7 @@ static Shader * compile_shader (ForeachData * loop, const RegionParameters * reg
   if (local) {
     shader = str_append (shader, "void main(){_loop(");
     local = 1;
-    for (const External * g = externals; g; g = g->next)
+    for (const External * g = merged; g; g = g->next)
       if (g->global == 2)
 	shader = str_append (shader, local++ == 1 ? "" : ",", EXTERNAL_NAME (g));
     shader = str_append (shader, ");}\n");
@@ -1189,7 +1270,67 @@ static Shader * compile_shader (ForeachData * loop, const RegionParameters * reg
     
   Shader * s = load_shader (shader, hash, loop);
   loop->data = s;
+  if (!s)
+    return NULL;
+  s->ng[0] = ng[0], s->ng[1] = ng[1];
+  
+  /**
+  ## Make list of uniforms */
+
+  for (External * g = merged; g; g = g->next)
+    g->used = 0;
+  int index = 1;
+  for (External * g = externals; g && g->name; g++)
+    g->used = index++;
+  int nuniforms = 0;
+  for (const External * g = merged; g; g = g->next) {
+    if (g->name[0] == '.') continue;
+    if (g->type == sym_function_declaration || g->type == sym_function_definition) continue;
+    if (g->type == sym_INT && (!strcmp (g->name, "N") ||
+			       !strcmp (g->name, "nl") ||
+			       !strcmp (g->name, "bc_period_x") ||
+			       !strcmp (g->name, "bc_period_y")))
+      continue;
+    if (g->type == sym_INT ||
+	g->type == sym_FLOAT ||
+	g->type == sym_DOUBLE ||
+	g->type == sym__COORD ||
+	g->type == sym_COORD ||
+	g->type == sym_BOOL ||
+	g->type == sym_VEC4) {
+      char * name = str_append (NULL, EXTERNAL_NAME (g));
+      int location = glGetUniformLocation (s->id, name);
+      sysfree (name);
+      if (location >= 0) {
+	// fprintf (stderr, "%s:%d: %s\n", loop->fname, loop->line, name);
+	// not an array or just a one-dimensional array
+	assert (!g->nd);
+	assert (!g->data || ((int *)g->data)[1] == 0);
+	int nd = g->data ? ((int *)g->data)[0] : 1;
+	s->uniforms = realloc (s->uniforms, (nuniforms + 2)*sizeof(MyUniform));
+	s->uniforms[nuniforms] = (MyUniform){
+	  .location = location, .type = g->type, .nd = nd,
+	  .local = g->global == 1 ? -1 : g->used - 1,
+	  .pointer = g->global == 1 ? g->pointer : NULL };
+	s->uniforms[nuniforms + 1].type = 0;
+	nuniforms++;
+	// uniforms refering to local variables must be in the 'externals' local list
+	assert (g->global == 1 || g->used);
+      }
+    }
+  }
+  
   return s;
+}
+
+static
+void free_reduction_fields (const External * externals)
+{
+  for (const External * g = externals; g; g = g->next)
+    if (g->reduct) {
+      scalar s = g->s;
+      delete ({s});
+    }
 }
 
 trace
@@ -1211,37 +1352,18 @@ static Shader * setup_shader (ForeachData * loop, const RegionParameters * regio
 	    c.gpu.index = index++;
       }
     }
-
-  if (!(externals = merge_externals (externals, loop)))
-    return NULL;
-  
-  /**
-  ## Number of compute shader work groups and groups */
-
-  static const int NWG[2] = {16, 16};
-  int Nl = region->level > 0 ? 1 << (region->level - 1) : N;
-  if (loop->face || loop->vertex) {
-    for (int i = 0; i < 2; i++)
-      if (Nl > NWG[i]) {
-	gpu_grid->nwg[i] = NWG[i] + 1;
-	gpu_grid->ng[i] = Nl/NWG[i];
-	assert (gpu_grid->nwg[i]*gpu_grid->ng[i] >= Nl + 1);
-      }
-      else {
-	gpu_grid->nwg[i] = Nl + 1;
-	gpu_grid->ng[i] = 1;
-      }
+  for (scalar s in loop->dirty) {
+    s.boundary_left   = s.boundary[left];
+    s.boundary_right  = s.boundary[right];
+    s.boundary_top    = s.boundary[top];
+    s.boundary_bottom = s.boundary[bottom];
   }
-  else
-    for (int i = 0; i < 2; i++) {
-      gpu_grid->nwg[i] = Nl > NWG[i] ? NWG[i] : Nl;
-      gpu_grid->ng[i] = Nl/gpu_grid->nwg[i];
-    }
+  apply_bc_list = loop->dirty;
   
   /**
   ## Allocate reduction fields */
 
-  for (External * g = externals; g; g = g->next)
+  for (External * g = externals; g && g->name; g++)
     if (g->reduct) {
       scalar s = new scalar;
       s.output = 1;
@@ -1252,22 +1374,23 @@ static Shader * setup_shader (ForeachData * loop, const RegionParameters * regio
 #endif
     }
 
-  Shader * shader = compile_shader (loop, region, externals, kernel);
+  /**
+  ## Reuse or compile a new shader */
   
-  if (!shader) {
-      
-    /**
-    ## Free reduction fields */
-    
-    for (const External * g = externals; g; g = g->next)
-      if (g->reduct) {
-	scalar s = g->s;
-	delete ({s});
-      }
-      
-    return NULL;
+  Shader * shader;
+  uint32_t hash = hash_shader (externals, loop, region, kernel);
+  assert (gpu_grid->shaders);
+  khiter_t k = kh_get (INT, gpu_grid->shaders, hash);
+  if (k != kh_end (gpu_grid->shaders))
+    shader = kh_value (gpu_grid->shaders, k);
+  else {
+    shader = compile_shader (loop, hash, region, externals, kernel);  
+    if (!shader) {
+      free_reduction_fields (externals);
+      return NULL;
+    }
   }
-  
+    
   gpu_cpu_sync (baseblock, GL_MAP_WRITE_BIT, loop->fname, loop->line);
 
   /**
@@ -1281,142 +1404,65 @@ static Shader * setup_shader (ForeachData * loop, const RegionParameters * regio
   GL_C (glBindBufferBase (GL_SHADER_STORAGE_BUFFER, 0, GPUContext.ssbo));
 
   /**
-  ## Set global variables */
+  ## Set uniforms */
 
-  for (const External * g = externals; g; g = g->next) {
-    if (g->name[0] == '.') continue;
-    if (g->type == sym_function_declaration || g->type == sym_function_definition) continue;
-    if (g->type == sym_INT && (!strcmp (g->name, "N") ||
-			       !strcmp (g->name, "nl") ||
-			       !strcmp (g->name, "bc_period_x") ||
-			       !strcmp (g->name, "bc_period_y")))
-      continue;
-    if (g->type == sym_INT ||
-	g->type == sym_FLOAT ||
-#if !SINGLE_PRECISION
-	g->type == sym_DOUBLE ||
-#endif
-	g->type == sym_VEC4) {
-      // not an array or just a one-dimensional array
-      assert (!g->data || ((int *)g->data)[1] == 0);
-      GLint location;
-      if (g->location)
-	location = g->location;
-      else {
-	char name[strlen(g->name) + strlen ("_in_[]") + 20];
-	strcpy (name, g->name);
-	if (g->reduct)
-	  strcat (name, "_in_");
-	location = glGetUniformLocation (shader->id, name);
-      }
-      if (g->type == sym_INT) {
-#if PRINTUNIFORM
-	int * p = g->pointer;
-	fprintf (stderr, "uniform int %s = %d\n", g->name, *p);
-#endif
-	glUniform1iv (location, g->data ? ((int *)g->data)[0] : 1, g->pointer);
-      }
-      else if (g->type == sym_FLOAT) {
-#if PRINTUNIFORM
-	float * p = g->pointer;
-	fprintf (stderr, "uniform float %s = %g\n", g->name, *p);
-#endif
-	glUniform1fv (location, g->data ? ((int *)g->data)[0] : 1, g->pointer);
-      }
-      else if (g->type == sym_DOUBLE) {
-#if PRINTUNIFORM
-	double * p = g->pointer;
-	fprintf (stderr, "uniform double %s = %g\n", g->name, *p);
-#endif
-	glUniform1dv (location, g->data ? ((int *)g->data)[0] : 1, g->pointer);
-      }
-      else if (g->type == sym_VEC4) {
-#if PRINTUNIFORM
-	float * p = g->pointer;
-	fprintf (stderr, "uniform vec4 %s = {%g,%g,%g,%g}\n", g->name, p[0], p[1], p[2], p[3]);
-#endif
-	glUniform4fv (location, g->data ? ((int *)g->data)[0] : 1, g->pointer);
-      }
+  for (const MyUniform * g = shader->uniforms; g && g->type; g++) {
+    void * pointer = g->pointer;
+    if (!pointer) {
+      assert (g->local >= 0);
+      pointer = externals[g->local].pointer;
     }
-    else if (g->type != sym_SCALAR &&
-	     g->type != sym_VECTOR &&
-	     g->type != sym_TENSOR) {
-      void * p = g->pointer;
-      // not an array or just a one-dimensional array
-      assert (!g->data || ((int *)g->data)[1] == 0);
-      int nd = g->data ? ((int *)g->data)[0] : 1;      
-      for (int d = 0; d < nd; d++) {
-	GLint location;
-	if (!g->data && g->location)
-	  location = g->location;
-	else {
-	  char name[strlen(g->name) + strlen ("_in_[]") + 20];
-	  strcpy (name, g->name);
-	  if (g->reduct)
-	    strcat (name, "_in_");
-	  if (d > 0) {
-	    char s[22];
-	    snprintf (s, 21, "[%d]", d);
-	    strcat (name, s);
-	  }
-	  location = glGetUniformLocation (shader->id, name);
-	}
-	if (g->type == sym_enumeration_constant) {
-#if PRINTUNIFORM
-	  fprintf (stderr, "uniform enum %s = %d\n", g->name, g->nd);
-#endif
-	  assert (nd == 1);
-	  glUniform1i (location, g->nd);
-	}
-	else if (g->nd == 0) {
-	  if (g->type == sym_DOUBLE) {
-#if PRINTUNIFORM
-	    fprintf (stderr, "uniform double %s = %g\n", g->name, *((double *)p));
-#endif
-	    glUniform1f (location, *((double *)p)); p = ((double *)p) + 1;
-	  }
-	  else if (g->type == sym_BOOL) {
-#if PRINTUNIFORM
-	    bool * p = g->pointer;
-	    fprintf (stderr, "uniform bool %s = %d\n", g->name, *p);
-#endif
-	    glUniform1i (location, *((bool *)p)); p = ((bool *)p) + 1;
-	  }
-	  else if (g->type == sym_COORD) {
-#if PRINTUNIFORM
-	    fprintf (stderr, "uniform coord %s = {%g,%g,%g}\n", g->name,
-		     ((double *)p)[0], ((double *)p)[1], ((double *)p)[2]);
-#endif
+    switch (g->type) {
+    case sym_INT:
+      glUniform1iv (g->location, g->nd, pointer); break;
+    case sym_FLOAT:
+      glUniform1fv (g->location, g->nd, pointer); break;
+    case sym_VEC4:
+      glUniform4fv (g->location, g->nd, pointer); break;
+    case sym_BOOL: {
+      int p[g->nd];
+      bool * data = pointer;
+      for (int i = 0; i < g->nd; i++)
+	p[i] = data[i];
+      glUniform1iv (g->location, g->nd, p);
+      break;
+    }
 #if SINGLE_PRECISION
-	    glUniform3f (location, ((double *)p)[0], ((double *)p)[1], ((double *)p)[2]);
-#else
-	    glUniform3d (location, ((double *)p)[0], ((double *)p)[1], ((double *)p)[2]);
-#endif
-	    p = ((double *)p) + 3;
-	  }
-	  else if (g->type == sym__COORD) {
-#if PRINTUNIFORM
-	    fprintf (stderr, "uniform _coord %s = {%g,%g}\n", g->name,
-		     ((double *)p)[0], ((double *)p)[1]);
-#endif
-#if SINGLE_PRECISION
-	    glUniform2f (location, ((double *)p)[0], ((double *)p)[1]); p = ((double *)p) + 2;
-#else
-	    glUniform2d (location, ((double *)p)[0], ((double *)p)[1]); p = ((double *)p) + 2;
-#endif
-	  }
-	  else {
-	    fprintf (stderr, "type: %d name: %s\n", g->type, g->name);
-	    assert (false);
-	  }
-	}
-	else
-	  assert (false);
-      }
+    case sym_DOUBLE: {
+      float p[g->nd];
+      double * data = pointer;
+      for (int i = 0; i < g->nd; i++)
+	p[i] = data[i];
+      glUniform1fv (g->location, g->nd, p);
+      break;
+    }
+    case sym__COORD: {
+      float p[2*g->nd];
+      double * data = pointer;
+      for (int i = 0; i < 2*g->nd; i++)
+	p[i] = data[i];
+      glUniform2fv (g->location, g->nd, p);
+      break;
+    }
+    case sym_COORD: {
+      float p[3*g->nd];
+      double * data = pointer;
+      for (int i = 0; i < 3*g->nd; i++)
+	p[i] = data[i];
+      glUniform3fv (g->location, g->nd, p);
+      break;
+    }
+#else // DOUBLE_PRECISION
+    case sym_DOUBLE:
+      glUniform1dv (g->location, g->nd, pointer); break;
+    case sym__COORD:
+      glUniform2dv (g->location, g->nd, pointer); break;
+    case sym_COORD:
+      glUniform3dv (g->location, g->nd, pointer); break;
+#endif // DOUBLE_PRECISION
     }
   }
 
-  shader->externals = externals;
   return shader;
 }
 
@@ -1427,8 +1473,7 @@ static bool doloop_on_gpu (ForeachData * loop, const RegionParameters * region,
   Shader * shader = setup_shader (loop, region, externals, kernel);
   if (!shader)
     return false;
-  externals = shader->externals;
-
+  
   /**
   ## Render 
 
@@ -1439,6 +1484,7 @@ static bool doloop_on_gpu (ForeachData * loop, const RegionParameters * region,
     int csOrigin[] = { (region->p.x - X0)/L0*Nl, (region->p.y - Y0)/L0*Nl };
     GL_C (glUniform2iv (0, 1, csOrigin));
     assert (!GPUContext.fragment_shader);
+    GL_C (glMemoryBarrier (GL_SHADER_STORAGE_BARRIER_BIT));
     GL_C (glDispatchCompute (1, 1, 1));
   }
 
@@ -1454,30 +1500,28 @@ static bool doloop_on_gpu (ForeachData * loop, const RegionParameters * region,
     GL_C (glUniform2fv (1, 1, vsOrigin));
     GL_C (glUniform2fv (2, 1, vsScale));
     assert (GPUContext.fragment_shader);
+    GL_C (glMemoryBarrier (GL_SHADER_STORAGE_BARRIER_BIT));
     GL_C (glDrawArrays (GL_TRIANGLES, 0, 6));
   }
 
   else {
     assert (!GPUContext.fragment_shader);
-    //    tracing ("glDispatchCompute", __FILE__, __LINE__);
-    GL_C (glDispatchCompute (gpu_grid->ng[0], gpu_grid->ng[1], 1));
-    //    end_tracing ("glDispatchCompute", __FILE__, __LINE__);
+    GL_C (glMemoryBarrier (GL_SHADER_STORAGE_BARRIER_BIT));
+    GL_C (glDispatchCompute (shader->ng[0], shader->ng[1], 1));
   }
-  
-  GL_C (glMemoryBarrier (GL_ALL_BARRIER_BITS));
 
   /**
   ## Perform reductions and cleanup */
 
   bool nreductions = false;
-  for (const External * g = externals; g; g = g->next)
+  for (const External * g = externals; g && g->name; g++)
     if (g->reduct) {
       nreductions = true;
       break;
     }
   if (nreductions)
     tracing ("gpu_reduction", loop->fname, loop->line);
-  for (const External * g = externals; g; g = g->next)
+  for (const External * g = externals; g && g->name; g++)
     if (g->reduct) {
       scalar s = g->s;
       double result = gpu_reduction (field_offset (s), g->reduct, region,
