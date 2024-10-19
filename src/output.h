@@ -531,7 +531,7 @@ of the domain for which *mask* is negative.
 with *file*).
 
 *fps*
-: used only for [online output](gpu/output.h) on GPUs.
+: used only for [online output](grid/gpu/output.h) on GPUs.
 */
 
 trace
