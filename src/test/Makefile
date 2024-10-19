@@ -144,6 +144,7 @@ lid-restore.c: lid.c
 	ln -sf lid.c lid-restore.c
 lid-restore.dump: lid/dump
 	ln -sf lid/dump lid-restore.dump
+lid-restore.tst: CFLAGS += -grid=multigrid
 lid-restore.tst: lid.tst lid-restore.dump
 
 oscillation-compressible.c: oscillation.c
