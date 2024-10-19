@@ -59,6 +59,7 @@ script()
     rm -f log-* stencil stencil-* fine fine-* coarse coarse-*
     tail -f --pid=$$ --retry display.html 2> /dev/null | grep -o 'http://.*:[0-9]*' &
     tail -f --pid=$$ --retry $log 2> /dev/null | grep -E '.*:[0-9]*:.*(warning|error).*:' &
+    retail=$!
     if test -n "$EXEC" -o -z "$GDB"; then
 	if ! $EXEC ./$test 2> $log > $out; then
 	    pass=false
@@ -84,7 +85,8 @@ script()
 	fi
 	rm -f gdb.log
     fi
-
+    kill $retail
+    
     if test -f log-1; then
 	mv -f $log log-0
 	cat log-* > $log
@@ -529,7 +531,7 @@ elif ! test -f $test/fail.$ext || ! test -f $test/fail || ! checksum $test.s $te
 fi
 
 if test -f $test/fail; then
-    grep -v -E '.*:[0-9]*:.*(warning|error).*:' $test/fail
+    cat $test/fail
     if test -f $test.$ext; then
 	if test -n "$SANDBOX"; then
 	    mv -f $test.$ext $test/fail.tst
