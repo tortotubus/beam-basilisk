@@ -1,6 +1,6 @@
-837 constraints, 837 unknowns
-[0]  ast/interpreter/overload.h:337: '*c = 0[0]'
-[0]  ast/interpreter/overload.h:505: 'M_PI = 3.14159265358979 [0]'
+836 constraints, 836 unknowns
+[0]  ast/interpreter/overload.h:509: 'M_PI = 3.14159265358979 [0]'
+[0]  /src/grid/array.h:25: '4096'
 [0]  /src/grid/multigrid-common.h:454: 'size[] = 1'
 [0]  /src/common.h:105: '0.'
 [0]  /src/okada.h:16: '0.'
