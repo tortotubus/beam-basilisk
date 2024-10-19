@@ -202,6 +202,14 @@ __NV_PRIME_RENDER_OFFLOAD=1 __GLX_VENDOR_LIBRARY_NAME=nvidia ./nonlinear.gpu/non
 # Multigrid (GPU), 20565 steps, 25.9465 CPU, 25.96 real, 8.31e+08 points.step/s, 14 var
 # Multigrid (GPU), 20585 steps, 27.2398 CPU, 27.26 real, 7.92e+08 points.step/s, 14 var
 
+OpenGL renderer string: Quadro RTX 6000/PCIe/SSE2
+Dedicated video memory: 24576 MB
+
+./nonlinear.gpu/nonlinear.gpu 1024 2> /dev/null
+
+# Multigrid (GPU), 20565 steps, 9.33968 CPU, 9.36 real, 2.3e+09 points.step/s, 14 var
+# Multigrid (GPU), 20585 steps, 10.1986 CPU, 10.22 real, 2.11e+09 points.step/s, 14 var
+
 On CPU:
 
 CFLAGS='-grid=cartesian -fopenmp' make nonlinear.tst

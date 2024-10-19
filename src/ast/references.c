@@ -295,9 +295,9 @@ char * ast_external_references (Ast * scope, char * references, Stack * function
   ast_pop_scope (stack, scope);
 
   Ast ** n;
-  for (int i = 0; (n = stack_indexi (a.nonlocals, i)) && (!references || !strstr (references, "@error ")); i++)
-    references = add_reference (*n, references, scope, stack, functions);
   for (int i = 0; (n = stack_indexi (a.attributes, i)) && (!references || !strstr (references, "@error ")); i++)
+    references = add_reference (*n, references, scope, stack, functions);
+  for (int i = 0; (n = stack_indexi (a.nonlocals, i)) && (!references || !strstr (references, "@error ")); i++)
     references = add_reference (*n, references, scope, stack, functions);
 
   stack_destroy (a.nonlocals);

@@ -36,7 +36,7 @@ struct _External {
   void * data;    // the dimensions (int *) for arrays or the code (char *) for functions
   scalar s;       // used for reductions on GPUs
   External * externals, * next;
-  int used, location;
+  int used;
 };
 
 typedef struct {

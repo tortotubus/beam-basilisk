@@ -1,6 +1,7 @@
 real cpu_reduction (GLuint src, size_t offset, size_t nb, const char op)
 {
   GL_C (glBindBuffer (GL_SHADER_STORAGE_BUFFER, src));
+  GL_C (glMemoryBarrier (GL_BUFFER_UPDATE_BARRIER_BIT));
   real result = 0., * a = glMapBufferRange (GL_SHADER_STORAGE_BUFFER,
 					    offset*sizeof(real), nb*sizeof(real),
 					    GL_MAP_READ_BIT);
@@ -72,7 +73,9 @@ real gpu_reduction (size_t offset, const char op, const RegionParameters * regio
 		" real _data[]; };\n"
 		"layout (std430, binding = 1) writeonly buffer _reduct_layout {"
 		" real _reduct[]; };\n"
-		"uniform uint offset, nb, nbr;\n"
+		"layout (location = 3) uniform uint offset;\n"
+		"layout (location = 4) uniform uint nb;\n"
+		"layout (location = 5) uniform uint nbr;\n"
 		"layout (local_size_x = ", nwgrs, ") in;\n"
 		"void main() {\n"
 		"if (gl_GlobalInvocationID.x < nb) {\n"
@@ -95,13 +98,8 @@ real gpu_reduction (size_t offset, const char op, const RegionParameters * regio
   shader = load_shader (fs, a32_hash (&hash), NULL);
   assert (shader);
   GL_C (glUseProgram (shader->id));
-  GLint loffset = glGetUniformLocation (shader->id, "offset");
-  assert (loffset >= 0);
-  GLint lnb = glGetUniformLocation (shader->id, "nb");
-  assert (lnb >= 0);
-  GLint lnbr = glGetUniformLocation (shader->id, "nbr");
-  assert (lnbr >= 0);
-
+  const GLint loffset = 3, lnb = 4, lnbr = 5;
+  
   if (is_foreach_point) {
     real result = 0.;
     int i = (region->p.x - X0)/L0*N;
@@ -113,8 +111,8 @@ real gpu_reduction (size_t offset, const char op, const RegionParameters * regio
       GL_C (glBindBufferBase (GL_SHADER_STORAGE_BUFFER, 1, br[0]));
       GL_C (glUniform1ui (lnbr, 1));
       GL_C (glUniform1ui (lnb, 1));
+      GL_C (glMemoryBarrier (GL_SHADER_STORAGE_BARRIER_BIT));
       GL_C (glDispatchCompute (1, 1, 1));
-      GL_C (glMemoryBarrier (GL_ALL_BARRIER_BITS));
       GL_C (glBindBuffer (GL_SHADER_STORAGE_BUFFER, br[0]));
       GL_C (glGetBufferSubData (GL_SHADER_STORAGE_BUFFER, 0, sizeof (real), &result));
       GL_C (glBindBuffer (GL_SHADER_STORAGE_BUFFER, 0));
@@ -138,8 +136,8 @@ real gpu_reduction (size_t offset, const char op, const RegionParameters * regio
     if (ng*nwgr < nb)
       ng++;
     GL_C (glUniform1ui (lnb, nb));
+    GL_C (glMemoryBarrier (GL_SHADER_STORAGE_BARRIER_BIT));
     GL_C (glDispatchCompute (ng, 1, 1));
-    GL_C (glMemoryBarrier (GL_ALL_BARRIER_BITS));
     swap (int, src, dst);
     if (offset) {
       GL_C (glUniform1ui (loffset, 0));
