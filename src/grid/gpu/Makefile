@@ -11,7 +11,8 @@ all: libgpu.a
 libgpu.a: errors.o glad.o
 	ar cr libgpu.a errors.o glad.o
 
-clean:
-	rm -f *.o *.a
-
 check:
+
+Benchmarks.md.html: Benchmarks/plots
+
+include ../../Makefile.defs
