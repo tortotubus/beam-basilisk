@@ -22,7 +22,7 @@ necessary and is done automatically.
 OpenGL is an open standard (unlike
 e.g. [CUDA](https://en.wikipedia.org/wiki/CUDA)) and is widely
 supported by graphics cards (with the notable exception of Apple
-graphics card and some high-end "professional" Nvidia cards).
+graphics cards and some high-end "professional" Nvidia cards).
 
 ## Running on GPUs
 
@@ -100,7 +100,7 @@ If this worked, you can then try a more interesting example
 
 ~~~bash
 CFLAGS='-DSHOW' make bump2D-gpu.tst
-__NV_PRIME_RENDER_OFFLOAD=1 __GLX_VENDOR_LIBRARY_NAME=nvidia ./bump2D-gpu/bump2D-gpu
+__NV_PRIME_RENDER_OFFLOAD=1 __GLX_VENDOR_LIBRARY_NAME=nvidia ./bump2D-gpu/bump2D-gpu 10
 ~~~
 
 and also
