@@ -17,11 +17,16 @@ The RTX6000 is still about three times slower (on paper) than current
 state-of-the-art "gamers" graphics cards (e.g. the [RTX
 4090](https://www.techpowerup.com/gpu-specs/geforce-rtx-4090.c3889)).
 
+Do not hesitate to send [me](/sandbox/popinet/README) benchmarks
+results on other cards: to reproduce the benchmarks on your system
+follow the links for the raw scripts and results given in each
+section.
+
 ## Time-reversed advection in a vortex
 
 This is this [test case](/src/test/advection.c) i.e. the [BCG](/src/bcg.h) advection solver.
 
-See [advection]() for the commands and raw data.
+See [Benchmarks/advection]() for the commands and raw data.
 
 ~~~gnuplot Time-reversed advection in a vortex
 set term svg enhanced font ',11' size 1000,500
@@ -56,7 +61,7 @@ This is [this test case](/src/test/reversed.c) i.e. a test of the [VOF
 advection scheme](/src/vof.h), which is significantly more complex
 than the BCG scheme.
 
-See [reversed]() for the commands and raw data.
+See [Benchmarks/reversed]() for the commands and raw data.
 
 ~~~gnuplot Time-reversed VOF advection in a vortex
 set multiplot layout 1, 2
@@ -77,7 +82,7 @@ unset multiplot
 This is close to this [test case](/src/test/bump2D.c) and tests the
 [Saint-Venant solver](/src/saint-venant.h).
 
-See [bump2D-gpu]() for the commands and raw data.
+See [Benchmarks/bump2D-gpu]() for the commands and raw data.
 
 ~~~gnuplot Saint-Venant bump
 set multiplot layout 1, 2
@@ -101,7 +106,7 @@ the previous benchmarks is the use of the [multigrid
 solvers](/src/poisson.h) used for [viscosity](/src/viscosity.h) and
 pressure.
 
-See [lid]() for the commands and raw data.
+See [Benchmarks/lid]() for the commands and raw data.
 
 ~~~gnuplot Lid-driven cavity
 set multiplot layout 1, 2
@@ -124,7 +129,7 @@ streamfunction--vorticity [Navier-Stokes
 solver](/src/navier-stokes/stream.h) (i.e. mostly the multigrid
 Poisson solver).
 
-See [turbulence]() for the commands and raw data.
+See [Benchmarks/turbulence]() for the commands and raw data.
 
 ~~~gnuplot Two-dimensional turbulence
 set multiplot layout 1, 2

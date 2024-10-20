@@ -191,32 +191,6 @@ Note that only the documented test cases appear in the list below
 * [Boundary conditions for face vector fields](mpi-interpu.c)
 * [Simple test of Basilisk View](view.c)
 
-## GPUs
-
-These tests need to be run manually using
-
-~~~bash
-make gpu-tests
-~~~
-
-* [gpu.c](Basic GPU operations)
-* [gpu-reduce.c](Reductions on GPUs)
-* [advection.c](Time-reversed advection in a vortex)
-* [bump2D-gpu.c](Saint-Venant bump)
-
-## Speed benchmarks
-
-* [Speed of elementary operations on different grids](laplacian.c)
-* [Poisson equation](poisson.c)
-* [Poisson equation with a circular refined patch](circle.c)
-
-## Basic operations
-
-* [Automatic stencils / boundary conditions](stencils.c)
-* [Interpolation on halos](interp.c)
-* [Tangential interpolation on face vector fields](interpu.c)
-* [Height Functions](hf.c)
-
 ## GPU tests
 
 These tests need to be run manually using:
@@ -236,6 +210,21 @@ Tests for the multigrid solver on GPUs.
 
 * [Convergence of axisymmetric viscous terms](axi.c)
 * [Lid-driven cavity](lid.c)
+
+See also the [GPU Benchmarks](/src/grid/gpu/Benchmarks).
+
+## Speed benchmarks
+
+* [Speed of elementary operations on different grids](laplacian.c)
+* [Poisson equation](poisson.c)
+* [Poisson equation with a circular refined patch](circle.c)
+
+## Basic operations
+
+* [Automatic stencils / boundary conditions](stencils.c)
+* [Interpolation on halos](interp.c)
+* [Tangential interpolation on face vector fields](interpu.c)
+* [Height Functions](hf.c)
 
 ## Other
 

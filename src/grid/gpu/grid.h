@@ -6,8 +6,7 @@ The files in this directory implement Cartesian and Multigrid grids on
 Units](https://en.wikipedia.org/wiki/Graphics_processing_unit)
 (GPUs). The ultimate goal is to allow running any [Basilisk
 solver](/src/README#solvers) on GPUs without any modification to the
-original source code (or only [minor
-modifications](/src/?changes=20241018142827)).
+original source code.
 
 To do so the [Basilisk preprocessor](/src/ast/README) automatically
 generates "computation kernels" for each [loop
@@ -246,6 +245,7 @@ priority" these are:
 * Access to video memories largers than 2^32^ bytes i.e. 4GB is
   currently impossible. This will be lifted soon (once I have found a
   solution...)
+* Boundary conditions have only been implemented for 3x3 stencils.
 * At this stage only a few solvers [have been
   tested](/src/test/README#gpu-tests). Other solvers may or may not
   work. In particular [surface tension](/src/tension.h) will not work
@@ -296,7 +296,6 @@ To maximize performance, here are a few tips and observations:
 
 * [Test cases on GPUs](/src/test/README#gpu-tests)
 * [GPU benchmarks](Benchmarks.md)
-* [Minor GPU adaptations for solvers](/src/?changes=20241018142827)
 * [Computation kernels](/src/ast/kernels.c)
 
 # Implementation */
