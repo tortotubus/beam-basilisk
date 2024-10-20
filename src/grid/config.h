@@ -527,7 +527,7 @@ double _val_higher_dimension = 0.;
  * This blog was useful:
  *   http://codingcastles.blogspot.co.nz/2008/12/nans-in-c.html 
  */
-@if (_GNU_SOURCE || __APPLE__) && !_OPENMP && !_CADNA
+@if (_GNU_SOURCE || __APPLE__) && !_OPENMP && !_CADNA && !_GPU
 double undefined;
 @ if __APPLE__
 @   include <stdint.h>
@@ -541,7 +541,7 @@ static void set_fpe (void) {
   memcpy (&undefined, &lnan, sizeof (double));
   enable_fpe (FE_DIVBYZERO|FE_INVALID);
 }
-@else // !((_GNU_SOURCE || __APPLE__) && !_OPENMP && !_CADNA)
+@else // !((_GNU_SOURCE || __APPLE__) && !_OPENMP && !_CADNA && !_GPU)
 @  define undefined ((double) DBL_MAX)
 @  define enable_fpe(flags)
 @  define disable_fpe(flags)
