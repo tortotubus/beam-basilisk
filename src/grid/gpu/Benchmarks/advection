@@ -2,28 +2,30 @@
 cd $BASILISK/src/test/
 
 CFLAGS=-fopenmp make advection.ctst
-OMP_NUM_THREADS=8 ./advection/advection 1024 2> /dev/null | grep steps
+OMP_NUM_THREADS=8 ./advection/advection 2048 2> /dev/null | grep steps
 
 OpenGL renderer string: Intel Core i7
 
-# Multigrid, 412 steps, 0.295415 CPU, 0.03878 real, 4.35e+07 points.step/s, 7 var
-# Multigrid, 796 steps, 0.928406 CPU, 0.1164 real, 1.12e+08 points.step/s, 7 var
-# Multigrid, 1566 steps, 5.6364 CPU, 0.7167 real, 1.43e+08 points.step/s, 7 var
-# Multigrid, 3100 steps, 39.7444 CPU, 4.969 real, 1.64e+08 points.step/s, 7 var
-# Multigrid, 6163 steps, 548.55 CPU, 68.58 real, 9.42e+07 points.step/s, 7 var
+# Multigrid, 412 steps, 0.275058 CPU, 0.03633 real, 4.65e+07 points.step/s, 7 var
+# Multigrid, 796 steps, 0.928328 CPU, 0.1163 real, 1.12e+08 points.step/s, 7 var
+# Multigrid, 1566 steps, 5.72297 CPU, 0.7265 real, 1.41e+08 points.step/s, 7 var
+# Multigrid, 3100 steps, 40.9198 CPU, 5.116 real, 1.59e+08 points.step/s, 7 var
+# Multigrid, 6163 steps, 538.689 CPU, 67.34 real, 9.6e+07 points.step/s, 7 var
+# Multigrid, 12280 steps, 4756.62 CPU, 594.6 real, 8.66e+07 points.step/s, 7 var
 
 make advection.gpu.tst
 
 OpenGL renderer string: Mesa Intel(R) UHD Graphics (TGL GT1) (0x9a60)
 Video memory: 3072MB
 
-./advection.gpu/advection.gpu 1024 2> /dev/null | grep steps
+./advection.gpu/advection.gpu 2048 2> /dev/null | grep steps
 
-# Multigrid (GPU), 412 steps, 0.05744 CPU, 0.1066 real, 1.58e+07 points.step/s, 8 var
-# Multigrid (GPU), 796 steps, 0.071283 CPU, 0.2083 real, 6.26e+07 points.step/s, 8 var
-# Multigrid (GPU), 1566 steps, 0.193343 CPU, 0.9687 real, 1.06e+08 points.step/s, 8 var
-# Multigrid (GPU), 3100 steps, 0.881404 CPU, 6.278 real, 1.29e+08 points.step/s, 8 var
-# Multigrid (GPU), 6163 steps, 3.45753 CPU, 43.12 real, 1.5e+08 points.step/s, 8 var
+# Multigrid (GPU), 412 steps, 0.052281 CPU, 0.08927 real, 1.89e+07 points.step/s, 8 var
+# Multigrid (GPU), 796 steps, 0.061498 CPU, 0.1933 real, 6.75e+07 points.step/s, 8 var
+# Multigrid (GPU), 1566 steps, 0.174751 CPU, 0.9532 real, 1.08e+08 points.step/s, 8 var
+# Multigrid (GPU), 3100 steps, 0.766669 CPU, 6.167 real, 1.32e+08 points.step/s, 8 var
+# Multigrid (GPU), 6163 steps, 3.10575 CPU, 43.14 real, 1.5e+08 points.step/s, 8 var
+# Multigrid (GPU), 12280 steps, 7.34859 CPU, 340 real, 1.51e+08 points.step/s, 8 var
 
 OpenGL renderer string: NVIDIA GeForce RTX 3050 Ti Laptop GPU/PCIe/SSE2
 Dedicated video memory: 4096 MB

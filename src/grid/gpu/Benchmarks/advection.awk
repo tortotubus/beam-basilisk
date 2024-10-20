@@ -2,7 +2,7 @@ BEGIN {
     i = 0
 }
 /points.step/ {
-    a[i][n++] = $(NF - 3)
+    a[i][n++] = $(NF - findex)
     next
 }
 {

@@ -13,6 +13,8 @@ libgpu.a: errors.o glad.o
 
 check:
 
+Benchmarks/plots: Benchmarks/advection Benchmarks/bump2D-gpu Benchmarks/advection.awk \
+	Benchmarks/lid Benchmarks/reversed Benchmarks/turbulence
 Benchmarks.md.html: Benchmarks/plots
 
 include ../../Makefile.defs
