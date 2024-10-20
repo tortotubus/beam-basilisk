@@ -211,7 +211,7 @@ Tests for the multigrid solver on GPUs.
 * [Convergence of axisymmetric viscous terms](axi.c)
 * [Lid-driven cavity](lid.c)
 
-See also the [GPU Benchmarks](/src/grid/gpu/Benchmarks).
+See also the [GPU Benchmarks](/src/grid/gpu/Benchmarks.md).
 
 ## Speed benchmarks
 
