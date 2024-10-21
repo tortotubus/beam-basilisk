@@ -570,6 +570,30 @@ void kernel (Ast * n, Stack * stack, void * data)
     break;
   }
     
+  /**
+  ## Diagonalize */
+
+  case sym_macro_statement: {
+    Ast * identifier = ast_schema (n, sym_macro_statement,
+				   0, sym_function_call,
+				   0, sym_postfix_expression,
+				   0, sym_primary_expression,
+				   0, sym_IDENTIFIER);
+    if (!strcmp (ast_terminal (identifier)->start, "diagonalize")) {
+      Ast * field = ast_schema (n, sym_macro_statement,
+				0, sym_function_call,
+				2, sym_argument_expression_list,
+				0, sym_argument_expression_list_item,
+				0, sym_assignment_expression);
+      if (field && (field = ast_is_identifier_expression (field))) {
+	stack_push (stack, &n);
+	ast_traverse (n, stack, ast_diagonalize, field);
+	ast_pop_scope (stack, n);
+      }
+    }
+    break; 
+  }
+    
   }
 }
 
