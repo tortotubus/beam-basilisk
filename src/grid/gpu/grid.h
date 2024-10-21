@@ -380,6 +380,8 @@ static char glsl_preproc[] =
   "#define val(s,k,l,m) ((s).i < _NVARMAX ? valt(s,k,l,m)"
   " : _constant[clamp((s).i -_NVARMAX,0,_nconst-1)])\n"
   "#define val_out_(s,i,j,k) valt(s,i,j,k)\n"
+  "#define diagonalize(a)\n"
+  "#define val_diagonal(s,i,j,k) real((i) == 0 && (j) == 0 && (k) == 0)\n"
   "#define _attr(s,member) (_attr[(s).index].member)\n"
   "#define forin(type,s,list) for (int _i = 0; _i < list.length() - 1; _i++) { type s = list[_i];\n"
   "#define endforin() }\n"
@@ -1340,12 +1342,14 @@ static External * merge_externals (External * externals, const ForeachData * loo
     { .name = "L0", .type = sym_DOUBLE, .pointer = &L0, .global = 1 },
     { .name = "N",  .type = sym_INT,    .pointer = &N, .global = 1 },
 #if LAYERS
-    { .name = "nl",  .type = sym_INT, .pointer = &nl },
+    { .name = "nl",  .type = sym_INT, .pointer = &nl, .global = 1 },
     { .name = ".block", .type = sym_INT, .nd = attroffset (block) },
 #endif
     { .name = NULL }
   };
-  static External bc = { .name = "apply_bc", .type = sym_function_declaration, .pointer = (void *)(long)apply_bc };
+  static External bc = {
+    .name = "apply_bc", .type = sym_function_declaration, .pointer = (void *)(long)apply_bc
+  };
 
   for (External * g = externals; g->name; g++) {
     g->used = false;
