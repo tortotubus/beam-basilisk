@@ -80,6 +80,8 @@ bool is_constant();
 void dimensional();
 void NOT_UNUSED();
 void neighborp();
+void diagonalize();
+double val_diagonal();
 
 double abs (double x);
 double acos (double x);
