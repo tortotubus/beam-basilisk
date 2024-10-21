@@ -278,7 +278,26 @@ void kernel (Ast * n, Stack * stack, void * data)
   case sym_selection_statement:
     implicit_type_cast (n, stack);
     break;
-    
+
+  case sym_for_declaration_statement:
+  case sym_iteration_statement:
+    if (n->child[0]->sym == sym_WHILE || n->child[0]->sym == sym_DO) {
+      Ast * expr = ast_child (n, sym_expression);
+      Ast * type = implicit_type_cast (expr, stack);
+      if (!type || type->sym != sym_BOOL)
+	type_cast (expr, "bool");
+    }
+    else if (n->child[0]->sym == sym_for_scope) {
+      Ast * expr = ast_schema (n->child[3], sym_expression_statement,
+			       0, sym_expression);
+      if (expr) {
+	Ast * type = implicit_type_cast (expr, stack);
+	if (!type || type->sym != sym_BOOL)
+	  type_cast (expr, "bool");
+      }
+    }
+    break;
+
   /**
   ## Typedef struct */
 
