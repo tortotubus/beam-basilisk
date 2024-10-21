@@ -382,6 +382,20 @@ void kernel (Ast * n, Stack * stack, void * data)
   }
 
   /**
+  ## Arrays as parameters 
+
+  This forces arrays passed as parameters to functions to behave like
+  in C99 i.e. passing by reference (inout) rather than by value.  */
+    
+  case sym_parameter_declaration:
+    if (ast_schema (n, sym_parameter_declaration,
+		    1, sym_declarator,
+		    0, sym_direct_declarator,
+		    2, sym_assignment_expression))
+      ast_before (n, "inout ");
+    break;
+    
+  /**
   ## Cast expressions */
 
   case sym_cast_expression:
