@@ -201,6 +201,7 @@ make -k gpu-tests
 ~~~
 
 * [A range of GPU tests](gpu.c)
+* [Layers](layers.c)
 * [Reductions on GPUs](gpu-reduce.c)
 * [Non-linear geostrophic adjustment](nonlinear.c)
 * [Time-reversed advection in a vortex](advection.c)
