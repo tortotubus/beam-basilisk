@@ -239,7 +239,6 @@ implementation also has the following limitations, some of which will
 be lifted in the (not-too-distant) future. In rough order of "lifting
 priority" these are:
 
-* [Multilayer](/Basilisk%20C#layers) is currently limited to a single layer
 * Only 2D Cartesian and Multigrid grids for now: 3D multigrid will
   follow easily, quadtrees and octrees are more difficult.
 * Access to video memories largers than 2^32^ bytes i.e. 4GB is
@@ -372,9 +371,7 @@ static char glsl_preproc[] =
   "};\n"
   "#define field_size() _field_size\n"
   "#define ast_pointer(x) (x)\n"
-  
   GPU_CODE()
-  
   "#define _NVARMAX 65536\n"
   "#define NULL 0\n"
   "#define val(s,k,l,m) ((s).i < _NVARMAX ? valt(s,k,l,m)"
@@ -386,10 +383,15 @@ static char glsl_preproc[] =
   "#define forin(type,s,list) for (int _i = 0; _i < list.length() - 1; _i++) { type s = list[_i];\n"
   "#define endforin() }\n"
 #if LAYERS
+  "#define _index(a,m) ((a).i + (point.l + _layer + (m) < _attr(a,block) ? point.l + _layer + (m) : 0))\n"
   "#define foreach_block_inner() for (point.l = 0; point.l < nl; point.l++)\n"
   "#define end_foreach_block_inner() point.l = 0;\n"
   "#define foreach_blockf(_f) for (point.l = 0; point.l < _attr(_f,block); point.l++)\n"
   "#define end_foreach_blockf() point.l = 0;\n"
+#else
+  "#define _index(a,m) ((a).i)\n"
+  "#define foreach_blockf(_f)\n"
+  "#define end_foreach_blockf()\n"
 #endif
   "#define forin2(a,b,c,d) for (int _i = 0; _i < c.length() - 1; _i++)"
   "  { a = c[_i]; b = d[_i];\n"
@@ -491,7 +493,8 @@ static void boundary_top (Point point, int i)
   for (scalar s in apply_bc_list)
     if (!s.face || s.i != s.v.y.i) {
       scalar b = (s.v.x.i < 0 ? s : s.i == s.v.y.i ? s.v.x : s.v.y);
-      s[i,-bc_period_y] = b.boundary_top (neighborp(i), neighborp(i,-bc_period_y), s, &data);
+      foreach_blockf(s)
+	s[i,-bc_period_y] = b.boundary_top (neighborp(i), neighborp(i,-bc_period_y), s, &data);
     }
 }
 
@@ -501,7 +504,8 @@ static void boundary_bottom (Point point, int i)
   for (scalar s in apply_bc_list)
     if (!s.face || s.i != s.v.y.i) {
       scalar b = (s.v.x.i < 0 ? s : s.i == s.v.y.i ? s.v.x : s.v.y);
-      s[i,bc_period_y] = b.boundary_bottom (neighborp(i), neighborp(i,bc_period_y), s, &data);
+      foreach_blockf(s)
+	s[i,bc_period_y] = b.boundary_bottom (neighborp(i), neighborp(i,bc_period_y), s, &data);
     }
 }
 
@@ -513,30 +517,35 @@ void apply_bc (Point point)
   if (point.i == GHOSTS)
     for (scalar s in apply_bc_list)
       if (s.face && s.i == s.v.x.i && s.boundary_left)
-	s[] = s.boundary_left (point, neighborp(bc_period_x), s, &data);
+	foreach_blockf(s)
+	  s[] = s.boundary_left (point, neighborp(bc_period_x), s, &data);
   if (point.i == N + GHOSTS)
     for (scalar s in apply_bc_list)
       if (s.face && s.i == s.v.x.i && s.boundary_right)
-	s[] = s.boundary_right (neighborp(bc_period_x), point, s, &data);
+	foreach_blockf(s)
+	  s[] = s.boundary_right (neighborp(bc_period_x), point, s, &data);
   if (point.j == GHOSTS)
     for (scalar s in apply_bc_list)
       if (s.face && s.i == s.v.y.i) {
 	scalar b = s.v.x;
 	if (b.boundary_bottom)
-	  s[] = b.boundary_bottom (point, neighborp(0,bc_period_y), s, &data);
+	  foreach_blockf(s)
+	    s[] = b.boundary_bottom (point, neighborp(0,bc_period_y), s, &data);
       }
   if (point.j == N + GHOSTS)
     for (scalar s in apply_bc_list)
       if (s.face && s.i == s.v.y.i) {
 	scalar b = s.v.x;
 	if (b.boundary_top)
-	  s[] = b.boundary_top (neighborp(0,bc_period_y), point, s, &data);
+	  foreach_blockf(s)
+	    s[] = b.boundary_top (neighborp(0,bc_period_y), point, s, &data);
       }
   // centered BCs
   if (point.i == GHOSTS) { // left
     for (scalar s in apply_bc_list)
       if (!s.face || s.i != s.v.x.i)
-	s[bc_period_x] = s.boundary_left (point, neighborp(bc_period_x), s, &data);
+	foreach_blockf(s)
+	  s[bc_period_x] = s.boundary_left (point, neighborp(bc_period_x), s, &data);
     if (point.j == GHOSTS)
       boundary_bottom (point, bc_period_x); // bottom-left
     if (point.j == N + GHOSTS - 1)
@@ -545,7 +554,8 @@ void apply_bc (Point point)
   if (point.i == N + GHOSTS - 1) { // right
     for (scalar s in apply_bc_list)
       if (!s.face || s.i != s.v.x.i)
-	s[- bc_period_x] = s.boundary_right (point, neighborp(- bc_period_x), s, &data);
+	foreach_blockf(s)
+	  s[- bc_period_x] = s.boundary_right (point, neighborp(- bc_period_x), s, &data);
     if (point.j == GHOSTS)
       boundary_bottom (point, - bc_period_x); // bottom-right
     if (point.j == N + GHOSTS - 1)
@@ -1193,13 +1203,13 @@ static void gpu_cpu_sync_scalar (scalar s, char * sep, GLenum mode)
   GL_C (glBindBuffer (GL_SHADER_STORAGE_BUFFER, GPUContext.ssbo));
   GL_C (glMemoryBarrier (GL_BUFFER_UPDATE_BARRIER_BIT));
   size_t size = field_size()*sizeof(real);
-  char * gd = glMapBufferRange (GL_SHADER_STORAGE_BUFFER, s.i*size, size, mode);
+  char * gd = glMapBufferRange (GL_SHADER_STORAGE_BUFFER, s.i*size, s.block*size, mode);
   assert (gd);
   char * cd = grid_data() + s.i*size;
   if (mode == GL_MAP_READ_BIT)
-    memcpy (cd, gd, size);
+    memcpy (cd, gd, s.block*size);
   else if (mode == GL_MAP_WRITE_BIT)
-    memcpy (gd, cd, size);
+    memcpy (gd, cd, s.block*size);
   else
     assert (false);
   assert (glUnmapBuffer (GL_SHADER_STORAGE_BUFFER));
@@ -1247,11 +1257,11 @@ void reset_gpu (void * alist, double val)
 #if SINGLE_PRECISION
       float fval = val;
       GL_C (glClearBufferSubData (GL_SHADER_STORAGE_BUFFER, GL_R32F,
-				  s.i*size, size,
+				  s.i*size, s.block*size,
 				  GL_RED, GL_FLOAT, &fval));
 #else
       GL_C (glClearBufferSubData (GL_SHADER_STORAGE_BUFFER, GL_RG32UI,
-				  s.i*size, size,
+				  s.i*size, s.block*size,
 				  GL_RG_INTEGER, GL_UNSIGNED_INT, &val));      
 #endif
       s.gpu.stored = -1;
@@ -1343,6 +1353,7 @@ static External * merge_externals (External * externals, const ForeachData * loo
     { .name = "N",  .type = sym_INT,    .pointer = &N, .global = 1 },
 #if LAYERS
     { .name = "nl",  .type = sym_INT, .pointer = &nl, .global = 1 },
+    { .name = "_layer",  .type = sym_INT, .pointer = &_layer, .global = 1 },
     { .name = ".block", .type = sym_INT, .nd = attroffset (block) },
 #endif
     { .name = NULL }
@@ -1364,9 +1375,6 @@ static External * merge_externals (External * externals, const ForeachData * loo
     bc.used = false;
     merged = merge_external (merged, &end, &bc, loop);
   }
-#if LAYERS
-  assert (nl == 1); // fixme: not implemented yet for more than one layer
-#endif
   for (External * g = externals; g->name; g++)
     merged = merge_external (merged, &end, g, loop);
 #if PRINTEXTERNAL  
