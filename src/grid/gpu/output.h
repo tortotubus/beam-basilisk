@@ -142,6 +142,7 @@ void output_ppm_gpu (OutputPPMGPU * display,
       GL_C (glFrontFace (GL_CCW));
       GL_C (glBindFramebuffer (GL_FRAMEBUFFER, 0));
       GL_C (glUseProgram (0));
+      GPUContext.current_shader = -1;
       GL_C (glBindTexture (GL_TEXTURE_2D, 0));
       GL_C (glDepthFunc (GL_LESS));
       GL_C (glPointSize (1));

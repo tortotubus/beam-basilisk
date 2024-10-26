@@ -1652,11 +1652,14 @@ static Shader * setup_shader (ForeachData * loop, const RegionParameters * regio
   ensure proper synchronisation of the compute shader and fragment
   shader (for example when using output_ppm() for interactive
   display). The nvidia driver somehow does not need this... */
-    
-  GL_C (glBindBufferBase (GL_SHADER_STORAGE_BUFFER, 0, 0));
-  GL_C (glUseProgram (shader->id));
-  GL_C (glBindBufferBase (GL_SHADER_STORAGE_BUFFER, 0, GPUContext.ssbo));
 
+  if (shader->id != GPUContext.current_shader) {
+    GL_C (glBindBufferBase (GL_SHADER_STORAGE_BUFFER, 0, 0));
+    GL_C (glUseProgram (shader->id));
+    GL_C (glBindBufferBase (GL_SHADER_STORAGE_BUFFER, 0, GPUContext.ssbo));
+    GPUContext.current_shader = shader->id;
+  }
+    
   /**
   ## Set uniforms */
 
