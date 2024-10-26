@@ -309,8 +309,10 @@ static int nconst = 0;
 void init_const_scalar (scalar s, const char * name, double val)
 {
   if (s.i - _NVARMAX >= nconst) {
+    qrealloc (_constant, s.i - _NVARMAX + 1, double);
+    for (int i = nconst; i < s.i - _NVARMAX; i++)
+      _constant[i] = 0.;
     nconst = s.i - _NVARMAX + 1;
-    qrealloc (_constant, nconst, double);
   }
   _constant[s.i - _NVARMAX] = val;
 }
