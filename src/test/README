@@ -135,6 +135,7 @@ Note that only the documented test cases appear in the list below
 * [Stability of the embedded face velocity interpolation](uf.c)
 * [Hydrostatic balance with refined embedded boundaries](hydrostatic2.c)
 * [Hydrostatic balance with refined embedded boundaries in 3D](hydrostatic3.c)
+* [Compatibility of embedded boundaries, axi and VOF](missing_metric.c)
 
 ### Stokes
 
