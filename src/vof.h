@@ -302,14 +302,14 @@ static void sweep_x (scalar c, scalar cc, scalar * tcl)
   
   foreach()
     if (cs[] > 0.) {
-      c[] += dt*(flux[] - flux[1] + cc[]*(uf.x[1] - uf.x[]))/Delta;
+      c[] += dt*cs[]*(flux[] - flux[1] + cc[]*(uf.x[1] - uf.x[]))/(cm[]*Delta);
 #if NO_1D_COMPRESSION
       for (t, tflux in tracers, tfluxl)
-	t[] += dt*(tflux[] - tflux[1])/Delta;
+	t[] += dt*cs[]*(tflux[] - tflux[1])/(cm[]*Delta);
 #else // !NO_1D_COMPRESSION
       scalar t, tc, tflux;
       for (t, tc, tflux in tracers, tcl, tfluxl)
-	t[] += dt*(tflux[] - tflux[1] + tc[]*(uf.x[1] - uf.x[]))/Delta;
+	t[] += dt*cs[]*(tflux[] - tflux[1] + tc[]*(uf.x[1] - uf.x[]))/(cm[]*Delta);
 #endif // !NO_1D_COMPRESSION
     }
 #endif // EMBED
