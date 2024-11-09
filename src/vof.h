@@ -258,8 +258,8 @@ static void sweep_x (scalar c, scalar cc, scalar * tcl)
 
   if (cfl > 0.5 + 1e-6)
     fprintf (ferr, 
-	     "WARNING: CFL must be <= 0.5 for VOF (cfl - 0.5 = %g)\n", 
-	     cfl - 0.5), fflush (ferr);
+	     "src/vof.h:%d: warning: CFL must be <= 0.5 for VOF (cfl - 0.5 = %g)\n", 
+	     __LINE__, cfl - 0.5), fflush (ferr);
 
   /**
   Once we have computed the fluxes on all faces, we can update the

@@ -397,8 +397,9 @@ FILE * open_image (const char * file, const char * options)
 	has_ffmpeg = true;
       else {
 	fprintf (ferr,
-		 "open_image(): warning: cannot find '%s' or 'ffmpeg'/'avconv'\n"
-		 "open_image(): warning: falling back to raw PPM outputs\n", command);
+		 "src/output.h:%d: warning: cannot find '%s' or 'ffmpeg'/'avconv'\n"
+		 "src/output.h:%d: warning: falling back to raw PPM outputs\n",
+		 __LINE__, command, __LINE__);
 	has_ffmpeg = false;
       }
     }
@@ -430,8 +431,9 @@ FILE * open_image (const char * file, const char * options)
 	has_convert = true;
       else {
 	fprintf (ferr,
-		 "open_image(): warning: cannot find 'convert'\n"
-		 "open_image(): warning: falling back to raw PPM outputs\n");
+		 "src/output.h:%d: warning: cannot find 'convert'\n"
+		 "src/output.h:%d: warning: falling back to raw PPM outputs\n",
+		 __LINE__, __LINE__);
 	has_convert = false;
       }
     }
