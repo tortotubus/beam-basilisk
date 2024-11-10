@@ -361,6 +361,7 @@ void ast_cleanup (Ast * n, Stack * stack, Ast * scope, bool init_declarator)
     break;
 
   case sym_forin_declaration_statement:
+  case sym_forin_statement:
   case sym_foreach_inner_statement:
     ast_erase (n);
     break;
