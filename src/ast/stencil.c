@@ -1062,9 +1062,9 @@ Ast * ast_get_function_definition (Stack * stack, Ast * identifier, Ast * declar
 {
   if (!identifier)
     return NULL;
-  declaration = identifier_function_declaration
+  Ast * declaration1 = identifier_function_declaration
     (stack, ast_terminal (identifier)->start, declaration, NULL);
-  Ast * function_definition = declaration;
+  Ast * function_definition = declaration1;
   while (function_definition &&
 	 function_definition->sym != sym_declaration &&
 	 function_definition->sym != sym_function_definition)
@@ -1082,7 +1082,9 @@ Ast * ast_get_function_definition (Stack * stack, Ast * identifier, Ast * declar
 		   0, sym_generic_identifier,
 		   0, sym_IDENTIFIER))
     return NULL;
-  return ast_get_function_definition (stack, identifier, declaration);
+  if (declaration1 == declaration)
+    return NULL;
+  return ast_get_function_definition (stack, identifier, declaration1);
 }
 
 static void append_function_declaration (Ast * parent, Ast * declaration)
