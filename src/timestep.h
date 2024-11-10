@@ -2,6 +2,7 @@
 double timestep (const face vector u, double dtmax)
 {
   static double previous = 0.;
+  if (t == 0.) previous = 0.;
   dtmax /= CFL;
   foreach_face(reduction(min:dtmax))
     if (u.x[] != 0.) {
