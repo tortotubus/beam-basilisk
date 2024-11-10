@@ -1,6 +1,6 @@
-WARNING: convergence for pf not reached after 100 iterations
+src/poisson.h:219: warning: convergence for pf not reached after 100 iterations
   res: 930.013 sum: 6.56705 nrelax: 69 tolerance: 45.6316
-WARNING: convergence for p not reached after 100 iterations
+src/poisson.h:219: warning: convergence for p not reached after 100 iterations
   res: 144.481 sum: 2.95773e-10 nrelax: 69 tolerance: 11.4079
 0.59375 0.28471
 0.592343 0.289062
