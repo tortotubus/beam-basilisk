@@ -131,20 +131,16 @@ laplacian.tst: laplacian.ctst
 
 lidmac.c: lid.c
 	ln -sf lid.c lidmac.c
-lidmac.s: CFLAGS += -DMAC=1 -grid=multigrid
-lidmac.s.d: CFLAGS += -DMAC=1 -grid=multigrid
-lidmac.tst: CFLAGS += -DMAC=1 -grid=multigrid
+lidmac.s: CFLAGS += -DMAC=1
+lidmac.s.d: CFLAGS += -DMAC=1
+lidmac.tst: CFLAGS += -DMAC=1
 
-lid.s: CFLAGS += -grid=multigrid
-lid.s.d: CFLAGS += -grid=multigrid
-lid.tst: CFLAGS += -grid=multigrid
 lid.tst: lidmac.tst
 
 lid-restore.c: lid.c
 	ln -sf lid.c lid-restore.c
 lid-restore.dump: lid/dump
 	ln -sf lid/dump lid-restore.dump
-lid-restore.tst: CFLAGS += -grid=multigrid
 lid-restore.tst: lid.tst lid-restore.dump
 
 oscillation-compressible.c: oscillation.c
@@ -174,10 +170,6 @@ poiseuille-fenep.tst: CFLAGS += -DFENE_P=1
 poiseuille-oldroydb.tst: poiseuille-fenep.tst
 
 poisson.tst: poisson.ctst
-
-axi.s.d: CFLAGS += -grid=multigrid
-axi.s: CFLAGS += -grid=multigrid
-axi.tst: CFLAGS += -grid=multigrid
 
 rising-axi.c: rising.c
 	ln -sf rising.c rising-axi.c
@@ -368,14 +360,12 @@ ponds-ml.tst: CFLAGS += -DML=1
 
 stommel-ml.tst: CFLAGS += -DML=1
 
-nonlinear.s: CFLAGS += -grid=multigrid
-nonlinear.tst: CFLAGS += -grid=multigrid
 nonlinear.tst: nonlinear-ml.tst
 
 nonlinear-ml.c: nonlinear.c
 	ln -sf nonlinear.c nonlinear-ml.c 
-nonlinear-ml.s: CFLAGS += -DML=1 -grid=multigrid
-nonlinear-ml.tst: CFLAGS += -DML=1 -grid=multigrid
+nonlinear-ml.s: CFLAGS += -DML=1
+nonlinear-ml.tst: CFLAGS += -DML=1
 
 shockwave.tst: CFLAGS += -grid=bitree
 shockwave.ctst: CFLAGS += -grid=multigrid1D
@@ -583,18 +573,12 @@ dimensions-tests: bump2D.s capwave.s lid.s rising-axi.s		\
 
 # GPUs
 # fixme: the dependencies *.gpu.s.d are not created automatically
-gpu-tests: gpu.gpu.tst gpu-cpu.tst gpu-reduce.gpu.tst layers.gpu.tst nonlinear.gpu.tst \
+gpu-tests: gpu.gpu.tst gpu-cpu.gpu.tst gpu-reduce.gpu.tst layers.gpu.tst nonlinear.gpu.tst \
 	advection.gpu.tst bump2D-gpu.tst reversed.gpu.tst axi.gpu.tst lid.gpu.tst
 gpu-tests: CFLAGS += -DPRINTNSHADERS
 
-gpu.s.d: CFLAGS += -grid=multigrid
-gpu.s: CFLAGS += -grid=multigrid
-gpu.tst: CFLAGS += -grid=multigrid
-
 gpu-cpu.c: gpu.c
 	ln -sf gpu.c gpu-cpu.c
-gpu-cpu.s.d: CFLAGS += -grid=multigrid
-gpu-cpu.s: CFLAGS += -grid=gpu/multigrid -cpu
-gpu-cpu.tst: CFLAGS += -grid=gpu/multigrid -cpu
+gpu-cpu.gpu.tst: CFLAGS += -cpu
 
 include ../Makefile.defs

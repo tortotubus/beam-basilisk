@@ -40,8 +40,6 @@ in the source code, or using the `-grid` command line option of
 qcc -autolink -Wall -O2 -grid=gpu/multigrid code.c -o code -lm
 ~~~
 
-(where `code.c` does not specify the grid).
-
 The standard Basilisk [Makefile](/Tutorial#using-makefiles) also
 includes the handy recipe
 

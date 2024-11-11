@@ -1,10 +1,9 @@
 /**
 # Layers */
 
+#define LAYERS 1
 // fixme: does not work on quadtrees
 #include "grid/multigrid.h"
-
-#define LAYERS 1
 
 int main()
 {

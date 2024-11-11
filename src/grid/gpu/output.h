@@ -10,7 +10,7 @@ frames-per-second to display.
 For example
 
 ~~~literatec
-  output_ppm (f, fps = 30, map = jet, spread = -1, linear = true);
+  output_ppm (f, fp = NULL, fps = 30, map = jet, spread = -1, linear = true);
 ~~~
 
 will display field `f` with a maximum of 30 frames per second. 
