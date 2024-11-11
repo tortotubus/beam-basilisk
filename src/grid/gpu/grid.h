@@ -168,11 +168,11 @@ make test.gpu.tst
 we get
 
 ~~~bash
-test.gpu.c:9: GLSL: error: strings are not supported
+test.gpu.c:9: GLSL: error: unknown function 'printf'
 test.gpu.c:8: warning: foreach() done on CPU (see GLSL errors above)
 ~~~
 
-Basilisk warns us that "strings are not supported" in GLSL (at line 9)
+Basilisk warns us that "printf" is not known in GLSL (at line 9)
 and that, as a consequence, the loop at line 8 (i.e. the second loop
 which includes "printf") was run on the CPU. Note that the first
 message is a "GLSL: error" but that the code still ran OK on the
@@ -182,11 +182,10 @@ runtime by the graphics card driver.
 
 Since GPUs have a very limited access to the operating system
 (i.e. only through the OpenGL interface) we cannot expect the loop
-including "printf" (or any other output) to run on the GPU (in
-addition to the fact that "strings are not supported"). Note also that
-the second loop should be "serial" rather than parallel (see [Parallel
-Programming](/Basilisk C#parallel-programming)). So we need to modify
-the code to
+including "printf" (or any other output) to run on the GPU. Note also
+that the second loop should be "serial" rather than parallel (see
+[Parallel Programming](/Basilisk C#parallel-programming)). So we need
+to modify the code to
 
 ~~~literatec
 ...
@@ -341,6 +340,7 @@ static char * str_append_array (char * dst, const char * list[])
 static char glsl_preproc[] =
   "// #line " xstr(__LINE__) " " __FILE__ "\n"
   "#define dimensional(x)\n"
+  "#define qassert(file, line, cond)\n"
 #if !SINGLE_PRECISION
   "#define real double\n"
   "#define coord dvec3\n"
