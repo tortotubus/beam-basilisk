@@ -213,17 +213,6 @@ void kernel (Ast * n, Stack * stack, void * data)
   
   switch (n->sym) {
     
-  /**
-  ## Strings (unsupported) */
-
-  case sym_STRING_LITERAL: {
-    char s[1000];
-    AstTerminal * t = ast_terminal (n);
-    snprintf (s, 999, "\\n@error %s:%d: GLSL: error: strings are not supported\\n", t->file, t->line);
-    d->error = strdup (s);
-    return;
-  }    
-
   case sym_IDENTIFIER: {
 
     /**
