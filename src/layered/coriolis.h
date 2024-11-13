@@ -64,3 +64,14 @@ event acceleration (i++)
 }
 
 #undef alpha_H
+
+coord geostrophic_velocity (Point point)
+{
+  coord ug;
+  static const coord a = {-1., 1.};
+  foreach_dimension()
+    ug.y = a.y*G*(hf.x[]*gmetric(0)*(eta[] - eta[-1]) +
+		  hf.x[1]*gmetric(1)*(eta[1] - eta[]))
+    /(Delta*F0()*(hf.x[] + hf.x[1] + dry));
+  return ug;
+}
