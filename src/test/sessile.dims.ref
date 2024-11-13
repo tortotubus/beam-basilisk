@@ -1,4 +1,4 @@
-1614 constraints, 1614 unknowns
+1618 constraints, 1618 unknowns
 [0]  ast/interpreter/overload.h:477: '0'
 [0]  /src/grid/array.h:25: '4096'
 [0]  /src/navier-stokes/centered.h:294: '1.'
@@ -180,6 +180,7 @@
 [1]  sessile.c:57: '2 [1]'
 [1]  sessile.c:87: '0.5'
 [-1]  ast/interpreter/overload.h:477: '0'
+[-1]  /src/curvature.h:77: '1e30'
 [-1]  /src/curvature.h:215: '1e30'
 [-1]  /src/curvature.h:217: '1e30'
 [-1]  /src/curvature.h:224: '1e30'

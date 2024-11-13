@@ -1,4 +1,4 @@
-1704 constraints, 1704 unknowns
+1706 constraints, 1706 unknowns
 [0]  ast/interpreter/overload.h:477: '0'
 [0]  /src/grid/array.h:25: '4096'
 [0]  /src/grid/multigrid-common.h:28: 'sum = 0.'
@@ -189,6 +189,7 @@
 [1]  rising-reduced.c:121: '0.25'
 [1]  rising-reduced.c:121: '0.5'
 [-1]  ast/interpreter/overload.h:477: '0'
+[-1]  /src/curvature.h:77: '1e30'
 [-1]  /src/curvature.h:215: '1e30'
 [-1]  /src/curvature.h:217: '1e30'
 [-1]  /src/curvature.h:224: '1e30'
