@@ -120,9 +120,9 @@ int main()
 {
   G = 9.8;
   nl = 2;
-  size (6000e3);
+  size (6000e3 [1]);
   origin (0, - L0/2.);
-  DT = 3000;
+  DT = 3000 [0,1];
   N = 32;
   theta_H = 0.51;
   run();
