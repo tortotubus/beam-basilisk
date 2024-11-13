@@ -1,4 +1,4 @@
-1352 constraints, 1352 unknowns
+1354 constraints, 1354 unknowns
 [0]  ast/interpreter/overload.h:477: '0'
 [0]  /src/grid/array.h:25: '4096'
 [0]  /src/navier-stokes/centered.h:294: '1.'
@@ -177,6 +177,7 @@
 [1]  capwave.c:49: '2. [1]'
 [1]  capwave.c:75: 'a = 0.01'
 [-1]  ast/interpreter/overload.h:477: '0'
+[-1]  /src/curvature.h:77: '1e30'
 [-1]  /src/curvature.h:215: '1e30'
 [-1]  /src/curvature.h:217: '1e30'
 [-1]  /src/curvature.h:224: '1e30'

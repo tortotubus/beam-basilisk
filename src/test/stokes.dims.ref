@@ -115,7 +115,7 @@
 [2,-1]  /src/layered/nh.h:78: '0.'
 [1,-2]  stokes.c:33: 'g_ = 1.'
 [-2,1]  stokes.c:34: 'RE = 40000.'
-[2,-2]  ast/interpreter/overload.h:168: '0.'
+[2,-2]  ast/interpreter/overload.h:168: 'phi[] = 0.'
 [2,-2]  /src/grid/multigrid-common.h:28: 'sum = 0.'
 [2,-2]  /src/layered/nh.h:204: 'n = 0.'
 [2,-2]  /src/layered/nh.h:206: 'pg = 0.'
