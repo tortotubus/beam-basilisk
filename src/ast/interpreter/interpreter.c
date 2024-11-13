@@ -2888,8 +2888,8 @@ Value * ast_run_node (Ast * n, Stack * stack)
       }
       else
 	value = new_value (stack, n, (Ast *)&ast_void, 0);
-      StackData * d = stack_get_data (stack);
 #if 1
+      StackData * d = stack_get_data (stack);
       if (d->call < d->conditional) // fixme: changed from d->call <= d->conditional
 	value_set_flags (value, unset);
 #endif
@@ -2948,7 +2948,7 @@ Value * ast_run_node (Ast * n, Stack * stack)
       } while (maxiter--);
     }
     else if (n->child[0]->sym == sym_for_declaration_statement)
-      run (n->child[0], stack);
+      value = run (n->child[0], stack);
     else { // for loop
       assert (n->child[0]->sym == sym_for_scope);
       run (n->child[2], stack);
