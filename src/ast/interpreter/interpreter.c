@@ -968,6 +968,8 @@ Value * unary_operation (Ast * n, Ast * op, Value * a, Stack * stack)
     va = value_data (a, float);			\
   else if (a->type->sym == sym_DOUBLE)		\
     va = value_data (a, double);		\
+  else if (a->type->sym == sym_CHAR)		\
+    va = value_data (a, char);			\
   else						\
     return not_implemented (NULL, n, stack)
 
@@ -2237,6 +2239,28 @@ Value * internal_functions (Ast * call, Ast * identifier, Ast ** parameters, boo
       }
       else
 	value_data (value, int) = strcmp (s1, s2);
+    }
+    return ast_internal_functions_hook (call, identifier, params, stack, value);
+  }
+  else if (!strcmp (name, "strncmp")) {
+    Value * params[] = { run (parameters[0], stack), run (parameters[1], stack), run (parameters[2], stack) };
+    if (!params[0] || !params[1] || !params[2])
+      return undefined (NULL, call, stack);
+    Value * value = new_value (stack, call, (Ast *)&ast_int, 0);
+    if ((value_flags (params[0]) & unset) ||
+	(value_flags (params[1]) & unset) ||
+	(value_flags (params[2]) & unset))
+      value_set_flags (value, unset);
+    else {
+      const char * s1 = value_data (params[0], void *);
+      const char * s2 = value_data (params[1], void *);
+      long size = value_data (params[2], long);
+      if (!s1 || !s2) {
+	message (NULL, call, "strncmp (null, null, stack)\n", 2, stack);
+	value_data (value, int) = 0;
+      }
+      else
+	value_data (value, int) = strncmp (s1, s2, size);
     }
     return ast_internal_functions_hook (call, identifier, params, stack, value);
   }
