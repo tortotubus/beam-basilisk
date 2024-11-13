@@ -140,7 +140,6 @@ static void init_block_scalar (scalar sb, const char * name, const char * ext,
     baseblock = list_append (baseblock, sb);
   }
   else {
-     // fixme: should use functions compatible with the interpreter
     sprintf (bname, "%s%d%s", name, n, ext);
     sb.block = - n;
   }

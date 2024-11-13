@@ -14,6 +14,7 @@ char * strcpy (char *dest, const char *src) {}
 char * strcat (char * dest, const char * src) {}
 long strlen (const char * s) {}
 int strcmp (const char * s1, const char * s2) {}
+int strncmp (const char * s1, const char * s2, long size) {}
 
 double fabs (double x) {}
 double sqrt (double x) {}
