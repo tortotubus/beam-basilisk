@@ -41,7 +41,7 @@ file. */
 # define F0() 0.
 #endif
 #ifndef alpha_H
-# define alpha_H 0.5
+# define alpha_H 1.
 #endif
 
 event acceleration (i++)

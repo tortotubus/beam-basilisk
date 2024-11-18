@@ -148,7 +148,6 @@ more implicit discretisation than the default ($\alpha_H = 1/2$). */
 
 #define F0() (Beta*(y - 0.5))
 #define K0() (DELTA*Beta)
-#define alpha_H 1.
 #include "layered/coriolis.h"
 
 double border = 0.;

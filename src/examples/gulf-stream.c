@@ -25,7 +25,6 @@ scalar zbs[];
 #define K0() (point.l > 0 && h[0,0,-1] > 10. ? 0. : h[] < dry ? HUGE :	\
 	      Cb*norm(u)/h[])
 #endif
-#define alpha_H 1.
 #include "layered/coriolis.h"
 
 #define rho0 1000.
