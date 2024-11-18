@@ -27,6 +27,9 @@ shoal-ml.c: shoal.c
 shoal-ml.tst: shoal.s
 shoal-ml.tst: CFLAGS += -DML=1
 
+gulf-stream.tst: CC = mpicc -D_MPI=8
+gulf-stream.tst: CFLAGS += -DCOMPRESSED=1
+
 # Coupled solvers
 
 master.s: slave.o
