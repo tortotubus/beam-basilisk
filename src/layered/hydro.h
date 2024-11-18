@@ -234,20 +234,17 @@ event face_fields (i++, last)
       the step. */
 
       double hff;
-#if DRYSTEP
       if (Hl <= dry)
 	hff = fmax (fmin (zb[] + Hr - zb[-1], h[]), 0.);
       else if (Hr <= dry)
 	hff = fmax (fmin (zb[-1] + Hl - zb[], h[-1]), 0.);
-      else
-#endif // DRYSTEP
+      else {
 
-      /**
-      In the default case, the face height is computed using a variant of the
-      [BCG](/src/bcg.h) scheme. */
+	/**
+	In the default case, the face height is computed using a variant of the
+	[BCG](/src/bcg.h) scheme. */
 
-      {
-	double un = pdt*(hu.x[] + pdt*ax)/Delta, a = sign(un);
+	double un = pdt*hu.x[]/Delta, a = sign(un);
 	int i = - (a + 1.)/2.;
 	double g = h.gradient ? h.gradient (h[i-1], h[i], h[i+1])/Delta :
 	  (h[i+1] - h[i-1])/(2.*Delta);

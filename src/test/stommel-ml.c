@@ -226,10 +226,10 @@ event init (i = 0)
   when a "border" is not included. */
 
   foreach_dimension() {
+    zb[left] = 1000.;
     h[left] = 0.;
-    eta[left] = dirichlet(1.);
+    zb[right] = 1000.;
     h[right] = 0.;
-    eta[right] = dirichlet(1.);
   }
 
   /**
