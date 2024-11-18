@@ -54,7 +54,6 @@ plot [0:5]						\
 This flag changes the way face heights are computed for isopycnals
 intersecting the bathymetry (in [hydro.h](/src/layered/hydro.h)). */
 
-#define DRYSTEP 1
 #include "layered/hydro.h"
 #include "layered/implicit.h"
 
@@ -65,6 +64,7 @@ We include Coriolis acceleration on a $\beta$-plane. */
 
 double Beta = 2e-11;
 #define F0() (0.83e-4 + Beta*y)
+// #define alpha_H 1. // fixme?: unstable, stable for 0.9
 #include "layered/coriolis.h"
 
 /**
@@ -135,15 +135,19 @@ event init (i = 0)
 {
 
   /**
-  No-slip conditions on all boundaries. Note that this is only
-  relevant for "wet" boundaries. For example, given that there is a
-  (dry) coastline at x = 4400 km (see below), the `u.t[right]`
+  No-slip (and dry) conditions on all boundaries. Note that this is
+  only relevant for "wet" boundaries. For example, given that there is
+  a (dry) coastline at x = 4400 km (see below), the `u.t[right]`
   boundary condition below is useless. */
-  
-  u.t[left] = dirichlet(0);
-  u.t[right] = dirichlet(0);
-  u.t[top] = dirichlet(0);
-  u.t[bottom] = dirichlet(0);
+
+  foreach_dimension() {
+    u.t[left] = dirichlet(0);
+    zb[left] = 1000.;
+    h[left] = 0.;
+    u.t[right] = dirichlet(0);
+    zb[right] = 1000.;
+    h[right] = 0.;
+  }
 
   foreach() {
 
