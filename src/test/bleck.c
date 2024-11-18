@@ -64,7 +64,7 @@ We include Coriolis acceleration on a $\beta$-plane. */
 
 double Beta = 2e-11;
 #define F0() (0.83e-4 + Beta*y)
-// #define alpha_H 1. // fixme?: unstable, stable for 0.9
+#define alpha_H 0.5 // fixme: unstable for alpha_H 1
 #include "layered/coriolis.h"
 
 /**
