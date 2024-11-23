@@ -606,9 +606,13 @@ vector lookup_vector (const char * name)
     char component[strlen(name) + 3];
     strcpy (component, name);
     strcat (component, ".x");
+    interpreter_maximum_iterations (256);
     for (scalar * s = all; s && s->i >= 0; s++)
-      if (!strcmp (_attribute[s->i].name, component))
+      if (!strcmp (_attribute[s->i].name, component)) {
+	interpreter_maximum_iterations (32);
 	return _attribute[s->i].v;
+      }
+    interpreter_maximum_iterations (32);
     // Check whether the name is of the form ".*[0-9]+"
     int size = strlen (name) - 1;
     while (size >= 0 && name[size] >= '0' && name[size] <= '9') size--;

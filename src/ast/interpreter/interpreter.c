@@ -51,8 +51,10 @@ KHASH_MAP_INIT_INT64(INT64, void *)
 # define allocate(alloc, size) calloc (1, size)
 #endif
 
+static unsigned
+  maximum_iterations = 32; // INT_MAX;
+  
 static const unsigned
-  maximum_iterations = 32, // INT_MAX,
   maximum_recursion = 2,
   display_pointers = false,
   
@@ -2294,6 +2296,8 @@ Value * internal_functions (Ast * call, Ast * identifier, Ast ** parameters, boo
   }
   else if (!strcmp (name, "interpreter_verbosity"))
     ((StackData *)stack_get_data (stack))->verbosity = value_data (run (parameters[0], stack), int);
+  else if (!strcmp (name, "interpreter_maximum_iterations"))
+    maximum_iterations = value_data (run (parameters[0], stack), int);
   else if (!strcmp (name, "reset_field_value")) {
     Value * params[] = { run (parameters[0], stack), run (parameters[1], stack), run (parameters[2], stack) };
     char * field = value_data (params[0], char *);
