@@ -19,9 +19,12 @@ characteristics of the setup are:
   at the northern and southern boundaries (see Table 2 of H&H, 2000
   for the values of fluxes)
 
-![Animation of the relative vorticity (approx. 2 years), min and max
- are $\pm$ 10^-4^ s^-1^. The spatial resolution is 1/24
+![Animation of the relative surface vorticity (approx. 2 years), min
+ and max are $\pm$ 10^-4^ s^-1^. The spatial resolution is 1/24
  degree.](gulf-stream/2048/omega-short.mp4)(width=100%)
+
+![Animation of the norm of the surface velocity. Red is for values
+ larger than 1.5 m/s.](gulf-stream/2048/nu-short.mp4)(width=100%)
 
 # Setup
 
@@ -92,8 +95,8 @@ double * drho = (double [NL]){ 2.13/rho0, 1.72/rho0, 1.41/rho0, 1.01/rho0, 0. };
 
 See [entrainment.h](/src/layered/entrainment.h) for explanations. The
 mininum and maximum layer thicknesses are given by `hmin` and `hmax`
-(in meters here). The average entrainement velocity is set to 7 cm/s
-(see Table 2 of H&H, 2000) and the coefficient of additional
+(in meters here). The average entrainement velocity is set to 0.07
+cm/s (see Table 2 of H&H, 2000) and the coefficient of additional
 interfacial friction associated with entrainment is zero. */
 
 #include "layered/entrainment.h"
@@ -719,7 +722,7 @@ accessible in the following folders:
 * Boundary fluxes cause large velocities which may unnecessarily
   restrict the timestep: smoother conditions may then improve runtimes.
 * Real ("uncompressed") bathymetry runs but the Gulf Stream stays
-  attached: this may be caused to a tuning of isopycnal layers, fluxes
+  attached: this may be caused by a tuning of isopycnal layers, fluxes
   etc. which is specific to the compressed bathymetry.
 * Dimensional analysis misses some constants.
 
