@@ -41,5 +41,6 @@ double sq (double x){}
 double cube (double x){}
 
 void interpreter_verbosity (int verbosity) {}
+void interpreter_maximum_iterations (int maximum_iterations) {}
 void display_value (void * value) {}
 void reset_field_value (real * field, const char * name, real val) {}
