@@ -355,15 +355,15 @@ void load_wind (vector wind, int index)
   char name[80];
 #if COADS  
   sprintf (name, "coads-%d_5.asc", index + 1);
-  input_grd (wind.x, file = name, linear = true, periodic = true, zero = true);
+  input_grd (wind.x, file = name, linear = true, periodic = {true, false}, nodatavalue = 0.);
   sprintf (name, "coads-%d_6.asc", index + 1);
-  input_grd (wind.y, file = name, linear = true, periodic = true, zero = true);
+  input_grd (wind.y, file = name, linear = true, periodic = {true, false}, nodatavalue = 0.);
 #else // HR
   sprintf (name, "wind/hr-%d-x.asc", index + 1);
-  input_grd (wind.x, file = name, linear = true, periodic = true, zero = true,
+  input_grd (wind.x, file = name, linear = true, periodic = {true, false}, nodatavalue = 0.,
 	     smooth = 1);
   sprintf (name, "wind/hr-%d-y.asc", index + 1);
-  input_grd (wind.y, file = name, linear = true, periodic = true, zero = true,
+  input_grd (wind.y, file = name, linear = true, periodic = {true, false}, nodatavalue = 0.,
 	     smooth = 1);
 #endif // HR
 }
