@@ -259,6 +259,7 @@ $$
 * [Hessenberg systems](hessenberg.h)
 * [Community Ocean Vertical Mixing (CVMix) interface](cvmix/cvmix.h)
 * [A C interface to the General Ocean Turbulence Model](gotm/common.h)
+* [Equilibrium tide](equilibrium_tide.h)
 
 # The Basilisk C preprocessor
 
