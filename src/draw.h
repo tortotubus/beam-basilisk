@@ -541,13 +541,14 @@ static scalar compile_expression (char * expr, bool * isexpr)
 }
 
 #define colorize_args()							\
+  if (!color)								\
+    return false;							\
   scalar col = {-1};							\
-  if (color && strcmp (color, "level")) {				\
+  if (strcmp (color, "level")) {					\
     col = compile_expression (color, &expr);				\
     if (col.i < 0)							\
       return false;							\
   }									\
-									\
   double cmap[NCMAP][3];						\
   if (color) {								\
     if (min == 0 && max == 0) {						\
