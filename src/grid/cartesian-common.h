@@ -1037,6 +1037,8 @@ void stencil_val (Point p, scalar s, int i, int j, int k,
 {
   if (is_constant(s) || s.i < 0)
     return;
+  if (s.block < 0)
+    s.i += s.block;
   int index[] = {i, j, k};
   for (int d = 0; d < dimension; d++)
     index[d] += (&p.i)[d];      
@@ -1073,6 +1075,8 @@ void stencil_val_a (Point p, scalar s, int i, int j, int k, bool input,
 {
   if (is_constant(s) || s.i < 0)
     abort();
+  if (s.block < 0)
+    s.i += s.block;
   int index[] = {i, j, k};
   for (int d = 0; d < dimension; d++)
     index[d] += (&p.i)[d];    
