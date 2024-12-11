@@ -457,7 +457,13 @@ static char * write_scalar (char * fs, scalar s)
 {
   char i[20], index[20];
   snprintf (i, 19, "%d", s.i);
-  snprintf (index, 19, "%d", s.i < 0 || is_constant(s) ? 0 : s.gpu.index - 1);
+  if (s.i < 0 || is_constant(s))
+    strcpy (index, "0");
+  else {
+    if (s.block < 0)
+      s.i += s.block;
+    snprintf (index, 19, "%d", s.gpu.index - 1);
+  }
   return str_append (fs, "{", i, ",", index, "}");
 }
 
