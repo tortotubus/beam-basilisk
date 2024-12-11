@@ -208,6 +208,7 @@ make -k gpu-tests
 * [Time-reversed advection in a vortex](advection.c)
 * [Saint-Venant bump](bump2D-gpu.c)
 * [Time-reversed VOF advection in a vortex](reversed.c)
+* [Stommel gyre](stommel-ml.c)
 
 Tests for the multigrid solver on GPUs.
 
