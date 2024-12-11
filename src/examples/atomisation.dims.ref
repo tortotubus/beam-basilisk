@@ -1,5 +1,5 @@
 /src/gl/font.h:328: warning: 'font->Height' is unset: assuming it has dimension [0]
-1234 constraints, 1234 unknowns
+1276 constraints, 1276 unknowns
 [0]  ast/interpreter/overload.h:168: 'f[] = 0.'
 [0]  ast/interpreter/overload.h:477: '0'
 [0]  /src/grid/array.h:25: '4096'
@@ -37,6 +37,13 @@
 [0]  /src/curvature.h:515: '1.'
 [0]  /src/curvature.h:601: 'a = 0.'
 [0]  /src/curvature.h:605: '0.'
+[0]  /src/draw.h:806: '1.'
+[0]  /src/draw.h:810: '1.'
+[0]  /src/draw.h:817: 'max = - 1e30'
+[0]  /src/draw.h:817: 'min = 1e30'
+[0]  /src/draw.h:819: '1.'
+[0]  /src/draw.h:824: '0.5'
+[0]  /src/draw.h:905: 'cmin = 1e-3'
 [0]  /src/fractions.h:48: '0.'
 [0]  /src/fractions.h:48: '1.'
 [0]  /src/fractions.h:65: '.5'
@@ -75,6 +82,11 @@
 [0]  /src/geometry.h:195: '0.'
 [0]  /src/geometry.h:201: '0.'
 [0]  /src/geometry.h:201: '1.'
+[0]  /src/geometry.h:295: '0.5'
+[0]  /src/geometry.h:295: '1.'
+[0]  /src/geometry.h:295: 's = -0.5'
+[0]  /src/geometry.h:297: '1e-4'
+[0]  /src/geometry.h:299: '0.5'
 [0]  /src/geometry.h:388: '0.'
 [0]  /src/geometry.h:393: 'p->z = 0.'
 [0]  /src/geometry.h:395: '0.'
