@@ -182,15 +182,19 @@ event init (i = 0)
 /**
 ## Outputs */
 
+#if !_GPU // fixme: GPUs are not compatible with view.h yet
 #include "view.h"
+#endif
 
 event end (t = 5*year)
 {
+#if !_GPU  
   view (fov = 19.7885,
 	tx = -0.35, ty = 0, width = 440, height = 600);
   squares ("zb < 100 ? eta : nodata", spread = -1);
   vectors ("u1", scale = 8e5);
   save ("gyre.png");
+#endif
 }
 
 event logfile (i += 300)
