@@ -16,7 +16,7 @@ conditions for each field. */
 
 attribute {
   // fixme: use a structure
-  bool input, output;
+  bool input, output, nowarning; // fixme: use a single flag
   int width; // maximum stencil width/height/depth
   int dirty; // // boundary conditions status:
   // 0: all conditions applied
@@ -60,7 +60,7 @@ typedef struct {
   };
   if (baseblock) for (scalar s = baseblock[0], * i = baseblock;
 		s.i >= 0; i++, s = *i) {
-    _attribute[s.i].input = _attribute[s.i].output = false;
+    _attribute[s.i].input = _attribute[s.i].output = _attribute[s.i].nowarning = false;
     _attribute[s.i].width = 0;
   }
   int ig = 0, jg = 0, kg = 0; NOT_UNUSED(ig); NOT_UNUSED(jg); NOT_UNUSED(kg);
@@ -258,7 +258,7 @@ void check_stencil (ForeachData * loop)
       type (i.e. face or vertex). */
       
       if (write) {
-	if (dimension > 1 && !loop->vertex && loop->first) {
+	if (dimension > 1 && !loop->vertex && loop->first && !s.nowarning) {
 	  bool vertex = true;
 	  foreach_dimension()
 	    if (s.d.x != -1)
@@ -270,7 +270,7 @@ void check_stencil (ForeachData * loop)
 		     loop->fname, loop->line, s.name);
 	}
 	if (s.face) {
-	  if (loop->face == 0 && loop->first)
+	  if (loop->face == 0 && loop->first && !s.nowarning)
 	    fprintf (stderr,
 		     "%s:%d: warning: face vector '%s' should be assigned with"
 		     " a foreach_face() loop\n",
@@ -291,7 +291,7 @@ void check_stencil (ForeachData * loop)
 	      }
 	      d *= 2, i++;
 	    }
-	    if (!s.face && loop->first)
+	    if (!s.face && loop->first && !s.nowarning)
 	      fprintf (stderr,
 		       "%s:%d: warning: scalar '%s' should be assigned with "
 		       "a foreach_face(x|y|z) loop\n",

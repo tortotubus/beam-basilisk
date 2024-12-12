@@ -1014,10 +1014,10 @@ void default_stencil (Point p, scalar * list)
     if (s.v.x.i != -1) {
       vector v = s.v;
       for (scalar c in {v})
-	c.input = c.output = true, c.width = 2;
+	c.input = c.output = c.nowarning = true, c.width = 2;
     }
     else
-      s.input = s.output = true, s.width = 2;
+      s.input = s.output = s.nowarning = true, s.width = 2;
   }
 }
 
