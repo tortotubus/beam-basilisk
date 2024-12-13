@@ -496,6 +496,7 @@ bool save (char * file = NULL, char * format = "ppm", char * opt = NULL,
 	   FILE * fp = NULL,
 	   float lw = 0,
 	   int sort = 0, int options = 0,
+	   FILE * checksum = NULL,
 	   
 	   bview * view = NULL)
 {
@@ -522,9 +523,18 @@ bool save (char * file = NULL, char * format = "ppm", char * opt = NULL,
       if (!fp) {
 	perror (file);
 	return false;
-      }      
+      }
       gl_write_image (fp, image, view->width, view->height, view->samples);
       close_image (file, fp);
+      if (checksum) {
+	Adler32Hash hash;
+	a32_hash_init (&hash);
+	a32_hash_add (&hash, image, view->width*view->height*4*sizeof (unsigned char));
+	fputs ("# ", checksum);
+	if (file)
+	  fprintf (checksum, "%s: ", file);
+	fprintf (checksum, "checksum: %08lx\n", (unsigned long) a32_hash (&hash));
+      }
     }
     return true;
   }  
