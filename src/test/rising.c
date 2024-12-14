@@ -13,6 +13,7 @@ axisymmetric or planar version. We can used standard or "reduced"
 gravity. We also test levelset interface tracking and a momentum
 formulation. */
 
+#include "grid/multigrid.h"
 #if AXIS
 # include "axi.h" // fixme: does not run with -catch
 #endif
@@ -62,6 +63,7 @@ int main() {
   The domain will span $[0:2]\times[0:0.5]$ and will be resolved with
   $256\times 64$ grid points. */
 
+  dimensions (nx = 4);
   size (2 [1]);
   DT = 1. [0,1];
   init_grid (1 << LEVEL);
@@ -105,11 +107,6 @@ int main() {
 }
 
 event init (t = 0) {
-
-  /**
-  The domain is a rectangle. We only simulate half the bubble. */
-  
-  mask (y > 0.5 ? top : none);
 
   /**
   The bubble is centered on (0.5,0) and has a radius of 0.25. */

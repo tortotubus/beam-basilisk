@@ -87,9 +87,34 @@ static void mpi_boundary_destroy (Boundary * b)
   free (m);
 }
 
+static void mpi_dimensions_error (int n)
+{
+  fprintf (stderr,
+	   "%s:%d: error: the number of MPI processes must be equal to ",
+	   __FILE__, LINENO);
+  if (n > 1)
+    fprintf (stderr, "%dx", n);
+  fprintf (stderr, "%d^i\n", 1 << dimension);
+  exit (1);  
+}
+
 Boundary * mpi_boundary_new()
 {
   MpiBoundary * m = qcalloc (1, MpiBoundary);
+  int n = 1;
+  for (int i = 0; i < dimension; i++)
+    n *= mpi_dims[i];
+  if (npe() % n)
+    mpi_dimensions_error (n);
+  int j = npe()/n, i = 0;
+  while (j > 1) {
+    if (j % (1 << dimension))
+      mpi_dimensions_error (n);
+    j /= 1 << dimension;
+    i++;
+  }
+  for (int d = 0; d < dimension; d++)
+    mpi_dims[d] *= 1 << i;
   MPI_Dims_create (npe(), dimension, mpi_dims);
   MPI_Cart_create (MPI_COMM_WORLD, dimension,
 		   mpi_dims, &Period.x, 0, &m->cartcomm);
