@@ -16,15 +16,31 @@ typedef double real;
 @ define BGHOSTS 1
 #endif
 
+static int mpi_dims[dimension] =
+#if dimension == 1
+  {1}
+#elif dimension == 2
+  {1,1}
+#elif dimension == 3
+  {1,1,1}
+#endif
+;
+
+#if _MPI
+# define ND(i) (1 << point.level)
+#else
+# define ND(i) ((1 << point.level)*mpi_dims[i])
+#endif
+
 #define _I     (point.i - GHOSTS)
 #define _J     (point.j - GHOSTS)
 #define _K     (point.k - GHOSTS)
-#define _DELTA (1./(1 << point.level))
+#define _DELTA (1./((1 << point.level)*mpi_dims[0]))
 
 typedef struct {
   Grid g;
   char * d;
-  size_t field_size;
+  size_t * shift;
 } Multigrid;
 
 struct _Point {
@@ -35,7 +51,14 @@ struct _Point {
 #if dimension > 2
   int k;
 #endif
-  int level, n;
+  int level;
+#if dimension == 1
+  struct { int x; } n;
+#elif dimension == 2
+  struct { int x, y; } n;
+#elif dimension == 3
+  struct { int x, y, z; } n;
+#endif
 @ifdef foreach_block
   int l;
   @define _BLOCK_INDEX , point.l
@@ -46,41 +69,30 @@ struct _Point {
 static Point last_point;
 
 #define multigrid ((Multigrid *)grid)
-
-// see /src/notes/index.tm
-#if dimension == 1
-# define _shift(l) ((1 << (l)) - 1 + 2*GHOSTS*(l))
-#elif dimension == 2
-# define _shift(l) (((1 << 2*(l)) - 1)/3 + 4*GHOSTS*((1 << (l)) - 1 + GHOSTS*(l)))
-#elif dimension == 3
-# define _shift(l) (((1 << 3*(l)) - 1)/7 + 2*GHOSTS*((1 << 2*(l)) - 1) + \
-		    12*sq(GHOSTS)*((1 << (l)) - 1) + 8*cube(GHOSTS)*(l))
-#endif
-
 #define CELL(m,level,i)  (*((Cell *) &m[level][(i)*datasize]))
 
 /***** Cartesian macros *****/
 #if dimension == 1
 @undef val
 @def val(a,k,l,m) (((real *)multigrid->d)[point.i + (k) +
-					  _shift (point.level) +
-					  _index(a,m)*multigrid->field_size])
+					  multigrid->shift[point.level] +
+					  _index(a,m)*multigrid->shift[depth() + 1]])
 @
 #elif dimension == 2
 @undef val
 @def val(a,k,l,m) (((real *)multigrid->d)[point.j + (l) +
-					  (point.i + (k))*((1 << point.level) + 2*GHOSTS) +
-					  _shift (point.level) +
-					  _index(a,m)*multigrid->field_size])
+					  (point.i + (k))*(ND(1) + 2*GHOSTS) +
+					  multigrid->shift[point.level] +
+					  _index(a,m)*multigrid->shift[depth() + 1]])
 @
 #elif dimension == 3
 @undef val
 @def val(a,l,m,o) (((real *)multigrid->d)[point.k + (o) +
-					  ((1 << point.level) + 2*GHOSTS)*
+					  (ND(2) + 2*GHOSTS)*
 					  (point.j + (m) +
-					   (point.i + (l))*((1 << point.level) + 2*GHOSTS)) +
-					  _shift (point.level) +
-					  _index(a,0)*multigrid->field_size])
+					   (point.i + (l))*(ND(1) + 2*GHOSTS)) +
+					  multigrid->shift[point.level] +
+					  _index(a,0)*multigrid->shift[depth() + 1]])
 @
 #endif
 
@@ -89,39 +101,39 @@ static Point last_point;
 # if BGHOSTS == 1
 @define allocated(...) true
 # else // BGHOST != 1
-@define allocated(k,l,m) (point.i+(k) >= 0 && point.i+(k) < (1 << point.level) + 2*GHOSTS)
+@define allocated(k,l,m) (point.i+(k) >= 0 && point.i+(k) < ND(0) + 2*GHOSTS)
 # endif // BGHOST != 1
 @def allocated_child(k,l,m) (level < depth() &&
-                             point.i > 0 && point.i <= (1 << point.level) + 2)
+                             point.i > 0 && point.i <= ND(0) + 2)
 @
 #elif dimension == 2
 # if BGHOSTS == 1
 @define allocated(...) true
 # else // BGHOST != 1
-@def allocated(k,l,m) (point.i+(k) >= 0 && point.i+(k) < (1 << point.level) + 2*GHOSTS &&
-		       point.j+(l) >= 0 && point.j+(l) < (1 << point.level) + 2*GHOSTS)
+@def allocated(k,l,m) (point.i+(k) >= 0 && point.i+(k) < ND(0) + 2*GHOSTS &&
+		       point.j+(l) >= 0 && point.j+(l) < ND(1) + 2*GHOSTS)
 @
 # endif // BGHOST != 1
 @def allocated_child(k,l,m)  (level < depth() &&
-			      point.i > 0 && point.i <= (1 << point.level) + 2 &&
-			      point.j > 0 && point.j <= (1 << point.level) + 2)
+			      point.i > 0 && point.i <= ND(0) + 2 &&
+			      point.j > 0 && point.j <= ND(1) + 2)
 @			   
 #else // dimension == 3
 # if BGHOSTS == 1
 @define allocated(...) true
 #else // BGHOST != 1
 @def allocated(a,l,m) (point.i+(a) >= 0 &&
-		       point.i+(a) < (1 << point.level) + 2*GHOSTS &&
+		       point.i+(a) < ND(0) + 2*GHOSTS &&
 		       point.j+(l) >= 0 &&
-		       point.j+(l) < (1 << point.level) + 2*GHOSTS &&
+		       point.j+(l) < ND(1) + 2*GHOSTS &&
 		       point.k+(m) >= 0 &&
-		       point.k+(m) < (1 << point.level) + 2*GHOSTS)
+		       point.k+(m) < ND(2) + 2*GHOSTS)
 @
 #endif // BGHOST != 1
 @def allocated_child(a,l,m)  (level < depth() &&
-			      point.i > 0 && point.i <= (1 << point.level) + 2 &&
-			      point.j > 0 && point.j <= (1 << point.level) + 2 &&
-			      point.k > 0 && point.k <= (1 << point.level) + 2)
+			      point.i > 0 && point.i <= ND(0) + 2 &&
+			      point.j > 0 && point.j <= ND(1) + 2 &&
+			      point.k > 0 && point.k <= ND(2) + 2)
 @
 #endif // dimension == 3
 
@@ -130,13 +142,13 @@ static Point last_point;
 #if dimension == 1
 @def fine(a,k,l,m)
 (((real *)multigrid->d)[2*point.i - GHOSTS + (k) +
-			_shift (point.level + 1) +
-			_index(a,m)*multigrid->field_size])
+			multigrid->shift[point.level + 1] +
+			_index(a,m)*multigrid->shift[depth() + 1]])
 @
 @def coarse(a,k,l,m)
 (((real *)multigrid->d)[(point.i + GHOSTS)/2 + (k) +
-			_shift (point.level - 1) +
-			_index(a,m)*multigrid->field_size])
+			multigrid->shift[point.level - 1] +
+			_index(a,m)*multigrid->shift[depth() + 1]])
 @
 @def POINT_VARIABLES
   VARIABLES
@@ -149,15 +161,15 @@ static Point last_point;
 #elif dimension == 2
 @def fine(a,k,l,m)
 (((real *)multigrid->d)[2*point.j - GHOSTS + (l) +
-			(2*point.i - GHOSTS + (k))*((1 << point.level)*2 + 2*GHOSTS) +
-			_shift (point.level + 1) +
-			_index(a,m)*multigrid->field_size])
+			(2*point.i - GHOSTS + (k))*(ND(1)*2 + 2*GHOSTS) +
+			multigrid->shift[point.level + 1] +
+			_index(a,m)*multigrid->shift[depth() + 1]])
 @
 @def coarse(a,k,l,m)
 (((real *)multigrid->d)[(point.j + GHOSTS)/2 + (l) +
-			((point.i + GHOSTS)/2 + (k))*((1 << point.level)/2 + 2*GHOSTS) +
-			_shift (point.level - 1) +
-			_index(a,m)*multigrid->field_size])
+			((point.i + GHOSTS)/2 + (k))*(ND(1)/2 + 2*GHOSTS) +
+			multigrid->shift[point.level - 1] +
+			_index(a,m)*multigrid->shift[depth() + 1]])
 @
 @def POINT_VARIABLES
   VARIABLES
@@ -172,19 +184,19 @@ static Point last_point;
 #elif dimension == 3
 @def fine(a,l,m,o)
 (((real *)multigrid->d)[2*point.k - GHOSTS + (o) +
-			((1 << point.level)*2 + 2*GHOSTS)*
+			(ND(2)*2 + 2*GHOSTS)*
 			(2*point.j - GHOSTS + (m) +
-			 (2*point.i - GHOSTS + (l))*((1 << point.level)*2 + 2*GHOSTS)) +
-			_shift (point.level + 1) +
-			_index(a,0)*multigrid->field_size])
+			 (2*point.i - GHOSTS + (l))*(ND(1)*2 + 2*GHOSTS)) +
+			multigrid->shift[point.level + 1] +
+			_index(a,0)*multigrid->shift[depth() + 1]])
 @
 @def coarse(a,l,m,o)
 (((real *)multigrid->d)[(point.k + GHOSTS)/2 + (o) +
-			((1 << point.level)/2 + 2*GHOSTS)*
+			(ND(2)/2 + 2*GHOSTS)*
 			((point.j + GHOSTS)/2 + (m) +
-			 ((point.i + GHOSTS)/2 + (l))*((1 << point.level)/2 + 2*GHOSTS)) +
-			_shift (point.level - 1) +
-			_index(a,0)*multigrid->field_size])
+			 ((point.i + GHOSTS)/2 + (l))*(ND(1)/2 + 2*GHOSTS)) +
+			multigrid->shift[point.level - 1] +
+			_index(a,0)*multigrid->shift[depth() + 1]])
 @
 @def POINT_VARIABLES
   VARIABLES
@@ -202,19 +214,45 @@ static Point last_point;
 @
 #endif
 
+#if _MPI
+#if dimension == 1
+@define set_dimensions() point.n.x = 1 << point.level
+#elif dimension == 2
+@define set_dimensions() point.n.x = point.n.y = 1 << point.level
+#elif dimension == 3
+@define set_dimensions() point.n.x = point.n.y = point.n.z = 1 << point.level
+#endif
+#else // !_MPI
+#if dimension == 1
+@define set_dimensions() point.n.x = (1 << point.level)*mpi_dims[0]
+#elif dimension == 2
+@def set_dimensions()
+  point.n.x = (1 << point.level)*mpi_dims[0],
+  point.n.y = (1 << point.level)*mpi_dims[1]
+@
+#elif dimension == 3
+@def set_dimensions()
+  point.n.x = (1 << point.level)*mpi_dims[0],
+  point.n.y = (1 << point.level)*mpi_dims[1],
+  point.n.z = (1 << point.level)*mpi_dims[2]
+@
+#endif  
+#endif // !_MPI
+
 @def foreach_level(l)
 OMP_PARALLEL() {
   int ig = 0, jg = 0, kg = 0; NOT_UNUSED(ig); NOT_UNUSED(jg); NOT_UNUSED(kg);
   Point point = {0};
-  point.level = l; point.n = 1 << point.level;
+  point.level = l;
+  set_dimensions();
   int _k;
   OMP(omp for schedule(static))
-  for (_k = GHOSTS; _k < point.n + GHOSTS; _k++) {
+  for (_k = GHOSTS; _k < point.n.x + GHOSTS; _k++) {
     point.i = _k;
 #if dimension > 1
-    for (point.j = GHOSTS; point.j < point.n + GHOSTS; point.j++)
+    for (point.j = GHOSTS; point.j < point.n.y + GHOSTS; point.j++)
 #if dimension > 2
-      for (point.k = GHOSTS; point.k < point.n + GHOSTS; point.k++)
+      for (point.k = GHOSTS; point.k < point.n.z + GHOSTS; point.k++)
 #endif
 	{
 #endif
@@ -232,15 +270,16 @@ OMP_PARALLEL() {
   OMP_PARALLEL() {
   int ig = 0, jg = 0, kg = 0; NOT_UNUSED(ig); NOT_UNUSED(jg); NOT_UNUSED(kg);
   Point point = {0};
-  point.level = depth(); point.n = 1 << point.level;
+  point.level = depth();
+  set_dimensions();
   int _k;
   OMP(omp for schedule(static))
-  for (_k = GHOSTS; _k < point.n + GHOSTS; _k++) {
+  for (_k = GHOSTS; _k < point.n.x + GHOSTS; _k++) {
     point.i = _k;
 #if dimension > 1
-    for (point.j = GHOSTS; point.j < point.n + GHOSTS; point.j++)
+    for (point.j = GHOSTS; point.j < point.n.y + GHOSTS; point.j++)
 #if dimension > 2
-      for (point.k = GHOSTS; point.k < point.n + GHOSTS; point.k++)
+      for (point.k = GHOSTS; point.k < point.n.z + GHOSTS; point.k++)
 #endif
 	{
 #endif
@@ -270,15 +309,16 @@ OMP_PARALLEL() {
   OMP_PARALLEL() {
   int ig = 0, jg = 0, kg = 0; NOT_UNUSED(ig); NOT_UNUSED(jg); NOT_UNUSED(kg);
   Point point = {0};
-  point.level = depth(); point.n = 1 << point.level;
+  point.level = depth();
+  set_dimensions();
   int _k;
   OMP(omp for schedule(static))
-  for (_k = GHOSTS; _k <= point.n + GHOSTS; _k++) {
+  for (_k = GHOSTS; _k <= point.n.x + GHOSTS; _k++) {
     point.i = _k;
 #if dimension > 1
-    for (point.j = GHOSTS; point.j <= point.n + GHOSTS; point.j++)
+    for (point.j = GHOSTS; point.j <= point.n.y + GHOSTS; point.j++)
 #if dimension > 2
-      for (point.k = GHOSTS; point.k <= point.n + GHOSTS; point.k++)
+      for (point.k = GHOSTS; point.k <= point.n.z + GHOSTS; point.k++)
 #endif
         {
 #endif
@@ -315,7 +355,7 @@ foreach_face_generic() {
 @def foreach_child() {
   int _i = 2*point.i - GHOSTS;
   point.level++;
-  point.n *= 2;
+  point.n.x *= 2;
   for (int _k = 0; _k < 2; _k++) {
     point.i = _i + _k;
     POINT_VARIABLES;
@@ -324,7 +364,7 @@ foreach_face_generic() {
   }
   point.i = (_i + GHOSTS)/2;
   point.level--;
-  point.n /= 2;
+  point.n.x /= 2;
 }
 @
 @define foreach_child_break() _k = 2
@@ -332,15 +372,15 @@ foreach_face_generic() {
 #elif dimension == 2
 #define foreach_edge() foreach_face(y,x)
 
-@define is_face_x() { int ig = -1; VARIABLES; if (point.j < point.n + GHOSTS) {
+@define is_face_x() { int ig = -1; VARIABLES; if (point.j < point.n.y + GHOSTS) {
 @define end_is_face_x() }}
-@define is_face_y() { int jg = -1; VARIABLES; if (point.i < point.n + GHOSTS) {
+@define is_face_y() { int jg = -1; VARIABLES; if (point.i < point.n.x + GHOSTS) {
 @define end_is_face_y() }}
 				 
 @def foreach_child() {
   int _i = 2*point.i - GHOSTS, _j = 2*point.j - GHOSTS;
   point.level++;
-  point.n *= 2;
+  point.n.x *= 2, point.n.y *= 2;
   for (int _k = 0; _k < 2; _k++)
     for (int _l = 0; _l < 2; _l++) {
       point.i = _i + _k; point.j = _j + _l;
@@ -350,7 +390,7 @@ foreach_face_generic() {
   }
   point.i = (_i + GHOSTS)/2; point.j = (_j + GHOSTS)/2;
   point.level--;
-  point.n /= 2;
+  point.n.x /= 2, point.n.y /= 2;
 }
 @
 @define foreach_child_break() _k = _l = 2
@@ -365,13 +405,13 @@ foreach_vertex() {
 #define foreach_edge()					\
   foreach_vertex_aux()					\
     foreach_dimension()					\
-      if (_a.x < point.n + GHOSTS)
+      if (_a.x < point.n.x + GHOSTS)
 
-@define is_face_x() { int ig = -1; VARIABLES; if (point.j < point.n + GHOSTS && point.k < point.n + GHOSTS) {
+@define is_face_x() { int ig = -1; VARIABLES; if (point.j < point.n.y + GHOSTS && point.k < point.n.z + GHOSTS) {
 @define end_is_face_x() }}
-@define is_face_y() { int jg = -1; VARIABLES; if (point.i < point.n + GHOSTS && point.k < point.n + GHOSTS) {
+@define is_face_y() { int jg = -1; VARIABLES; if (point.i < point.n.x + GHOSTS && point.k < point.n.z + GHOSTS) {
 @define end_is_face_y() }}
-@define is_face_z() { int kg = -1; VARIABLES; if (point.i < point.n + GHOSTS && point.j < point.n + GHOSTS) {
+@define is_face_z() { int kg = -1; VARIABLES; if (point.i < point.n.x + GHOSTS && point.j < point.n.y + GHOSTS) {
 @define end_is_face_z() }}
   
 @def foreach_child() {
@@ -379,7 +419,7 @@ foreach_vertex() {
   int _j = 2*point.j - GHOSTS;
   int _k = 2*point.k - GHOSTS;
   point.level++;
-  point.n *= 2;
+  point.n.x *= 2, point.n.y *= 2, point.n.z *= 2;
   for (int _l = 0; _l < 2; _l++)
     for (int _m = 0; _m < 2; _m++)
       for (int _n = 0; _n < 2; _n++) {
@@ -392,7 +432,7 @@ foreach_vertex() {
   point.j = (_j + GHOSTS)/2;
   point.k = (_k + GHOSTS)/2;
   point.level--;
-  point.n /= 2;
+  point.n.x /= 2, point.n.y /= 2, point.n.z /= 2;
 }
 @
 @define foreach_child_break() _l = _m = _n = 2
@@ -412,8 +452,8 @@ void reset (void * alist, double val)
     if (!is_constant(s))
       for (int b = 0; b < s.block; b++) {
 	real * data = (real *) multigrid->d;
-	data += (s.i + b)*multigrid->field_size;
-	for (int i = 0; i < multigrid->field_size; i++, data++)
+	data += (s.i + b)*multigrid->shift[depth() + 1];
+	for (int i = 0; i < multigrid->shift[depth() + 1]; i++, data++)
 	  *data = val;
       }
 }
@@ -425,13 +465,13 @@ void reset (void * alist, double val)
   int ig = 0, jg = 0, kg = 0; NOT_UNUSED(ig); NOT_UNUSED(jg); NOT_UNUSED(kg);
   Point point = {0};
   point.level = l < 0 ? depth() : l;
-  point.n = 1 << point.level;
+  set_dimensions();
   if (d == left) {
     point.i = GHOSTS;
     ig = -1;
   }
   else if (d == right) {
-    point.i = point.n + GHOSTS - 1;
+    point.i = point.n.x + GHOSTS - 1;
     ig = 1;
   }
   {
@@ -440,7 +480,7 @@ void reset (void * alist, double val)
 @define end_foreach_boundary_dir() }
 
 @define neighbor(o,p,q) ((Point){point.i+o, point.level, point.n _BLOCK_INDEX})
-@define is_boundary(point) (point.i < GHOSTS || point.i >= point.n + GHOSTS)
+@define is_boundary(point) (point.i < GHOSTS || point.i >= point.n.x + GHOSTS)
 
 #elif dimension == 2
 @def foreach_boundary_dir(l,d)
@@ -448,29 +488,29 @@ void reset (void * alist, double val)
   int ig = 0, jg = 0, kg = 0; NOT_UNUSED(ig); NOT_UNUSED(jg); NOT_UNUSED(kg);
   Point point = {0};
   point.level = l < 0 ? depth() : l;
-  point.n = 1 << point.level;
-  int * _i = &point.j;
+  set_dimensions();
+  int * _i = &point.j, _n = point.n.y;
   if (d == left) {
     point.i = GHOSTS;
     ig = -1;
   }
   else if (d == right) {
-    point.i = point.n + GHOSTS - 1;
+    point.i = point.n.x + GHOSTS - 1;
     ig = 1;
   }
   else if (d == bottom) {
     point.j = GHOSTS;
-    _i = &point.i;
+    _i = &point.i, _n = point.n.x;
     jg = -1;
   }
   else if (d == top) {
-    point.j = point.n + GHOSTS - 1;
-    _i = &point.i;
+    point.j = point.n.y + GHOSTS - 1;
+    _i = &point.i, _n = point.n.x;
     jg = 1;
   }
   int _l;
   OMP(omp for schedule(static))
-  for (_l = 0; _l < point.n + 2*GHOSTS; _l++) {
+  for (_l = 0; _l < _n + 2*GHOSTS; _l++) {
     *_i = _l;
     {
       POINT_VARIABLES
@@ -484,8 +524,8 @@ void reset (void * alist, double val)
 @def neighbor(o,p,q)
   ((Point){point.i+o, point.j+p, point.level, point.n _BLOCK_INDEX})
 @
-@def is_boundary(point) (point.i < GHOSTS || point.i >= point.n + GHOSTS ||
-			 point.j < GHOSTS || point.j >= point.n + GHOSTS)
+@def is_boundary(point) (point.i < GHOSTS || point.i >= point.n.x + GHOSTS ||
+			 point.j < GHOSTS || point.j >= point.n.y + GHOSTS)
 @
 
 #elif dimension == 3
@@ -494,41 +534,44 @@ void reset (void * alist, double val)
   int ig = 0, jg = 0, kg = 0; NOT_UNUSED(ig); NOT_UNUSED(jg); NOT_UNUSED(kg);
   Point point = {0};
   point.level = l < 0 ? depth() : l;
-  point.n = 1 << point.level;
+  set_dimensions();
   int * _i = &point.j, * _j = &point.k;
+  int _n[2] = { point.n.y, point.n.z };
   if (d == left) {
     point.i = GHOSTS;
     ig = -1;
   }
   else if (d == right) {
-    point.i = point.n + GHOSTS - 1;
+    point.i = point.n.x + GHOSTS - 1;
     ig = 1;
   }
   else if (d == bottom) {
     point.j = GHOSTS;
-    _i = &point.i;
+    _i = &point.i, _n[0] = point.n.x;
     jg = -1;
   }
   else if (d == top) {
-    point.j = point.n + GHOSTS - 1;
-    _i = &point.i;
+    point.j = point.n.y + GHOSTS - 1;
+    _i = &point.i, _n[0] = point.n.x;
     jg = 1;
   }
   else if (d == back) {
     point.k = GHOSTS;
     _i = &point.i; _j = &point.j;
+    _n[0] = point.n.x, _n[1] = point.n.y;
     kg = -1;
   }
   else if (d == front) {
-    point.k = point.n + GHOSTS - 1;
+    point.k = point.n.z + GHOSTS - 1;
     _i = &point.i; _j = &point.j;
+    _n[0] = point.n.x, _n[1] = point.n.y;
     kg = 1;
   }
   int _l;
   OMP(omp for schedule(static))
-  for (_l = 0; _l < point.n + 2*GHOSTS; _l++) {
+  for (_l = 0; _l < _n[0] + 2*GHOSTS; _l++) {
     *_i = _l;
-    for (int _m = 0; _m < point.n + 2*GHOSTS; _m++) {
+    for (int _m = 0; _m < _n[1] + 2*GHOSTS; _m++) {
       *_j = _m;
       POINT_VARIABLES
 @
@@ -541,9 +584,9 @@ void reset (void * alist, double val)
 @def neighbor(o,p,q)
   ((Point){point.i+o, point.j+p, point.k+q, point.level, point.n _BLOCK_INDEX})
 @
-@def is_boundary(point) (point.i < GHOSTS || point.i >= point.n + GHOSTS ||
-			 point.j < GHOSTS || point.j >= point.n + GHOSTS ||
-			 point.k < GHOSTS || point.k >= point.n + GHOSTS)
+@def is_boundary(point) (point.i < GHOSTS || point.i >= point.n.x + GHOSTS ||
+			 point.j < GHOSTS || point.j >= point.n.y + GHOSTS ||
+			 point.k < GHOSTS || point.k >= point.n.z + GHOSTS)
 @
 
 #endif // dimension == 3
@@ -653,18 +696,19 @@ static void periodic_boundary_level_x (const Boundary * b, scalar * list, int l)
   }
 
   Point point = {0};
-  point.level = l < 0 ? depth() : l; point.n = 1 << point.level;
+  point.level = l < 0 ? depth() : l;
+  set_dimensions();
   for (int i = 0; i < GHOSTS; i++)
     for (scalar s in list1)
       for (int b = 0; b < s.block; b++) {
 	scalar sb = {s.i + b};
-	sb[i] = sb[i + point.n];
+	sb[i] = sb[i + point.n.x];
       }
-  for (int i = point.n + GHOSTS; i < point.n + 2*GHOSTS; i++)
+  for (int i = point.n.x + GHOSTS; i < point.n.x + 2*GHOSTS; i++)
     for (scalar s in list1)
       for (int b = 0; b < s.block; b++) {
 	scalar sb = {s.i + b};
-	sb[i] = sb[i - point.n];
+	sb[i] = sb[i - point.n.x];
       }
   free (list1);
 }
@@ -705,40 +749,41 @@ static void periodic_boundary_level_x (const Boundary * b, scalar * list, int l)
   
   OMP_PARALLEL() {
     Point point = {0};
-    point.level = l < 0 ? depth() : l; point.n = 1 << point.level;
+    point.level = l < 0 ? depth() : l;
+    set_dimensions();
 #if dimension == 2  
     int j;
     OMP(omp for schedule(static))
-      for (j = 0; j < point.n + 2*GHOSTS; j++) {
+      for (j = 0; j < point.n.y + 2*GHOSTS; j++) {
 	for (int i = 0; i < GHOSTS; i++)
 	  for (scalar s in list1)
 	    for (int b = 0; b < s.block; b++) {
 	      scalar sb = {s.i + b};
-	      sb[i,j] = sb[i + point.n,j];
+	      sb[i,j] = sb[i + point.n.x,j];
 	    }
-	for (int i = point.n + GHOSTS; i < point.n + 2*GHOSTS; i++)
+	for (int i = point.n.x + GHOSTS; i < point.n.x + 2*GHOSTS; i++)
 	  for (scalar s in list1)
 	    for (int b = 0; b < s.block; b++) {
 	      scalar sb = {s.i + b};
-	      sb[i,j] = sb[i - point.n,j];
+	      sb[i,j] = sb[i - point.n.x,j];
 	    }
       }
 #else // dimension == 3
     int j;
     OMP(omp for schedule(static))
-      for (j = 0; j < point.n + 2*GHOSTS; j++)
-	for (int k = 0; k < point.n + 2*GHOSTS; k++) {
+      for (j = 0; j < point.n.y + 2*GHOSTS; j++)
+	for (int k = 0; k < point.n.z + 2*GHOSTS; k++) {
 	  for (int i = 0; i < GHOSTS; i++)
 	    for (scalar s in list1)
 	      for (int b = 0; b < s.block; b++) {
 		scalar sb = {s.i + b};
-		sb[i,j,k] = sb[i + point.n,j,k];
+		sb[i,j,k] = sb[i + point.n.x,j,k];
 	      }
-	  for (int i = point.n + GHOSTS; i < point.n + 2*GHOSTS; i++)
+	  for (int i = point.n.x + GHOSTS; i < point.n.x + 2*GHOSTS; i++)
 	    for (scalar s in list1)
 	      for (int b = 0; b < s.block; b++) {
 		scalar sb = {s.i + b};
-		sb[i,j,k] = sb[i - point.n,j,k];
+		sb[i,j,k] = sb[i - point.n.x,j,k];
 	      }
 	}
 #endif
@@ -759,6 +804,7 @@ void free_grid (void)
   free_boundaries();
   Multigrid * m = multigrid;
   free (m->d);
+  free (m->shift);
   free (m);
   grid = NULL;
 }
@@ -775,10 +821,15 @@ void init_grid (int n)
   free_grid();
   Multigrid * m = qmalloc (1, Multigrid);
   grid = (Grid *) m;
-  grid->depth = grid->maxdepth = log_base2(n);
-  N = 1 << depth();
+  grid->depth = grid->maxdepth = log_base2(n/mpi_dims[0]);
+  N = (1 << grid->depth)*mpi_dims[0];
+#if !_MPI
   // mesh size
-  grid->n = grid->tn = 1 << dimension*depth();
+  grid->n = 1 << dimension*depth();
+  for (int i = 0; i < dimension; i++)
+    grid->n *= mpi_dims[i];
+  grid->tn = grid->n;
+#endif // !_MPI
   // box boundaries
   Boundary * b = qcalloc (1, Boundary);
   b->level = box_boundary_level;
@@ -795,8 +846,18 @@ void init_grid (int n)
   }
 #endif
   // allocate grid: this must be after mpi_boundary_new() since this modifies depth()
-  m->field_size = _shift (depth() + 1);
-  m->d = (char *) malloc(m->field_size*datasize);
+  m->shift = qmalloc (depth() + 2, size_t);
+  size_t totalsize = 0;
+  for (int l = 0; l <= depth() + 1; l++) {
+    m->shift[l] = totalsize;
+    struct _Point point = { .level = l };
+    set_dimensions();
+    size_t size = 1;
+    foreach_dimension()
+      size *= point.n.x + 2*GHOSTS;
+    totalsize += size;
+  }
+  m->d = (char *) malloc(m->shift[depth() + 1]*datasize);
   reset (all, 0.);
 }
 
@@ -804,53 +865,51 @@ void realloc_scalar (int size)
 {
   Multigrid * p = multigrid;
   datasize += size;
-  qrealloc (p->d, p->field_size*datasize, char);
+  qrealloc (p->d, p->shift[depth() + 1]*datasize, char);
 }
 
 #if _MPI
-int mpi_dims[dimension], mpi_coords[dimension];
-#undef _DELTA
+int mpi_coords[dimension];
 #undef _I
 #undef _J
 #undef _K
-#define _DELTA (1./(1 << point.level)/mpi_dims[0])
 #define _I     (point.i - GHOSTS + mpi_coords[0]*(1 << point.level))
 #define _J     (point.j - GHOSTS + mpi_coords[1]*(1 << point.level))
 #define _K     (point.k - GHOSTS + mpi_coords[2]*(1 << point.level))
 #endif
 
-
-
 Point locate (double xp = 0, double yp = 0, double zp = 0)
 {
   Point point = {0};
-  point.level = -1, point.n = 1 << depth();
-#if _MPI
-  point.i = (xp - X0)/L0*point.n*mpi_dims[0] + GHOSTS - mpi_coords[0]*point.n;
-  if (point.i < GHOSTS || point.i >= point.n + GHOSTS)
+  point.level = depth();
+  set_dimensions();
+  point.level = -1;
+#if _MPI // fixme: can probably simplify with below
+  point.i = (xp - X0)/L0*point.n.x*mpi_dims[0] + GHOSTS - mpi_coords[0]*point.n.x;
+  if (point.i < GHOSTS || point.i >= point.n.x + GHOSTS)
     return point;
 #if dimension >= 2
-  point.j = (yp - Y0)/L0*point.n*mpi_dims[0] + GHOSTS - mpi_coords[1]*point.n;
-  if (point.j < GHOSTS || point.j >= point.n + GHOSTS)
+  point.j = (yp - Y0)/L0*point.n.x*mpi_dims[0] + GHOSTS - mpi_coords[1]*point.n.x;
+  if (point.j < GHOSTS || point.j >= point.n.y + GHOSTS)
     return point;
 #endif
 #if dimension >= 3
-  point.k = (zp - Z0)/L0*point.n*mpi_dims[0] + GHOSTS - mpi_coords[2]*point.n;
-  if (point.k < GHOSTS || point.k >= point.n + GHOSTS)
+  point.k = (zp - Z0)/L0*point.n.x*mpi_dims[0] + GHOSTS - mpi_coords[2]*point.n.x;
+  if (point.k < GHOSTS || point.k >= point.n.z + GHOSTS)
     return point;
 #endif  
 #else // !_MPI
-  point.i = (xp - X0)/L0*point.n + GHOSTS;
-  if (point.i < GHOSTS || point.i >= point.n + GHOSTS)
+  point.i = (xp - X0)/L0*point.n.x + GHOSTS;
+  if (point.i < GHOSTS || point.i >= point.n.x + GHOSTS)
     return point;
 #if dimension >= 2
-  point.j = (yp - Y0)/L0*point.n + GHOSTS;
-  if (point.j < GHOSTS || point.j >= point.n + GHOSTS)
+  point.j = (yp - Y0)/L0*point.n.x + GHOSTS;
+  if (point.j < GHOSTS || point.j >= point.n.y + GHOSTS)
     return point;
 #endif
 #if dimension >= 3
-  point.k = (zp - Z0)/L0*point.n + GHOSTS;
-  if (point.k < GHOSTS || point.k >= point.n + GHOSTS)
+  point.k = (zp - Z0)/L0*point.n.x + GHOSTS;
+  if (point.k < GHOSTS || point.k >= point.n.z + GHOSTS)
     return point;
 #endif  
 #endif // !_MPI
@@ -862,13 +921,11 @@ Point locate (double xp = 0, double yp = 0, double zp = 0)
 # include "multigrid-common.h"
 #endif
 
-void dimensions (int nx = 0, int ny = 0, int nz = 0)
+void dimensions (int nx = 1, int ny = 1, int nz = 1)
 {
-#if _MPI
   int p[] = {nx, ny, nz};
   for (int i = 0; i < dimension; i++)
     mpi_dims[i] = p[i];
-#endif
 }
 
 #if _MPI
@@ -877,7 +934,7 @@ void dimensions (int nx = 0, int ny = 0, int nz = 0)
 
 @def foreach_slice_x(start, end, l) {
   Point point = {0};
-  point.level = l; point.n = 1 << point.level;
+  point.level = l; set_dimensions();
   for (point.i = start; point.i < end; point.i++)
 @
 @define end_foreach_slice_x() }
@@ -886,16 +943,16 @@ void dimensions (int nx = 0, int ny = 0, int nz = 0)
 
 @def foreach_slice_x(start, end, l) {
   Point point = {0};
-  point.level = l; point.n = 1 << point.level;
+  point.level = l; set_dimensions();
   for (point.i = start; point.i < end; point.i++)
-    for (point.j = 0; point.j < point.n + 2*GHOSTS; point.j++)
+    for (point.j = 0; point.j < point.n.y + 2*GHOSTS; point.j++)
 @
 @define end_foreach_slice_x() }
       
 @def foreach_slice_y(start, end, l) {
   Point point = {0};
-  point.level = l; point.n = 1 << point.level;
-  for (point.i = 0; point.i < point.n + 2*GHOSTS; point.i++)
+  point.level = l; set_dimensions();
+  for (point.i = 0; point.i < point.n.x + 2*GHOSTS; point.i++)
     for (point.j = start; point.j < end; point.j++)
 @
 @define end_foreach_slice_y() }
@@ -904,27 +961,27 @@ void dimensions (int nx = 0, int ny = 0, int nz = 0)
 
 @def foreach_slice_x(start, end, l) {
   Point point = {0};
-  point.level = l; point.n = 1 << point.level;
+  point.level = l; set_dimensions();
   for (point.i = start; point.i < end; point.i++)
-    for (point.j = 0; point.j < point.n + 2*GHOSTS; point.j++)
-      for (point.k = 0; point.k < point.n + 2*GHOSTS; point.k++)
+    for (point.j = 0; point.j < point.n.y + 2*GHOSTS; point.j++)
+      for (point.k = 0; point.k < point.n.z + 2*GHOSTS; point.k++)
 @
 @define end_foreach_slice_x() }
       
 @def foreach_slice_y(start, end, l) {
   Point point = {0};
-  point.level = l; point.n = 1 << point.level;
-  for (point.i = 0; point.i < point.n + 2*GHOSTS; point.i++)
+  point.level = l; set_dimensions();
+  for (point.i = 0; point.i < point.n.x + 2*GHOSTS; point.i++)
     for (point.j = start; point.j < end; point.j++)
-      for (point.k = 0; point.k < point.n + 2*GHOSTS; point.k++)
+      for (point.k = 0; point.k < point.n.z + 2*GHOSTS; point.k++)
 @
 @define end_foreach_slice_y() }
 
 @def foreach_slice_z(start, end, l) {
   Point point = {0};
-  point.level = l; point.n = 1 << point.level;
-  for (point.i = 0; point.i < point.n + 2*GHOSTS; point.i++)
-    for (point.j = 0; point.j < point.n + 2*GHOSTS; point.j++)
+  point.level = l; set_dimensions();
+  for (point.i = 0; point.i < point.n.x + 2*GHOSTS; point.i++)
+    for (point.j = 0; point.j < point.n.y + 2*GHOSTS; point.j++)
       for (point.k = start; point.k < end; point.k++)
 @
 @define end_foreach_slice_z() }

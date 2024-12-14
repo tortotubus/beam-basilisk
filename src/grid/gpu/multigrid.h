@@ -6,9 +6,9 @@
 #define _GPU 1
 #define GRIDNAME "Multigrid (GPU)"
 #define GRIDPARENT Multigrid
-#define field_size() (multigrid->field_size)
+#define field_size() (multigrid->shift[depth() + 1])
 #define grid_data() (multigrid->d)
-#define field_offset(s) (_shift(depth()) + (s).i*field_size())
+#define field_offset(s) (multigrid->shift[depth()] + (s).i*field_size())
 
 #define GPU_CODE()							\
   "#define POINT_VARIABLES VARIABLES "					\
