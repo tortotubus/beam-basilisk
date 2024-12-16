@@ -112,7 +112,10 @@ event viscous_term (i++)
   
   /**
   We then enforce the conservation of the volume of each layer using a
-  global average flux. */
+  global average flux. Note that this is only necessary to compensate
+  for either: 1) accumulation of floating-point errors when running in
+  single-precision (typically on GPUs), 2) inaccurate boundary
+  fluxes. */
 
   double eh[nl];
   foreach_layer()
@@ -139,11 +142,14 @@ event viscous_term (i++)
 	}
       }
     }
-#if 0 // fixme: should be included??
-    foreach_layer()
-      foreach_dimension()
-	u.x[] = h[] > dry ? hu[point.l].x/h[] : 0.;
-#endif
+
+    /**
+    The line below is necessary to compensate round-off errors since
+    the total volume is conserved "only" to within machine accuracy
+    (double precision is OK but single precision is too low for
+    long-running simulations). */
+    
+    h[] = hnew[0];
   }
 }
 
