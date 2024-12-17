@@ -1130,8 +1130,8 @@ void dump (const char * file = "dump",
 			       dump_version };
 
 #if MULTIGRID_MPI
-  for (int i = 0; i < dimension; i++)
-    (&header.n.x)[i] = mpi_dims[i];
+  foreach_dimension()
+    header.n.x = Dimensions.x;
   MPI_Barrier (MPI_COMM_WORLD);
 #endif
 
