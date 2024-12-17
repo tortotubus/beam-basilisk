@@ -296,6 +296,8 @@ To maximize performance, here are a few tips and observations:
 
 # Implementation */
 
+bool on_cpu = false;
+
 #include <khash.h>
 
 typedef struct {
@@ -336,7 +338,7 @@ static char * str_append_array (char * dst, const char * list[])
 #define str(a) #a
 
 static char glsl_preproc[] =
-  "// #line " xstr(__LINE__) " " __FILE__ "\n"
+  "// #line " xstr(LINENO) " " __FILE__ "\n"
   "#define dimensional(x)\n"
   "#define qassert(file, line, cond)\n"
 #if !SINGLE_PRECISION
@@ -397,12 +399,12 @@ static char glsl_preproc[] =
   "#define forin3(a,b,e,c,d,f) for (int _i = 0; _i < c.length() - 1; _i++)"
   "  { a = c[_i]; b = d[_i]; e = f[_i];\n"
   "#define endforin3() }\n"
-  "#define is_face_x() { if (point.j < N + GHOSTS) {"
-  "  real Delta = L0/N, Delta_x = Delta, Delta_y = Delta,"
+  "#define is_face_x() { if (point.j < N*Dimensions.y + GHOSTS) {"
+  "  real Delta = L0/(N*Dimensions.x), Delta_x = Delta, Delta_y = Delta,"
   "  x = X0 + (point.i - GHOSTS)*Delta, y = Y0 + (point.j - GHOSTS + 0.5)*Delta;\n"
   "#define end_is_face_x() }}\n"
-  "#define is_face_y() { if (point.i < N + GHOSTS) {"
-  "  real Delta = L0/N, Delta_x = Delta, Delta_y = Delta,"
+  "#define is_face_y() { if (point.i < N*Dimensions.x + GHOSTS) {"
+  "  real Delta = L0/(N*Dimensions.x), Delta_x = Delta, Delta_y = Delta,"
   "  x = X0 + (point.i - GHOSTS + 0.5)*Delta, y = Y0 + (point.j - GHOSTS)*Delta;\n"
   "#define end_is_face_y() }}\n"
   "#define NOT_UNUSED(x)\n"
@@ -523,7 +525,7 @@ void apply_bc (Point point)
       if (s.face && s.i == s.v.x.i && s.boundary_left)
 	foreach_blockf(s)
 	  s[] = s.boundary_left (point, neighborp(bc_period_x), s, &data);
-  if (point.i == N + GHOSTS)
+  if (point.i == N*Dimensions.x + GHOSTS)
     for (scalar s in apply_bc_list)
       if (s.face && s.i == s.v.x.i && s.boundary_right)
 	foreach_blockf(s)
@@ -536,7 +538,7 @@ void apply_bc (Point point)
 	  foreach_blockf(s)
 	    s[] = b.boundary_bottom (point, neighborp(0,bc_period_y), s, &data);
       }
-  if (point.j == N + GHOSTS)
+  if (point.j == N*Dimensions.y + GHOSTS)
     for (scalar s in apply_bc_list)
       if (s.face && s.i == s.v.y.i) {
 	scalar b = s.v.x;
@@ -552,22 +554,22 @@ void apply_bc (Point point)
 	  s[bc_period_x] = s.boundary_left (point, neighborp(bc_period_x), s, &data);
     if (point.j == GHOSTS)
       boundary_bottom (point, bc_period_x); // bottom-left
-    if (point.j == N + GHOSTS - 1)
+    if (point.j == N*Dimensions.y + GHOSTS - 1)
       boundary_top (point, bc_period_x);    // top-left
   }
-  if (point.i == N + GHOSTS - 1) { // right
+  if (point.i == N*Dimensions.x + GHOSTS - 1) { // right
     for (scalar s in apply_bc_list)
       if (!s.face || s.i != s.v.x.i)
 	foreach_blockf(s)
 	  s[- bc_period_x] = s.boundary_right (point, neighborp(- bc_period_x), s, &data);
     if (point.j == GHOSTS)
       boundary_bottom (point, - bc_period_x); // bottom-right
-    if (point.j == N + GHOSTS - 1)
+    if (point.j == N*Dimensions.y + GHOSTS - 1)
       boundary_top (point, - bc_period_x);    // top-right
   }
   if (point.j == GHOSTS)
     boundary_bottom (point, 0);  // bottom
-  if (point.j == N + GHOSTS - 1)
+  if (point.j == N*Dimensions.y + GHOSTS - 1)
     boundary_top (point, 0);     // top
 }
 
@@ -652,6 +654,7 @@ uint32_t hash_shader (const External * externals,
 #if LAYERS
   a32_hash_add (&hash, &nl, sizeof (nl));
 #endif
+  a32_hash_add (&hash, &Dimensions, sizeof (Dimensions));
   a32_hash_add (&hash, &Period, sizeof (Period));
   a32_hash_add (&hash, kernel, strlen (kernel));
   a32_hash_add (&hash, &nconst, sizeof (nconst));
@@ -715,13 +718,13 @@ trace
 char * build_shader (External * externals, const ForeachData * loop,
 		     const RegionParameters * region, const GLuint nwg[2])
 {
-  int Nl = region->level > 0 ? 1 << (region->level - 1) : N;
+  int Nl = region->level > 0 ? 1 << (region->level - 1) : N/Dimensions.x;
   char s[20];
   snprintf (s, 19, "%d", nconst > 0 ? nconst : 1);
   char a[20];
   snprintf (a, 19, "%g", nconst > 0 ? _constant[0] : 0);
   char * fs = str_append (NULL, "#version 430\n", glsl_preproc,
-			  "#define VARIABLES real Delta = L0/N,"
+			  "#define VARIABLES real Delta = L0/(N*Dimensions.x),"
 			  " Delta_x = Delta, Delta_y = Delta,",
 			  " x = X0 + (point.i - GHOSTS + 0.5 + ig/2.)*Delta,"
 			  " y = Y0 + (point.j - GHOSTS + 0.5 + jg/2.)*Delta;\n",
@@ -875,14 +878,26 @@ char * build_shader (External * externals, const ForeachData * loop,
 	snprintf (l, 19, "%d", level);
 	snprintf (size, 19, "%ld", (size_t) field_size());
 	fs = str_append (fs,
-			 "const uint N = ", s, ", _depth = ", d, ", _field_size = ", size, ";\n"
-			 "const uint NY = ",
-			 loop->face > 1 || loop->vertex ? "N + 1" : "N",
-			 ";\n");
+			 "const uint N = ", s, ", _depth = ", d, ", _field_size = ", size, ";\n");
+#ifdef shift_level // multigrid
+	fs = str_append (fs,
+			 "const uint _shift[_depth + 1] = {");
+	for (int d = 0; d <= depth(); d++) {
+	  snprintf (s, 19, "%ld", shift_level(d));
+	  fs = str_append (fs,  d > 0 ? "," : "", s);
+	}
+	fs = str_append (fs, "};\n");
+#endif // ifdef shift_level
+	snprintf (s, 19, "{%d,%d}", Dimensions.x, Dimensions.y);
+	fs = str_append (fs,
+			 "const ivec Dimensions = ", s, ";\n"
+			 "const uint NY = ", loop->face > 1 || loop->vertex ?
+			 "N*Dimensions.y + 1" : "N*Dimensions.y", ";\n");
 	if (GPUContext.fragment_shader)
 	  fs = str_append (fs, "in vec2 vsPoint;\n"
-			   "Point point = {int((vsPoint.x*vsScale.x + vsOrigin.x)*N) + GHOSTS,"
-			   "int((vsPoint.y*vsScale.y + vsOrigin.y)*N) + GHOSTS,", l,
+			   "Point point = {int((vsPoint.x*vsScale.x + vsOrigin.x)*N*Dimensions.x)"
+			   " + GHOSTS,"
+			   "int((vsPoint.y*vsScale.y + vsOrigin.y)*N*Dimensions.x) + GHOSTS,", l,
 #if LAYERS
 			   ",0"
 #endif
@@ -906,9 +921,11 @@ char * build_shader (External * externals, const ForeachData * loop,
 	fs = str_append (fs, "const int nl = ", nl, ";\n");
       }
       else if (g->type == sym_INT && !strcmp (g->name, "bc_period_x"))
-	fs = str_append (fs, "const int bc_period_x = ", Period.x ? "int(N)" : "-1", ";\n");
+	fs = str_append (fs, "const int bc_period_x = ", Period.x ?
+			 "int(N*Dimensions.x)" : "-1", ";\n");
       else if (g->type == sym_INT && !strcmp (g->name, "bc_period_y"))
-	fs = str_append (fs, "const int bc_period_y = ", Period.y ? "int(N)" : "-1", ";\n");
+	fs = str_append (fs, "const int bc_period_y = ", Period.y ?
+			 "int(N*Dimensions.y)" : "-1", ";\n");
       else if (GPUContext.fragment_shader && (region->n.x > 1 || region->n.y > 1) &&
 	       g->type == sym_COORD && !strcmp (g->name, "p")) {
 
@@ -918,7 +935,7 @@ char * build_shader (External * externals, const ForeachData * loop,
 	
 	fs = str_append (fs, "coord p = vec3((vsPoint*vsScale + vsOrigin)*L0 + vec2(X0, Y0),0);\n");
       }
-      else {
+      else if (strcmp (g->name, "Dimensions")) {
 	char * type = type_string (g);
 	fs = str_append (fs, "uniform ", type, " ", EXTERNAL_NAME (g));
 	for (int * d = g->data; d && *d > 0; d++) {
@@ -1398,23 +1415,24 @@ static Shader * compile_shader (ForeachData * loop,
 
   static const int NWG[2] = {16, 16};
   GLuint ng[2], nwg[2];
-  int Nl = region->level > 0 ? 1 << (region->level - 1) : N;
+  int Nl = region->level > 0 ? 1 << (region->level - 1) : N/Dimensions.x;
+  int * dims = &Dimensions.x;
   if (loop->face || loop->vertex) {
     for (int i = 0; i < 2; i++)
-      if (Nl > NWG[i]) {
+      if (Nl*dims[1-i] > NWG[i]) {
 	nwg[i] = NWG[i] + 1;
-	ng[i] = Nl/NWG[i];
-	assert (nwg[i]*ng[i] >= Nl + 1);
+	ng[i] = Nl*dims[1-i]/NWG[i];
+	assert (nwg[i]*ng[i] >= Nl*dims[1-i] + 1);
       }
       else {
-	nwg[i] = Nl + 1;
+	nwg[i] = Nl*dims[1-i] + 1;
 	ng[i] = 1;
       }
   }
   else
     for (int i = 0; i < 2; i++) {
-      nwg[i] = Nl > NWG[i] ? NWG[i] : Nl;
-      ng[i] = Nl/nwg[i];
+      nwg[i] = Nl*dims[1-i] > NWG[i] ? NWG[i] : Nl*dims[1-i];
+      ng[i] = Nl*dims[1-i]/nwg[i];
     }
  
   char * shader = build_shader (merged, loop, region, nwg);
@@ -1455,7 +1473,8 @@ static Shader * compile_shader (ForeachData * loop,
 			 );
   }
   shader = str_append (shader,
-		       "if (point.i < N + 2*GHOSTS && point.j < N + 2*GHOSTS) {\n"
+		       "if (point.i < N*Dimensions.x + 2*GHOSTS && "
+		       "point.j < N*Dimensions.y + 2*GHOSTS) {\n"
 		       "POINT_VARIABLES\n");
   if (loop->vertex)
     shader = str_append (shader, "  x -= Delta/2., y -= Delta/2.;\n");
@@ -1694,9 +1713,9 @@ static bool doloop_on_gpu (ForeachData * loop, const RegionParameters * region,
 
   If this is a `foreach_point()` iteration, we draw a single point */
 
-  int Nl = region->level > 0 ? 1 << (region->level - 1) : N;  
+  int Nl = region->level > 0 ? 1 << (region->level - 1) : N/Dimensions.x;
   if (region->n.x == 1 && region->n.y == 1) {
-    int csOrigin[] = { (region->p.x - X0)/L0*Nl, (region->p.y - Y0)/L0*Nl };
+    int csOrigin[] = { (region->p.x - X0)/L0*Nl*Dimensions.x, (region->p.y - Y0)/L0*Nl*Dimensions.x };
     GL_C (glUniform2iv (0, 1, csOrigin));
     assert (!GPUContext.fragment_shader);
     GL_C (glMemoryBarrier (GL_SHADER_STORAGE_BARRIER_BIT));
@@ -1741,9 +1760,10 @@ static bool doloop_on_gpu (ForeachData * loop, const RegionParameters * region,
       scalar s = g->s;
       double result = gpu_reduction (field_offset (s), g->reduct, region,
 				     loop->face == 1 || loop->face == 2 ?
-				     Nl*(Nl + 1) :
-				     loop->face == 3 || loop->vertex ? sq(Nl + 1) - 1 :
-				     sq(Nl));
+				     Nl*Dimensions.x*(Nl*Dimensions.y + 1) :
+				     loop->face == 3 || loop->vertex ?
+				     sq(Nl + 1)*Dimensions.x*Dimensions.y - 1 :
+				     sq(Nl)*Dimensions.x*Dimensions.y);
 #if PRINTREDUCT
       fprintf (stderr, "%s:%d: %s %c %g\n",
 	       loop->fname, loop->line, g->name, g->reduct, result);
@@ -1766,7 +1786,8 @@ bool gpu_end_stencil (ForeachData * loop,
 		      External * externals,
 		      const char * kernel)
 {
-  bool on_gpu = (loop->parallel == 1 || loop->parallel == 3) && (loop->first || loop->data);
+  bool on_gpu = ((loop->parallel == 1 && !on_cpu) || loop->parallel == 3) &&
+    (loop->first || loop->data);
   if (on_gpu) {
     on_gpu = doloop_on_gpu (loop, region, externals, kernel);
     if (!on_gpu) {

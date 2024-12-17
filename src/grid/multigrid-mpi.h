@@ -102,8 +102,8 @@ Boundary * mpi_boundary_new()
 {
   MpiBoundary * m = qcalloc (1, MpiBoundary);
   int n = 1;
-  for (int i = 0; i < dimension; i++)
-    n *= mpi_dims[i];
+  foreach_dimension()
+    n *= Dimensions.x;
   if (npe() % n)
     mpi_dimensions_error (n);
   int j = npe()/n, i = 0;
@@ -113,11 +113,11 @@ Boundary * mpi_boundary_new()
     j /= 1 << dimension;
     i++;
   }
-  for (int d = 0; d < dimension; d++)
-    mpi_dims[d] *= 1 << i;
-  MPI_Dims_create (npe(), dimension, mpi_dims);
+  foreach_dimension()
+    Dimensions.x *= 1 << i;
+  MPI_Dims_create (npe(), dimension, &Dimensions.x);
   MPI_Cart_create (MPI_COMM_WORLD, dimension,
-		   mpi_dims, &Period.x, 0, &m->cartcomm);
+		   &Dimensions.x, &Period.x, 0, &m->cartcomm);
   MPI_Cart_coords (m->cartcomm, pid(), dimension, mpi_coords);
 
   // make sure other boundary conditions are not applied
@@ -132,12 +132,12 @@ Boundary * mpi_boundary_new()
   }
 
   // rescale the resolution
-  N /= mpi_dims[0];
+  N /= Dimensions.x;
   int r = 0;
   while (N > 1)
     N /= 2, r++;
   grid->depth = grid->maxdepth = r;
-  N = mpi_dims[0]*(1 << r);
+  N = Dimensions.x*(1 << r);
   grid->n = 1 << dimension*depth();
   grid->tn = npe()*grid->n;
   

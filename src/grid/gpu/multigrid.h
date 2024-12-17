@@ -6,6 +6,7 @@
 #define _GPU 1
 #define GRIDNAME "Multigrid (GPU)"
 #define GRIDPARENT Multigrid
+#define shift_level(d) (multigrid->shift[d])
 #define field_size() (multigrid->shift[depth() + 1])
 #define grid_data() (multigrid->d)
 #define field_offset(s) (multigrid->shift[depth()] + (s).i*field_size())
@@ -19,12 +20,12 @@
   " Point parent = point;"						\
   " parent.level--;"							\
   " parent.i = (point.i + GHOSTS)/2; parent.j = (point.j + GHOSTS)/2;\n" \
-  "#define _shift(l) (((1 << 2*(l)) - 1)/3 + 4*GHOSTS*((1 << (l)) - 1 + GHOSTS*(l)))\n"	\
   "#define valt(s,k,l,m)"						\
-  "  _data[_index(s,m)*field_size() + point.j + (l) + (point.i + (k))*((1 << point.level) + 2*GHOSTS) +" \
-  " _shift (point.level)]\n"		\
+  "  _data[_index(s,m)*field_size() + point.j + (l) + "			\
+  " (point.i + (k))*((1 << point.level)*Dimensions.y + 2*GHOSTS) +"			\
+  " _shift[point.level]]\n"						\
   "#define val_red_(s) _data[(s).i*field_size() + point.j - GHOSTS +"	\
-  "  (point.i - GHOSTS)*NY + _shift (point.level)]\n"			\
+  "  (point.i - GHOSTS)*NY + _shift[point.level]]\n"			\
   "#define foreach_child() {"						\
   "  int _i = 2*point.i - GHOSTS, _j = 2*point.j - GHOSTS;"		\
   "  point.level++;"							\
@@ -39,13 +40,13 @@
   "}\n"									\
   "#define fine(a,k,l,m)"						\
   "  _data[2*point.j - GHOSTS + (l) +"					\
-  "        (2*point.i - GHOSTS + (k))*((1 << point.level)*2 + 2*GHOSTS) +" \
-  "        _shift (point.level + 1) +"					\
+  "        (2*point.i - GHOSTS + (k))*((1 << point.level)*Dimensions.y*2 + 2*GHOSTS) +" \
+  "        _shift[point.level + 1] +"					\
   "        _index(a,m)*field_size()]\n"					\
   "#define coarse(a,k,l,m)"						\
   "  _data[(point.j + GHOSTS)/2 + (l) +"				\
-  "        ((point.i + GHOSTS)/2 + (k))*((1 << point.level)/2 + 2*GHOSTS) +" \
-  "        _shift (point.level - 1) +"					\
+  "        ((point.i + GHOSTS)/2 + (k))*((1 << point.level)*Dimensions.y/2 + 2*GHOSTS) +" \
+  "        _shift[point.level - 1] +"					\
   "        _index(a,m)*field_size()]\n"
 
 #include "../multigrid.h"
