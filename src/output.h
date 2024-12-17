@@ -579,6 +579,9 @@ with *file*).
 
 *fps*
 : used only for [online output](grid/gpu/output.h) on GPUs.
+
+*checksum*
+: write a checksum of the generated image in the file pointed.
 */
 
 trace
@@ -593,7 +596,8 @@ void output_ppm (scalar f,
 		 scalar mask = {-1},
 		 Colormap map = jet,
 		 char * opt = NULL,
-		 int fps = 0)
+		 int fps = 0,
+		 FILE * checksum = NULL)
 {
   // default values
   if (!min && !max) {
@@ -662,6 +666,16 @@ void output_ppm (scalar f,
       close_image (file, fp);
     else
       fflush (fp);
+
+    if (checksum) {
+      Adler32Hash hash;
+      a32_hash_init (&hash);
+      a32_hash_add (&hash, ppm0, sizeof(unsigned char)*3*cn.x*cn.y);
+      fputs ("# ", checksum);
+      if (file)
+	fprintf (checksum, "%s: ", file);
+      fprintf (checksum, "checksum: %08lx\n", (unsigned long) a32_hash (&hash));
+    }
   }
     
   matrix_free (ppm);
