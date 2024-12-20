@@ -1077,6 +1077,8 @@ void gpu_free()
 
 void gpu_init()
 {
+  /* GPUs drivers often generate floating-point exceptions... turn them off */
+  disable_fpe (FE_DIVBYZERO|FE_INVALID);
   if (!GPUContext.window) {
     if (!glfwInit ())
       exit (1);
