@@ -131,6 +131,8 @@ int main()
 /**
 ## Initial conditions */
 
+double sum0 = 0., sum1 = 0.;
+
 event init (i = 0)
 {
 
@@ -177,6 +179,9 @@ event init (i = 0)
     h[] = max (- 1000. - zb[], 0.);
     h[0,0,1] = max (- zb[] - h[], 0.);
   }
+
+  sum0 = statsf(h).sum;
+  sum1 = statsf(lookup_field("h1")).sum;
 }
 
 /**
@@ -199,7 +204,7 @@ event end (t = 5*year)
 
 event logfile (i += 300)
 {
-  double ke0 = 0., ke1 = 0., area = 0., rho0 = 1000;
+  double ke0 = 0., ke1 = 0., area = 0., rho0 = 1000 [0];
   scalar h1 = lookup_field ("h1");
   vector u1 = lookup_vector ("u1");
   foreach (reduction (+:ke0) reduction(+:ke1) reduction(+:area)) {
@@ -207,6 +212,8 @@ event logfile (i += 300)
     ke1 += dv()*h1[]*(sq(u1.x[]) + sq(u1.y[]))/2.;
     area += dv();
   }
-  fprintf (stderr, "%g %g %g %g %g %g %d %d\n", t, rho0*ke0/area, rho0*ke1/area,
-	   statsf (h).sum, statsf (h1).sum, dt, mgH.i, mgH.nrelax);
+  fprintf (stderr, "%g %g %g %g %g %g %d %d\n", t,
+	   rho0*ke0/area, rho0*ke1/area,
+	   (statsf (h).sum - sum0)/sq(L0), (statsf (h1).sum - sum1)/sq(L0),
+	   dt, mgH.i, mgH.nrelax);
 }
