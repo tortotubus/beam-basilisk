@@ -215,13 +215,13 @@ remotely()
 	    ;;
     esac
     cat <<EOF >$chksum/$chksum.sh
-#!/bin/sh
+#!/bin/bash
 
 run_untrusted()
 {
   status=0
   notrust=/tmp/$chksum
-  if ! sudo -n -u basilisk-untrusted -- bash -c "source /home/basilisk/.bashrc && mkdir \$notrust && cp -arf * \$notrust && cd \$notrust && rm -f completing && \$1 && touch completing"; then
+  if ! sudo -n -u basilisk-untrusted -- bash -c "source /home/basilisk/.bashrc-untrusted && mkdir \$notrust && cp -arf * \$notrust && cd \$notrust && rm -f completing && \$1 && touch completing"; then
      status=1
   fi
   if ! cp -arf \$notrust/* .; then
@@ -240,7 +240,7 @@ if ! test -f fail; then
        pass=false
     fi
   else
-    if ! run_untrusted "$TIMEOUT gdb -batch -return-child-result -ex \"run 2> $log > $out\" $chksum > gdb.log 2> gdb.err" > gdb.log 2> gdb.err; then
+    if ! run_untrusted "$TIMEOUT gdb -batch -return-child-result -ex \"run 2>> $log > $out\" $chksum > gdb.log 2> gdb.err" > gdb.log 2> gdb.err; then
        pass=false
        cat gdb.err >> $log
        awk '
@@ -366,7 +366,7 @@ run_untrusted()
 {
   status=0
   notrust=/tmp/$chksum
-  if ! sudo -n -u basilisk-untrusted -- bash -c "source /home/basilisk/.bashrc && mkdir \$notrust && cp -arf * \$notrust && cd \$notrust && rm -f completing && \$1 && touch completing"; then
+  if ! sudo -n -u basilisk-untrusted -- bash -c "source /home/basilisk/.bashrc-untrusted && mkdir \$notrust && cp -arf * \$notrust && cd \$notrust && rm -f completing && \$1 && touch completing"; then
      status=1
   fi
   if ! cp -arf \$notrust/* .; then
