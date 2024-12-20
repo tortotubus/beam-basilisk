@@ -514,6 +514,20 @@ int main (int argc, char * argv[])
     foreach (serial)
       assert (s[-1] == 1);
   }
+
+  /**
+  ## Initialisation of `coord` */
+
+  {
+    init_grid (1);
+    vector v[];
+    foreach() {
+      coord v0 = {1, -1}; // needs a third coordinate
+      coord v1 = {0, -1, 2}, v2 = {1}; // needs a second and third coordinate
+      foreach_dimension()
+	v.x[] = v0.x = v1.x = v2.x;
+    }
+  }
   
   /**
   ## Other tests */
