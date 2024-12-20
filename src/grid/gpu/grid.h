@@ -1760,7 +1760,7 @@ static bool doloop_on_gpu (ForeachData * loop, const RegionParameters * region,
   for (const External * g = externals; g && g->name; g++)
     if (g->reduct) {
       scalar s = g->s;
-      double result = gpu_reduction (field_offset (s), g->reduct, region,
+      double result = gpu_reduction (field_offset(s, region->level), g->reduct, region,
 				     loop->face == 1 || loop->face == 2 ?
 				     Nl*Dimensions.x*(Nl*Dimensions.y + 1) :
 				     loop->face == 3 || loop->vertex ?

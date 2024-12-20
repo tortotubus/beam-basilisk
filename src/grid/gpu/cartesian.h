@@ -8,7 +8,7 @@
 #define GRIDPARENT Cartesian
 #define field_size() sq(N + 2)
 #define grid_data() (cartesian->d)
-#define field_offset(s) ((s).i*field_size())
+#define field_offset(s,level) ((s).i*field_size())
 #define depth() 0
 #define GPU_CODE()							\
   "#define POINT_VARIABLES VARIABLES\n"					\
