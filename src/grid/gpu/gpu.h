@@ -299,7 +299,10 @@ typedef struct {
     fprintf (stderr, "\n");
   }
 #endif // PRINTIO
+  bool _first = _loop.first;
+  _loop.first = 0; // to avoid warnings in check_stencil
   check_stencil (&_loop);
+  _loop.first = _first;
   _gpu_done_ = gpu_end_stencil (&_loop, _region, _externals_, _kernel_);
   _loop.first = 0;
   end_tracing_foreach ("foreach", S__FILE__, S_LINENO);
