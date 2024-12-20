@@ -355,6 +355,8 @@ int main (int argc, char ** argv)
       FILE * fout = dopen (cpp, "w");
       if (swig)
 	fputs ("@include <Python.h>\n", fout);
+      if (gpu)
+	fputs ("@define _GPU 1\n", fout);
       fputs ("@if _XOPEN_SOURCE < 700\n"
 	     "  @undef _XOPEN_SOURCE\n"
 	     "  @define _XOPEN_SOURCE 700\n"

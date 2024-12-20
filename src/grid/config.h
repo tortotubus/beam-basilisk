@@ -527,13 +527,17 @@ double _val_higher_dimension = 0.;
  * This blog was useful:
  *   http://codingcastles.blogspot.co.nz/2008/12/nans-in-c.html 
  */
-@if (_GNU_SOURCE || __APPLE__) && !_OPENMP && !_CADNA && !_GPU
+@if (_GNU_SOURCE || __APPLE__) && !_OPENMP && !_CADNA
 double undefined;
 @ if __APPLE__
 @   include <stdint.h>
 @   include "fp_osx.h"
 @ endif
+@if _GPU
+@  define enable_fpe(flags)
+@else
 @  define enable_fpe(flags)  feenableexcept (flags)
+@endif
 @  define disable_fpe(flags) fedisableexcept (flags)
 static void set_fpe (void) {
   int64_t lnan = 0x7ff0000000000001;
