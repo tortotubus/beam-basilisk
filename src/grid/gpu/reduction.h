@@ -1,10 +1,11 @@
-real cpu_reduction (GLuint src, size_t offset, size_t nb, const char op)
+double cpu_reduction (GLuint src, size_t offset, size_t nb, const char op)
 {
   GL_C (glBindBuffer (GL_SHADER_STORAGE_BUFFER, src));
   GL_C (glMemoryBarrier (GL_BUFFER_UPDATE_BARRIER_BIT));
-  real result = 0., * a = glMapBufferRange (GL_SHADER_STORAGE_BUFFER,
-					    offset*sizeof(real), nb*sizeof(real),
-					    GL_MAP_READ_BIT);
+  double result = 0.;
+  real * a = glMapBufferRange (GL_SHADER_STORAGE_BUFFER,
+			       offset*sizeof(real), nb*sizeof(real),
+			       GL_MAP_READ_BIT);
   assert (a);
   switch (op) {
   case '+':
@@ -14,12 +15,12 @@ real cpu_reduction (GLuint src, size_t offset, size_t nb, const char op)
   case 'M':
     result = *a++;
     for (int i = 1; i < nb; i++, a++)
-      result = max (result, *a);
+      result = fmax (result, *a);
     break;
   case 'm':
     result = *a++;
     for (int i = 1; i < nb; i++, a++)
-      result = min (result, *a);
+      result = fmin (result, *a);
     break;
   default: assert (false);
   }
@@ -28,7 +29,7 @@ real cpu_reduction (GLuint src, size_t offset, size_t nb, const char op)
   return result;
 }
 
-real gpu_reduction (size_t offset, const char op, const RegionParameters * region, size_t nb)
+double gpu_reduction (size_t offset, const char op, const RegionParameters * region, size_t nb)
 {
   const int stride = 64, nwgr = 64;
   bool is_foreach_point = (region->n.x == 1 && region->n.y == 1);
@@ -47,17 +48,29 @@ real gpu_reduction (size_t offset, const char op, const RegionParameters * regio
     GL_C (glBindBuffer (GL_SHADER_STORAGE_BUFFER, 0));
   }
   
-  const char * start, * operation;
-  static const char * startsum = "reduct = 0.;",
-    * opsum = "reduct += val;";
-  static const char * startmin = "reduct = val;",
-    * opmin = "if (val < reduct) reduct = val;";
-  static const char * startmax = "reduct = val;",
-    * opmax = "if (val > reduct) reduct = val;";
+  const char * operation;
+  static const char * opsum =
+    "  real reduct = 0.;\n"
+    "  for (uint j = 0; j < stride; j++) {\n"
+    "    val = _data[index + j];\n"
+    "    reduct += val;\n"
+    "  }\n";
+  static const char * opmin =
+    "  real reduct = val;\n"
+    "  for (uint j = 0; j < stride; j++) {\n"
+    "    val = _data[index + j];\n"
+    "    if (val < reduct) reduct = val;\n"
+    "  }\n";
+  static const char * opmax =
+    "  real reduct = val;\n"
+    "  for (uint j = 0; j < stride; j++) {\n"
+    "    val = _data[index + j];\n"
+    "    if (val > reduct) reduct = val;\n"
+    "  }\n";
   switch (op) {
-  case '+': start = startsum, operation = opsum; break;
-  case 'M': start = startmax, operation = opmax; break;
-  case 'm': start = startmin, operation = opmin; break;
+  case '+': operation = opsum; break;
+  case 'M': operation = opmax; break;
+  case 'm': operation = opmin; break;
   default: // unknown reduction operation
     assert (false);
   }
@@ -83,12 +96,7 @@ real gpu_reduction (size_t offset, const char op, const RegionParameters * regio
 		"  uint index = stride*gl_GlobalInvocationID.x;\n"
 		"  if (index + stride > nbr) stride = nbr - index;\n"
 		"  index += offset;\n"
-		"  real val = _data[index];\n"
-		"  real ", start, "\n"
-		"  for (uint j = 0; j < stride; j++) {\n"
-		"    val = _data[index + j];\n"
-		"    ", operation, "\n"
-		"  }\n"
+		"  real val = _data[index];\n", operation,
 		"  _reduct[gl_GlobalInvocationID.x] = reduct;\n"
 		"}}\n");
   Shader * shader;
