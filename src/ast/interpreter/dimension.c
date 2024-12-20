@@ -1788,7 +1788,17 @@ void dimension_after_run (Ast * n, Stack * stack)
 	  r->b = b;
 	}
 	fputs (s->lineno ? "    " : "  ", fp);
-	fputs (r->c[0]->label, fp);
+	if (s->lineno)
+	  fputs (r->c[0]->label, fp);
+	else {
+	  char * s = r->c[0]->label;
+	  while (*s != ':')
+	    fputc (*s++, fp);
+	  s++;
+	  while (*s != ':') s++;
+	  while (*s != '\0')
+	    fputc (*s++, fp);
+	}
 	fputc ('\n', fp);
       }
     }
