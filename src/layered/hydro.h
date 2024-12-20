@@ -457,8 +457,7 @@ event pressure (i++, last)
 }
   
 /**
-Finally the free-surface height $\eta$ is updated and the boundary
-conditions are applied. */
+Finally the free-surface height $\eta$ is updated. */
 
 event update_eta (i++, last)
 {
