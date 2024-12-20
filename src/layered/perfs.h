@@ -9,6 +9,8 @@ event perfs (i += 1) {
   if (i == 0)
     fprintf (fp,
 	     "t dt mgp.i mgp.nrelax grid->tn perf.t perf.speed npe\n");
+  static double start = 0.;
+  if (i > 10 && perf.t - start < 1.) return 0;
   fprintf (fp, "%g %g %d %d %ld %g %g %d\n", 
 	   t, dt,
 #if NH
@@ -20,6 +22,7 @@ event perfs (i += 1) {
 #endif
 	   grid->tn*nl, perf.t, perf.speed*nl, npe());
   fflush (fp);
+  start = perf.t;
 }
 
 /**

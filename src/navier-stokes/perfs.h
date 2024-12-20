@@ -10,10 +10,13 @@ event perfs (i += 1) {
     fprintf (fp,
 	     "t dt mgp.i mgp.nrelax mgpf.i mgpf.nrelax mgu.i mgu.nrelax "
 	     "grid->tn perf.t perf.speed npe\n");
+  static double start = 0.;
+  if (i > 10 && perf.t - start < 1.) return 0;
   fprintf (fp, "%g %g %d %d %d %d %d %d %ld %g %g %d\n", 
 	   t, dt, mgp.i, mgp.nrelax, mgpf.i, mgpf.nrelax, mgu.i, mgu.nrelax,
 	   grid->tn, perf.t, perf.speed, npe());
   fflush (fp);
+  start = perf.t;
 }
 
 /**
