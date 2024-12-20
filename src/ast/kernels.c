@@ -251,6 +251,31 @@ void kernel (Ast * n, Stack * stack, void * data)
     ast_terminal (n)->start[0] = '\0';
     break;
 
+  /** 
+  ## Initialization of `coord` (must include three components) */
+
+  case sym_TYPEDEF_NAME: {
+    if (n->parent->sym == sym_types && !strcmp (ast_terminal(n)->start, "coord") &&
+	(n = ast_schema (ast_parent (n, sym_declaration), sym_declaration,
+			 1, sym_init_declarator_list)))
+      foreach_item (n, 2, init_declarator) {
+	Ast * list;
+	if ((list = ast_schema (init_declarator, sym_init_declarator,
+				2, sym_initializer,
+				1, sym_initializer_list))) {
+	  int i = 0;
+	  foreach_item (list, 2, init)
+	    i++;
+	  Ast * last = ast_schema (list->parent, sym_initializer,
+				   2, token_symbol('}'));
+	  if (last)
+	    while (i++ < 3)
+	      str_prepend (ast_terminal (last)->start, ",0");
+	}
+      }
+    break;
+  }
+
   /**
   ## Implicit type casts */
 
