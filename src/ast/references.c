@@ -271,11 +271,26 @@ char * add_reference (Ast * ref, char * references, Ast * scope, Stack * stack, 
   /**
   Array dimensions */
   
-  if (dim.dimension && (*dim.dimension)->sym != sym_VOID) {
-    str_append (references, ",.data=(int[]){");
-    for (Ast ** d = dim.dimension; *d; d++)
-      references = ast_str_append (*d, references);
-    str_append (references, ",0}");
+  if (dim.dimension) {
+    if ((*dim.dimension)->sym != sym_VOID) {
+      str_append (references, ",.data=(int[]){");    
+      for (Ast ** d = dim.dimension; *d; d++)
+	references = ast_str_append (*d, references);
+      str_append (references, ",0}");
+    }
+    else if (*(dim.dimension + 1) == NULL) { // a single undefined dimension
+      Ast * initializer = ast_schema (ast_parent (ref, sym_init_declarator), sym_init_declarator,
+				      2, sym_initializer,
+				      1, sym_initializer_list);
+      if (initializer) {
+	int n = 0;
+	foreach_item (initializer, 2, item)
+	  n++;
+	char s[20];
+	snprintf (s, 19, "%d", n);
+	str_append (references, ",.data=(int[]){", s, ",0}");
+      }
+    }
   }
   free (dim.dimension);
     
