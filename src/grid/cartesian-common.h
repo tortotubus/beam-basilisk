@@ -1039,6 +1039,11 @@ void stencil_val (Point p, scalar s, int i, int j, int k,
     return;
   if (s.block < 0)
     s.i += s.block;
+  if (!s.name) {
+    fprintf (stderr, "%s:%d: error: trying to access a deleted field\n",
+	     file, line);
+    exit (1);
+  }
   int index[] = {i, j, k};
   for (int d = 0; d < dimension; d++)
     index[d] += (&p.i)[d];      
@@ -1077,6 +1082,11 @@ void stencil_val_a (Point p, scalar s, int i, int j, int k, bool input,
     abort();
   if (s.block < 0)
     s.i += s.block;
+  if (!s.name) {
+    fprintf (stderr, "%s:%d: error: trying to access a deleted field\n",
+	     file, line);
+    exit (1);
+  }
   int index[] = {i, j, k};
   for (int d = 0; d < dimension; d++)
     index[d] += (&p.i)[d];    
