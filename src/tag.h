@@ -265,18 +265,27 @@ int tag (scalar t)
   return n;
 }
 
+static int sort_long (const void * a, const void * b)
+{
+  return *(const long *)a < *(const long *)b;
+}
+
 /**
 # Removing (small) droplets/bubbles
 
 Using tag(), the function below can identify and remove droplets (or
 bubbles) defined by VOF tracer *f* (resp. $1 - f$), smaller than a
-given diameter (*minsize*) expressed in number of cells. */
+given diameter (*minsize*) expressed in number of
+cells. Alternatively, if *minsize* is negative, the function will keep
+only the `-minsize` largest droplets/bubbles. */
 
 void remove_droplets (scalar f,
 		      int minsize = 3,
 		      double threshold = 1e-4,
 		      bool bubbles = false)
 {
+  if (minsize == 0)
+    return;
   scalar d[];
   foreach()
     d[] = (bubbles ? 1. - f[] : f[]) > threshold;
@@ -290,7 +299,16 @@ void remove_droplets (scalar f,
 #if _MPI
   MPI_Allreduce (MPI_IN_PLACE, size, n, MPI_LONG, MPI_SUM, MPI_COMM_WORLD);
 #endif
-  minsize = pow (minsize, dimension);
+  if (minsize > 0)
+    minsize = pow (minsize, dimension);
+  else {
+    if (- minsize >= n)
+      return;
+    long size1[n];
+    memcpy (size1, size, n*sizeof(long));
+    qsort (size1, n, sizeof (long), sort_long);
+    minsize = size1[- minsize - 1];
+  }
   foreach()
     if (d[] > 0 && size[((int) d[]) - 1] < minsize)
       f[] = bubbles;
