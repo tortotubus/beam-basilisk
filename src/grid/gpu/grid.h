@@ -1629,6 +1629,57 @@ static Shader * setup_shader (ForeachData * loop, const RegionParameters * regio
   gpu_cpu_sync (baseblock, GL_MAP_WRITE_BIT, loop->fname, loop->line);
 
   /**
+  ## Apply boundary conditions
+  
+  This can be required if boundary conditions have been modified
+  between loops. */
+
+  scalar * listc = NULL;
+  for (scalar s in loop->listc)
+    if (s.dirty)
+      listc = list_prepend (listc, s);
+  scalar * listf_x = NULL, * listf_y = NULL;
+  foreach_dimension()
+    for (scalar s in loop->listf.x)
+      if (s.dirty)
+	listf_x = list_prepend (listf_x, s);
+  if (listc || listf_x || listf_y) {
+#if PRINTBC
+    fprintf (stderr, "%s:%d: applying BCs for", loop->fname, loop->line);
+    for (scalar s in listc)
+      fprintf (stderr, " %s", s.name);
+    foreach_dimension()
+      for (scalar s in listf_x)
+	fprintf (stderr, " %s", s.name);
+    fputc ('\n', stderr);
+#endif
+    int nvar = datasize/sizeof(real);
+    _Attributes backup[nvar];
+    memcpy (backup, _attribute, nvar*sizeof(_Attributes));
+    foreach (gpu) {
+      for (scalar s in listc)
+	s[] = s[]; // does nothing but ensures that BCs are applied at the end of the loop
+      foreach_dimension()
+	for (scalar s in listf_x)
+	  s[] = s[];
+    }
+    memcpy (_attribute, backup, nvar*sizeof(_Attributes));
+    for (scalar s in listc) {
+      s.dirty = false;
+      s.gpu.stored = -1;
+    }
+    free (listc); 
+    foreach_dimension() {
+      for (scalar s in listf_x) {
+	s.dirty = false;
+	s.gpu.stored = -1;
+      }
+      free (listf_x);
+    }
+    apply_bc_list = loop->dirty;
+  }
+  
+  /**
   For the Intel driver, it looks like the next line is necessary to
   ensure proper synchronisation of the compute shader and fragment
   shader (for example when using output_ppm() for interactive
@@ -1719,7 +1770,10 @@ static bool doloop_on_gpu (ForeachData * loop, const RegionParameters * region,
 
   int Nl = region->level > 0 ? 1 << (region->level - 1) : N/Dimensions.x;
   if (region->n.x == 1 && region->n.y == 1) {
-    int csOrigin[] = { (region->p.x - X0)/L0*Nl*Dimensions.x, (region->p.y - Y0)/L0*Nl*Dimensions.x };
+    int csOrigin[] = {
+      (region->p.x - X0)/L0*Nl*Dimensions.x,
+      (region->p.y - Y0)/L0*Nl*Dimensions.x
+    };
     GL_C (glUniform2iv (0, 1, csOrigin));
     assert (!GPUContext.fragment_shader);
     GL_C (glMemoryBarrier (GL_SHADER_STORAGE_BARRIER_BIT));

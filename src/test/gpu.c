@@ -513,6 +513,12 @@ int main (int argc, char * argv[])
     myfunc8 (s);
     foreach (serial)
       assert (s[-1] == 1);
+    s[left] = 2;
+    scalar s1[];
+    foreach()
+      s1[] = s[-1];
+    foreach (serial)
+      assert (s1[] == 2);
   }
 
   /**
