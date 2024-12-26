@@ -11,10 +11,13 @@ solver](/src/layered/hydro.h) described in [Popinet,
 See [Hurlburt & Hogan, 2000](#hurlburt2000) for details but the main
 characteristics of the setup are:
 
-* 5 isopycnal layers (see Table 2 of H&H, 2000 for the reference densities, thicknesses etc.)
-* Wind stress in the top layer given by the monthly climatology of Hellerman & Rosenstein, 1983
+* 5 isopycnal layers (see Table 2 of H&H, 2000 for the reference
+  densities, thicknesses etc.)
+* Wind stress in the top layer given by the monthly climatology of
+  Hellerman & Rosenstein, 1983
 * "Compressed bathymetry" as in H&H, 2000
-* Quadratic bottom friction (Cb = 2 x 10^-3^), Laplacian horizontal viscosity (10 m^2^/s)
+* Quadratic bottom friction (Cb = 2 x 10^-3^), Laplacian horizontal
+  viscosity (10 m^2^/s)
 * Atlantic Meridional Overturning Circulation (AMOC) driven by fluxes
   at the northern and southern boundaries (see Table 2 of H&H, 2000
   for the values of fluxes)
@@ -36,6 +39,7 @@ coordinates. */
 #include "spherical.h"
 #include "layered/hydro.h"
 #include "layered/implicit.h"
+#include "profiling.h"
 
 /**
 ## Coriolis acceleration and bottom friction
@@ -120,7 +124,11 @@ vector ua, ud;
 scalar Ha, etam[], eta2[];
 vector uga[], ugd[];
 
-double tspinup = 5.*year; // start averaging after that time
+/**
+The default starting time for averaging (i.e. spinup time) is set to
+5 years. This is a minimum. */
+
+double tspinup = 5.*year;
 
 /**
 ## Boundary fluxes 
@@ -157,15 +165,15 @@ int main (int argc, char * argv[])
 {
 
   /**
+  The domain is rectangular with a 2x1 aspect ratio. */  
+  
+  dimensions (2, 1);
+
+  /**
   On a [spherical grid](/src/spherical.h), the sizes are given in
   degrees (of longitude). */
   
-  if (npe() > 1) {
-    dimensions (ny = sqrt(npe()/2));
-    size (42*2.);
-  }
-  else
-    size (42);
+  size (42*dimensions().x);
 
   /**
   The Earth radius, here in meters, sets the length unit. */
@@ -201,19 +209,16 @@ int main (int argc, char * argv[])
     DT = atof(argv[2]);
 
   /**
-  The default starting time for averaging (i.e. spinup time) is set to
-  5 years. This is a minimum. */
+  We can change the spinup time using the third command-line parameter. */
   
   if (argc > 3)
     tspinup = atof(argv[3]);
 
   /**
-  The number of layers is set to NL (five) and the tolerance on the
-  implicit free-surface solver is set to 10^-4^ (meters). */
+  The number of layers is set to NL (five). */
   
   nl = NL;
-  TOLERANCE = 1e-4;
-
+  
   /**
   The "implicitness parameter" of the [implicit barotropic
   solver](/src/layered/implicit.h) is set to 0.55 rather than the
@@ -341,10 +346,11 @@ event init (i = 0)
 ## Wind stress
 
 The surface wind stress is modelled as in [H & H,
-2000](#hurlburt2000), page 293. */
+2000](#hurlburt2000), page 293. Note that this is only used with the
+"COADS" wind climatology since the Hellerman & Rosenstein climatology
+directly gives the wind stress.*/
 
-double Cw = 1.5e-3;
-double rho_air = 1.2;
+double Cw = 1.5e-3, rho_air = 1.2;
 
 /**
 This function loads the [Hellerman & Rosenstein, 1983](#hellerman1983)
@@ -535,14 +541,14 @@ event outputs (t += day)
       fprintf (stderr, " d%s%d.sum/dt", h.name, l);
     fputc ('\n', stderr);
   }
-  fprintf (stderr, "%g %g %g %g %d %d %g %g", t/day, ke/vol/2., keb/volb/2., dt,
-	   mgH.i, mgH.nrelax,
-	   statsf (etad).stddev, statsf(nu).stddev);
+  else
+    fprintf (stderr, "%g %g %g %g %d %d %g %g", t/day, ke/vol/2., keb/volb/2., dt,
+	     mgH.i, mgH.nrelax,
+	     statsf (etad).stddev, statsf(nu).stddev);
 
   /**
-  This computes the rate of variation of the volume of each layer. The
-  entrainment model above must ensure that this volume remains
-  constant (i.e. the rate of variation should be close to zero). */
+  This computes the variation of the volume-averaged thickness of each
+  layer. This is zero when the volume of each layer is conserved. */
   
   static double s0[NL], t0 = 0.;
   foreach_layer() {
@@ -562,11 +568,11 @@ event outputs (t += day)
   
   output_ppm (etad, mask = m, file = "eta.mp4", n = clamp(N,1024,2048),
 	      min = -0.8, max = 0.6,
-	      box = {{X0,Y0},{X0+L0,Y0+L0/2.}},
+	      box = {{X0,Y0},{X0+L0,Y0+L0*dimensions().y/dimensions().x}},
 	      map = jet);
   output_ppm (nu, mask = m, file = "nu.mp4", n = clamp(N,1024,2048),
 	      min = 0, max = 1.5,
-	      box = {{X0,Y0},{X0+L0,Y0+L0/2.}},
+	      box = {{X0,Y0},{X0+L0,Y0+L0*dimensions().y/dimensions().x}},
 	      map = cool_warm);
 
   char name[80];
@@ -577,9 +583,34 @@ event outputs (t += day)
 	      linear = false,
 	      //	      spread = 5,
 	      min = -0.5e-4, max = 0.5e-4,
-	      box = {{X0,Y0},{X0+L0,Y0+L0/2.}},
+	      box = {{X0,Y0},{X0+L0,Y0+L0*dimensions().y/dimensions().x}},
 	      map = blue_white_red);
 }
+
+/**
+## Real-time display on GPUs */
+
+#if _GPU && SHOW
+event display (i++)
+{
+  scalar etad[], m[], nu[];
+  foreach() {
+    etad[] = h[] > dry ? eta[] : 0.;
+    m[] = etad[] - zbs[];
+    nu[] = h[] > dry ? norm(u) : 0.;
+  }
+  output_ppm (etad, mask = m, fp = NULL, fps = 30,
+	      n = clamp(N,1024,2048),
+	      min = -0.8, max = 0.6,
+	      box = {{X0,Y0},{X0+L0,Y0+L0*dimensions().y/dimensions().x}},
+	      map = jet);
+  output_ppm (nu, mask = m, fp = NULL, fps = 30,
+	      n = clamp(N,1024,2048),
+	      min = 0, max = 1.5,
+	      box = {{X0,Y0},{X0+L0,Y0+L0*dimensions().y/dimensions().x}},
+	      map = cool_warm);
+}
+#endif
 
 /**
 ## Fluxes through vertical cross-sections 
@@ -680,12 +711,12 @@ event average_outputs (t = tspinup; t += 30*day)
   output_ppm (etad, mask = m, file = "etad.mp4", n = clamp(N,1024,2048),
 	      linear = false,
 	      min = 0, max = 0.4,
-	      box = {{X0,Y0},{X0+L0,Y0+L0/2.}},
+	      box = {{X0,Y0},{X0+L0,Y0+L0*dimensions().y/dimensions().x}},
 	      map = jet);
   output_ppm (etam, mask = m, file = "etam.mp4", n = clamp(N,1024,2048),
 	      linear = false,
 	      min = -0.6, max = 0.6,
-	      box = {{X0,Y0},{X0+L0,Y0+L0/2.}},
+	      box = {{X0,Y0},{X0+L0,Y0+L0*dimensions().y/dimensions().x}},
 	      map = jet);
 }
 
@@ -704,6 +735,15 @@ On 128 cores of the "navier" cluster at d'Alembert, runtimes are of
 the order of 89 simulated years per day (ypd) for a resolution of 512
 x 256, 28 ypd for 1024 x 512 and 6 ypd for 2048 x 1024.
 
+The simulation also runs fine [on GPUs](/src/grid/gpu/grid.h) using e.g.
+
+~~~bash
+OMP_NUM_THREADS=16 make gulf-stream.gpu.tst
+~~~
+
+On an [RTX 4090 D](https://www.techpowerup.com/gpu-specs/geforce-rtx-4090.c3889)
+runtimes are approx. 44 ypd for a resolution of 2048 x 1024.
+
 Spinup takes at least 5 years and statistics (for e.g. the standard
 deviations of SSH) at least 10 years.
 
@@ -715,6 +755,7 @@ accessible in the following folders:
 * [gulf-stream/512/]()
 * [gulf-stream/1024/]()
 * [gulf-stream/2048/]()
+* [gulf-stream/4096/]()
 
 ## Todo
 
