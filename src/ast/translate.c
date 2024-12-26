@@ -1961,6 +1961,7 @@ static void set_boundary_component (Ast * member_identifier)
   }  
 }
 
+// fixme: does not set 'dirty' properly due to the u.t u.n conventions
 static char * set_boundary (Ast * array, char * ind)
 {
   assert (array->sym == sym_array_access);
