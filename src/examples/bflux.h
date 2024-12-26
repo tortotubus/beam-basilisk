@@ -32,6 +32,11 @@ specified in H&H, 2000 (see Note b of Table 2 in H&H, 2000). */
 #define northern_flux() (x > -50 && x < - 40 && y > 50.5 && val(zbs,0,0,0) < -4000)
 #define southern_flux() (x > -60 && x < - 50 && y < 9.5 && val(zbs,0,0,0) < - 4000)
 
+/**
+The AMOC (see below) is balanced using (vertical) fluxes between layers. */
+
+#include "layered/conservation.h"
+
 event viscous_term (i++)
 {
 
@@ -43,11 +48,14 @@ event viscous_term (i++)
   double sht[nl], shb[nl];
   for (int l = 0; l < nl; l++)
     sht[l] = shb[l] = 0.;
-  foreach(reduction(+:sht[:nl]) reduction(+:shb[:nl]))
-    foreach_layer() {
-      sht[point.l] += northern_flux()*fmax(h[] - hmin[point.l]/10., 0.)*dv();
-      shb[point.l] += southern_flux()*fmax(h[] - hmin[point.l]/10., 0.)*dv();
+  foreach_layer() {
+    double t = 0., b = 0.;
+    foreach(reduction(+:t) reduction(+:b)) {
+      t += northern_flux()*fmax(h[] - hmin[_layer]/10., 0.)*dv();
+      b += southern_flux()*fmax(h[] - hmin[_layer]/10., 0.)*dv();
     }
+    sht[_layer] = t, shb[_layer] = b;
+  }
 
   /**
   The fluxes (in m^3^/s i.e. Sverdrups/10^6^) are given in Table 2 of
@@ -55,33 +63,39 @@ event viscous_term (i++)
 
   See also the 2nd paragraph page 295 which discusses in more detail
   the chosen fluxes and their control of the northward, southward
-  (Deep Western Boundary Current) and upward currents. */
+  (Deep Western Boundary Current) and upward (Atlantic Meridional
+  Overturning Circulation, AMOC) currents. */
 
-#if NODWBC
-  static const double northern[] =
-    { 0., - 0.33e6, - 2.33e6, - 4.84e6, - 6.5e6 };
-  static const double southern[] =
-    { 0.,   0.33e6,   2.33e6,   4.84e6,   6.5e6 };
-#else
   static const double factor = 0.9;
-  static const double northern[] =
-    { + 14e6, - 0.33e6, - 2e6*factor - 0.33e6, - 4.5e6*factor - 0.34e6, - 6.5e6*factor };
-  static const double southern[] =
-    { - 13e6, 0., 2e6*factor, 4.5e6*factor, 6.5e6*factor };
-#endif
+  static const double AMOC = 1e6;
+  static const double southern[] = {
+    - 13e6,        // bottom layer
+    0.,
+    2e6*factor,
+    4.5e6*factor,
+    6.5e6*factor   // top layer
+  };
+  static const double northern[] = {
+    + AMOC    - southern[0], // bottom layer
+    - AMOC/3. - southern[1],
+    - AMOC/3. - southern[2],
+    - AMOC/3. - southern[3],
+    - southern[4]            // top layer
+  };
 
-  /**
-  The fluxes are imposed using a thickness-weighted sum over the
-  northern and southern ports. */
-  
   assert (nl == 5);
   foreach()
     foreach_layer() {
-      h[] += dt*northern_flux()*fmax(h[] - hmin[point.l]/10., 0.)*
-	northern[point.l]/max(sht[point.l], dry);
-      h[] += dt*southern_flux()*fmax(h[] - hmin[point.l]/10., 0.)*
-	southern[point.l]/max(shb[point.l], dry);
-      if (h[] < 0.)
-	h[] = 0.;
+
+      /**
+      The fluxes are imposed using a thickness-weighted sum over the
+      northern and southern ports. */
+  
+      double hn = h[];
+      hn += dt*northern_flux()*fmax(h[] - hmin[point.l]/10., 0.)*
+	northern[point.l]/fmax(sht[point.l], dry);
+      hn += dt*southern_flux()*fmax(h[] - hmin[point.l]/10., 0.)*
+	southern[point.l]/fmax(shb[point.l], dry);
+      h[] = fmax(hn, 0.);
     }
 }
