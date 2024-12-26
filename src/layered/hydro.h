@@ -209,10 +209,9 @@ event face_fields (i++, last)
   The (CFL-limited) timestep is also computed by this function. A
   difficulty is that the prediction step below also requires an
   estimated timestep (the `pdt` variable below). The timestep at the
-  previous iteration is used as estimate. For the initial timestep a
-  "sufficiently small" value is used. */
-  
-  static double pdt = 1e-6;
+  previous iteration is used as estimate. */
+
+  static double pdt = 0.;
   foreach_face (reduction (min:dtmax)) {
     double ax = a_baro (eta, 0);
     double H = 0., um = 0.;
