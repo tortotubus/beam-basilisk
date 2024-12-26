@@ -88,7 +88,7 @@
 [0,1]  ast/interpreter/overload.h: '1e30'
 [0,1]  /src/grid/events.h: 'TEND_EVENT = 1234567890'
 [0,1]  /src/grid/events.h: 'ev->t = 0'
-[0,1]  /src/layered/hydro.h: 'pdt = 1e-6'
+[0,1]  /src/layered/hydro.h: 'pdt = 0.'
 [0,1]  /src/layered/hydro.h: '0'
 [0,1]  /src/run.h: 't = 0.'
 [0,1]  /src/run.h: '0'
