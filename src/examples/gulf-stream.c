@@ -104,7 +104,7 @@ cm/s (see Table 2 of H&H, 2000) and the coefficient of additional
 interfacial friction associated with entrainment is zero. */
 
 #include "layered/entrainment.h"
-double * hmin = (double [NL]){ 0, 40, 40, 40, 50 };
+double * hmin = (double [NL]){ 40, 40, 40, 40, 50 };
 double * hmax = (double [NL]){ HUGE, HUGE, HUGE, HUGE, HUGE };
 double omr = 0.07e-2, Cm = 0.;
 
@@ -142,9 +142,7 @@ much more realistic results are obtained when including the simplified
 representation proposed by [Hurlburt & Hogan,
 2000](#hurlburt2000). See [bflux.h]() for details. */
 
-#if 1
 #include "bflux.h"
-#endif
 
 /**
 ## main() 
@@ -553,7 +551,7 @@ event outputs (t += day)
   static double s0[NL] = {0}, t0 = 0.;
   foreach_layer() {
     double s = statsf(h).sum;
-    if (i == 0)
+    if (t0 == 0.)
       fprintf (stderr, " 0");
     else
       fprintf (stderr, " %g", (s - s0[_layer])/(t - t0));
@@ -709,7 +707,7 @@ event average_outputs (t = tspinup; t += 30*day)
 /**
 ## Run times
 
-The simulation can/should be run on parallel machines using something like:
+The simulation can be run on parallel machines using something like:
 
 ~~~bash
 ../qcc -source -D_MPI=1 gulf-stream.c

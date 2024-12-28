@@ -61,9 +61,11 @@ event init (i = 0)
   We "dry out" all the other basins. */
   
   foreach()
-    if (!d[])
+    if (!d[]) {
       foreach_layer()
 	h[] = 0.;
+      zb[] = HUGE;
+    }
 
   /**
   And finally we store the initial volume of each layer. */
@@ -94,13 +96,13 @@ event viscous_term (i++)
     /**
     The ratio of these two quantities gives the vertical displacement,
     which is then applied in each cell which is "thick enough". */
-    
-    if (area > 0.) {
-      double dh = (Conservation.sum[_layer] - volume)/area;
-      foreach()
-	if (h[] > hmin[_layer]/10.)
-	  h[] += dh;
-    }
+
+    assert (area > 0.);
+    double dh = (Conservation.sum[_layer] - volume)/area;
+    assert (dh > - hmin[_layer]/10.);
+    foreach()
+      if (h[] > hmin[_layer]/10.)
+	h[] += dh;
   }
 }
 
