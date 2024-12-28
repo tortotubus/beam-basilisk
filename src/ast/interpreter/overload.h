@@ -142,6 +142,19 @@ void _init_point_variables (void)
 }
 
 /**
+foreach() macros */
+
+void _foreach_block (void)
+{
+  for (_layer = 0; _layer < nl; _layer++) {};
+}
+
+void _foreach_block_inner (void)
+{
+  for (point.l = 0; point.l < nl; point.l++) {};
+}
+
+/**
 Grid functions */
 
 typedef struct {
@@ -471,6 +484,16 @@ double min (double a, double b)
   return a < b ? a : b;
 }
 
+double fmax (double a, double b)
+{
+  return a > b ? a : b;
+}
+
+double fmin (double a, double b)
+{
+  return a < b ? a : b;
+}
+
 int sign (double x)
 {
   const int i = 1;
@@ -602,7 +625,7 @@ scalar lookup_field (const char * name)
 
 vector lookup_vector (const char * name)
 {
-  if (name) { interpreter_verbosity (2);
+  if (name) {
     char component[strlen(name) + 3];
     strcpy (component, name);
     strcat (component, ".x");

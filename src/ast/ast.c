@@ -505,6 +505,31 @@ void ast_print_tree (Ast * n, FILE * fp, const char * indent,
   }
 }
 
+void ast_print_constructor (Ast * n, FILE * fp, const char * indent)
+{
+  if (indent)
+    fputs (indent, fp);
+  AstTerminal * t = ast_terminal (n);
+  if (t) {
+    if (t->start[1] == '\0')
+      fprintf (fp, "NCA(n, \"%s\")", t->start);
+    else
+      fprintf (fp, "NA(n, sym_%s, \"%s\")", symbol_name (n->sym), t->start);
+  }
+  else {
+    fprintf (fp, "NN(n, sym_%s,\n", symbol_name (n->sym));
+    char * ind = indent ? strdup (indent) : strdup ("");
+    str_append (ind, "   ");
+    for (Ast **c = n->child; *c; c++) {
+      ast_print_constructor (*c, fp, ind);
+      if (*(c + 1))
+	fputs (",\n", fp);
+    }
+    fputs (")", fp);
+    free (ind);
+  }
+}
+
 AstTerminal * ast_terminal_new (Ast * parent, int symbol, const char * start)
 {
   AstTerminal * t = allocate (ast_get_root (parent)->alloc,

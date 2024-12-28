@@ -41,23 +41,6 @@ event viscous_term (i++)
 {
 
   /**
-  In order to distribute the fluxes within each layer, we first
-  compute the volume of the northern and southern ports, for each
-  layer. */
-  
-  double sht[nl], shb[nl];
-  for (int l = 0; l < nl; l++)
-    sht[l] = shb[l] = 0.;
-  foreach_layer() {
-    double t = 0., b = 0.;
-    foreach(reduction(+:t) reduction(+:b)) {
-      t += northern_flux()*fmax(h[] - hmin[_layer]/10., 0.)*dv();
-      b += southern_flux()*fmax(h[] - hmin[_layer]/10., 0.)*dv();
-    }
-    sht[_layer] = t, shb[_layer] = b;
-  }
-
-  /**
   The fluxes (in m^3^/s i.e. Sverdrups/10^6^) are given in Table 2 of
   H&H, 2000. 
 
@@ -66,7 +49,7 @@ event viscous_term (i++)
   (Deep Western Boundary Current) and upward (Atlantic Meridional
   Overturning Circulation, AMOC) currents. */
 
-  static const double factor = 0.9;
+  #define factor 0.9
   static const double AMOC = 1e6;
   static const double southern[] = {
     - 13e6,        // bottom layer
@@ -82,20 +65,37 @@ event viscous_term (i++)
     - AMOC/3. - southern[3],
     - southern[4]            // top layer
   };
-
   assert (nl == 5);
+
+  /**
+  In order to distribute the fluxes within each layer, we compute the
+  volume of the northern and southern ports, for each layer. */
+  
+  double sht[nl], shb[nl];
+  foreach_layer() {
+    double t = 0., b = 0.;
+    foreach(reduction(+:t) reduction(+:b)) {
+      t += northern_flux()*fmax(h[] - hmin[_layer]/10., 0.)*dv();
+      b += southern_flux()*fmax(h[] - hmin[_layer]/10., 0.)*dv();
+    }
+    assert (t > 0. && b > 0.);
+    sht[_layer] = northern[_layer]/t, shb[_layer] = southern[_layer]/b;
+  }
+
   foreach()
     foreach_layer() {
 
       /**
       The fluxes are imposed using a thickness-weighted sum over the
       northern and southern ports. */
-  
-      double hn = h[];
-      hn += dt*northern_flux()*fmax(h[] - hmin[point.l]/10., 0.)*
-	northern[point.l]/fmax(sht[point.l], dry);
-      hn += dt*southern_flux()*fmax(h[] - hmin[point.l]/10., 0.)*
-	southern[point.l]/fmax(shb[point.l], dry);
-      h[] = fmax(hn, 0.);
+
+      if (h[] > hmin[point.l]/10.) {
+	double hn = h[];
+	if (northern_flux())
+	  hn += dt*(h[] - hmin[point.l]/10.)*sht[point.l];
+	if (southern_flux())
+	  hn += dt*(h[] - hmin[point.l]/10.)*shb[point.l];
+	h[] = fmax(hn, 0.);
+      }
     }
 }
