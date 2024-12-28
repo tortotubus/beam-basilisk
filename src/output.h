@@ -39,7 +39,7 @@ void output_field (scalar * list = all,
 		   FILE * fp = stdout,
 		   int n = N,
 		   bool linear = false,
-		   coord box[2] = {{X0, Y0},{X0 + L0, Y0 + L0}})
+		   coord box[2] = {{X0, Y0}, {X0 + L0, Y0 + L0*Dimensions.y/Dimensions.x}})
 {
   n++;
   int len = list_len (list);
@@ -128,7 +128,7 @@ void output_matrix (scalar f,
 		    int n = N,
 		    bool linear = false,
 		    const char * file = NULL,
-		    coord box[2] = {{X0, Y0}, {X0 + L0, Y0 + L0}})
+		    coord box[2] = {{X0, Y0}, {X0 + L0, Y0 + L0*Dimensions.y/Dimensions.x}})
 {
   coord cn = {n}, p;
   double delta = (box[1].x - box[0].x)/n;
@@ -592,7 +592,7 @@ void output_ppm (scalar f,
 		 double min = 0, double max = 0, double spread = 5,
 		 double z = 0,
 		 bool linear = false,
-		 coord box[2] = {{X0, Y0}, {X0 + L0, Y0 + L0}},
+		 coord box[2] = {{X0, Y0}, {X0 + L0, Y0 + L0*Dimensions.y/Dimensions.x}},
 		 scalar mask = {-1},
 		 Colormap map = jet,
 		 char * opt = NULL,
@@ -716,25 +716,25 @@ void output_grd (scalar f,
 		 FILE * fp = stdout,
 		 double Delta = L0/N,
 		 bool linear = false,
-		 double box[2][2] = {{X0, Y0}, {X0 + L0, Y0 + L0}},
+		 coord box[2] = {{X0, Y0}, {X0 + L0, Y0 + L0*Dimensions.y/Dimensions.x}},
 		 scalar mask = {-1})
 {
-  int nx = (box[1][0] - box[0][0])/Delta;
-  int ny = (box[1][1] - box[0][1])/Delta;
+  int nx = (box[1].x - box[0].x)/Delta;
+  int ny = (box[1].y - box[0].y)/Delta;
 
   // header
   fprintf (fp, "ncols          %d\n", nx);
   fprintf (fp, "nrows          %d\n", ny);
-  fprintf (fp, "xllcorner      %g\n", box[0][0]);
-  fprintf (fp, "yllcorner      %g\n", box[0][1]);
+  fprintf (fp, "xllcorner      %g\n", box[0].x);
+  fprintf (fp, "yllcorner      %g\n", box[0].y);
   fprintf (fp, "cellsize       %g\n", Delta);
   fprintf (fp, "nodata_value   -9999\n");
   
   // data
   for (int j = ny-1; j >= 0; j--) {
-    double yp = Delta*j + box[0][1] + Delta/2.;
+    double yp = Delta*j + box[0].y + Delta/2.;
     for (int i = 0; i < nx; i++) {
-      double xp = Delta*i + box[0][0] + Delta/2., v;
+      double xp = Delta*i + box[0].x + Delta/2., v;
       if (mask.i >= 0) { // masking
 	double m = interpolate (mask, xp, yp, linear = linear);
 	if (m < 0.)
@@ -1074,21 +1074,33 @@ void dump (const char * file = "dump",
   scalar * slist = list_concat ({size}, dlist); free (dlist);
   struct DumpHeader header = { t, list_len(slist), iter, depth(), npe(),
 			       dump_version };
+  int npe = 1;
+  foreach_dimension() {
+    header.n.x = Dimensions.x;
+    npe *= header.n.x;
+  }
+  header.npe = npe;
   dump_header (fp, &header, slist);
   
   subtree_size (size, false);
-  
+#if _GPU
+  for (scalar s in slist)
+    s.input = 1;
+  gpu_cpu_sync (slist, GL_MAP_READ_BIT, __FILE__, LINENO);
+#endif // _GPU
   foreach_cell() {
     unsigned flags = is_leaf(cell) ? leaf : 0;
     if (fwrite (&flags, sizeof(unsigned), 1, fp) < 1) {
       perror ("dump(): error while writing flags");
       exit (1);
     }
-    for (scalar s in slist)
-      if (fwrite (&s[], sizeof(double), 1, fp) < 1) {
+    for (scalar s in slist) {
+      double val = s[] == (real) nodata ? (double) nodata : s[];
+      if (fwrite (&val, sizeof(double), 1, fp) < 1) {
 	perror ("dump(): error while writing scalars");
 	exit (1);
       }
+    }
     if (is_leaf(cell))
       continue;
   }
@@ -1161,7 +1173,7 @@ void dump (const char * file = "dump",
       unsigned flags = is_leaf(cell) ? leaf : 0;
       fwrite (&flags, 1, sizeof(unsigned), fh);
       for (scalar s in slist) {
-	double val = s[];
+	double val = s[] == (real) nodata ? (double) nodata : s[];
 	fwrite (&val, 1, sizeof(double), fh);
       }
       pos += cell_size;
@@ -1210,15 +1222,13 @@ bool restore (const char * file = "dump",
 	     header.npe, npe());
     exit (1);
   }
+#endif // MULTIGRID_MPI
   dimensions (header.n.x, header.n.y, header.n.z);
   double n = header.n.x;
   int depth = header.depth;
   while (n > 1)
     depth++, n /= 2;
   init_grid (1 << depth);
-#else // !MULTIGRID_MPI
-  init_grid (1 << header.depth);
-#endif
 #endif // multigrid
 
   bool restore_all = (list == all);
@@ -1315,13 +1325,18 @@ bool restore (const char * file = "dump",
 	exit (1);
       }
       if (s.i != INT_MAX)
-	s[] = val;
+	s[] = val == (double) nodata ? (real) nodata : val;
     }
     if (!(flags & leaf) && is_leaf(cell))
       refine_cell (point, listm, 0, NULL);
     if (is_leaf(cell))
       continue;
   }
+#if _GPU
+  for (scalar s in slist)
+    if (s.i != INT_MAX)
+      s.gpu.stored = 1; // stored on CPU
+#endif // _GPU
   for (scalar s in all)
     s.dirty = true;
 #endif

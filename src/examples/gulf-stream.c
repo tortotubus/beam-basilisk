@@ -567,13 +567,9 @@ event outputs (t += day)
   surface vorticity. */
   
   output_ppm (etad, mask = m, file = "eta.mp4", n = clamp(N,1024,2048),
-	      min = -0.8, max = 0.6,
-	      box = {{X0,Y0},{X0+L0,Y0+L0*dimensions().y/dimensions().x}},
-	      map = jet);
+	      min = -0.8, max = 0.6, map = jet);
   output_ppm (nu, mask = m, file = "nu.mp4", n = clamp(N,1024,2048),
-	      min = 0, max = 1.5,
-	      box = {{X0,Y0},{X0+L0,Y0+L0*dimensions().y/dimensions().x}},
-	      map = cool_warm);
+	      min = 0, max = 1.5, map = cool_warm);
 
   char name[80];
   sprintf (name, "u%d", nl - 1);
@@ -582,9 +578,7 @@ event outputs (t += day)
   output_ppm (nu, mask = m, file = "omega.mp4", n = clamp(N,1024,2048),
 	      linear = false,
 	      //	      spread = 5,
-	      min = -0.5e-4, max = 0.5e-4,
-	      box = {{X0,Y0},{X0+L0,Y0+L0*dimensions().y/dimensions().x}},
-	      map = blue_white_red);
+	      min = -0.5e-4, max = 0.5e-4, map = blue_white_red);
 }
 
 /**
@@ -601,14 +595,10 @@ event display (i++)
   }
   output_ppm (etad, mask = m, fp = NULL, fps = 30,
 	      n = clamp(N,1024,2048),
-	      min = -0.8, max = 0.6,
-	      box = {{X0,Y0},{X0+L0,Y0+L0*dimensions().y/dimensions().x}},
-	      map = jet);
+	      min = -0.8, max = 0.6, map = jet);
   output_ppm (nu, mask = m, fp = NULL, fps = 30,
 	      n = clamp(N,1024,2048),
-	      min = 0, max = 1.5,
-	      box = {{X0,Y0},{X0+L0,Y0+L0*dimensions().y/dimensions().x}},
-	      map = cool_warm);
+	      min = 0, max = 1.5, map = cool_warm);
 }
 #endif // _GPU && SHOW
 
@@ -710,14 +700,10 @@ event average_outputs (t = tspinup; t += 30*day)
   }
   output_ppm (etad, mask = m, file = "etad.mp4", n = clamp(N,1024,2048),
 	      linear = false,
-	      min = 0, max = 0.4,
-	      box = {{X0,Y0},{X0+L0,Y0+L0*dimensions().y/dimensions().x}},
-	      map = jet);
+	      min = 0, max = 0.4, map = jet);
   output_ppm (etam, mask = m, file = "etam.mp4", n = clamp(N,1024,2048),
 	      linear = false,
-	      min = -0.6, max = 0.6,
-	      box = {{X0,Y0},{X0+L0,Y0+L0*dimensions().y/dimensions().x}},
-	      map = jet);
+	      min = -0.6, max = 0.6, map = jet);
 }
 
 /**

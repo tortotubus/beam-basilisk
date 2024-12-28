@@ -416,15 +416,15 @@ the sub-segment contained in each cell are defined by `p[0]` and
 /**
 This function returns a summary of the currently-defined fields. */
 
-void fields_stats()
+void fields_stats (scalar * list = all)
 {
   fprintf (ferr, "# t = %g, fields = {", t);
-  for (scalar s in all)
+  for (scalar s in list)
     fprintf (ferr, " %s", s.name);
   fputs (" }\n", ferr);
   fprintf (ferr, "# %12s: %12s %12s %12s %12s\n",
 	   "name", "min", "avg", "stddev", "max");
-  for (scalar s in all) {
+  for (scalar s in list) {
     stats ss = statsf (s);
     fprintf (ferr, "# %12s: %12g %12g %12g %12g\n",
 	     s.name, ss.min, ss.sum/ss.volume, ss.stddev, ss.max);

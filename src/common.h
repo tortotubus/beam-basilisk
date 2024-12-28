@@ -147,7 +147,7 @@ typedef struct {
 #endif
 #if dimension > 2
   int z;
-#endif  
+#endif
 } ivec;
 typedef double (* BoundaryFunc) (Point, Point, scalar, bool *);
 typedef struct {
@@ -168,6 +168,14 @@ static _Attributes * _attribute = NULL;
 
 #define foreach_block() // treatment of block data is disabled by default
 #define foreach_blockf(s)
+
+#if dimension == 1
+ivec Dimensions = {1};
+#elif dimension == 2
+ivec Dimensions = {1,1};
+#elif dimension == 3
+ivec Dimensions = {1,1,1};
+#endif
 
 // lists
 

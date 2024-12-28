@@ -470,6 +470,14 @@ restore-tree.tst: pdump.tst restore-tree.dump
 restore-tree.tst: CFLAGS = -DDEBUGCOND=false
 restore-tree.tst: CC = mpicc -D_MPI=23
 
+restore-multigrid-serial.dump: pdump-multigrid/restore.dump
+	ln -sf pdump-multigrid/restore.dump restore-multigrid-serial.dump
+restore-multigrid-serial.tst: pdump-multigrid.tst restore-multigrid-serial.dump
+
+restore-rectangle.dump: dump-rectangle/restore-rectangle.dump
+	ln -sf dump-rectangle/restore-rectangle.dump
+restore-rectangle.tst: dump-rectangle.tst restore-rectangle.dump
+
 bump2Dp-restore.c: bump2Dp.c
 	ln -sf bump2Dp.c bump2Dp-restore.c
 bump2Dp-restore.dump: bump2Dp/dump

@@ -16,14 +16,6 @@ typedef double real;
 @ define BGHOSTS 1
 #endif
 
-#if dimension == 1
-ivec Dimensions = {1};
-#elif dimension == 2
-ivec Dimensions = {1,1};
-#elif dimension == 3
-ivec Dimensions = {1,1,1};
-#endif
-
 #if _MPI
 # define ND(i) (1 << point.level)
 #else
@@ -935,7 +927,7 @@ ivec dimensions (int nx = 0, int ny = 0, int nz = 0)
 
 #if _MPI
 
-@if dimension == 1
+#if dimension == 1
 
 @def foreach_slice_x(start, end, l) {
   Point point = {0};
@@ -944,7 +936,7 @@ ivec dimensions (int nx = 0, int ny = 0, int nz = 0)
 @
 @define end_foreach_slice_x() }
  
-@elif dimension == 2
+#elif dimension == 2
 
 @def foreach_slice_x(start, end, l) {
   Point point = {0};
@@ -962,7 +954,7 @@ ivec dimensions (int nx = 0, int ny = 0, int nz = 0)
 @
 @define end_foreach_slice_y() }
 
-@elif dimension == 3
+#elif dimension == 3
 
 @def foreach_slice_x(start, end, l) {
   Point point = {0};
@@ -991,7 +983,63 @@ ivec dimensions (int nx = 0, int ny = 0, int nz = 0)
 @
 @define end_foreach_slice_z() }
   
-@endif // dimension == 3
+#endif // dimension == 3
  
 #include "multigrid-mpi.h"
-#endif // _MPI
+
+#else // !_MPI
+
+#if dimension == 1
+@def foreach_cell_multigrid()
+  for (int ox = 0; ox < Dimensions.x; ox++)
+    foreach_cell() {
+      point.i += ox*(1 << point.level);
+      {
+	POINT_VARIABLES;
+@
+@def end_foreach_cell_multigrid()
+      }
+      point.i -= ox*(1 << point.level);
+    } end_foreach_cell();
+@
+#elif dimension == 2
+@def foreach_cell_multigrid()
+  for (int ox = 0; ox < Dimensions.x; ox++)
+    for (int oy = 0; oy < Dimensions.y; oy++)
+      foreach_cell() {
+	point.i += ox*(1 << point.level);
+	point.j += oy*(1 << point.level);
+	{
+	  POINT_VARIABLES;
+@
+@def end_foreach_cell_multigrid()
+        }
+  	point.i -= ox*(1 << point.level);
+	point.j -= oy*(1 << point.level);
+      } end_foreach_cell();
+@
+#elif dimension == 3
+@def foreach_cell_multigrid()
+  for (int ox = 0; ox < Dimensions.x; ox++)
+    for (int oy = 0; oy < Dimensions.y; oy++)
+      for (int oz = 0; oz < Dimensions.z; oz++)
+	foreach_cell() {
+	  point.i += ox*(1 << point.level);
+	  point.j += oy*(1 << point.level);
+	  point.k += oz*(1 << point.level);
+	  {
+	    POINT_VARIABLES;
+@
+@def end_foreach_cell_multigrid()
+          }
+	  point.i -= ox*(1 << point.level);
+	  point.j -= oy*(1 << point.level);
+	  point.k -= oz*(1 << point.level);
+	} end_foreach_cell();
+@
+#endif // dimension == 3
+
+#define foreach_cell() foreach_cell_multigrid()
+#define end_foreach_cell() end_foreach_cell_multigrid()
+
+#endif // !_MPI
