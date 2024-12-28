@@ -1247,6 +1247,8 @@ bool squares (char * color,
 #endif
   colorize_args();
   scalar f = col;
+  if (f.i < 0)
+    return false;
   
   bview * view = draw();
   glShadeModel (GL_SMOOTH);
@@ -1386,101 +1388,51 @@ trace
 bool box (bool notics = false, float lc[3] = {0}, float lw = 1.)
 {
   bview * view = draw();
+  coord box[2] = {
+    {X0, Y0, Z0},
+    {X0 + L0,
+     Y0 + L0*Dimensions.y/Dimensions.x
+#if dimension > 2     
+     , Z0 + L0*Dimensions.z/Dimensions.x
+#endif
+    }
+  };
+  coord e;
+  double emin = HUGE;
+  foreach_dimension() {
+    e.x = box[1].x - box[0].x;
+    if (e.x < emin)
+      emin = e.x;
+  }
   draw_lines (view, lc, lw) {
 
     float height = 0.5*gl_StrokeHeight();
-    float width = gl_StrokeWidth ('1'), scale = L0/(60.*width), length;
-    float Z1 = dimension == 2 ? 0. : Z0;
+    float width = gl_StrokeWidth ('1'), scale = emin/(60.*width), length;
+    float Z1 = dimension == 2 ? 0. : box[0].z;
     char label[80];
   
     glMatrixMode (GL_MODELVIEW);
-
-    if (!notics) {
-      int nt = 8;
-      for (int i = 0; i <= nt; i++) {
-	glPushMatrix();
-	glTranslatef (X0 + i*L0/nt - height/2.*scale, Y0 - width/3.*scale, Z1);
-	glRotatef (-90, 0, 0, 1);
-	glScalef (scale, scale, 1.);
-	sprintf (label, "%g", X0 + i*L0/nt);
-	gl_StrokeString (label);
-	glPopMatrix();
-
-	glPushMatrix();
-	sprintf (label, "%g", Y0 + i*L0/nt);
-	length = gl_StrokeLength (label);
-	glTranslatef (X0 - (length + width/3.)*scale,
-		      Y0 + i*L0/nt - height/2.*scale, Z1);
-	glScalef (scale, scale, 1.);
-	gl_StrokeString (label);
-	glPopMatrix();
-
-#if dimension > 2
-	glPushMatrix();
-	sprintf (label, "%g", Z0 + i*L0/nt);
-	length = gl_StrokeLength (label);
-	glTranslatef (X0 - (length + width/3.)*scale,
-		      Y0, Z0 + i*L0/nt + height/2.*scale);
-	glRotatef (-90, 1, 0, 0);
-	glScalef (scale, scale, 1.);
-	gl_StrokeString (label);
-	glPopMatrix();
-#endif
-      }
-
-      glPushMatrix();
-      sprintf (label, "%g", X0 + L0/2.);
-      length = gl_StrokeLength (label);
-      glTranslatef (X0 + L0/2 - height*scale, Y0 - (length + 4.*width)*scale, Z1);
-      glScalef (2.*scale, 2.*scale, 1.);
-      gl_StrokeString ("X");
-      glPopMatrix();
-
-  
-      glPushMatrix();
-      sprintf (label, "%g", Y0 + L0/2.);
-      length = gl_StrokeLength (label);
-      glTranslatef (X0 - (length + 4.*width)*scale,
-		    Y0 + L0/2. - height*scale, Z1);
-      glScalef (2.*scale, 2.*scale, 1.);
-      gl_StrokeString ("Y");
-      glPopMatrix();
-
-#if dimension > 2
-      glPushMatrix();
-      sprintf (label, "%g", Z0 + L0/2.);
-      length = gl_StrokeLength (label);
-      glTranslatef (X0 - (length + 4.*width)*scale,
-		    Y0, Z0 + L0/2. + height*scale);
-      glRotatef (-90, 1, 0, 0);
-      glScalef (2.*scale, 2.*scale, 1.);
-      gl_StrokeString ("Z");
-      glPopMatrix();
-#endif
-    }
   
 #if dimension == 2
-    foreach_level (0, serial) {
-      glBegin (GL_LINE_LOOP);
-      glvertex2d (view, x - Delta_x/2., y - Delta_y/2.);
-      glvertex2d (view, x + Delta_x/2., y - Delta_y/2.);
-      glvertex2d (view, x + Delta_x/2., y + Delta_y/2.);
-      glvertex2d (view, x - Delta_x/2., y + Delta_y/2.);
-      glEnd ();
-      view->ni++;
-    }  
+    glBegin (GL_LINE_LOOP);
+    glvertex2d (view, box[0].x, box[0].y);
+    glvertex2d (view, box[1].x, box[0].y);
+    glvertex2d (view, box[1].x, box[1].y);
+    glvertex2d (view, box[0].x, box[1].y);
+    glEnd ();
+    view->ni++;
 #else // dimension != 2
     foreach_level (0, serial) {
       for (int i = -1; i <= 1; i += 2) {
 	glBegin (GL_LINE_LOOP);
-	glvertex3d (view, x - Delta_x/2., y - Delta_y/2., z + i*Delta/2.);
-	glvertex3d (view, x + Delta_x/2., y - Delta_y/2., z + i*Delta/2.);
-	glvertex3d (view, x + Delta_x/2., y + Delta_y/2., z + i*Delta/2.);
-	glvertex3d (view, x - Delta_x/2., y + Delta_y/2., z + i*Delta/2.);
+	glvertex3d (view, box[0].x, box[0].y, z + i*Delta/2.); // fixme
+	glvertex3d (view, box[1].x, box[0].y, z + i*Delta/2.);
+	glvertex3d (view, box[1].x, box[1].y, z + i*Delta/2.);
+	glvertex3d (view, box[0].x, box[1].y, z + i*Delta/2.);
 	glEnd ();
 	view->ni++;
 	glBegin (GL_LINES);
-	for (int j = -1; j <= 1; j += 2) {
+	for (int j = -1; j <= 1; j += 2) { // fixme
 	  glvertex3d (view, x + i*Delta/2., y + j*Delta/2., z - Delta/2.);
 	  glvertex3d (view, x + i*Delta/2., y + j*Delta/2., z + Delta/2.);
 	}
@@ -1489,6 +1441,72 @@ bool box (bool notics = false, float lc[3] = {0}, float lw = 1.)
       }
     }
 #endif // dimension != 2
+    
+    if (!notics) {
+      int nt = 8;
+      for (int i = 0; i <= nt; i++) {
+	glPushMatrix();
+	glTranslatef (X0 + i*e.x/nt - height/2.*scale,
+		      Y0 - width/3.*scale, Z1);
+	glRotatef (-90, 0, 0, 1);
+	glScalef (scale, scale, scale);
+	sprintf (label, "%g", X0 + i*e.x/nt);
+	gl_StrokeString (label);
+	glPopMatrix();
+
+	glPushMatrix();
+	sprintf (label, "%g", Y0 + i*e.y/nt);
+	length = gl_StrokeLength (label);
+	glTranslatef (X0 - (length + width/3.)*scale,
+		      Y0 + i*e.y/nt - height/2.*scale, Z1);
+	glScalef (scale, scale, scale);
+	gl_StrokeString (label);
+	glPopMatrix();
+
+#if dimension > 2
+	glPushMatrix();
+	sprintf (label, "%g", Z0 + i*e.z/nt);
+	length = gl_StrokeLength (label);
+	glTranslatef (X0 - (length + width/3.)*scale,
+		      Y0, Z0 + i*e.z/nt + height/2.*scale);
+	glRotatef (-90, 1, 0, 0);
+	glScalef (scale, scale, scale);
+	gl_StrokeString (label);
+	glPopMatrix();
+#endif
+      }
+
+      glPushMatrix();
+      sprintf (label, "%g", X0 + e.x/2.);
+      length = gl_StrokeLength (label);
+      glTranslatef (X0 + e.x/2 - height*scale,
+		    Y0 - (length + 4.*width)*scale, Z1);
+      glScalef (2.*scale, 2.*scale, 2.*scale);
+      gl_StrokeString ("X");
+      glPopMatrix();
+
+  
+      glPushMatrix();
+      sprintf (label, "%g", Y0 + e.y/2.);
+      length = gl_StrokeLength (label);
+      glTranslatef (X0 - (length + 4.*width)*scale,
+		    Y0 + e.y/2. - height*scale, Z1);
+      glScalef (2.*scale, 2.*scale, 2.*scale);
+      gl_StrokeString ("Y");
+      glPopMatrix();
+
+#if dimension > 2
+      glPushMatrix();
+      sprintf (label, "%g", Z0 + e.z/2.);
+      length = gl_StrokeLength (label);
+      glTranslatef (X0 - (length + 4.*width)*scale,
+		    Y0, Z0 + e.z/2. + height*scale);
+      glRotatef (-90, 1, 0, 0);
+      glScalef (2.*scale, 2.*scale, 2.*scale);
+      gl_StrokeString ("Z");
+      glPopMatrix();
+#endif
+    }
   }
   return true;
 }
