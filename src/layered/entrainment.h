@@ -43,7 +43,7 @@ event viscous_term (i++)
   
   double oma[nl], wa[nl];
   for (int l = 0; l < nl; l++)
-    oma[l] = wa[l] = 0.;
+    oma[l] = 0., wa[l] = 0.;
   foreach_layer() {
     double o = 0., w = 0.;
     if (_layer > 0)

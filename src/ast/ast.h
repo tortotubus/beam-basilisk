@@ -47,6 +47,7 @@ char *    ast_str_print        (const Ast * n, char * s, int kind, int real);
 void      ast_print            (const Ast * n, FILE * fp, int kind);
 void      ast_print_tree       (Ast * n, FILE * fp, const char * indent,
 				bool compress, int maxdepth);
+void      ast_print_constructor (Ast * n, FILE * fp, const char * indent);
 void      ast_print_file_line  (Ast * n, FILE * fp);
 AstRoot * ast_get_root         (const Ast * n);
 void      ast_identifier_print (Ast * identifier, FILE * fp);

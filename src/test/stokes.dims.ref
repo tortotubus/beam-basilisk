@@ -1,4 +1,4 @@
-291 constraints, 291 unknowns
+394 constraints, 394 unknowns
 [0]  ast/interpreter/overload.h: '0'
 [0]  /src/grid/array.h: '4096'
 [0]  /src/layered/hydro.h: 'CFL = 1./(2.*1)'
@@ -56,6 +56,8 @@
 [1]  /src/layered/hydro.h: 'H = 0.'
 [1]  /src/layered/hydro.h: 'Hl = 0.'
 [1]  /src/layered/hydro.h: 'Hr = 0.'
+[1]  /src/layered/hydro.h: '0.'
+[1]  /src/layered/hydro.h: '0.'
 [1]  /src/layered/hydro.h: '0.'
 [1]  /src/layered/hydro.h: '0.'
 [1]  /src/layered/hydro.h: '0.'

@@ -178,7 +178,7 @@ int main (int argc, char * argv[])
   /**
   The Earth radius, here in meters, sets the length unit. */
   
-  Radius = 6371220.;
+  Radius = 6371220 [1];
 
   /**
   The longitude and latitude of the lower-left corner. */
@@ -204,7 +204,7 @@ int main (int argc, char * argv[])
   timestep (at low resolutions) can significantly affect the structure
   of the boundary current. */
   
-  DT = 600;
+  DT = 600 [0,1];
   if (argc > 2)
     DT = atof(argv[2]);
 
@@ -460,7 +460,7 @@ event acceleration (i++)
 #if COADS
       double n = Cw*rho_air*sqrt(sq(tauw.x) + sq(tauw.y));
 #else // HR
-      double n = 0.1; // conversion from dynes/cm^2 to kg/m/s^2
+      double n = 0.1 [0]; // conversion from dynes/cm^2 to kg/m/s^2
 #endif
       ha.x[] += n*tauw/rho0;
     }
@@ -549,8 +549,8 @@ event outputs (t += day)
   /**
   This computes the variation of the volume-averaged thickness of each
   layer. This is zero when the volume of each layer is conserved. */
-  
-  static double s0[NL], t0 = 0.;
+
+  static double s0[NL] = {0}, t0 = 0.;
   foreach_layer() {
     double s = statsf(h).sum;
     if (i == 0)
@@ -610,7 +610,7 @@ event display (i++)
 	      box = {{X0,Y0},{X0+L0,Y0+L0*dimensions().y/dimensions().x}},
 	      map = cool_warm);
 }
-#endif
+#endif // _GPU && SHOW
 
 /**
 ## Fluxes through vertical cross-sections 

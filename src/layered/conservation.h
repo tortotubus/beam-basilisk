@@ -84,11 +84,11 @@ event viscous_term (i++)
     ... we compute the current volume of each layer and the area of
     cells which are "thick enough". */
     
-    double area = 0., dh = 0.;
-    foreach (reduction(+:area) reduction(+:dh)) {
+    double area = 0., volume = 0.;
+    foreach (reduction(+:area) reduction(+:volume)) {
       if (h[] > hmin[_layer]/10.)
 	area += dv();
-      dh += h[]*dv();
+      volume += h[]*dv();
     }
 
     /**
@@ -96,7 +96,7 @@ event viscous_term (i++)
     which is then applied in each cell which is "thick enough". */
     
     if (area > 0.) {
-      dh = (Conservation.sum[_layer] - dh)/area;
+      double dh = (Conservation.sum[_layer] - volume)/area;
       foreach()
 	if (h[] > hmin[_layer]/10.)
 	  h[] += dh;
