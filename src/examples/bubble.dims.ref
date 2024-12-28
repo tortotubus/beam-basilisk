@@ -1,4 +1,3 @@
-1230 constraints, 1230 unknowns
 [0]  ast/interpreter/overload.h: 'f[] = 0.'
 [0]  ast/interpreter/overload.h: '0'
 [0]  /src/grid/array.h: '4096'

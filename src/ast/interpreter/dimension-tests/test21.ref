@@ -1,0 +1,6 @@
+8 constraints, 8 unknowns
+Dimensions of finite constants
+  [1]
+    /src/common.h:33: 'L0 = 1. [1]'
+    dimension-tests/test21.c:7: '1'
+    dimension-tests/test21.c:7: '2'

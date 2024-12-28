@@ -1,4 +1,3 @@
-1407 constraints, 1407 unknowns
 [0]  ast/interpreter/overload.h: '0'
 [0]  /src/grid/array.h: '4096'
 [0]  /src/grid/multigrid-common.h: 'sum = 0.'

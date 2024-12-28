@@ -1263,7 +1263,7 @@ static bool system_solve (System * s)
     
   }
 
-  if (s->output)
+  if (s->output && s->lineno)
     fprintf (s->output, "%d constraints, %d unknowns\n", s->m, s->n);
 
   return true;
@@ -1290,6 +1290,70 @@ Value * dimension_run (Ast * n, Stack * stack)
 	     !strcmp (ast_terminal (n->child[0])->start, "_val_higher_dimension"))
       value_dimension (v) = dimension_any;
     return v;
+  }
+
+  /**
+  All initializers of `double *` or `double []` arrays have the same dimensions. */
+
+  case sym_init_declarator: {
+    Ast * list;
+    if (!(list = ast_find (n, sym_initializer_list)) ||
+	!ast_find (ast_parent (n, sym_declaration), sym_declaration_specifiers,
+		   0, sym_type_specifier,
+		   0, sym_types,
+		   0, sym_DOUBLE))
+      return ast_run_node (n, stack);
+    Ast * array = NULL;
+    if (ast_schema (n, sym_init_declarator,
+		    0, sym_declarator,
+		    0, sym_direct_declarator,
+		    1, token_symbol('['))) { // a `double []` array
+      if (!(array = ast_schema (n, sym_init_declarator,
+				0, sym_declarator,
+				0, sym_direct_declarator,
+				0, sym_direct_declarator,
+				0, sym_generic_identifier,
+				0, sym_IDENTIFIER)))
+	return ast_run_node (n, stack);
+    }
+    else if (ast_schema (n, sym_init_declarator,
+			 0, sym_declarator,
+			 0, sym_pointer)) { // a `double *` array
+      if (!(array = ast_schema (n, sym_init_declarator,
+				0, sym_declarator,
+				1, sym_direct_declarator,
+				0, sym_generic_identifier,
+				0, sym_IDENTIFIER)))
+	return ast_run_node (n, stack);
+    }
+    else
+      return ast_run_node (n, stack);
+    Value * value = ast_run_node (n, stack);
+    int len = 0;
+    foreach_item (list, 2, item) len++;
+    if (len > 1) {
+      char slen[20];
+      snprintf (slen, 19, "%d", len);
+      Ast * call =
+	NN(n, sym_function_call,
+	   NN(n, sym_postfix_expression,
+	      NN(n, sym_primary_expression,
+		 NA(n, sym_IDENTIFIER, "_set_element_dimensions"))),
+	   NCA(n, "("),
+	   NN(n, sym_argument_expression_list,
+	      NN(n, sym_argument_expression_list,
+		 NN(n, sym_argument_expression_list_item,
+		    ast_attach (ast_new_unary_expression (n),
+				ast_new_identifier (n, ast_terminal(array)->start)))),
+	      NCA(n, ","),
+	      NN(n, sym_argument_expression_list_item,
+		 ast_new_constant (n, sym_I_CONSTANT, slen))),
+	   NCA(n, ")"));
+      // fprintf (stderr, "%d ", len); ast_print_tree (array, stderr, 0, 0, -1);
+      ast_run_node (call, stack);
+      ast_destroy (call);
+    }
+    return value;
   }
     
   default:

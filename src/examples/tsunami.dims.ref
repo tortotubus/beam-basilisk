@@ -1,4 +1,3 @@
-836 constraints, 836 unknowns
 [0]  ast/interpreter/overload.h: 'M_PI = 3.14159265358979 [0]'
 [0]  /src/grid/array.h: '4096'
 [0]  /src/grid/multigrid-common.h: 'size[] = 1'

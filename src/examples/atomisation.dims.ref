@@ -1,5 +1,4 @@
 /src/gl/font.h:328: warning: 'font->Height' is unset: assuming it has dimension [0]
-1276 constraints, 1276 unknowns
 [0]  ast/interpreter/overload.h: 'f[] = 0.'
 [0]  ast/interpreter/overload.h: '0'
 [0]  /src/grid/array.h: '4096'
