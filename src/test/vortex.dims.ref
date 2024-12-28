@@ -1,4 +1,3 @@
-193 constraints, 193 unknowns
 [0]  ast/interpreter/overload.h: '0'
 [0]  /src/grid/array.h: '4096'
 [0]  /src/navier-stokes/centered.h: 'CFL = 0.8'

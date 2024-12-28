@@ -1,4 +1,3 @@
-3077 constraints, 3077 unknowns
 [0]  ast/interpreter/overload.h: 'f[] = 0.'
 [0]  ast/interpreter/overload.h: 'rhov[] = 0.'
 [0]  ast/interpreter/overload.h: '0'

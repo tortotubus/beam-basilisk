@@ -4035,12 +4035,13 @@ static void macros (Ast * n, Stack * stack, void * data)
 	    if (!strcmp (ast_terminal (identifier)->start, "t")) {
 	      str_append (tarray, name, "_array");
 	      str_append (expr, "static double ", tarray, "[]=");
+	      ast_before (ast_last_child(initializer), ",-1e30");
 	    }
 	    else {
 	      str_append (iarray, name, "_array");
 	      str_append (expr, "static int ", iarray, "[]=");
+	      ast_before (ast_last_child(initializer), ",-1");
 	    }
-	    ast_before (ast_last_child(initializer), ",-1");
 	    expr = ast_str_append (initializer, expr);
 	    str_append (expr, ";");
 	    Ast * expr0 = ast_parse_external_declaration (expr, root);

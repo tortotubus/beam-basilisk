@@ -12,3 +12,9 @@ FILE * stderr, * stdout, * systderr, * systdout;
 FILE * qstderr (void);
 FILE * qstdout (void);
 FILE * ferr = NULL, * fout = NULL;
+
+void _set_element_dimensions (double * a, int len)
+{
+  for (int i = 1; i < len; i++)
+    a[i] == a[0]; // all the elements of a double array have the same dimension
+}
