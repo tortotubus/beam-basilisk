@@ -32,8 +32,9 @@ int main()
     fprintf (stderr, "%g %g\n%g %g\n\n",
 	     S[i][0].x, S[i][0].y,
 	     S[i][1].x, S[i][1].y);
-    foreach_segment (S[i],r)
-      for (int i = 0; i < 2; i++)
-	fprintf (stderr, "a %g %g %g %g %d\n", r[i].x, r[i].y, x, y, _n);
+    foreach_segment (S[i],r,{
+	for (int i = 0; i < 2; i++)
+	  fprintf (stderr, "a %g %g %g %g %d\n", r[i].x, r[i].y, x, y, _n);
+      });
   }
 }
