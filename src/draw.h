@@ -2,6 +2,7 @@
 # Drawing functions for [Basilisk View](view.h) 
 */
 
+#include <ctype.h>
 #include "fractions.h"
 #include "gl/font.h"
 
@@ -1735,6 +1736,68 @@ bool labels (char * f,
 }
 
 /**
+# *lines()*: from a file.
+
+* *file*: the gnuplot-formatted file containing the polyline(s).
+* *lc[]*: an array of red, green, blue values between 0 and 1 which
+  defines the line color.
+* *lw*: the line width.
+*/
+
+trace
+bool lines (char * file, float lc[3] = {0}, float lw = 1.)
+{
+#if dimension != 2
+  assert (false);
+#else // dimension == 2
+  if (!file) {
+    fprintf (stderr, "lines(): file must be specified\n");
+    return false;
+  }
+  FILE * fp = fopen (file, "r");
+  if (!fp) {
+    perror (file);
+    return false;
+  }
+  bview * view = draw();
+  draw_lines (view, lc, lw) {
+    bool line = false;
+    int c = fgetc (fp);
+    while (c != EOF) {
+      while (c == ' ' || c == '\t') c = fgetc (fp);
+      if (c == '.' || c == '+' || c == '-' || isdigit (c)) {
+	ungetc (c, fp);
+	double x, y;
+	if (fscanf (fp, "%lf %lf", &x, &y) == 2) {
+	  if (!line) {
+	    glBegin (GL_LINE_STRIP);
+	    line = true;
+	  }
+	  glvertex2d (view, x, y);
+	  while ((c = fgetc(fp)) == ' ' || c == '\t');
+	  if (c == '\n') c = fgetc (fp);
+	  view->ni++;
+	}
+	else // ignore the rest of the line
+	  while ((c = fgetc(fp)) != EOF && c != '\n');
+      }
+      else if (c == '#')
+	while ((c = fgetc(fp)) != EOF && c != '\n');
+      else {
+	if (line)
+	  glEnd(), line = false;
+	c = fgetc (fp);
+      }
+    }
+    if (line)
+      glEnd();
+  }
+  fclose (fp);
+#endif // dimension == 2
+  return true;
+}
+
+/**
 # Interface export
 
 This is used by [bview](bview/README) to automatically generate the
@@ -1753,6 +1816,7 @@ struct {
   { _isoline_json },
   { _labels_json },
   { _vectors_json },
+  { _lines_json },
 #else // dimension == 3
   { _isosurface_json },
 #endif
