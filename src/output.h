@@ -1095,7 +1095,7 @@ void dump (const char * file = "dump",
       exit (1);
     }
     for (scalar s in slist) {
-      double val = s[] == (real) nodata ? (double) nodata : s[];
+      double val = s[];
       if (fwrite (&val, sizeof(double), 1, fp) < 1) {
 	perror ("dump(): error while writing scalars");
 	exit (1);
@@ -1173,7 +1173,7 @@ void dump (const char * file = "dump",
       unsigned flags = is_leaf(cell) ? leaf : 0;
       fwrite (&flags, 1, sizeof(unsigned), fh);
       for (scalar s in slist) {
-	double val = s[] == (real) nodata ? (double) nodata : s[];
+	double val = s[];
 	fwrite (&val, 1, sizeof(double), fh);
       }
       pos += cell_size;
@@ -1325,7 +1325,7 @@ bool restore (const char * file = "dump",
 	exit (1);
       }
       if (s.i != INT_MAX)
-	s[] = val == (double) nodata ? (real) nodata : val;
+	s[] = isfinite(val) ? val : nodata;
     }
     if (!(flags & leaf) && is_leaf(cell))
       refine_cell (point, listm, 0, NULL);

@@ -24,7 +24,7 @@
 [0,1]  /src/grid/events.h: 'TEND_EVENT = 1234567890'
 [0,1]  /src/predictor-corrector.h: 'dt = 0.'
 [0,1]  /src/predictor-corrector.h: 't = 0.'
-[0,1]  /src/utils.h: 'DT = 1e30 [0,1]'
+[0,1]  /src/utils.h: 'DT = 1e30f [0,1]'
 [0,1]  wind-driven-stvt.c: '0'
 [0,1]  wind-driven-stvt.c: '0'
 [2]  wind-driven-stvt.c: 't0 = 10'
