@@ -1003,6 +1003,9 @@ default is "dump".
 
 *unbuffered*
 : whether to use a file buffer. Default is false.
+
+*zero*
+: whether to dump fields which are zero. Default is true.
 */
 
 struct DumpHeader {
@@ -1016,12 +1019,26 @@ static const int dump_version =
   // 161020
   170901;
 
-static scalar * dump_list (scalar * lista)
+static scalar * dump_list (scalar * lista, bool zero)
 {
   scalar * list = is_constant(cm) ? NULL : list_concat ({cm}, NULL);
-  for (scalar s in lista)
-    if (!s.face && !s.nodump && s.i != cm.i)
-      list = list_add (list, s);
+  // fixme: on GPUs statsf() can change the `all` list, because it
+  // allocates new fields to store reductions, which causes a nasty
+  // crash...
+#if 1
+  scalar * listb = list_copy (lista);
+#endif
+  for (scalar s in listb)
+    if (!s.face && !s.nodump && s.i != cm.i) {
+      if (zero)
+	list = list_add (list, s);
+      else {	
+	stats ss = statsf (s);
+	if (ss.min != 0. || ss.max != 0.)
+	  list = list_add (list, s);
+      }
+    }
+  free (listb);
   return list;
 }
 
@@ -1054,7 +1071,8 @@ trace
 void dump (const char * file = "dump",
 	   scalar * list = all,
 	   FILE * fp = NULL,
-	   bool unbuffered = false)
+	   bool unbuffered = false,
+	   bool zero = true)
 {
   char * name = NULL;
   if (!fp) {
@@ -1069,7 +1087,7 @@ void dump (const char * file = "dump",
   }
   assert (fp);
   
-  scalar * dlist = dump_list (list);
+  scalar * dlist = dump_list (list, zero);
   scalar size[];
   scalar * slist = list_concat ({size}, dlist); free (dlist);
   struct DumpHeader header = { t, list_len(slist), iter, depth(), npe(),
@@ -1118,7 +1136,8 @@ trace
 void dump (const char * file = "dump",
 	   scalar * list = all,
 	   FILE * fp = NULL,
-	   bool unbuffered = false)
+	   bool unbuffered = false,
+	   bool zero = true)
 {
   if (fp != NULL || file == NULL) {
     fprintf (ferr, "dump(): must specify a file name when using MPI\n");
@@ -1135,7 +1154,7 @@ void dump (const char * file = "dump",
     exit (1);    
   }
 
-  scalar * dlist = dump_list (list);
+  scalar * dlist = dump_list (list, zero);
   scalar size[];
   scalar * slist = list_concat ({size}, dlist); free (dlist);
   struct DumpHeader header = { t, list_len(slist), iter, depth(), npe(),
@@ -1232,7 +1251,7 @@ bool restore (const char * file = "dump",
 #endif // multigrid
 
   bool restore_all = (list == all);
-  scalar * slist = dump_list (list ? list : all);
+  scalar * slist = dump_list (list ? list : all, true);
   if (header.version == 161020) {
     if (header.len - 1 != list_len (slist)) {
       fprintf (ferr,

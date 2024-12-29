@@ -641,7 +641,7 @@ event snapshots (t += month)
   sprintf (name, "u%d", nl - 1);
   scalar omega[];
   vorticity (lookup_vector (name), omega);
-  dump();
+  dump (zero = false);
 }
 
 /**
