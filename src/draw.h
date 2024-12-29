@@ -307,10 +307,9 @@ foreach_cell() {
   if (VertexBuffer.visible &&
       !sphere_in_frustum (_p.x, _p.y, _p.z, _r, &(view)->frustum))
     continue;
-  if (is_leaf(cell) ||
+  if (is_leaf(cell) || point.level == (view)->maxlevel ||
       (VertexBuffer.visible &&
-       sphere_diameter (_p.x, _p.y, _p.z, _r/L0, &(view)->frustum)
-       < (view)->res)) {
+       sphere_diameter (_p.x, _p.y, _p.z, _r/L0, &(view)->frustum) < (view)->res)) {
     if (is_active(cell) && is_local(cell)) {
 @
 @def end_foreach_visible()
@@ -1156,7 +1155,7 @@ bool cells (coord n = {0,0,1}, double alpha = 0.,
 The vectors are scaled using the *scale* factor. */
 
 trace
-bool vectors (char * u, double scale = 1, float lc[3] = {0}, float lw = 1.)
+bool vectors (char * u, double scale = 1, float lc[3] = {0}, float lw = 1., int level = -1)
 {
 #if dimension == 2
   vector fu;
@@ -1174,6 +1173,8 @@ bool vectors (char * u, double scale = 1, float lc[3] = {0}, float lw = 1.)
   float res = view->res;
   if (view->res < 15*view->samples)
     view->res = 15*view->samples;
+  int maxlevel = view->maxlevel;
+  view->maxlevel = level;
   draw_lines (view, lc, lw) {
     double fscale = (scale ? scale : 1.)*view->res/view->samples;
     glBegin (GL_LINES);
@@ -1193,6 +1194,7 @@ bool vectors (char * u, double scale = 1, float lc[3] = {0}, float lw = 1.)
     glEnd();
   }
   view->res = res;
+  view->maxlevel = maxlevel;
 #else // dimension == 3
   fprintf (stderr, "vectors() is not implemented in 3D yet\n");
 #endif // dimension == 3
@@ -1247,8 +1249,10 @@ bool squares (char * color,
 #endif
   colorize_args();
   scalar f = col;
-  if (f.i < 0)
+  if (f.i < 0) {
+    fprintf (stderr, "squares(): must specify color\n");
     return false;
+  }
   
   bview * view = draw();
   glShadeModel (GL_SMOOTH);
