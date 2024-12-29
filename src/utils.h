@@ -335,83 +335,43 @@ vector lookup_vector (const char * name)
 }
 
 /**
-The function below traverses the set of sub-segments intersecting the
+The macro below traverses the set of sub-segments intersecting the
 mesh and spanning the [A:B] segment. The pair of coordinates defining
 the sub-segment contained in each cell are defined by `p[0]` and
 `p[1]`. */
 
-#if 1 // fixme: foreach_dimension() does not work anymore within macros
-@def foreach_segment(_S,_p) {
-  coord t = {(_S)[1].x - (_S)[0].x, (_S)[1].y - (_S)[0].y};
-  double norm = sqrt(sq(t.x) + sq(t.y));
-  assert (norm > 0.);
-  t.x = t.x/norm + 1e-6, t.y = t.y/norm - 1.5e-6;
-  double alpha = ((_S)[0].x*((_S)[1].y - (_S)[0].y) -
-		  (_S)[0].y*((_S)[1].x - (_S)[0].x))/norm;
-  foreach()
-    if (fabs(t.y*x - t.x*y - alpha) < 0.708*Delta) {
-      coord _o = {x,y}, _p[2];
-      int _n = 0;
-	if (t.x)
-	  for (int _i = -1; _i <= 1 && _n < 2; _i += 2) {
-	    _p[_n].x = _o.x + _i*Delta/2.;
-	    double a = (_p[_n].x - (_S)[0].x)/t.x;
-	    _p[_n].y = (_S)[0].y + a*t.y;
-	    if (fabs(_p[_n].y - _o.y) <= Delta/2.) {
-	      a = clamp (a, 0., norm);
-	      _p[_n].x = (_S)[0].x + a*t.x, _p[_n].y = (_S)[0].y + a*t.y;
-	      if (fabs(_p[_n].x - _o.x) <= Delta/2. &&
-		  fabs(_p[_n].y - _o.y) <= Delta/2.)
-		_n++;
-	    }
-	  }
-#if dimension > 1	
-	if (t.y)
-	  for (int _i = -1; _i <= 1 && _n < 2; _i += 2) {
-	    _p[_n].y = _o.y + _i*Delta/2.;
-	    double a = (_p[_n].y - (_S)[0].y)/t.y;
-	    _p[_n].x = (_S)[0].x + a*t.x;
-	    if (fabs(_p[_n].x - _o.x) <= Delta/2.) {
-	      a = clamp (a, 0., norm);
-	      _p[_n].y = (_S)[0].y + a*t.y, _p[_n].x = (_S)[0].x + a*t.x;
-	      if (fabs(_p[_n].y - _o.y) <= Delta/2. &&
-		  fabs(_p[_n].x - _o.x) <= Delta/2.)
-		_n++;
-	    }
-	  }
-#endif
-      if (_n == 2) {
-@
-#else
-@def foreach_segment(_S,_p) {
-  coord t = {(_S)[1].x - (_S)[0].x, (_S)[1].y - (_S)[0].y};
-  double norm = sqrt(sq(t.x) + sq(t.y));
-  assert (norm > 0.);
-  t.x = t.x/norm + 1e-6, t.y = t.y/norm - 1.5e-6;
-  double alpha = ((_S)[0].x*((_S)[1].y - (_S)[0].y) -
-		  (_S)[0].y*((_S)[1].x - (_S)[0].x))/norm;
-  foreach()
-    if (fabs(t.y*x - t.x*y - alpha) < 0.708*Delta) {
-      coord _o = {x,y}, _p[2];
-      int _n = 0;
-      foreach_dimension()
-	if (t.x)
-	  for (int _i = -1; _i <= 1 && _n < 2; _i += 2) {
-	    _p[_n].x = _o.x + _i*Delta/2.;
-	    double a = (_p[_n].x - (_S)[0].x)/t.x;
-	    _p[_n].y = (_S)[0].y + a*t.y;
-	    if (fabs(_p[_n].y - _o.y) <= Delta/2.) {
-	      a = clamp (a, 0., norm);
-	      _p[_n].x = (_S)[0].x + a*t.x, _p[_n].y = (_S)[0].y + a*t.y;
-	      if (fabs(_p[_n].x - _o.x) <= Delta/2. &&
-		  fabs(_p[_n].y - _o.y) <= Delta/2.)
-		_n++;
-	    }
-	  }
-      if (_n == 2) {
-@
-#endif  
-@define end_foreach_segment() } } end_foreach(); }
+// fixme: this is an ugly macro....
+
+#define foreach_segment(_S, _p, expr, ...) do {			\
+  double norm = sqrt(sq((_S)[1].x - (_S)[0].x) + sq((_S)[1].y - (_S)[0].y)); \
+  if (norm > 0.) {							\
+    coord t = {((_S)[1].x - (_S)[0].x)/norm + 1e-6, ((_S)[1].y - (_S)[0].y)/norm - 1.5e-6}; \
+    double alpha = (_S)[0].x*t.y - (_S)[0].y*t.x;			\
+    foreach(__VA_ARGS__)						\
+      if (fabs(t.y*x - t.x*y - alpha) < 0.708*Delta_x) {		\
+	coord _o = {x,y}, _p[2];					\
+	int _n = 0;							\
+	foreach_dimension() {						\
+	  if (t.x)							\
+	    for (int _i = -1; _i <= 1 && _n < 2; _i += 2) {		\
+	      _p[_n].x = _o.x + _i*Delta_x/2.;				\
+	      double a = (_p[_n].x - (_S)[0].x)/t.x;			\
+	      _p[_n].y = (_S)[0].y + a*t.y;				\
+	      if (fabs(_p[_n].y - _o.y) <= Delta_x/2.) {		\
+		a = clamp (a, 0., norm);				\
+		_p[_n].x = (_S)[0].x + a*t.x, _p[_n].y = (_S)[0].y + a*t.y; \
+		if (fabs(_p[_n].x - _o.x) <= Delta_x/2. &&		\
+		    fabs(_p[_n].y - _o.y) <= Delta_x/2.)		\
+		  _n++;							\
+	      }								\
+	    }								\
+	}								\
+	if (_n == 2) {							\
+	  expr								\
+	}								\
+      }									\
+  }									\
+} while(0)
 
 /**
 This function returns a summary of the currently-defined fields. */
