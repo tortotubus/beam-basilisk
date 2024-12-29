@@ -328,3 +328,18 @@ else if (!strcmp (s, "labels")) {
   if (!labels (f,lc,lw))
     return false;
 }
+else if (!strcmp (s, "lines")) {
+  char * file = NULL;
+  float lc[3] = {0};
+  float lw = 1.;
+  Params params[] = {
+    {"file", pstring, &file},
+    {"lc", pfloat, lc, 3},
+    {"lw", pfloat, &lw},
+    {NULL}
+  };
+  if (!parse_params (params))
+    return false;
+  if (!lines (file,lc,lw))
+    return false;
+}

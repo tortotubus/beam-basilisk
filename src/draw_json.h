@@ -309,3 +309,17 @@ int _labels_json (char * s, int len) {
   s += i, len -= i, len1 += i;
   return len1;
 }
+int _lines_json (char * s, int len) {
+  int i, len1 = 0;
+  i = snprintf (s, len, "  \"lines\" : {");
+  s += i, len -= i, len1 += i;
+  i = snprintf (s, len, "\n    \"file\": { \"type\": \"pstring\", \"cardinality\": 1, \"value\": \"%s\" }", "");
+  s += i, len -= i, len1 += i;
+  i = snprintf (s, len, ",\n    \"lc\": { \"type\": \"color\", \"cardinality\": 3, \"value\": [%f,%f,%f] }", 0., 0., 0.);
+  s += i, len -= i, len1 += i;
+  i = snprintf (s, len, ",\n    \"lw\": { \"type\": \"pfloat\", \"cardinality\": 1, \"value\": \"%f\" }", 0.);
+  s += i, len -= i, len1 += i;
+  i = snprintf (s, len, "\n  }");
+  s += i, len -= i, len1 += i;
+  return len1;
+}
