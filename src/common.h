@@ -1,6 +1,6 @@
 #define pi 3.14159265358979
 #undef HUGE
-#define HUGE 1e30
+#define HUGE 1e30f
 #define nodata HUGE
 
 @define max(a,b) ((a) > (b) ? (a) : (b))

@@ -29,7 +29,7 @@
 [0,1]  /src/grid/events.h: 'TEND_EVENT = 1234567890'
 [0,1]  /src/predictor-corrector.h: 'dt = 0.'
 [0,1]  /src/predictor-corrector.h: 't = 0.'
-[0,1]  /src/utils.h: 'DT = 1e30 [0,1]'
+[0,1]  /src/utils.h: 'DT = 1e30f [0,1]'
 [0,1]  madsen.c: '1e30'
 [0,1]  madsen.c: '2000'
 [0,1]  madsen.c: '35'
