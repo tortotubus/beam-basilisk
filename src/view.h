@@ -150,6 +150,8 @@ struct _bview {
 
   unsigned width, height, samples;
 
+  int maxlevel; // the maximum level to draw
+  
   framebuffer * fb;
   Frustum frustum; // the view frustum
 
@@ -188,7 +190,8 @@ bview * bview_new()
 
   p->samples = 4;
   p->width = 600*p->samples, p->height = 600*p->samples;
-
+  p->maxlevel = -1;
+  
   /* OpenGL somehow generates floating-point exceptions... turn them off */
   disable_fpe (FE_DIVBYZERO|FE_INVALID);
 
