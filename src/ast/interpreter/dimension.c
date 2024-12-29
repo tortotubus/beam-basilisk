@@ -243,6 +243,7 @@ struct _Dimension {
   Key ** c;
   const Ast * origin;
   int row;
+  char * warn;
   System * s;
 };
 
@@ -567,6 +568,7 @@ Dimension * dimension_zero (Allocator * alloc, Ast * origin)
   d->b = NULL;
   d->c = NULL;
   d->origin = origin;
+  d->warn = NULL;
   return d;
 }
 
@@ -623,6 +625,7 @@ Dimension * new_dimension (Ast * n, Stack * stack)
   *dimension->c[0] = (Key) { .parent = n };
   dimension->c[1] = NULL;
   dimension->origin = n;
+  dimension->warn = NULL;
   return dimension;
 }
 
@@ -723,17 +726,20 @@ Dimension * get_dimension (Value * v, Stack * stack)
   /**
   Everything else is dimensionless. */
 
-  System * system = interpreter_get_data (stack);
-  if ((value_flags (v) & unset) && v->type->sym != sym_LONG && system->output) {
-    Ast * n = (Ast *) v;
-    AstTerminal * t = ast_left_terminal (n);
-    char * s = ast_str_append (n, NULL);
-    fprintf (system->output, "%s:%d: warning: '%s' is unset: assuming it has dimension [0]\n",
-	     ast_file_crop (t->file), t->line, ast_crop_before (s));
+  Dimension * d = dimension_zero (stack_static_alloc (stack), (Ast *) v);
+  if ((value_flags (v) & unset) && v->type->sym != sym_LONG &&
+      ((System *)interpreter_get_data (stack))->output) {
+    AstTerminal * t = ast_left_terminal ((Ast *) v);    
+    char * s = ast_str_append ((Ast *) v, NULL), warn[200];
+    snprintf (warn, 199,
+	      "%s:%d: warning: '%s' is unset: assuming it has dimension [0]\n",
+	      ast_file_crop (t->file), t->line, ast_crop_before (s));
     free (s);
+    int len = strlen (warn) + 1;
+    d->warn = allocate (stack_static_alloc (stack), len*sizeof (char));
+    strcpy (d->warn, warn);
   }
-
-  return (value_dimension (v) = dimension_zero (stack_static_alloc (stack), (Ast *) v));
+  return (value_dimension (v) = d);
 }
 
 static
@@ -1382,6 +1388,16 @@ Value * dimension_assign (Ast * n, Value * dst, Value * src, Stack * stack)
   return dst;
 }
 
+static void warn_unset_zero (Dimension * d, Stack * stack)
+{
+  if (d && d->warn) {
+    System * system = interpreter_get_data (stack);
+    if (system->output)
+      fputs (d->warn, system->output);
+    d->warn = NULL;
+  }
+}
+
 static
 Dimension * homogeneous_dimensions (Ast * n, Value * va, Value * vb, Stack * stack)
 {
@@ -1390,6 +1406,9 @@ Dimension * homogeneous_dimensions (Ast * n, Value * va, Value * vb, Stack * sta
     return db;
   if (db == dimension_any)
     return da;
+
+  warn_unset_zero (da, stack);
+  warn_unset_zero (db, stack);
   
   /**
   We first consider the case where all dimensions are known and check
