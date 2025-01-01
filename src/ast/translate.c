@@ -105,10 +105,10 @@ Ast * ast_block_list_append (Ast * list, int item_sym, Ast * item)
 }
 
 /**
-Appends `item` to (comma-separated) `list`. The list item symbol is
+Appends `item` to (`separator`-separated) `list`. The list item symbol is
 `item_sym`. */
 
-Ast * ast_list_append (Ast * list, int item_sym, Ast * item)
+Ast * ast_list_append (Ast * list, int item_sym, Ast * item, const char * separator)
 {
   ast_set_line (item, ast_right_terminal (list));
   Ast * parent = list->parent;
@@ -117,12 +117,12 @@ Ast * ast_list_append (Ast * list, int item_sym, Ast * item)
   if (item->sym == item_sym)
     l = ast_new_children (ast_new (parent, list->sym),
 			  list, 
-			  ast_terminal_new_char (item, ","),
+			  ast_terminal_new_char (item, separator),
 			  item);
   else {
     l =  ast_new_children (ast_new (parent, list->sym),
 			   list, 
-			   ast_terminal_new_char (item, ","),
+			   ast_terminal_new_char (item, separator),
 			   ast_new (item, item_sym));
     ast_attach (l->child[2], item);
   }
@@ -153,7 +153,7 @@ Ast * ast_list_prepend (Ast * list, int item_sym, Ast * item)
   Ast * r = list;
   while (r->child[0]->sym != item_sym)
     r = r->child[0];
-  Ast * l = ast_list_append (r, item_sym, item), * tmp = r->child[0];
+  Ast * l = ast_list_append (r, item_sym, item, ","), * tmp = r->child[0];
   ast_set_child (r, 0, l->child[2]);
   ast_set_child (l, 2, tmp);
   return r != list ? list : l;
@@ -437,7 +437,7 @@ Ast * ast_new_empty_vector (Ast * parent, int dimension)
   Ast * ret = NN(parent, sym_initializer,
 		 NCA(parent, "{"), list, NCA(parent, "}"));
   for (int i = 1; i < dimension; i++)
-    ast_list_append (list, sym_initializer, ast_new_empty_scalar (parent));
+    ast_list_append (list, sym_initializer, ast_new_empty_scalar (parent), ",");
   return ret;
 }
 
@@ -448,7 +448,7 @@ Ast * ast_new_empty_tensor (Ast * parent, int dimension)
   Ast * ret = NN(parent, sym_initializer,
 		 NCA(parent, "{"), list, NCA(parent, "}"));
   for (int i = 1; i < dimension; i++)
-    ast_list_append (list, sym_initializer, ast_new_empty_vector (parent, dimension));
+    ast_list_append (list, sym_initializer, ast_new_empty_vector (parent, dimension), ",");
   return ret;
 }
 
@@ -685,7 +685,8 @@ static void complete_arguments (Ast * function_call, int n)
     args = ast_list_append (args,
 			    sym_argument_expression_list_item,
 			    ast_new_constant (function_call->child[3],
-					      sym_I_CONSTANT, "0"));
+					      sym_I_CONSTANT, "0"),
+			    ",");
     ast_set_child (function_call, 2, args);
   }
 }
@@ -4679,14 +4680,14 @@ static void macros (Ast * n, Stack * stack, void * data)
 	Finalize both global and local lists */
 	
 	if (type == 1) // scalar
-	  ast_list_append (n->child[1], sym_initializer, ast_new_empty_scalar (n));
+	  ast_list_append (n->child[1], sym_initializer, ast_new_empty_scalar (n), ",");
 	else if (type == 2) { // vector
 	  TranslateData * d = data;
-	  ast_list_append (n->child[1], sym_initializer, ast_new_empty_vector (n, d->dimension));
+	  ast_list_append (n->child[1], sym_initializer, ast_new_empty_vector (n, d->dimension), ",");
 	}
 	else { // tensor
 	  TranslateData * d = data;
-	  ast_list_append (n->child[1], sym_initializer, ast_new_empty_tensor (n, d->dimension));
+	  ast_list_append (n->child[1], sym_initializer, ast_new_empty_tensor (n, d->dimension), ",");
 	}
 
 	Ast * type_name = NN(n, sym_type_name,
