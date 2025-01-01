@@ -1124,14 +1124,14 @@ static void default_stencil (Ast * n, Stack * stack, void * scope)
 				       NN (n, sym_primary_expression,
 					   NB (n, sym_IDENTIFIER, "point"))))));
   ast_set_child (n, 2, args);
-  args = ast_list_append (args, sym_argument_expression_list_item, initializer);
+  args = ast_list_append (args, sym_argument_expression_list_item, initializer, ",");
   ast_set_child (initializer, 1, list);
   foreach_item (arguments, 2, argument)
     if (argument != ast_placeholder && is_field (argument, stack)) {
       if (!list->child)
 	ast_attach (list, NN (list, sym_initializer, argument->child[0]));
       else
-	list = ast_list_append (list, sym_initializer, argument->child[0]);	
+	list = ast_list_append (list, sym_initializer, argument->child[0], ",");
     }
   ast_destroy (arguments);
   if (!list->child) { // no field arguments

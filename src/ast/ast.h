@@ -242,7 +242,7 @@ Ast * ast_block_list_insert_after (Ast * insert, Ast * item);
 Ast * ast_block_list_insert_before (Ast * insert, Ast * item);
 Ast * ast_block_list_insert_before2 (Ast * insert, Ast * item);
 Ast * ast_block_list_get_item (Ast * statement);
-Ast * ast_list_append (Ast * list, int item_sym, Ast * item);
+Ast * ast_list_append (Ast * list, int item_sym, Ast * item, const char * separator);
 Ast * ast_list_prepend (Ast * list, int item_sym, Ast * item);
 Ast * ast_list_remove (Ast * list, Ast * item);
 Ast * ast_list_insert_after (Ast * insert, Ast * item);
