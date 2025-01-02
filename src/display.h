@@ -701,7 +701,7 @@ void display_url (FILE * fp)
   if (!h)
     fprintf (stderr,
 	     "src/display.h:%d: warning: gethostbyname(\"%s\") returned NULL\n",
-	     __LINE__, hostname);
+	     LINENO, hostname);
   fprintf (fp, DISPLAY_JS "?ws://%s:%d", h ? h->h_name : "127.0.0.1",
 	   Display.port);
 }

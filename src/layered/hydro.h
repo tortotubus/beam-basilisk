@@ -321,8 +321,8 @@ void advect (scalar * tracers, face vector hu, face vector hf, double dt)
 	  hu.x[0,0,1] += hu.x[] - hul;
 #if !_GPU
 	else if (nl > 1)
-	  fprintf (stderr, "warning: could not conserve barotropic flux "
-		   "at %g,%g,%d\n", x, y, point.l);
+	  fprintf (stderr, "src/layered/hydro.h:%d: warning: could not conserve barotropic flux "
+		   "at %g,%g,%d\n", LINENO, x, y, point.l);
 #endif
 	hu.x[] = hul;
       }
@@ -383,8 +383,8 @@ void advect (scalar * tracers, face vector hu, face vector hf, double dt)
 	h1 += dt*(hu.x[] - hu.x[1])/(Delta*cm[]);
 #if !_GPU
       if (h1 < - dry)
-	fprintf (stderr, "warning: h1 = %g < - 1e-12 at %g,%g,%d,%g\n",
-		 h1, x, y, _layer, t);
+	fprintf (stderr, "src/layered/hydro.h:%d: warning: h1 = %g < - 1e-12 at %g,%g,%d,%g\n",
+		 LINENO, h1, x, y, _layer, t);
 #endif
       h[] = max(h1, 0.);
       if (h1 < dry) {
