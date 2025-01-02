@@ -1250,11 +1250,6 @@ bool squares (char * color,
 #endif
   colorize_args();
   scalar f = col;
-  if (f.i < 0) {
-    fprintf (stderr, "squares(): must specify color\n");
-    return false;
-  }
-  
   bview * view = draw();
   glShadeModel (GL_SMOOTH);
   if (linear) {
@@ -1263,7 +1258,7 @@ bool squares (char * color,
       if (Z.i < 0) {
 	glNormal3d (0, 0, view->reversed ? -1 : 1);
 	foreach_visible (view)
-	  if (f[] != nodata) {
+	  if (f.i < 0 || f[] != nodata) {
 	    glBegin (GL_TRIANGLE_FAN);
 	    color_vertex ((4.*f[] +
 			   2.*(f[1] + f[-1] + f[0,1] + f[0,-1]) +
@@ -1285,7 +1280,7 @@ bool squares (char * color,
       }
       else // Z.i > 0
 	foreach_leaf() // fixme: foreach_visible() would be better
-	  if (f[] != nodata) {
+	  if (f.i < 0 || f[] != nodata) {
 	    glBegin (GL_TRIANGLE_FAN);
 	    color_vertex ((4.*f[] +
 			   2.*(f[1] + f[-1] + f[0,1] + f[0,-1]) +
@@ -1311,7 +1306,7 @@ bool squares (char * color,
 	  }
 #else // dimension == 3
       foreach_visible_plane (view, n, alpha)
-	if (f[] != nodata) {
+	if (f.i < 0 || f[] != nodata) {
 	  coord v[12];
 	  int m = facets (n, alpha, v, 1.);
 	  if (m > 2) {
@@ -1342,7 +1337,7 @@ bool squares (char * color,
     glNormal3d (0, 0, view->reversed ? -1 : 1);
     glBegin (GL_QUADS);
     foreach_visible (view)
-      if (f[] != nodata) {
+      if (f.i < 0 || f[] != nodata) {
 	color_facet();
 	glvertex2d (view, x - Delta_x/2., y - Delta_y/2.);
 	color_facet();
@@ -1356,7 +1351,7 @@ bool squares (char * color,
     glEnd();
 #else // dimension == 3
     foreach_visible_plane (view, n, alpha)
-      if (f[] != nodata) {
+      if (f.i < 0 || f[] != nodata) {
 	coord v[12];
 	int m = facets (n, alpha, v, 1.);
 	if (m > 2) {
