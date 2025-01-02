@@ -444,7 +444,7 @@ FILE * open_image (const char * file, const char * options)
 	fprintf (ferr,
 		 "src/output.h:%d: warning: cannot find '%s' or 'ffmpeg'/'avconv'\n"
 		 "src/output.h:%d: warning: falling back to raw PPM outputs\n",
-		 __LINE__, command, __LINE__);
+		 LINENO, command, LINENO);
 	has_ffmpeg = false;
       }
     }
@@ -478,7 +478,7 @@ FILE * open_image (const char * file, const char * options)
 	fprintf (ferr,
 		 "src/output.h:%d: warning: cannot find 'convert'\n"
 		 "src/output.h:%d: warning: falling back to raw PPM outputs\n",
-		 __LINE__, __LINE__);
+		 LINENO, LINENO);
 	has_convert = false;
       }
     }
