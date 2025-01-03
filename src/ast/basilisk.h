@@ -133,7 +133,9 @@ extern int yydebug;
     FOREACH = 334,                 /* FOREACH  */
     FOREACH_INNER = 335,           /* FOREACH_INNER  */
     FOREACH_DIMENSION = 336,       /* FOREACH_DIMENSION  */
-    REDUCTION = 337                /* REDUCTION  */
+    REDUCTION = 337,               /* REDUCTION  */
+    MACRO = 338,                   /* MACRO  */
+    ELLIPSIS_MACRO = 339           /* ELLIPSIS_MACRO  */
   };
   typedef enum yytokentype yytoken_kind_t;
 #endif

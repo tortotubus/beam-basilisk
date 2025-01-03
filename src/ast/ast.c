@@ -192,7 +192,7 @@ void ast_replace_child (Ast * parent, int index, Ast * child)
 	assert (!left->before);
 	left->file = oldleft->file;
 	left->line = oldleft->line;
-	ast_set_line (child, left);
+	ast_set_line (child, left, false);
       }
       if (left->before)
 	str_append (left->before, oldleft->before);
@@ -210,7 +210,7 @@ void ast_replace_child (Ast * parent, int index, Ast * child)
 	left->before = line->before, line->before = NULL;      
       left->file = line->file;
       left->line = line->line;
-      ast_set_line (child, left);
+      ast_set_line (child, left, false);
     }      
   }
 }
@@ -235,7 +235,7 @@ AstTerminal * ast_replace (Ast * n, const char * terminal, Ast * with)
 	int after = count_lines (right->start);
 	right->line += after;
 	for (c++; *c; c++)
-	  ast_set_line (*c, right);
+	  ast_set_line (*c, right, false);
 	right->line -= after;
 	return right;
       }
@@ -301,6 +301,22 @@ void string_append (void * a, ...)
   va_end (ap);
 }
 
+static const char * only_spaces (const char * s, const File * file, const AstTerminal * t)
+{
+  const char * spaces = NULL;
+  int line = file->line;
+  while (*s != '\0') {
+    if (!strchr (" \t\n\r", *s))
+      return NULL;
+    if (strchr ("\n\r", *s)) {
+      spaces = s + 1;
+      line++;
+    }
+    s++;
+  }
+  return line > t->line ? spaces : NULL;
+}
+
 static void str_print_internal (const Ast * n, int sym, int real, File * file,
 				void (* output) (void *, ...), void * data)
 {
@@ -308,12 +324,30 @@ static void str_print_internal (const Ast * n, int sym, int real, File * file,
     output (data, "$", NULL);
     return;
   }
+
+  /**
+  Ignore macro definitions. */
+
+  if (ast_is_macro_definition (n, "macro")) {
+    AstTerminal * t = ast_left_terminal (n);
+    if (t->before && !only_spaces (t->before, file, t)) {
+      output (data, t->before, NULL);
+      update_file_line (t->before, file);
+    }
+    return;
+  }
+  
   //  ast_print_file_line (n, stderr);
   AstTerminal * t = ast_terminal (n);
   if (t) {
     if (t->before) {
-      output (data, t->before, NULL);
-      update_file_line (t->before, file);
+      const char * spaces = only_spaces (t->before, file, t);
+      if (spaces)
+	output (data, spaces, NULL);
+      else {
+	output (data, t->before, NULL);
+	update_file_line (t->before, file);
+      }
     }
     if (t->file) {
       int len = strlen (t->file);
@@ -871,6 +905,34 @@ Ast * ast_identifier_declaration (Stack * stack, const char * identifier)
   return n ? *n : NULL;
 }
 
+int ast_identifier_parse_type (Stack * stack, const char * identifier)
+{
+  if (!strcmp (identifier, "einstein_sum") ||
+      !strcmp (identifier, "diagonalize"))
+    return MACRO;
+
+  Ast * declaration = ast_identifier_declaration (stack, identifier);
+  if (declaration) {
+    if (ast_is_typedef (declaration))
+      return TYPEDEF_NAME;
+    Ast * type;
+    if ((type = ast_schema (ast_ancestor (declaration, 6), sym_function_definition,
+			    0, sym_function_declaration,
+			    0, sym_declaration_specifiers,
+			    0, sym_type_specifier,
+			    0, sym_types,
+			    0, sym_TYPEDEF_NAME))) {
+      AstTerminal * t = ast_terminal (type);
+      int len = t->after - t->start;
+      if (len == 4 && !strncmp (t->start, "macro", len))
+	return MACRO;
+    }
+    return IDENTIFIER;
+  }  
+  
+  return IDENTIFIER;
+}
+
 char * str_append_realloc (char * src, ...)
 {
   va_list ap;
@@ -1047,18 +1109,18 @@ void ast_check (Ast * n)
   }
 }
 
-void ast_set_line (Ast * n, AstTerminal * l)
+void ast_set_line (Ast * n, AstTerminal * l, bool overwrite)
 {
   if (n == ast_placeholder)
     return;
   AstTerminal * t = ast_terminal (n);
-  if (t && !t->file) {
+  if (t && (overwrite || !t->file)) {
     t->file = l->file;
     t->line = l->line;
   }
   if (n->child)
     for (Ast ** c = n->child; *c; c++)
-      ast_set_line (*c, l);
+      ast_set_line (*c, l, overwrite);
 }
 
 Ast * ast_flatten (Ast * n, AstTerminal * t)

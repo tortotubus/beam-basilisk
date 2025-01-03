@@ -170,7 +170,7 @@ char * ast_line (AstTerminal * t);
 #define ast_file_line(n, nolineno)					\
   "\"", ast_terminal((Ast *)n)->file, "\",",				\
     nolineno ? "0" : ast_line(ast_terminal((Ast *)n))
-void ast_set_line (Ast * n, AstTerminal * l);
+void ast_set_line (Ast * n, AstTerminal * l, bool overwrite);
 Ast * ast_flatten (Ast * n, AstTerminal * t);
 AstTerminal * ast_replace (Ast * n, const char * terminal, Ast * with);
 
@@ -223,6 +223,7 @@ void  ast_traverse                 (Ast * n, Stack * stack,
        list = list->parent, arg = ast_child (list, symbol))
 
 Ast * ast_identifier_declaration (Stack * stack, const char * identifier);
+int   ast_identifier_parse_type (Stack * stack, const char * identifier);
 Ast * ast_identifier_declaration_from_to (Stack * stack, const char * identifier,
 					  const Ast * start, const Ast * end);
 Ast * ast_function_identifier (const Ast * function_definition);
@@ -303,6 +304,11 @@ char * ast_external_references (Ast * n, char * references, Stack * functions);
 char * ast_kernel               (Ast * n, Ast * argument, char * s);
 
 /**
+## Macros */
+
+bool ast_is_macro_definition (const Ast * function_definition, const char * macro_type);
+
+/**
 ## Interface for the generic C interpreter */
 
 int ast_run (AstRoot * root, Ast * n, int verbosity, int maxcalls, void * data);
@@ -312,3 +318,13 @@ int ast_run (AstRoot * root, Ast * n, int verbosity, int maxcalls, void * data);
 
 bool ast_check_dimensions (AstRoot * root, Ast * n, int verbosity, int maxcalls,
 			   FILE * dimensions, int finite, int redundant, int lineno, int warn);
+
+/**
+## The entry function
+
+Called by [qcc](/src/qcc.c) to trigger the translation. */
+
+AstRoot * endfor (FILE * fin, FILE * fout,
+		  const char * grid, int dimension,
+		  bool nolineno, bool progress, bool catch, bool parallel, bool cpu, bool gpu,
+		  FILE * swigfp, char * swigname);

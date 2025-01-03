@@ -510,7 +510,7 @@ void ast_cleanup (Ast * n, Stack * stack, Ast * scope, bool init_declarator)
       ast_set_child (statement, 0, n->child[1]);
     }
     else
-      assert (false);
+      ast_erase (n);
     break;
     
   default:

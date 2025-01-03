@@ -50,6 +50,7 @@ All other options will be passed directly to the C compiler. */
 #include <sys/types.h>
 #include <sys/wait.h>
 #include <assert.h>
+#include "ast/ast.h"
 
 int dimension = 2, bghosts = 0, layers = 0;
   
@@ -108,17 +109,12 @@ FILE * dopen (const char * fname, const char * mode)
   return fout;
 }
 
-void * compdir (FILE * fin, FILE * fout, FILE * swigfp, 
-		char * swigname, char * grid)
+AstRoot * compdir (FILE * fin, FILE * fout, FILE * swigfp, 
+		   char * swigname, char * grid)
 {
   FILE * fout1 = dopen ("_endfor.c", "w");
-
-  void * endfor (FILE * fin, FILE * fout,
-		 const char * grid, int dimension,
-		 int nolineno, int progress, int catch, int parallel, int cpu, int gpu,
-		 FILE * swigfp, char * swigname);
-  void * ast = endfor (fin, fout1, grid, dimension, nolineno, progress, catch, parallel, cpu, gpu,
-		       swigfp, swigname);
+  AstRoot * ast = endfor (fin, fout1, grid, dimension, nolineno, progress, catch, parallel, cpu, gpu,
+			  swigfp, swigname);
   fclose (fout1);
   
   fout1 = dopen ("_endfor.c", "r");
