@@ -35,91 +35,90 @@ static mgstats solve_stats;
 /**
 ## Implementation
 
-Note that the large macro below is a slightly simplified version of
+Note that the macro below is a slightly simplified version of
 the [mg_solve()](poisson.h#mg_solve) and
 [mg_cycle()](poisson.h#mg_cycle) functions where more
 documentation can be found. */
 
-#define solve(_a, _func, _rhs, ...)					\
-  do {									\
-    solve_stats = (mgstats){0};						\
-    struct { int dummy, nrelax, minlevel; double tolerance; }		\
-      p = {0, __VA_ARGS__};						\
-    scalar _res[], _da[];						\
-    scalar_clone (_da, _a);						\
-    for (int b = 0; b < nboundary; b++)					\
-      _da.boundary[b] = _da.boundary_homogeneous[b];			\
-    solve_stats.nrelax = p.nrelax > 0 ? p.nrelax : 4;			\
-    double resb;							\
-    {									\
-      double maxres = 0.;						\
-      foreach (reduction(max:maxres)) {					\
-	_res[] = _rhs[] - (_func);					\
-	if (fabs (_res[]) > maxres)					\
-	  maxres = fabs (_res[]);					\
-      }									\
-      resb = solve_stats.resb = solve_stats.resa = maxres;		\
-    }									\
-    if (p.tolerance == 0.)						\
-      p.tolerance = TOLERANCE;						\
-    for (solve_stats.i = 0;						\
-	 solve_stats.i < NITERMAX &&					\
-	   (solve_stats.i < NITERMIN || solve_stats.resa > p.tolerance); \
-	 solve_stats.i++) {						\
-      {									\
-	restriction ({_res});						\
-	int maxlevel = grid->maxdepth;					\
-	int minlevel = min (p.minlevel, maxlevel);			\
-	for (int l = minlevel; l <= maxlevel; l++) {			\
-	  if (l == minlevel)						\
-	    foreach_level_or_leaf (l)					\
-	      foreach_blockf (_da)					\
-	        _da[] = 0.;						\
-	  else								\
-	    foreach_level (l)						\
-		foreach_blockf (_da)					\
-		  _da[] = bilinear (point, _da);			\
-	  boundary_level ({_da}, l);					\
-	  for (int i = 0; i < solve_stats.nrelax; i++) {		\
-	    scalar _a = _da;						\
-	    foreach_level_or_leaf (l) {					\
-	      _a[] = 0.;						\
-	      double n = _res[] - (_func), d;				\
-	      diagonalize(_a) {						\
-		d = (_func);						\
-	      }								\
-	      _a[] = n/d;						\
-	    }								\
-	    boundary_level ({_da}, l);					\
-	  }								\
-	}								\
-	foreach()							\
-	  foreach_blockf (_a)						\
-	    _a[] += _da[];						\
-      }									\
-      {									\
-	double maxres = 0.;						\
-	foreach (reduction(max:maxres)) {				\
-	  _res[] = _rhs[] - (_func);					\
-	  if (fabs (_res[]) > maxres)					\
-	    maxres = fabs (_res[]);					\
-	}								\
-	solve_stats.resa = maxres;					\
-      }									\
-      if (solve_stats.resa > p.tolerance) {				\
-	if (resb/solve_stats.resa < 1.2 && solve_stats.nrelax < 100)	\
-	  solve_stats.nrelax++;						\
-	else if (resb/solve_stats.resa > 10 && solve_stats.nrelax > 2)	\
-	  solve_stats.nrelax--;						\
-      }									\
-      resb = solve_stats.resa;						\
-    }									\
-    solve_stats.minlevel = p.minlevel;					\
-    if (solve_stats.resa > p.tolerance)					\
-      fprintf (ferr,							\
-	       "src/solve.h:120: warning: convergence for %s not reached " \
-	       "after %d iterations\n"					\
-	       "  res: %g nrelax: %d\n", _a.name,			\
-	       solve_stats.i, solve_stats.resa, solve_stats.nrelax),	\
-	fflush (ferr);							\
-  } while (0)
+macro solve (scalar _a, double _func, scalar _rhs)
+{
+  solve_stats = (mgstats){0};
+  struct { int dummy, nrelax, minlevel; double tolerance; }
+    p = {0};
+  scalar _res[], _da[];
+  scalar_clone (_da, _a);
+  for (int b = 0; b < nboundary; b++)
+    _da.boundary[b] = _da.boundary_homogeneous[b];
+  solve_stats.nrelax = p.nrelax > 0 ? p.nrelax : 4;
+  double resb;
+  {
+    double maxres = 0.;
+    foreach (reduction(max:maxres)) {
+      _res[] = _rhs[] - (_func);
+      if (fabs (_res[]) > maxres)
+	maxres = fabs (_res[]);
+    }
+    resb = solve_stats.resb = solve_stats.resa = maxres;
+  }
+  if (p.tolerance == 0.)
+    p.tolerance = TOLERANCE;
+  for (solve_stats.i = 0;
+       solve_stats.i < NITERMAX &&
+	 (solve_stats.i < NITERMIN || solve_stats.resa > p.tolerance);
+       solve_stats.i++) {
+    {
+      restriction ({_res});
+      int maxlevel = grid->maxdepth;
+      int minlevel = min (p.minlevel, maxlevel);
+      for (int l = minlevel; l <= maxlevel; l++) {
+	if (l == minlevel)
+	  foreach_level_or_leaf (l)
+	    foreach_blockf (_da)
+	    _da[] = 0.;
+	else
+	  foreach_level (l)
+	    foreach_blockf (_da)
+	    _da[] = bilinear (point, _da);
+	boundary_level ({_da}, l);
+	for (int i = 0; i < solve_stats.nrelax; i++) {
+	  scalar _a = _da;
+	  foreach_level_or_leaf (l) {
+	    _a[] = 0.;
+	    double n = _res[] - _func, d;
+	    diagonalize(_a)
+	      d = _func;
+	    _a[] = n/d;
+	  }
+	  boundary_level ({_da}, l);
+	}
+      }      
+      foreach()
+	foreach_blockf (_a)
+	_a[] += _da[];
+    }
+    {
+      double maxres = 0.;
+      foreach (reduction(max:maxres)) {
+	_res[] = _rhs[] - (_func);
+	if (fabs (_res[]) > maxres)
+	  maxres = fabs (_res[]);
+      }
+      solve_stats.resa = maxres;
+    }
+    if (solve_stats.resa > p.tolerance) {
+      if (resb/solve_stats.resa < 1.2 && solve_stats.nrelax < 100)
+	solve_stats.nrelax++;
+      else if (resb/solve_stats.resa > 10 && solve_stats.nrelax > 2)
+	solve_stats.nrelax--;
+    }
+    resb = solve_stats.resa;
+  }
+  solve_stats.minlevel = p.minlevel;
+  if (solve_stats.resa > p.tolerance)
+    fprintf (stderr,
+	     "src/solve.h:%d: warning: convergence for %s not reached "
+	     "after %d iterations\n"
+	     "  res: %g nrelax: %d\n", LINENO, _a.name,
+	     solve_stats.i, solve_stats.resa, solve_stats.nrelax),
+      fflush (ferr);
+}

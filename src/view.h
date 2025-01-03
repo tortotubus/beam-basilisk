@@ -702,12 +702,6 @@ bool process_line (char * line)
 
   #include "draw_get.h"
 
-  else if (!strcmp (s, "end_mirror"))
-    end_mirror();
-  
-  else if (!strcmp (s, "end_translate"))
-    end_translate();
-  
   else if (!strcmp (s, "clear"))
     clear();
 
