@@ -35,9 +35,8 @@ mytensor A,B,C;
 Note that the name `mytensor` is arbitrary. However, the name of the structure members must be $x$, $y$ and $z$. Following the Einstein summation convention the scalar product introduced in the previous paragraph can be written in $\texttt{Basilisk C}$ as
 
 ~~~literatec
-einstein_sum(i,j,k) {
-  C.i.j = A.i.k*B.k.j; 
-}
+einstein_sum(i,j,k)
+  C.i.j = A.i.k*B.k.j;
 ~~~
 
 With this macro, the preprocessor of $\texttt{Basilisk C}$ interprets all lines of code within the braces as tensor operations. The letters given within the parenthesis indicate the indices on which the Einstein summation takes place. In this case a summation will be applied on the index $k$ and permutations will be performed on the indices $i$ and $j$. 
@@ -113,9 +112,8 @@ L2 = sqrt (C.i.j*C.i.j);
 Lastly, if no equality sign is identified, the preprocessor will not perform any summation operations. It will only carry the permutation on the current line of code. For example if one wants to print the content of a tensor one may write 
 
 ~~~literatec
-einstein_sum (i,j) {
+einstein_sum (i,j)
   fprintf (stderr, "%g\n", C.i.j);
-}
 ~~~
 
 which gives in $2D$
@@ -157,7 +155,7 @@ This function appends a block to an expression with a `+` sign separator. */
 
 Ast * ast_add_list_append (Ast * list, int item_sym, Ast * item)
 {
-  ast_set_line (item, ast_right_terminal (list));
+  ast_set_line (item, ast_right_terminal (list), false);
   Ast * parent = list->parent;
   int index = ast_child_index (list);
   Ast * l =  ast_new_children (ast_new (parent, list->sym),
@@ -195,10 +193,8 @@ static char * get_einstein_sum_args (Ast * n, Stack * stack)
   while (strcmp (identifier, "einstein_sum")) {
     ein_macro = ast_parent (n, sym_macro_statement);
     identifier = ast_terminal(ast_schema (ein_macro, sym_macro_statement,
-					  0, sym_function_call,
-					  0, sym_postfix_expression,
-					  0, sym_primary_expression,
-					  0, sym_IDENTIFIER))->start;
+					  0, sym_macro_call,
+					  0, sym_MACRO))->start;
   }
   // gather the args in the buffer
   char buffer[100] = {0}; // fixme: buffer overflows??

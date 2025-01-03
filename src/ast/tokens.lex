@@ -34,7 +34,8 @@ STRING \"([^"\\\n]|{ES})*\"
 #include <assert.h>
 #include "parser.h"
 #include "basilisk.h"
-
+#include "symbols.h"
+	   
 #define YYSTYPE Ast *
 #define YY_DECL int yylex (YYSTYPE * yylval_param, AstRoot * parse)
  
@@ -176,6 +177,7 @@ static Ast * new_ast (AstRoot * parse,
 
 ({SP}?\"([^"\\\n]|{ES})*\"{WS}*)+	{ SAST(STRING_LITERAL); }
 
+"{...}"					{ SAST(ELLIPSIS_MACRO); }
 "..."					{ SAST(ELLIPSIS); }
 ">>="					{ SAST(RIGHT_ASSIGN); }
 "<<="					{ SAST(LEFT_ASSIGN); }
@@ -295,15 +297,7 @@ static int check_type (AstRoot * parse)
 {
   if (parse->type_already_specified)
     return IDENTIFIER;
-  
-  Ast * declaration = ast_identifier_declaration (parse->stack, yytext);
-  if (declaration) {
-    if (ast_is_typedef (declaration))
-      return TYPEDEF_NAME;
-    return IDENTIFIER;
-  }
-
-  return IDENTIFIER;
+  return ast_identifier_parse_type (parse->stack, yytext);
 }
 
 void lexer_setup (char * buffer, size_t len)

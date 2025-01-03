@@ -51,6 +51,11 @@ https://blog.robertelder.org/jim-roskind-grammar/c%2B%2Bgrammar2.0.tar.Z
 %define api.pure full
 %define api.value.type { Ast * }
 
+%printer {
+  fputc ('\n', stderr);
+  ast_print_tree ($$, stderr, "  ", 0, -1);
+} <>
+
 %{
 #include <string.h>
 #include <assert.h>
@@ -89,7 +94,7 @@ static int yyparse (AstRoot * parse, Ast * root);
 
 %token  MAYBECONST NEW_FIELD TRACE
 %token  FOREACH FOREACH_INNER FOREACH_DIMENSION
-%token  REDUCTION
+%token  REDUCTION MACRO ELLIPSIS_MACRO
 
 /**
 ## Grammar
@@ -513,6 +518,7 @@ parameter_declaration
 	| declaration_specifiers declarator '=' initializer /* Basilisk C extension */
 	| declaration_specifiers abstract_declarator
 	| declaration_specifiers
+	| BREAK '=' initializer /* Basilisk C extension */
 	;
 
 identifier_list
@@ -696,7 +702,8 @@ declaration_list
 ## Basilisk C grammar extensions */
 
 basilisk_statements
-        : macro_statement
+        : ELLIPSIS_MACRO
+        | macro_statement
         | foreach_statement
 	| foreach_inner_statement
 	| foreach_dimension_statement
@@ -704,8 +711,14 @@ basilisk_statements
 	| forin_statement
 	;
 
+macro_call
+        : MACRO '(' ')'
+	| MACRO '(' argument_expression_list ')'
+	;
+
 macro_statement
-        : function_call compound_statement
+        : macro_call statement
+	| function_call compound_statement
         ;
 
 foreach_statement
