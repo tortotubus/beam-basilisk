@@ -93,7 +93,7 @@ static int yyparse (AstRoot * parse, Ast * root);
 ## Basilisk C tokens */
 
 %token  MAYBECONST NEW_FIELD TRACE
-%token  FOREACH FOREACH_INNER FOREACH_DIMENSION
+%token  FOREACH FOREACH_DIMENSION
 %token  REDUCTION MACRO ELLIPSIS_MACRO
 
 /**
@@ -705,7 +705,6 @@ basilisk_statements
         : ELLIPSIS_MACRO
         | macro_statement
         | foreach_statement
-	| foreach_inner_statement
 	| foreach_dimension_statement
 	| forin_declaration_statement
 	| forin_statement
@@ -754,11 +753,6 @@ reduction_operator
 reduction_array
         : generic_identifier
 	| generic_identifier '[' ':' expression ']'
-	;
-
-foreach_inner_statement
-        : FOREACH_INNER '(' ')' statement
-	| FOREACH_INNER '(' expression ')' statement
 	;
 
 foreach_dimension_statement

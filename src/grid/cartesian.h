@@ -22,12 +22,12 @@ typedef struct {
 
 struct _Point {
   int i, j, level, n;
-@ifdef foreach_block
+#if LAYERS
   int l;
   @define _BLOCK_INDEX , point.l
-@else
+#else
   @define _BLOCK_INDEX
-@endif
+#endif
 };
 static Point last_point;
 

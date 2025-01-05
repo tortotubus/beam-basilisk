@@ -905,34 +905,6 @@ Ast * ast_identifier_declaration (Stack * stack, const char * identifier)
   return n ? *n : NULL;
 }
 
-int ast_identifier_parse_type (Stack * stack, const char * identifier)
-{
-  if (!strcmp (identifier, "einstein_sum") ||
-      !strcmp (identifier, "diagonalize"))
-    return MACRO;
-
-  Ast * declaration = ast_identifier_declaration (stack, identifier);
-  if (declaration) {
-    if (ast_is_typedef (declaration))
-      return TYPEDEF_NAME;
-    Ast * type;
-    if ((type = ast_schema (ast_ancestor (declaration, 6), sym_function_definition,
-			    0, sym_function_declaration,
-			    0, sym_declaration_specifiers,
-			    0, sym_type_specifier,
-			    0, sym_types,
-			    0, sym_TYPEDEF_NAME))) {
-      AstTerminal * t = ast_terminal (type);
-      int len = t->after - t->start;
-      if (len == 4 && !strncmp (t->start, "macro", len))
-	return MACRO;
-    }
-    return IDENTIFIER;
-  }  
-  
-  return IDENTIFIER;
-}
-
 char * str_append_realloc (char * src, ...)
 {
   va_list ap;

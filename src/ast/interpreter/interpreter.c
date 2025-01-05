@@ -3209,26 +3209,6 @@ Value * ast_run_node (Ast * n, Stack * stack)
     }
     break;
 
-  case sym_foreach_inner_statement:
-    if (!strcmp (ast_terminal (n->child[0])->start, "foreach_block") ||
-	!strcmp (ast_terminal (n->child[0])->start, "foreach_block_inner")) {
-      char * s = NULL;
-      str_append (s, "_", ast_terminal (n->child[0])->start);
-      Ast * foreach = ast_find (ast_parent (ast_identifier_declaration (stack, s),
-					    sym_function_definition), sym_iteration_statement);
-      free (s);
-      Ast * old = ast_schema (foreach, sym_iteration_statement,
-			      6, sym_statement);
-      Ast * statement = ast_child (n, sym_statement);
-      ast_set_child (foreach, 6, statement);
-      run (foreach, stack);
-      ast_set_child (n, 3, statement);
-      ast_set_child (foreach, 6, old);
-    }
-    else
-      default_check (stack, n);
-    break;
-
   case sym_macro_statement: {
     Ast * identifier = ast_schema (n, sym_macro_statement,
 				   0, sym_function_call,
