@@ -273,49 +273,51 @@ static void optional_arguments (Ast * call, Stack * stack)
 	  }
 	}
 	foreach_item (parameters1, 2, parameter) {
-	  Ast * initializer = ast_schema (parameter, sym_parameter_declaration,
-					  3, sym_initializer);
-	  if (!initializer) {
-	    Ast * id = ast_find (parameter, sym_direct_declarator,
-				 0, sym_generic_identifier,
-				 0, sym_IDENTIFIER);
-	    AstTerminal * t = ast_left_terminal (call);
-	    fprintf (stderr, "%s:%d: error: missing compulsory parameter '%s' in function call\n",
-		     t->file, t->line, ast_terminal (id)->start);
-	    exit (1);
-	  }
-	  Ast * assign = ast_schema (initializer, sym_initializer,
-				     0, sym_assignment_expression);
-	  if (assign)
-	    ast_new_children (parameter, assign);
-	  else {
-	    if (ast_schema (initializer, sym_initializer,
-			    0, sym_postfix_initializer))
-	      initializer = initializer->child[0];
-	    else
-	      assert (ast_schema (initializer, sym_initializer,
-				  1, sym_initializer_list));
-	    initializer->sym = sym_postfix_initializer;
-	    Ast * type_specifier = ast_find (parameter, sym_declaration_specifiers,
-					     0, sym_type_specifier);
-	    Ast * declarator = ast_schema (parameter, sym_parameter_declaration,
-					   1, sym_declarator);
-	    Ast * abstract = abstract_declarator_from_declarator (declarator);
-	    assert (type_specifier);
-	    AstTerminal * ob = NCA(parameter, "("), * cb = NCA(parameter, ")");
-	    Ast * type_name = abstract ?
-	      NN(call, sym_type_name,
-		 NN(call, sym_specifier_qualifier_list,
-		    type_specifier),
-		 abstract) :
-	      NN(call, sym_type_name,
-		 NN(call, sym_specifier_qualifier_list,
-		    type_specifier));
-	    ast_new_children (parameter, ast_attach
-			      (ast_new_unary_expression (parameter),				 
-			       NN(call, sym_postfix_expression,
-				  ob, type_name, cb,
-				  initializer)));
+	  if (parameter->child[0]->sym != sym_BREAK) {
+	    Ast * initializer = ast_schema (parameter, sym_parameter_declaration,
+					    3, sym_initializer);
+	    if (!initializer) {
+	      Ast * id = ast_find (parameter, sym_direct_declarator,
+				   0, sym_generic_identifier,
+				   0, sym_IDENTIFIER);
+	      AstTerminal * t = ast_left_terminal (call);
+	      fprintf (stderr, "%s:%d: error: missing compulsory parameter '%s' in function call\n",
+		       t->file, t->line, ast_terminal (id)->start);
+	      exit (1);
+	    }
+	    Ast * assign = ast_schema (initializer, sym_initializer,
+				       0, sym_assignment_expression);
+	    if (assign)
+	      ast_new_children (parameter, assign);
+	    else {
+	      if (ast_schema (initializer, sym_initializer,
+			      0, sym_postfix_initializer))
+		initializer = initializer->child[0];
+	      else
+		assert (ast_schema (initializer, sym_initializer,
+				    1, sym_initializer_list));
+	      initializer->sym = sym_postfix_initializer;
+	      Ast * type_specifier = ast_find (parameter, sym_declaration_specifiers,
+					       0, sym_type_specifier);
+	      Ast * declarator = ast_schema (parameter, sym_parameter_declaration,
+					     1, sym_declarator);
+	      Ast * abstract = abstract_declarator_from_declarator (declarator);
+	      assert (type_specifier);
+	      AstTerminal * ob = NCA(parameter, "("), * cb = NCA(parameter, ")");
+	      Ast * type_name = abstract ?
+		NN(call, sym_type_name,
+		   NN(call, sym_specifier_qualifier_list,
+		      type_specifier),
+		   abstract) :
+		NN(call, sym_type_name,
+		   NN(call, sym_specifier_qualifier_list,
+		      type_specifier));
+	      ast_new_children (parameter, ast_attach
+				(ast_new_unary_expression (parameter),				 
+				 NN(call, sym_postfix_expression,
+				    ob, type_name, cb,
+				    initializer)));
+	    }
 	  }
 	  parameter->sym = sym_argument_expression_list_item;
 	  parameter->parent->sym = sym_argument_expression_list;

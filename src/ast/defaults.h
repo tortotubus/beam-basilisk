@@ -81,7 +81,7 @@ bool is_constant();
 void dimensional();
 void NOT_UNUSED();
 void neighborp();
-void diagonalize();
+
 double val_diagonal();
 
 double abs (double x);
@@ -122,3 +122,9 @@ double trunc (double x);
 # Macros */
 
 typedef void macro;
+
+/**
+These are placeholders for internally-defined macros. */
+
+macro einstein_sum() {{...}}
+macro diagonalize() {{...}}

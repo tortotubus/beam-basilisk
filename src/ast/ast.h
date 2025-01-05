@@ -223,7 +223,7 @@ void  ast_traverse                 (Ast * n, Stack * stack,
        list = list->parent, arg = ast_child (list, symbol))
 
 Ast * ast_identifier_declaration (Stack * stack, const char * identifier);
-int   ast_identifier_parse_type (Stack * stack, const char * identifier);
+int   ast_identifier_parse_type (Stack * stack, const char * identifier, bool call, const char * file, int line);
 Ast * ast_identifier_declaration_from_to (Stack * stack, const char * identifier,
 					  const Ast * start, const Ast * end);
 Ast * ast_function_identifier (const Ast * function_definition);

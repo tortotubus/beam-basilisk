@@ -18,7 +18,6 @@
 
 #include "../cartesian.h"
 @define neighborp(k,l,o) neighbor(k,l,o)
-static ivec Dimensions = {1,1};
 #include "gpu.h"
 #include "../cartesian-common.h"
 

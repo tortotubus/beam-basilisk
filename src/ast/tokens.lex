@@ -44,7 +44,7 @@ static void preproc (void);
 static void bpreproc (void);
 static void ompreproc (void);
 static void file_line (AstRoot * parse, const char * text);
-static int  check_type (AstRoot * parse);
+static int  check_type (AstRoot * parse, bool call);
 
 static Ast * new_ast (AstRoot * parse,
 		      int token, int line, char * start, char * end)
@@ -86,53 +86,6 @@ static Ast * new_ast (AstRoot * parse,
 ^[ \t]*@.*
 ^[ \t]*OMP[ \t]*\(	                { ompreproc(); }
 	 
-"auto"					{ SAST(AUTO); }
-"break"					{ SAST(BREAK); }
-"case"					{ SAST(CASE); }
-"char"					{ SAST(CHAR); }
-"const"					{ SAST(CONST); }
-"continue"				{ SAST(CONTINUE); }
-"default"				{ SAST(DEFAULT); }
-"do"					{ SAST(DO); }
-"double"				{ SAST(DOUBLE); }
-"else"					{ SAST(ELSE); }
-"enum"					{ SAST(ENUM); }
-"extern"				{ SAST(EXTERN); }
-"float"					{ SAST(FLOAT); }
-"for"					{ SAST(FOR); }
-"goto"					{ SAST(GOTO); }
-"if"					{ SAST(IF); }
-"inline"				{ SAST(INLINE); }
-"int"					{ SAST(INT); }
-"long"					{ SAST(LONG); }
-"register"				{ SAST(REGISTER); }
-"restrict"				{ SAST(RESTRICT); }
-"return"				{ SAST(RETURN); }
-"short"					{ SAST(SHORT); }
-"signed"				{ SAST(SIGNED); }
-"sizeof"				{ SAST(SIZEOF); }
-"static"				{ SAST(STATIC); }
-"struct"				{ SAST(STRUCT); }
-"switch"				{ SAST(SWITCH); }
-"typedef"				{ SAST(TYPEDEF); }
-"union"					{ SAST(UNION); }
-"unsigned"				{ SAST(UNSIGNED); }
-"void"					{ SAST(VOID); }
-"volatile"				{ SAST(VOLATILE); }
-"while"					{ SAST(WHILE); }
-"_Alignas"                              { SAST(ALIGNAS); }
-"_Alignof"                              { SAST(ALIGNOF); }
-"_Atomic"                               { SAST(ATOMIC); }
-"_Bool"                                 { SAST(BOOL); }
-"_Complex"                              { SAST(COMPLEX); }
-"complex"                               { SAST(COMPLEX); }
-"_Generic"                              { SAST(GENERIC); }
-"_Imaginary"                            { SAST(IMAGINARY); }
-"_Noreturn"                             { SAST(NORETURN); }
-"_Static_assert"                        { SAST(STATIC_ASSERT); }
-"_Thread_local"                         { SAST(THREAD_LOCAL); }
-"__func__"                              { SAST(FUNC_NAME); }
-
                     /* Basilisk C tokens */
 
 "new"{WS}+("vertex"{WS}+)?"scalar"      { SAST(NEW_FIELD); }
@@ -143,17 +96,6 @@ static Ast * new_ast (AstRoot * parse,
 "symmetric"{WS}+"tensor"                { SAST(TYPEDEF_NAME); }
 "(const)"                               { SAST(MAYBECONST); }
 "trace"			                { SAST(TRACE); }
-"reduction"			        { SAST(REDUCTION); }
-
-"foreach_blockf" |
-"foreach_block" |
-"foreach_child" |
-"foreach_neighbor"                      { SAST(FOREACH_INNER); }
-
-"foreach_dimension"			{ SAST(FOREACH_DIMENSION); }
-
-"foreach" |
-"foreach_"{L}{A}*                       { SAST(FOREACH); }
 
                     /* GCC extensions */
 	   
@@ -161,7 +103,8 @@ static Ast * new_ast (AstRoot * parse,
 	   
                     /* End of GCC extensions */
 
-{L}{A}*					{ SAST(check_type (parse)); }
+{L}{A}*/{WS}*"("			{ SAST(check_type (parse, true)); }
+{L}{A}*			                { SAST(check_type (parse, false)); }
 
 {HP}{H}+{IS}?				{ SAST(I_CONSTANT); }
 {NZ}{D}*{IS}?				{ SAST(I_CONSTANT); }
@@ -293,11 +236,75 @@ static void file_line (AstRoot * parse, const char * text)
   //  fprintf (stderr, "%s: \"%s\" %d\n", text, file, yylineno);
 }
 
-static int check_type (AstRoot * parse)
+static int check_type (AstRoot * parse, bool call)
 {
+  typedef struct {
+    const char * name;
+    int type;
+  } Type;
+  static Type types[] = {
+    {"auto",	       AUTO},
+    {"break",	       BREAK},
+    {"case",	       CASE},
+    {"char",	       CHAR},
+    {"const",	       CONST},
+    {"continue",       CONTINUE},
+    {"default",	       DEFAULT},
+    {"do",	       DO},
+    {"double",	       DOUBLE},
+    {"else",	       ELSE},
+    {"enum",	       ENUM},
+    {"extern",	       EXTERN},
+    {"float",	       FLOAT},
+    {"for",	       FOR},
+    {"goto",	       GOTO},
+    {"if",	       IF},
+    {"inline",	       INLINE},
+    {"int",	       INT},
+    {"long",	       LONG},
+    {"register",       REGISTER},
+    {"restrict",       RESTRICT},
+    {"return",	       RETURN},
+    {"short",	       SHORT},
+    {"signed",	       SIGNED},
+    {"sizeof",	       SIZEOF},
+    {"static",	       STATIC},
+    {"struct",	       STRUCT},
+    {"switch",	       SWITCH},
+    {"typedef",	       TYPEDEF},
+    {"union",	       UNION},
+    {"unsigned",       UNSIGNED},
+    {"void",	       VOID},
+    {"volatile",       VOLATILE},
+    {"while",          WHILE},
+    {"_Alignas",       ALIGNAS},
+    {"_Alignof",       ALIGNOF},
+    {"_Atomic",        ATOMIC},
+    {"_Bool",          BOOL},
+    {"_Complex",       COMPLEX},
+    {"complex",        COMPLEX},
+    {"_Generic",       GENERIC},
+    {"_Imaginary",     IMAGINARY},
+    {"_Noreturn",      NORETURN},
+    {"_Static_assert", STATIC_ASSERT},
+    {"_Thread_local",  THREAD_LOCAL},
+    {"__func__",       FUNC_NAME},
+
+                        /* Basilisk C tokens */
+    
+    {"reduction", REDUCTION},
+    {"foreach_dimension", FOREACH_DIMENSION},
+    {"foreach",	FOREACH},
+    
+    {NULL}};
+  for (Type * t = types; t->name; t++)
+    if (!strcmp (yytext, t->name))
+      return t->type;
+  
   if (parse->type_already_specified)
     return IDENTIFIER;
-  return ast_identifier_parse_type (parse->stack, yytext);
+  
+  return ast_identifier_parse_type (parse->stack, yytext, call, parse->file, yylineno);
 }
 
 void lexer_setup (char * buffer, size_t len)

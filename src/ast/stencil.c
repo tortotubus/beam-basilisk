@@ -112,8 +112,9 @@ Ast * get_local_variable_reference (Ast * n, Stack * stack, Ast * scope)
 				sym_IDENTIFIER);
   if (!identifier || ast_ancestor (identifier, 3)->sym == sym_function_call)
     return NULL;
-  return ast_identifier_declaration_from_to
-    (stack, ast_terminal (identifier)->start, NULL, scope);
+  if (!strcmp (ast_terminal (identifier)->start, "point"))
+    return n;
+  return ast_identifier_declaration_from_to (stack, ast_terminal (identifier)->start, NULL, scope);
 }
 
 static
@@ -362,7 +363,6 @@ void ast_cleanup (Ast * n, Stack * stack, Ast * scope, bool init_declarator)
 
   case sym_forin_declaration_statement:
   case sym_forin_statement:
-  case sym_foreach_inner_statement:
     ast_erase (n);
     break;
     

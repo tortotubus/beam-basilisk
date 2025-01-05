@@ -32,7 +32,7 @@ macro func (double a) {
 */
 
 typedef struct {
-  Ast * statement, * arguments, * parameters;
+  Ast * statement, * arguments, * parameters, * call;
 } MacroReplacement;
 
 static Ast * argument_value (Ast * identifier, Stack * stack, MacroReplacement * r)
@@ -44,17 +44,19 @@ static Ast * argument_value (Ast * identifier, Stack * stack, MacroReplacement *
     Ast * parameters = r->parameters->child[0], * value = NULL;
     while (parameters && parameters->child[0]->sym == parameters->sym)
       parameters = parameters->child[0];
-    foreach_item_r (r->arguments, sym_argument_expression_list_item, argument) {
-      Ast * parameter = ast_child (parameters, sym_parameter_declaration);
-      parameters = parameters->parent;
-      assert (parameter);
-      if (parameter == parent) {
-	value = argument;
-	break;
+    if (r->arguments) {
+      foreach_item_r (r->arguments, sym_argument_expression_list_item, argument) {
+	Ast * parameter = ast_child (parameters, sym_parameter_declaration);
+	parameters = parameters->parent;
+	assert (parameter);
+	if (parameter == parent) {
+	  value = argument;
+	  break;
+	}
       }
     }
     if (!value) {
-      AstTerminal * t = ast_left_terminal (r->arguments);
+      AstTerminal * t = ast_left_terminal (r->call);
       fprintf (stderr, "%s:%d: error: missing '%s' macro parameter\n",
 	       t->file, t->line, ast_terminal (identifier)->start);
       exit (1);
@@ -74,13 +76,18 @@ static void replace_arguments (Ast * n, Stack * stack, void * data)
 				0, sym_IDENTIFIER))) {
     Ast * value = argument_value (identifier, stack, r);
     if (value) {
-      Ast * primary = NN(n, sym_primary_expression,
-			 NCA(n, "("),
-			 NN(n, sym_expression_error,
-			    NN(n, sym_expression,
-			       ast_copy (value->child[0]))),
-			 NCA(n, ")"));
-      ast_set_line (primary, ast_terminal (identifier), true);
+      Ast * primary = ast_is_simple_expression (value->child[0]);
+      if (primary) {
+	primary = ast_copy (primary->parent);
+	ast_set_line (primary, ast_terminal (identifier), true);
+      }
+      else
+	primary = NN(n, sym_primary_expression,
+		     NCA(n, "("),
+		     NN(n, sym_expression_error,
+			NN(n, sym_expression,
+			   ast_copy (value->child[0]))),
+		     NCA(n, ")"));
       ast_replace_child (n, 0, primary);
     }
   }
@@ -136,7 +143,6 @@ static void replace_break (Ast * n, Ast * breaking, Ast * parent)
 		  0, sym_BREAK)) {
     Ast * loop = n->parent;
     while (loop != parent &&
-	   loop->sym != sym_foreach_inner_statement && // fixme: obsolete
 	   loop->sym != sym_foreach_statement &&
 	   loop->sym != sym_forin_declaration_statement &&
 	   loop->sym != sym_forin_statement &&
@@ -156,7 +162,7 @@ static void replace_break (Ast * n, Ast * breaking, Ast * parent)
       replace_break (*c, breaking, parent);
 }
 
-static void macro_replacement (Ast * statement, Stack * stack, const char * macro_type)
+static void macro_replacement (Ast * statement, Stack * stack, const char * exclude[])
 {
   Ast * macro_call = ast_schema (statement, sym_statement,
 				 0, sym_basilisk_statements,
@@ -166,10 +172,19 @@ static void macro_replacement (Ast * statement, Stack * stack, const char * macr
     return;
   Ast * identifier = ast_schema (macro_call, sym_macro_call,
 				 0, sym_MACRO);
+  if (!strcmp (ast_terminal (identifier)->start, "foreach_block") &&
+      (inforeach (statement) || point_declaration (stack)))
+    str_append (ast_terminal (identifier)->start, "_inner");
   Ast * macro_definition = ast_schema (ast_ancestor (ast_identifier_declaration (stack, ast_terminal (identifier)->start), 6),
 				       sym_function_definition);
-  if (!ast_is_macro_definition (macro_definition, macro_type))
+  // fixme: should just be based on the names for "diagonalize" and "einstein_sum"
+  if (!ast_is_macro_definition (macro_definition, "macro"))
     return;
+
+  if (exclude)
+    for (const char ** s = exclude; *s; s++)
+      if (!strcmp (ast_terminal (identifier)->start, *s))
+	return;
   
   optional_arguments (macro_call, stack);
 
@@ -181,20 +196,17 @@ static void macro_replacement (Ast * statement, Stack * stack, const char * macr
 		0, sym_function_declaration,
 		1, sym_declarator,
 		0, sym_direct_declarator,
-		2, sym_parameter_type_list)
+		2, sym_parameter_type_list),
+    macro_call
   };
-  
+
   /**
   Replace 'break' with its macro definition (if it exists). */
 
   if (r.parameters) {
-    Ast * breaking = NULL;
-    foreach_item (r.parameters, 2, parameter)
-      if ((breaking = ast_schema (parameter, sym_parameter_list,
-				  0, sym_parameter_declaration,
-				  2, sym_initializer,
-				  0, sym_assignment_expression)))
-	break;
+    Ast * breaking = ast_find (r.parameters, sym_parameter_declaration,
+			       2, sym_initializer,
+			       0, sym_assignment_expression);
     if (breaking)
       replace_break (r.statement, breaking, r.statement);
   }

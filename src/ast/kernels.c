@@ -74,8 +74,7 @@ Ast * implicit_type_cast (Ast * n, Stack * stack)
       return type;
     }
     if (ast_schema (ast_ancestor (n, 2), sym_member_identifier,
-		    0, sym_generic_identifier,
-		    0, sym_IDENTIFIER)) {
+		    0, sym_generic_identifier)) {
       n = ast_expression_type (n, stack, false);
       if (ast_schema (ast_ancestor (n, 2), sym_direct_declarator))
 	return implicit_type_cast (ast_schema (ast_parent (n, sym_struct_declaration), sym_struct_declaration,
@@ -638,7 +637,18 @@ void kernel (Ast * n, Stack * stack, void * data)
     }
     break; 
   }
-    
+
+  /**
+  ## Macro call */
+
+  case sym_macro_call: {
+    if (!strcmp (ast_terminal (n->child[0])->start, "foreach_child")) { // fixme: just do it for all macros??
+      ast_before (n->parent, "{");
+      ast_after (n->parent, "end_", ast_terminal (n->child[0])->start, "()}");
+    }
+    break;
+  }
+  
   }
 }
 

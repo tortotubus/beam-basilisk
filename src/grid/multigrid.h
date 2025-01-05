@@ -49,12 +49,12 @@ struct _Point {
 #elif dimension == 3
   struct { int x, y, z; } n;
 #endif
-@ifdef foreach_block
+#if LAYERS
   int l;
   @define _BLOCK_INDEX , point.l
-@else
+#else
   @define _BLOCK_INDEX
-@endif
+#endif
 };
 static Point last_point;
 
@@ -342,22 +342,19 @@ foreach_face_generic() {
 
 // foreach_edge?
 
-@def foreach_child() {
+macro foreach_child (break = (_k = 2)) {
   int _i = 2*point.i - GHOSTS;
   point.level++;
   point.n.x *= 2;
   for (int _k = 0; _k < 2; _k++) {
     point.i = _i + _k;
     POINT_VARIABLES;
-@
-@def end_foreach_child()
+    {...}
   }
   point.i = (_i + GHOSTS)/2;
   point.level--;
   point.n.x /= 2;
 }
-@
-@define foreach_child_break() _k = 2
 
 #elif dimension == 2
 #define foreach_edge() foreach_face(y,x)
@@ -366,8 +363,8 @@ foreach_face_generic() {
 @define end_is_face_x() }}
 @define is_face_y() { int jg = -1; VARIABLES; if (point.i < point.n.x + GHOSTS) {
 @define end_is_face_y() }}
-				 
-@def foreach_child() {
+
+macro foreach_child (break = (_k = _l = 2)) {
   int _i = 2*point.i - GHOSTS, _j = 2*point.j - GHOSTS;
   point.level++;
   point.n.x *= 2, point.n.y *= 2;
@@ -375,15 +372,12 @@ foreach_face_generic() {
     for (int _l = 0; _l < 2; _l++) {
       point.i = _i + _k; point.j = _j + _l;
       POINT_VARIABLES;
-@
-@def end_foreach_child()
+      {...}
   }
   point.i = (_i + GHOSTS)/2; point.j = (_j + GHOSTS)/2;
   point.level--;
   point.n.x /= 2, point.n.y /= 2;
 }
-@
-@define foreach_child_break() _k = _l = 2
 
 #elif dimension == 3
 @def foreach_vertex_aux()
@@ -403,8 +397,8 @@ foreach_vertex() {
 @define end_is_face_y() }}
 @define is_face_z() { int kg = -1; VARIABLES; if (point.i < point.n.x + GHOSTS && point.j < point.n.y + GHOSTS) {
 @define end_is_face_z() }}
-  
-@def foreach_child() {
+
+macro foreach_child(break = (_l = _m = _n = 2)) {
   int _i = 2*point.i - GHOSTS;
   int _j = 2*point.j - GHOSTS;
   int _k = 2*point.k - GHOSTS;
@@ -415,8 +409,7 @@ foreach_vertex() {
       for (int _n = 0; _n < 2; _n++) {
 	point.i = _i + _l; point.j = _j + _m; point.k = _k + _n;
 	POINT_VARIABLES;
-@
-@def end_foreach_child()
+	{...}
   }
   point.i = (_i + GHOSTS)/2;
   point.j = (_j + GHOSTS)/2;
@@ -424,8 +417,6 @@ foreach_vertex() {
   point.level--;
   point.n.x /= 2, point.n.y /= 2, point.n.z /= 2;
 }
-@
-@define foreach_child_break() _l = _m = _n = 2
 #endif
   
 @if TRASH

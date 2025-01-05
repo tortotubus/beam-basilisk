@@ -12,19 +12,63 @@ respecting the C99 grammar (with added macros).
 #include <string.h>
 #include <math.h>
 #include "ast.h"
+#include "basilisk.h"
 #include "symbols.h"
 #include "einstein_sum.h"
 #include "optional.h"
-#include "macro.h"
 
 /**
 By default grammar checks are turned off. */
 
-#if 0 // fixme: einstein_sum.c is not grammatically correct
+#if 0
 # define CHECK(x, recursive) ast_check_grammar(x, recursive, true)
 #else
 # define CHECK(x, recursive) ((void) x)
 #endif
+
+bool ast_is_foreach_identifier (const char * identifier)
+{
+  return !strcmp (identifier, "foreach") ||
+    (strcmp (identifier, "foreach_child") &&
+     strcmp (identifier, "foreach_neighbor") &&
+     strcmp (identifier, "foreach_block") &&
+     strcmp (identifier, "foreach_block_inner") &&
+     strcmp (identifier, "foreach_blockf") &&
+     !strncmp (identifier, "foreach_", 8));
+}
+
+int ast_identifier_parse_type (Stack * stack, const char * identifier, bool call,
+			       const char * file, int line)
+{
+  if (ast_is_foreach_identifier (identifier))
+    return FOREACH;
+  
+  Ast * declaration = ast_identifier_declaration (stack, identifier);
+  if (declaration) {
+    if (ast_is_typedef (declaration))
+      return TYPEDEF_NAME;
+    if (call) {
+      Ast * type;
+      if ((type = ast_schema (ast_ancestor (declaration, 6), sym_function_definition,
+			      0, sym_function_declaration,
+			      0, sym_declaration_specifiers,
+			      0, sym_type_specifier,
+			      0, sym_types,
+			      0, sym_TYPEDEF_NAME))) {
+	AstTerminal * t = ast_terminal (type);
+	int len;
+	if (t->after)
+	  len = t->after - t->start + 1;
+	else
+	  len = strlen (t->start);
+	if (len == 5 && !strncmp (t->start, "macro", len))
+	  return MACRO;
+      }
+    }
+  }  
+  
+  return IDENTIFIER;
+}
 
 Ast * ast_is_typedef (const Ast * identifier)
 {
@@ -322,13 +366,25 @@ Ast * ast_is_simple_expression (const Ast * n)
   return NULL;
 }
 
+bool ast_is_foreach_statement (const Ast * n)
+{
+#if 1
+  return n->sym == sym_foreach_statement;
+#else
+  Ast * identifier;
+  return ((identifier = ast_schema (n, sym_macro_statement,
+				    0, sym_macro_call,
+				    0, sym_MACRO)) &&
+	  ast_is_foreach_identifier (ast_terminal (identifier)->start));
+#endif
+}
+
 Ast * ast_is_iteration_statement (const Ast * n)
 {
   if (n && (n->sym == sym_iteration_statement ||
-	    n->sym == sym_foreach_statement ||
-	    n->sym == sym_foreach_inner_statement ||
 	    n->sym == sym_forin_declaration_statement ||
-	    n->sym == sym_forin_statement))
+	    n->sym == sym_forin_statement ||
+	    ast_is_foreach_statement (n)))
     return (Ast *) n;
   return NULL;
 }
@@ -584,7 +640,7 @@ static Ast * inforeach (Ast * n)
 {
   Ast * parent = n->parent;
   while (parent) {
-    if (parent->sym == sym_foreach_statement)
+    if (ast_is_foreach_statement (parent))
       return parent;
     parent = parent->parent;
   }
@@ -1925,7 +1981,7 @@ static Ast * function_scope (Ast * n, Stack * stack)
   if (point_declaration (stack))
     return NULL;
   while (n) {
-    if (n->sym == sym_foreach_statement)
+    if (ast_is_foreach_statement (n))
       return NULL;
     if (n->sym == sym_function_definition ||
 	n->sym == sym_event_definition)
@@ -2061,10 +2117,23 @@ static char * append_initializer (char * init, Ast * initializer, const char * t
 /**
 # First pass: user macros */
 
+#include "macro.h"
+
 static void user_macros (Ast * n, Stack * stack, void * data)
+{  
+  if (n->sym == sym_statement)
+    macro_replacement (n, stack, (const char *[]){
+	"foreach_child", "foreach_neighbor",
+	NULL});
+}
+
+/**
+# Last pass: all remaining macros */
+
+static void remaining_macros (Ast * n, Stack * stack, void * data)
 {
   if (n->sym == sym_statement)
-    macro_replacement (n, stack, "macro");
+    macro_replacement (n, stack, NULL);
 }
 
 /**
@@ -2555,8 +2624,10 @@ static void translate (Ast * n, Stack * stack, void * data)
     Ast * identifier = ast_schema (n, sym_macro_statement,
 				   0, sym_macro_call,
 				   0, sym_MACRO);
-    if (!identifier)
+    if (!identifier) {
+      // ast_print (n->child[0], stderr, 0);
       break;
+    }
     
     /**
     ### Diagonalize */
@@ -2725,27 +2796,6 @@ static void translate (Ast * n, Stack * stack, void * data)
 	}
 	i++;
       }
-    }
-    break;
-  }
-
-  /**
-  ## Breaks within foreach_inner loops */
-
-  case sym_BREAK: {
-    Ast * loop = n->parent;
-    while (loop &&
-	   loop->sym != sym_foreach_inner_statement &&
-	   loop->sym != sym_foreach_statement &&
-	   loop->sym != sym_forin_declaration_statement &&
-	   loop->sym != sym_forin_statement &&
-	   loop->sym != sym_iteration_statement &&
-	   (loop->sym != sym_selection_statement ||
-	    loop->child[0]->sym != sym_SWITCH))
-      loop = loop->parent;
-    if (loop && loop->sym == sym_foreach_inner_statement) {
-      ast_before (n, ast_terminal (loop->child[0])->start, "_");
-      ast_after (n, "()");
     }
     break;
   }
@@ -3427,19 +3477,6 @@ static void stencils (Ast * n, Stack * stack, void * data)
 
     break;
     
-  /**
-  ## Foreach inner statements */
-
-  case sym_foreach_inner_statement: {
-    AstTerminal * t = ast_left_terminal(n);
-    if (!strcmp (t->start, "foreach_block") &&
-	(inforeach (n) || point_declaration (stack)))
-      str_append (t->start, "_inner");
-    ast_before (n, "{");
-    ast_after (n, "end_", t->start, "()}");
-    break;
-  }
-    
   case sym_macro_statement: {
     Ast * identifier = ast_schema (n, sym_macro_statement,
 				   0, sym_function_call,
@@ -3663,10 +3700,7 @@ void dotrace (Ast * n, Stack * stack, void * data)
 }
 
 /**
-# Fifth pass: "macro" expressions 
-
-This pass should regroup all transformations which require the use of
-macros which are not included in the Basilisk C grammar. */
+# Fifth pass */
 
 static void macros (Ast * n, Stack * stack, void * data)
 {
@@ -4867,8 +4901,26 @@ AstRoot * endfor (FILE * fin, FILE * fout,
   checks (root, d, &data);
   
   free (data.constants);
+
+  /**
+  We save the version before the final macro expansion
+  (i.e. expansions of foreach(), foreach_child(), foreach_neigbor()
+  etc...) which will be used for dimensional analysis etc. */
   
+  Ast * copy = ast_copy (((Ast *) root)->child[0]);
+
+  /**
+  We perform the expansion of remaining macros and output the source file. */
+
+  stack_push (root->stack, &root);
+  ast_traverse ((Ast *) root, root->stack, remaining_macros, &data);
+  ast_pop_scope (root->stack, (Ast *) root);
   ast_print ((Ast *) root, fout, 0);
+
+  /**
+  We restore the version without macro expansions. */
+  
+  ast_set_child ((Ast *) root, 0, copy);
 
   ((Ast *)root)->parent = (Ast *) d;
   return root;

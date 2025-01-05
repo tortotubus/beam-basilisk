@@ -168,12 +168,12 @@ struct _Point {
   int k;
 #endif
   int level;
-@ifdef foreach_block
+#if LAYERS
   int l;
   @define _BLOCK_INDEX , point.l
-@else
+#else
   @define _BLOCK_INDEX
-@endif
+#endif
 };
 static Point last_point;
 
@@ -345,22 +345,19 @@ void cache_shrink (Cache * c)
 #include "foreach_cell.h"
 
 #if dimension == 1
-@def foreach_child() {
+macro foreach_child (break = (_k = 2)) {
   int _i = 2*point.i - GHOSTS;
   point.level++;
   for (int _k = 0; _k < 2; _k++) {
     point.i = _i + _k;
     POINT_VARIABLES;
-@
-@def end_foreach_child()
+    {...}
   }
   point.i = (_i + GHOSTS)/2;
   point.level--;
 }
-@
-@define foreach_child_break() _k = 2
 #elif dimension == 2
-@def foreach_child() {
+macro foreach_child (break = (_k = _l = 2)) {
   int _i = 2*point.i - GHOSTS, _j = 2*point.j - GHOSTS;
   point.level++;
   for (int _k = 0; _k < 2; _k++) {
@@ -368,17 +365,14 @@ void cache_shrink (Cache * c)
     for (int _l = 0; _l < 2; _l++) {
       point.j = _j + _l;
       POINT_VARIABLES;
-@
-@def end_foreach_child()
+      {...}
     }
   }
   point.i = (_i + GHOSTS)/2; point.j = (_j + GHOSTS)/2;
   point.level--;
 }
-@
-@define foreach_child_break() _k = _l = 2
 #else // dimension == 3
-@def foreach_child() {
+macro foreach_child (break = (_l = _m = _n = 2)) {
   int _i = 2*point.i - GHOSTS, _j = 2*point.j - GHOSTS, _k = 2*point.k - GHOSTS;
   point.level++;
   for (int _l = 0; _l < 2; _l++) {
@@ -388,16 +382,13 @@ void cache_shrink (Cache * c)
       for (int _n = 0; _n < 2; _n++) {
 	point.k = _k + _n;
 	POINT_VARIABLES;
-@
-@def end_foreach_child()
+	{...}
       }
     }
   }
   point.i = (_i + GHOSTS)/2;point.j = (_j + GHOSTS)/2;point.k = (_k + GHOSTS)/2;
   point.level--;
 }
-@
-@define foreach_child_break() _l = _m = _n = 2
 #endif // dimension == 3
   
 #define update_cache() { if (tree->dirty) update_cache_f(); }
