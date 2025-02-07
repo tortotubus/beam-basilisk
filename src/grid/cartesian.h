@@ -39,46 +39,63 @@ static Point last_point;
 
 @define POINT_VARIABLES VARIABLES
 
-@def foreach()
-OMP_PARALLEL() {
-  int ig = 0, jg = 0; NOT_UNUSED(ig); NOT_UNUSED(jg);
-  Point point = {0};
-  point.n = cartesian->n;
-  int _k;
-  OMP(omp for schedule(static))
-  for (_k = 1; _k <= point.n; _k++) {
-    point.i = _k;
-    for (point.j = 1; point.j <= point.n; point.j++) {
-      POINT_VARIABLES
-@
-@define end_foreach() }}}
+macro foreach (char flags = 0, void reductions = None)
+{
+  OMP_PARALLEL (reductions) {
+    int ig = 0, jg = 0; NOT_UNUSED(ig); NOT_UNUSED(jg);
+    Point point = {0};
+    point.n = cartesian->n;
+    int _k;
+    OMP(omp for schedule(static))
+      for (_k = 1; _k <= point.n; _k++) {
+	point.i = _k;
+	for (point.j = 1; point.j <= point.n; point.j++) {
+	  POINT_VARIABLES;
+	  {...}
+	}
+      }
+  }
+}
 
-@def foreach_face_generic()
-OMP_PARALLEL() {
-  int ig = 0, jg = 0; NOT_UNUSED(ig); NOT_UNUSED(jg);
-  Point point = {0};
-  point.n = cartesian->n;
-  int _k;
-  OMP(omp for schedule(static))
-  for (_k = 1; _k <= point.n + 1; _k++) {
-    point.i = _k;
-    for (point.j = 1; point.j <= point.n + 1; point.j++) {
-      POINT_VARIABLES
-@
-@define end_foreach_face_generic() }}}
+macro foreach_face_generic (char flags = 0, void reductions = None)
+{
+  OMP_PARALLEL (reductions) {
+    int ig = 0, jg = 0; NOT_UNUSED(ig); NOT_UNUSED(jg);
+    Point point = {0};
+    point.n = cartesian->n;
+    int _k;
+    OMP(omp for schedule(static))
+      for (_k = 1; _k <= point.n + 1; _k++) {
+	point.i = _k;
+	for (point.j = 1; point.j <= point.n + 1; point.j++) {
+	  POINT_VARIABLES;
+	  {...}
+	}
+      }
+  }
+}
 
-@def foreach_vertex()
-foreach_face_generic() {
-  x -= Delta/2.; y -= Delta/2.;
-@
-@define end_foreach_vertex() } end_foreach_face_generic()
+macro foreach_vertex (char flags = 0, void reductions = None)
+{
+  foreach_face_generic (flags, reductions) {
+    x -= Delta/2.; y -= Delta/2.;
+    {...}
+  }
+}
 
 #define foreach_edge() foreach_face(y,x)
 
-@define is_face_x() { int ig = -1; VARIABLES; if (point.j <= point.n) {
-@define end_is_face_x() }}
-@define is_face_y() { int jg = -1; VARIABLES; if (point.i <= point.n) {
-@define end_is_face_y() }}
+macro is_face_x() {
+  int ig = -1; VARIABLES;
+  if (point.j <= point.n)
+    {...}
+}
+
+macro is_face_y() {
+  int jg = -1; VARIABLES;
+  if (point.i <= point.n)
+    {...}
+}
   
 @if TRASH
 @ undef trash
@@ -99,42 +116,42 @@ void reset (void * alist, double val)
 
 // Boundaries
 
-@def foreach_boundary_dir(l,d)
+macro foreach_boundary_dir (int l, int d)
+{
   OMP_PARALLEL() {
-  int ig = 0, jg = 0, kg = 0; NOT_UNUSED(ig); NOT_UNUSED(jg); NOT_UNUSED(kg);
-  Point point = {0};
-  point.n = cartesian->n;
-  int * _i = &point.j;
-  if (d == left) {
-    point.i = GHOSTS;
-    ig = -1;
-  }
-  else if (d == right) {
-    point.i = point.n + GHOSTS - 1;
-    ig = 1;
-  }
-  else if (d == bottom) {
-    point.j = GHOSTS;
-    _i = &point.i;
-    jg = -1;
-  }
-  else if (d == top) {
-    point.j = point.n + GHOSTS - 1;
-    _i = &point.i;
-    jg = 1;
-  }
-  int _l;
-  OMP(omp for schedule(static))
-  for (_l = 0; _l < point.n + 2*GHOSTS; _l++) {
-    *_i = _l;
-    {
-      POINT_VARIABLES
-@
-@def end_foreach_boundary_dir()
+    int ig = 0, jg = 0, kg = 0; NOT_UNUSED(ig); NOT_UNUSED(jg); NOT_UNUSED(kg);
+    Point point = {0};
+    point.n = cartesian->n;
+    int * _i = &point.j;
+    if (d == left) {
+      point.i = GHOSTS;
+      ig = -1;
     }
+    else if (d == right) {
+      point.i = point.n + GHOSTS - 1;
+      ig = 1;
+    }
+    else if (d == bottom) {
+      point.j = GHOSTS;
+      _i = &point.i;
+      jg = -1;
+    }
+    else if (d == top) {
+      point.j = point.n + GHOSTS - 1;
+      _i = &point.i;
+      jg = 1;
+    }
+    int _l;
+    OMP(omp for schedule(static))
+      for (_l = 0; _l < point.n + 2*GHOSTS; _l++) {
+	*_i = _l;
+	{
+	  POINT_VARIABLES;
+	  {...}
+	}
+      }
   }
-  }
-@
+}
 
 @define neighbor(o,p,q) ((Point){point.i+o, point.j+p, point.level, point.n})
 @def is_boundary(point) (point.i < GHOSTS || point.i >= point.n + GHOSTS ||
@@ -194,12 +211,13 @@ static void box_boundary_level_tangent (const Boundary * b,
   }
 }
 
-@def foreach_boundary(b)
+macro foreach_boundary (int b)
+{
   if (default_scalar_bc[b] != periodic_bc)
     foreach_boundary_dir (depth(), b)
-      if (!is_boundary(point)) {
-@
-@define end_foreach_boundary() } end_foreach_boundary_dir()
+      if (!is_boundary(point))
+	{...}
+}
 
 static double periodic_bc (Point point, Point neighbor, scalar s, bool * data);
 

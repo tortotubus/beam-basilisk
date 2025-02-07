@@ -14,12 +14,27 @@
  @include <nvtx3/nvToolsExt.h>
 #endif
 
+macro BEGIN_FOREACH() {{...}}
+ 
 #if _OPENMP
 @ include <omp.h>
 @ define OMP(x) Pragma(#x)
+
+macro OMP_SERIAL()
+{
+  @undef OMP
+  @define OMP(x)
+  ; // necessary so that the preproc above is included
+  {...}
+  @undef OMP
+  @define OMP(x) Pragma(#x)
+  ; // necessary so that the preproc above is included
+}
+   
 #elif _MPI
 
 @ define OMP(x)
+macro OMP_SERIAL() {{...}}
 
 @ include <mpi.h>
 static int mpi_rank, mpi_npe;
@@ -30,6 +45,7 @@ static int mpi_rank, mpi_npe;
 #else // not MPI, not OpenMP
 
 @ define OMP(x)
+macro OMP_SERIAL() {{...}}
 
 #endif // _MPI
 
@@ -386,6 +402,7 @@ int mpi_all_reduce0 (void *sendbuf, void *recvbuf, int count,
 {
   return MPI_Allreduce (sendbuf, recvbuf, count, datatype, op, comm);
 }
+
 @def mpi_all_reduce(v,type,op) {
   prof_start ("mpi_all_reduce");
   union { int a; float b; double c;} global;
@@ -394,30 +411,27 @@ int mpi_all_reduce0 (void *sendbuf, void *recvbuf, int count,
   prof_stop();
 }
 @
-@def mpi_all_reduce_array(v,type,op,elem) {
-  prof_start ("mpi_all_reduce");
-  type * global = malloc ((elem)*sizeof(type)), * tmp = malloc ((elem)*sizeof(type));
-  for (int i = 0; i < elem; i++)
-    tmp[i] = (v)[i];
-  MPI_Datatype datatype;
-  if (!strcmp(#type, "double")) datatype = MPI_DOUBLE;
-  else if (!strcmp(#type, "int")) datatype = MPI_INT;
-  else if (!strcmp(#type, "long")) datatype = MPI_LONG;
-  else if (!strcmp(#type, "bool")) datatype = MPI_C_BOOL;
-  else if (!strcmp(#type, "unsigned char")) datatype = MPI_UNSIGNED_CHAR;
+
+trace
+void mpi_all_reduce_array (void * v, MPI_Datatype datatype, MPI_Op op, int elem)
+{
+  size_t size;
+  if (datatype == MPI_DOUBLE) size = sizeof (double);
+  else if (datatype == MPI_INT) size = sizeof (int);
+  else if (datatype == MPI_LONG) size = sizeof (long);
+  else if (datatype == MPI_C_BOOL) size = sizeof (bool);
+  else if (datatype == MPI_UNSIGNED_CHAR) size = sizeof (unsigned char);
   else {
-    fprintf (stderr, "unknown reduction type '%s'\n", #type);
+    fprintf (stderr, "unknown reduction type\n");
     fflush (stderr);
     abort();
   }
+  void * global = malloc (elem*size), * tmp = malloc (elem*size);
+  memcpy (tmp, v, elem*size);
   mpi_all_reduce0 (tmp, global, elem, datatype, op, MPI_COMM_WORLD);
-  for (int i = 0; i < elem; i++)
-    (v)[i] = global[i];
+  memcpy (v, global, elem*size);
   free (global), free (tmp);
-  prof_stop();
 }
-@
-
 #endif // !FAKE_MPI
 
 @define QFILE FILE // a dirty trick to avoid qcc 'static FILE *' rule
@@ -510,7 +524,7 @@ void mpi_init()
 
 #endif // not MPI, not OpenMP
 
-@define OMP_PARALLEL() OMP(omp parallel)
+@define OMP_PARALLEL(...) OMP(omp parallel S__VA_ARGS__)
 
 @define NOT_UNUSED(x) (void)(x)
 

@@ -408,72 +408,77 @@ macro foreach_child (break = (_l = _m = _n = 2)) {
 			 )
 @
 
-@def foreach_cache(_cache) {
-  OMP_PARALLEL() {
-  int ig = 0, jg = 0, kg = 0; NOT_UNUSED(ig); NOT_UNUSED(jg); NOT_UNUSED(kg);
-  Point point = {0};
-  point.i = GHOSTS;
+macro foreach_cache (Cache _cache, void reductions = None) {
+  OMP_PARALLEL (reductions) {
+    int ig = 0, jg = 0, kg = 0; NOT_UNUSED(ig); NOT_UNUSED(jg); NOT_UNUSED(kg);
+    Point point = {0};
+    point.i = GHOSTS;
 #if dimension > 1
-  point.j = GHOSTS;
+    point.j = GHOSTS;
 #endif
 #if dimension > 2
-  point.k = GHOSTS;
+    point.k = GHOSTS;
 #endif
-  int _k; unsigned short _flags; NOT_UNUSED(_flags);
-  OMP(omp for schedule(static))
-  for (_k = 0; _k < _cache.n; _k++) {
-    point.i = _cache.p[_k].i;
+    int _k; unsigned short _flags; NOT_UNUSED(_flags);
+    OMP(omp for schedule(static))
+      for (_k = 0; _k < _cache.n; _k++) {
+	point.i = _cache.p[_k].i;
 #if dimension >= 2
-    point.j = _cache.p[_k].j;
+	point.j = _cache.p[_k].j;
 #endif
 #if dimension >= 3
-    point.k = _cache.p[_k].k;
+	point.k = _cache.p[_k].k;
 #endif
-    point.level = _cache.p[_k].level;
-    _flags = _cache.p[_k].flags;
-    POINT_VARIABLES;
-@
-@define end_foreach_cache() } } }
+	point.level = _cache.p[_k].level;
+	_flags = _cache.p[_k].flags;
+	POINT_VARIABLES;
+	{...}
+      }
+  }
+}
 
-@def foreach_cache_level(_cache,_l) {
-  OMP_PARALLEL() {
-  int ig = 0, jg = 0, kg = 0; NOT_UNUSED(ig); NOT_UNUSED(jg); NOT_UNUSED(kg);
-  Point point = {0};
-  point.i = GHOSTS;
+macro foreach_cache_level (Cache _cache, int _l, void reductions = None) {
+  OMP_PARALLEL (reductions) {
+    int ig = 0, jg = 0, kg = 0; NOT_UNUSED(ig); NOT_UNUSED(jg); NOT_UNUSED(kg);
+    Point point = {0};
+    point.i = GHOSTS;
 #if dimension > 1
-  point.j = GHOSTS;
+    point.j = GHOSTS;
 #endif
 #if dimension > 2
-  point.k = GHOSTS;
+    point.k = GHOSTS;
 #endif
-  point.level = _l;
-  int _k;
-  OMP(omp for schedule(static))
-  for (_k = 0; _k < _cache.n; _k++) {
-    point.i = _cache.p[_k].i;
+    point.level = _l;
+    int _k;
+    OMP(omp for schedule(static))
+      for (_k = 0; _k < _cache.n; _k++) {
+	point.i = _cache.p[_k].i;
 #if dimension >= 2
-    point.j = _cache.p[_k].j;
+	point.j = _cache.p[_k].j;
 #endif
 #if dimension >= 3
-    point.k = _cache.p[_k].k;
+	point.k = _cache.p[_k].k;
 #endif
-    POINT_VARIABLES;
-@
-@define end_foreach_cache_level() } } }
+	POINT_VARIABLES;
+	{...}
+      }
+  }
+}
 
-@def foreach_boundary_level(_l) {
+macro foreach_boundary_level (int _l, void reductions = None) {
   if (_l <= depth()) {
     update_cache();
     CacheLevel _boundary = tree->boundary[_l];
-    foreach_cache_level (_boundary,_l)
-@
-@define end_foreach_boundary_level() end_foreach_cache_level(); }}
+    foreach_cache_level (_boundary, _l, reductions)
+      {...}
+  }
+}
 
 #define bid(cell) (- cell.pid - 1)
 
-@def foreach_boundary(_b) {
+macro foreach_boundary (int _b, void reductions = None) {
   for (int _l = depth(); _l >= 0; _l--)
-    foreach_boundary_level(_l) {
+    foreach_boundary_level (_l, reductions) {
       if (bid(cell) == _b)
 	for (int _d = 0; _d < dimension; _d++) {
 	  for (int _i = -1; _i <= 1; _i += 2) {
@@ -489,8 +494,7 @@ macro foreach_child (break = (_l = _m = _n = 2)) {
 #if dimension >= 3
 	      point.k -= kg; z -= kg*Delta/2.;
 #endif
-@
-@def end_foreach_boundary()
+	      {...}
 	      point.i += ig; x += ig*Delta/2.;   
 #if dimension >= 2
 	      point.j += jg; y += jg*Delta/2.; 
@@ -502,16 +506,17 @@ macro foreach_child (break = (_l = _m = _n = 2)) {
 	  }
 	  ig = jg = kg = 0;
 	}
-    } end_foreach_boundary_level(); }
-@
-  
-@def foreach_halo(_name,_l) {
+    }
+}
+
+macro foreach_halo (void _name, int _l) {
   if (_l <= depth()) {
     update_cache();
     CacheLevel _cache = tree->_name[_l];
     foreach_cache_level (_cache, _l)
-@
-@define end_foreach_halo() end_foreach_cache_level(); }}
+      {...}
+  }
+}
 
 #include "neighbors.h"
 
@@ -682,29 +687,43 @@ static void update_cache_f (void)
 @endif
 }
 
-@define foreach() update_cache(); foreach_cache(tree->leaves)
-@define end_foreach()   end_foreach_cache()
-
-@def foreach_face_generic()
+macro foreach (char flags = 0, void reductions = None) {
   update_cache();
-  foreach_cache(tree->faces) @
-@define end_foreach_face_generic() end_foreach_cache()
+  foreach_cache (tree->leaves, reductions)
+    {...}
+}
+ 
+macro foreach_face_generic (char flags = 0, void reductions = None) {
+  update_cache();
+  foreach_cache (tree->faces, reductions)
+    {...}
+}
 
-@define is_face_x() { int ig = -1; VARIABLES; if (_flags & face_x) {
-@define end_is_face_x() }}
+macro is_face_x() {
+  int ig = -1; VARIABLES;
+  if (_flags & face_x)
+    {...}
+}
       
 #if dimension >= 2
-@define is_face_y() { int jg = -1; VARIABLES; if (_flags & face_y) {
-@define end_is_face_y() }}
+macro is_face_y() {
+  int jg = -1; VARIABLES;
+  if (_flags & face_y)
+    {...}
+}
 #endif
 #if dimension >= 3
-@define is_face_z() { int kg = -1; VARIABLES; if (_flags & face_z) {
-@define end_is_face_z() }}
+macro is_face_z() {
+  int kg = -1; VARIABLES;
+  if (_flags & face_z)
+    {...}
+}
 #endif
-    
-@def foreach_vertex()
+
+macro foreach_vertex (char flags = 0, void reductions = None)
+{
   update_cache();
-  foreach_cache(tree->vertices) {
+  foreach_cache (tree->vertices, reductions) {
     x -= Delta/2.;
 #if dimension >= 2
     y -= Delta/2.;
@@ -712,35 +731,40 @@ static void update_cache_f (void)
 #if dimension >= 3
     z -= Delta/2.;
 #endif
-@
-@define end_foreach_vertex() } end_foreach_cache()
+    {...}
+  }
+}
 
 #if dimension == 3
-# define foreach_edge()				\
-    foreach_vertex()				\
-      foreach_dimension()			\
-        if (is_vertex(neighbor(1)))
+# define foreach_edge(...)			\
+  foreach_vertex (__VA_ARGS__)			\
+    foreach_dimension()				\
+    if (is_vertex(neighbor(1)))
 #else // dimension < 3
-# define foreach_edge() foreach_face(y,x)
+# define foreach_edge(...) foreach_face(y,x,__VA_ARGS__)
 #endif
 
-@def foreach_level(l) {
+macro foreach_level (int l, char flags = 0, void reductions = None) {
   if (l <= depth()) {
     update_cache();
     CacheLevel _active = tree->active[l];
-    foreach_cache_level (_active,l)
-@
-@define end_foreach_level() end_foreach_cache_level(); }}
+    foreach_cache_level (_active, l, reductions)
+      {...}
+  }
+}
 
-@define foreach_coarse_level(l) foreach_level(l) if (!is_leaf(cell)) {
-@define end_foreach_coarse_level() } end_foreach_level()
+macro foreach_coarse_level (int l, char flags = 0, void reductions = None) {
+  foreach_level(l, flags, reductions)
+    if (!is_leaf(cell))
+      {...}
+}
 
-@def foreach_level_or_leaf(l) {
+macro foreach_level_or_leaf (int l, char flags = 0, void reductions = None) {
   for (int _l1 = l; _l1 >= 0; _l1--)
-    foreach_level(_l1)
-      if (_l1 == l || is_leaf (cell)) {
-@
-@define end_foreach_level_or_leaf() } end_foreach_level(); }
+    foreach_level(_l1, flags, reductions)
+      if (_l1 == l || is_leaf (cell))
+	{...}
+}
 
 @if TRASH
 @ undef trash

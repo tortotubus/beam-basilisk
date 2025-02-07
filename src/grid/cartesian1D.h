@@ -25,41 +25,48 @@ static Point last_point;
 
 @define POINT_VARIABLES VARIABLES
 
-@def foreach()
-  OMP_PARALLEL() {
-  int ig = 0, jg = 0; NOT_UNUSED(ig); NOT_UNUSED(jg);
-  Point point;
-  point.n = cartesian->n;
-  int _k;
-  OMP(omp for schedule(static))
-  for (_k = 1; _k <= point.n; _k++) {
-    point.i = _k;
-    POINT_VARIABLES
-@
-@define end_foreach() }}
-
-@def foreach_face_generic()
-  OMP_PARALLEL() {
-  int ig = 0, jg = 0; NOT_UNUSED(ig); NOT_UNUSED(jg);
-  Point point;
-  point.n = cartesian->n;
-  int _k;
-  OMP(omp for schedule(static))
-  for (_k = 1; _k <= point.n + 1; _k++) {
-    point.i = _k;
-    POINT_VARIABLES
-@
-@define end_foreach_face_generic() }}
-
-@def foreach_vertex()
-foreach_face_generic() {
-  x -= Delta/2.;
-@
-@define end_foreach_vertex() } end_foreach_face_generic()
-
-@define is_face_x() { int ig = -1; VARIABLES; {
-@define end_is_face_x() }}
+macro foreach (char flags = 0, void reductions = None)
+{
+  OMP_PARALLEL (reductions) {
+    int ig = 0, jg = 0; NOT_UNUSED(ig); NOT_UNUSED(jg);
+    Point point;
+    point.n = cartesian->n;
+    int _k;
+    OMP(omp for schedule(static))
+      for (_k = 1; _k <= point.n; _k++) {
+	point.i = _k;
+	POINT_VARIABLES;
+	{...}
+      }
+  }
+}
   
+macro foreach_face_generic (char flags = 0, void reductions = None)
+{
+  OMP_PARALLEL (reductions) {
+    int ig = 0, jg = 0; NOT_UNUSED(ig); NOT_UNUSED(jg);
+    Point point;
+    point.n = cartesian->n;
+    int _k;
+    OMP(omp for schedule(static))
+      for (_k = 1; _k <= point.n + 1; _k++) {
+	point.i = _k;
+	POINT_VARIABLES;
+	{...}
+      }
+  }
+}
+
+macro foreach_vertex (char flags = 0, void reductions = None)
+{
+  foreach_face_generic (flags, reductions) {
+    x -= Delta/2.;
+    {...}
+  }
+}
+
+macro is_face_x() { int ig = -1; VARIABLES; {...} }
+
 // ghost cell coordinates for each direction
 static int _ig[] = {1,-1};
 

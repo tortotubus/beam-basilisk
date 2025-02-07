@@ -239,31 +239,29 @@ char * add_reference (Ast * ref, char * references, Ast * scope, Stack * stack, 
   /**
   Reduction */
     
-  Ast * parameters = ast_child (scope, sym_foreach_parameters);
+  Ast * parameters = ast_child (scope, sym_argument_expression_list);
   if (parameters)
     foreach_item (parameters, 2, item) {
-      if (item->child[0]->sym == sym_reduction_list) {
-	Ast * reductions = item->child[0];
-	foreach_item (reductions, 1, reduction) {
-	  Ast * identifier = ast_schema (reduction, sym_reduction,
-					 4, sym_reduction_array,
-					 0, sym_generic_identifier,
-					 0, sym_IDENTIFIER);
-	  if (!strcmp (ast_terminal (identifier)->start, start)) {
-	    char * operator = ast_left_terminal (reduction->child[2])->start;
-	    Ast * array = ast_schema (reduction, sym_reduction,
-				      4, sym_reduction_array,
-				      3, sym_expression);
-	    if (array) {
-	      // fixme: not implemented yet
-	    }
-	    else
-	      str_append (references, ",.reduct=",
-			  !strcmp(operator, "min") ? "'m'" :
-			  !strcmp(operator, "max") ? "'M'" :
-			  !strcmp(operator, "+")   ? "'+'" :
-			  "'?'");
+      Ast * reductions = ast_find (item, sym_reduction_list);
+      foreach_item (reductions, 1, reduction) {
+	Ast * identifier = ast_schema (reduction, sym_reduction,
+				       4, sym_reduction_array,
+				       0, sym_generic_identifier,
+				       0, sym_IDENTIFIER);
+	if (!strcmp (ast_terminal (identifier)->start, start)) {
+	  char * operator = ast_left_terminal (reduction->child[2])->start;
+	  Ast * array = ast_schema (reduction, sym_reduction,
+				    4, sym_reduction_array,
+				    3, sym_expression);
+	  if (array) {
+	    // fixme: not implemented yet
 	  }
+	  else
+	    str_append (references, ",.reduct=",
+			!strcmp(operator, "min") ? "'m'" :
+			!strcmp(operator, "max") ? "'M'" :
+			!strcmp(operator, "+")   ? "'+'" :
+			"'?'");
 	}
       }
     }

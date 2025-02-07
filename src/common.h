@@ -549,6 +549,14 @@ typedef struct {
 
 @define BEGIN_FOREACH
 @define END_FOREACH
+
+/**
+These are placeholders for internally-defined macros. */
+
+macro foreach_face (char flags = 0, void reductions = None, const char * order = "xyz") {{...}}
+macro einstein_sum() {{...}}
+macro diagonalize (void a) {{...}}
+macro OMP_PARALLEL() {{...}}
  
 #if LAYERS
 # include "grid/layers.h"

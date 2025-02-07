@@ -52,63 +52,69 @@ typedef struct {
   void * data;        // user data
 } ForeachData;
 
-// fixme: this should be rewritten using better macros
-@def foreach_stencil(...) {
+macro foreach_stencil (char flags, void reductions) {
   static int _first = 1.;
   ForeachData _loop = {
     .fname = S__FILE__, .line = S_LINENO, .first = _first
   };
-  if (baseblock) for (scalar s = baseblock[0], * i = baseblock;
-		s.i >= 0; i++, s = *i) {
+  if (baseblock) for (scalar s = baseblock[0], * i = baseblock; s.i >= 0; i++, s = *i) {
     _attribute[s.i].input = _attribute[s.i].output = _attribute[s.i].nowarning = false;
     _attribute[s.i].width = 0;
   }
   int ig = 0, jg = 0, kg = 0; NOT_UNUSED(ig); NOT_UNUSED(jg); NOT_UNUSED(kg);
   Point point = {0}; NOT_UNUSED (point);
-@
 
-@def end_foreach_stencil()
+  {...}
+  
   check_stencil (&_loop);
   boundary_stencil (&_loop);
   _first = 0;
 }
-@
 
-@define foreach_vertex_stencil(...) foreach_stencil(S__VA_ARGS__) _loop.vertex = true;
-@define end_foreach_vertex_stencil() end_foreach_stencil()
+macro foreach_vertex_stencil (char flags, void reductions) {
+  foreach_stencil (flags, reductions) {
+    _loop.vertex = true;
+    {...}
+  }
+}
 
-@define foreach_face_stencil(...) foreach_stencil(S__VA_ARGS__)
-@define end_foreach_face_stencil() end_foreach_stencil()
+macro foreach_face_stencil (char flags, void reductions, const char * order) {
+  foreach_stencil (flags, reductions)
+    {...}
+}
 
-@define foreach_visible_stencil(...) foreach_stencil(S__VA_ARGS__)
-@define end_foreach_visible_stencil() end_foreach_stencil()
-
-@def foreach_level_stencil(...) {
+macro foreach_level_stencil (int l, char flags, void reductions) {
   if (0) {
     // automatic boundary conditions are not implemented yet so we don't do anything for the moment
     int ig = 0, jg = 0, kg = 0; NOT_UNUSED(ig); NOT_UNUSED(jg); NOT_UNUSED(kg);
     Point point = {0}; NOT_UNUSED (point);
-@
-@define end_foreach_level_stencil() }}
+    {...}
+  }
+}
 
-@define foreach_coarse_level_stencil(...) foreach_level_stencil(S__VA_ARGS__)
-@define end_foreach_coarse_level_stencil() end_foreach_level_stencil()
+macro foreach_coarse_level_stencil (int l, char flags, void reductions) {
+  foreach_level_stencil (l, flags, reductions)
+    {...}
+}
 
-@define foreach_level_or_leaf_stencil(...) foreach_level_stencil(S__VA_ARGS__)
-@define end_foreach_level_or_leaf_stencil() end_foreach_level_stencil()
+macro foreach_level_or_leaf_stencil (int l, char flags, void reductions) {
+  foreach_level_stencil (l, flags, reductions)
+    {...}
+}
 
-@define foreach_point_stencil(...) foreach_stencil(S__VA_ARGS__)
-@define end_foreach_point_stencil() end_foreach_stencil()
+macro foreach_point_stencil (double xp, double yp, double zp, char flags, void reductions) {
+  foreach_stencil (flags, reductions)
+    {...}
+}
 
-@define foreach_region_stencil(...) foreach_stencil(S__VA_ARGS__)
-@define end_foreach_region_stencil() end_foreach_stencil()
-  
-@define _stencil_is_face_x() { _loop.face |= (1 << 0);
-@define end__stencil_is_face_x() }
-@define _stencil_is_face_y() { _loop.face |= (1 << 1);
-@define end__stencil_is_face_y() }
-@define _stencil_is_face_z() { _loop.face |= (1 << 2);
-@define end__stencil_is_face_z() }
+macro foreach_region_stencil (coord p, coord box[2], coord n, char flags, void reductions) {
+  foreach_stencil (flags, reductions)
+    {...}
+}
+
+macro _stencil_is_face_x() { _loop.face |= (1 << 0); {...} }
+macro _stencil_is_face_y() { _loop.face |= (1 << 1); {...} }
+macro _stencil_is_face_z() { _loop.face |= (1 << 2); {...} }
 
 void stencil_val (Point p, scalar s, int i, int j, int k,
 		  const char * file, int line, bool overflow);

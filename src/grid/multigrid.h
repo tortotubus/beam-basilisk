@@ -229,59 +229,57 @@ static Point last_point;
 #endif  
 #endif // !_MPI
 
-@def foreach_level(l)
-OMP_PARALLEL() {
-  int ig = 0, jg = 0, kg = 0; NOT_UNUSED(ig); NOT_UNUSED(jg); NOT_UNUSED(kg);
-  Point point = {0};
-  point.level = l;
-  SET_DIMENSIONS();
-  int _k;
-  OMP(omp for schedule(static))
-  for (_k = GHOSTS; _k < point.n.x + GHOSTS; _k++) {
-    point.i = _k;
+macro foreach_level (int l, char flags = 0, void reductions = None) {
+  OMP_PARALLEL (reductions) {
+    int ig = 0, jg = 0, kg = 0; NOT_UNUSED(ig); NOT_UNUSED(jg); NOT_UNUSED(kg);
+    Point point = {0};
+    point.level = l;
+    SET_DIMENSIONS();
+    int _k;
+    OMP(omp for schedule(static))
+    for (_k = GHOSTS; _k < point.n.x + GHOSTS; _k++) {
+      point.i = _k;
 #if dimension > 1
-    for (point.j = GHOSTS; point.j < point.n.y + GHOSTS; point.j++)
+      for (point.j = GHOSTS; point.j < point.n.y + GHOSTS; point.j++)
 #if dimension > 2
-      for (point.k = GHOSTS; point.k < point.n.z + GHOSTS; point.k++)
+	for (point.k = GHOSTS; point.k < point.n.z + GHOSTS; point.k++)
 #endif
-	{
+	  {
 #endif
-          POINT_VARIABLES
-@
-@def end_foreach_level()
+	    POINT_VARIABLES;
+	    {...}
 #if dimension > 1
-	}
+	  }
 #endif
+    }
   }
 }
-@
 
-@def foreach()
-  OMP_PARALLEL() {
-  int ig = 0, jg = 0, kg = 0; NOT_UNUSED(ig); NOT_UNUSED(jg); NOT_UNUSED(kg);
-  Point point = {0};
-  point.level = depth();
-  SET_DIMENSIONS();
-  int _k;
-  OMP(omp for schedule(static))
-  for (_k = GHOSTS; _k < point.n.x + GHOSTS; _k++) {
-    point.i = _k;
+macro foreach (char flags = 0, void reductions = None) {
+  OMP_PARALLEL (reductions) {
+    int ig = 0, jg = 0, kg = 0; NOT_UNUSED(ig); NOT_UNUSED(jg); NOT_UNUSED(kg);
+    Point point = {0};
+    point.level = depth();
+    SET_DIMENSIONS();
+    int _k;
+    OMP(omp for schedule(static))
+      for (_k = GHOSTS; _k < point.n.x + GHOSTS; _k++) {
+	point.i = _k;
 #if dimension > 1
-    for (point.j = GHOSTS; point.j < point.n.y + GHOSTS; point.j++)
+	for (point.j = GHOSTS; point.j < point.n.y + GHOSTS; point.j++)
 #if dimension > 2
-      for (point.k = GHOSTS; point.k < point.n.z + GHOSTS; point.k++)
+	  for (point.k = GHOSTS; point.k < point.n.z + GHOSTS; point.k++)
 #endif
-	{
+	    {
 #endif
-          POINT_VARIABLES
-@
-@def end_foreach()
+	      POINT_VARIABLES;
+	      {...}
 #if dimension > 1
-	}
+	    }
 #endif
+      }
   }
 }
-@	    
 
 @define is_active(cell) (true)
 @define is_leaf(cell)   (level == depth())
@@ -295,50 +293,52 @@ OMP_PARALLEL() {
 @define tree multigrid
 #include "foreach_cell.h"
 
-@def foreach_face_generic()
-  OMP_PARALLEL() {
-  int ig = 0, jg = 0, kg = 0; NOT_UNUSED(ig); NOT_UNUSED(jg); NOT_UNUSED(kg);
-  Point point = {0};
-  point.level = depth();
-  SET_DIMENSIONS();
-  int _k;
-  OMP(omp for schedule(static))
-  for (_k = GHOSTS; _k <= point.n.x + GHOSTS; _k++) {
-    point.i = _k;
+macro foreach_face_generic (char flags = 0, void reductions = None) {
+  OMP_PARALLEL (reductions) {
+    int ig = 0, jg = 0, kg = 0; NOT_UNUSED(ig); NOT_UNUSED(jg); NOT_UNUSED(kg);
+    Point point = {0};
+    point.level = depth();
+    SET_DIMENSIONS();
+    int _k;
+    OMP(omp for schedule(static))
+      for (_k = GHOSTS; _k <= point.n.x + GHOSTS; _k++) {
+	point.i = _k;
 #if dimension > 1
-    for (point.j = GHOSTS; point.j <= point.n.y + GHOSTS; point.j++)
+	for (point.j = GHOSTS; point.j <= point.n.y + GHOSTS; point.j++)
 #if dimension > 2
-      for (point.k = GHOSTS; point.k <= point.n.z + GHOSTS; point.k++)
+	  for (point.k = GHOSTS; point.k <= point.n.z + GHOSTS; point.k++)
 #endif
-        {
+	    {
 #endif
-	  POINT_VARIABLES
-@
-@def end_foreach_face_generic()
+	      POINT_VARIABLES;
+	      {...}
 #if dimension > 1
-	}
+	    }
 #endif
+      }
   }
 }
-@ 
 
-@def foreach_vertex()
-foreach_face_generic() {  
-  x -= Delta/2.;
+macro foreach_vertex (char flags = 0, void reductions = None) {
+  foreach_face_generic (reductions) {
+    x -= Delta/2.;
 #if dimension > 1  
-  y -= Delta/2.;  
+    y -= Delta/2.;  
 #endif
 #if dimension > 2
-  z -= Delta/2.;  
+    z -= Delta/2.;  
 #endif
-@
-@define end_foreach_vertex() } end_foreach_face_generic()
+    {...}
+  }
+}
 
 @define is_coarse() (point.level < depth())
 
 #if dimension == 1
-@define is_face_x() { int ig = -1; VARIABLES; {
-@define end_is_face_x() }}
+macro is_face_x() {
+  int ig = -1; VARIABLES;
+  {...}
+}
 
 // foreach_edge?
 
@@ -359,10 +359,17 @@ macro foreach_child (break = (_k = 2)) {
 #elif dimension == 2
 #define foreach_edge() foreach_face(y,x)
 
-@define is_face_x() { int ig = -1; VARIABLES; if (point.j < point.n.y + GHOSTS) {
-@define end_is_face_x() }}
-@define is_face_y() { int jg = -1; VARIABLES; if (point.i < point.n.x + GHOSTS) {
-@define end_is_face_y() }}
+macro is_face_x() {
+  int ig = -1; VARIABLES;
+  if (point.j < point.n.y + GHOSTS)
+    {...}
+}
+
+macro is_face_y() {
+  int jg = -1; VARIABLES;
+  if (point.i < point.n.x + GHOSTS)
+    {...}
+}
 
 macro foreach_child (break = (_k = _l = 2)) {
   int _i = 2*point.i - GHOSTS, _j = 2*point.j - GHOSTS;
@@ -380,25 +387,38 @@ macro foreach_child (break = (_k = _l = 2)) {
 }
 
 #elif dimension == 3
-@def foreach_vertex_aux()
-foreach_vertex() {
-  struct { int x, y, z; } _a = {point.i, point.j, point.k};
-@
-@define end_foreach_vertex_aux() } end_foreach_vertex()
+macro foreach_vertex_aux (char flags = 0, void reductions = None) {
+  foreach_vertex (flags, reductions) {
+    struct { int x, y, z; } _a = {point.i, point.j, point.k};
+    {...}
+  }
+}
 
-#define foreach_edge()					\
-  foreach_vertex_aux()					\
+#define foreach_edge(...)				\
+  foreach_vertex_aux(__VA_ARGS__)			\
     foreach_dimension()					\
       if (_a.x < point.n.x + GHOSTS)
 
-@define is_face_x() { int ig = -1; VARIABLES; if (point.j < point.n.y + GHOSTS && point.k < point.n.z + GHOSTS) {
-@define end_is_face_x() }}
-@define is_face_y() { int jg = -1; VARIABLES; if (point.i < point.n.x + GHOSTS && point.k < point.n.z + GHOSTS) {
-@define end_is_face_y() }}
-@define is_face_z() { int kg = -1; VARIABLES; if (point.i < point.n.x + GHOSTS && point.j < point.n.y + GHOSTS) {
-@define end_is_face_z() }}
+macro is_face_x() {
+  int ig = -1; VARIABLES;
+  if (point.j < point.n.y + GHOSTS && point.k < point.n.z + GHOSTS)
+    {...}
+}
 
-macro foreach_child(break = (_l = _m = _n = 2)) {
+macro is_face_y() {
+  int jg = -1; VARIABLES;
+  if (point.i < point.n.x + GHOSTS && point.k < point.n.z + GHOSTS)
+    {...}
+}
+
+macro is_face_z() {
+  int kg = -1; VARIABLES;
+  if (point.i < point.n.x + GHOSTS && point.j < point.n.y + GHOSTS)
+    {...}
+}
+
+macro foreach_child (break = (_l = _m = _n = 2))
+{
   int _i = 2*point.i - GHOSTS;
   int _j = 2*point.j - GHOSTS;
   int _k = 2*point.k - GHOSTS;
@@ -442,7 +462,8 @@ void reset (void * alist, double val)
 // Boundaries
 
 #if dimension == 1
-@def foreach_boundary_dir(l,d)
+macro foreach_boundary_dir (int l, int d, void reductions = None)
+{
   int ig = 0, jg = 0, kg = 0; NOT_UNUSED(ig); NOT_UNUSED(jg); NOT_UNUSED(kg);
   Point point = {0};
   point.level = l < 0 ? depth() : l;
@@ -456,51 +477,52 @@ void reset (void * alist, double val)
     ig = 1;
   }
   {
-    POINT_VARIABLES
-@
-@define end_foreach_boundary_dir() }
+    POINT_VARIABLES;
+    {...}
+  }
+}
 
 @define neighbor(o,p,q) ((Point){point.i+o, point.level, point.n _BLOCK_INDEX})
 @define is_boundary(point) (point.i < GHOSTS || point.i >= point.n.x + GHOSTS)
 
 #elif dimension == 2
-@def foreach_boundary_dir(l,d)
-  OMP_PARALLEL() {
-  int ig = 0, jg = 0, kg = 0; NOT_UNUSED(ig); NOT_UNUSED(jg); NOT_UNUSED(kg);
-  Point point = {0};
-  point.level = l < 0 ? depth() : l;
-  SET_DIMENSIONS();
-  int * _i = &point.j, _n = point.n.y;
-  if (d == left) {
-    point.i = GHOSTS;
-    ig = -1;
-  }
-  else if (d == right) {
-    point.i = point.n.x + GHOSTS - 1;
-    ig = 1;
-  }
-  else if (d == bottom) {
-    point.j = GHOSTS;
-    _i = &point.i, _n = point.n.x;
-    jg = -1;
-  }
-  else if (d == top) {
-    point.j = point.n.y + GHOSTS - 1;
-    _i = &point.i, _n = point.n.x;
-    jg = 1;
-  }
-  int _l;
-  OMP(omp for schedule(static))
-  for (_l = 0; _l < _n + 2*GHOSTS; _l++) {
-    *_i = _l;
-    {
-      POINT_VARIABLES
-@
-@def end_foreach_boundary_dir()
+macro foreach_boundary_dir (int l, int d, void reductions = None)
+{
+  OMP_PARALLEL (reductions) {
+    int ig = 0, jg = 0, kg = 0; NOT_UNUSED(ig); NOT_UNUSED(jg); NOT_UNUSED(kg);
+    Point point = {0};
+    point.level = l < 0 ? depth() : l;
+    SET_DIMENSIONS();
+    int * _i = &point.j, _n = point.n.y;
+    if (d == left) {
+      point.i = GHOSTS;
+      ig = -1;
     }
+    else if (d == right) {
+      point.i = point.n.x + GHOSTS - 1;
+      ig = 1;
+    }
+    else if (d == bottom) {
+      point.j = GHOSTS;
+      _i = &point.i, _n = point.n.x;
+      jg = -1;
+    }
+    else if (d == top) {
+      point.j = point.n.y + GHOSTS - 1;
+      _i = &point.i, _n = point.n.x;
+      jg = 1;
+    }
+    int _l;
+    OMP(omp for schedule(static))
+      for (_l = 0; _l < _n + 2*GHOSTS; _l++) {
+	*_i = _l;
+	{
+	  POINT_VARIABLES;
+	  {...}
+	}
+      }
   }
 }
-@
 
 @def neighbor(o,p,q)
   ((Point){point.i+o, point.j+p, point.level, point.n _BLOCK_INDEX})
@@ -510,57 +532,56 @@ void reset (void * alist, double val)
 @
 
 #elif dimension == 3
-@def foreach_boundary_dir(l,d)
-  OMP_PARALLEL() {
-  int ig = 0, jg = 0, kg = 0; NOT_UNUSED(ig); NOT_UNUSED(jg); NOT_UNUSED(kg);
-  Point point = {0};
-  point.level = l < 0 ? depth() : l;
-  SET_DIMENSIONS();
-  int * _i = &point.j, * _j = &point.k;
-  int _n[2] = { point.n.y, point.n.z };
-  if (d == left) {
-    point.i = GHOSTS;
-    ig = -1;
-  }
-  else if (d == right) {
-    point.i = point.n.x + GHOSTS - 1;
-    ig = 1;
-  }
-  else if (d == bottom) {
-    point.j = GHOSTS;
-    _i = &point.i, _n[0] = point.n.x;
-    jg = -1;
-  }
-  else if (d == top) {
-    point.j = point.n.y + GHOSTS - 1;
-    _i = &point.i, _n[0] = point.n.x;
-    jg = 1;
-  }
-  else if (d == back) {
-    point.k = GHOSTS;
-    _i = &point.i; _j = &point.j;
-    _n[0] = point.n.x, _n[1] = point.n.y;
-    kg = -1;
-  }
-  else if (d == front) {
-    point.k = point.n.z + GHOSTS - 1;
-    _i = &point.i; _j = &point.j;
-    _n[0] = point.n.x, _n[1] = point.n.y;
-    kg = 1;
-  }
-  int _l;
-  OMP(omp for schedule(static))
-  for (_l = 0; _l < _n[0] + 2*GHOSTS; _l++) {
-    *_i = _l;
-    for (int _m = 0; _m < _n[1] + 2*GHOSTS; _m++) {
-      *_j = _m;
-      POINT_VARIABLES
-@
-@def end_foreach_boundary_dir()
+macro foreach_boundary_dir (int l, int d, void reductions = None) {
+  OMP_PARALLEL (reductions) {
+    int ig = 0, jg = 0, kg = 0; NOT_UNUSED(ig); NOT_UNUSED(jg); NOT_UNUSED(kg);
+    Point point = {0};
+    point.level = l < 0 ? depth() : l;
+    SET_DIMENSIONS();
+    int * _i = &point.j, * _j = &point.k;
+    int _n[2] = { point.n.y, point.n.z };
+    if (d == left) {
+      point.i = GHOSTS;
+      ig = -1;
     }
+    else if (d == right) {
+      point.i = point.n.x + GHOSTS - 1;
+      ig = 1;
+    }
+    else if (d == bottom) {
+      point.j = GHOSTS;
+      _i = &point.i, _n[0] = point.n.x;
+      jg = -1;
+    }
+    else if (d == top) {
+      point.j = point.n.y + GHOSTS - 1;
+      _i = &point.i, _n[0] = point.n.x;
+      jg = 1;
+    }
+    else if (d == back) {
+      point.k = GHOSTS;
+      _i = &point.i; _j = &point.j;
+      _n[0] = point.n.x, _n[1] = point.n.y;
+      kg = -1;
+    }
+    else if (d == front) {
+      point.k = point.n.z + GHOSTS - 1;
+      _i = &point.i; _j = &point.j;
+      _n[0] = point.n.x, _n[1] = point.n.y;
+      kg = 1;
+    }
+    int _l;
+    OMP(omp for schedule(static))
+      for (_l = 0; _l < _n[0] + 2*GHOSTS; _l++) {
+	*_i = _l;
+	for (int _m = 0; _m < _n[1] + 2*GHOSTS; _m++) {
+	  *_j = _m;
+	  POINT_VARIABLES;
+	  {...}
+	}
+      }
   }
 }
-@
 
 @def neighbor(o,p,q)
   ((Point){point.i+o, point.j+p, point.k+q, point.level, point.n _BLOCK_INDEX})
@@ -572,13 +593,14 @@ void reset (void * alist, double val)
 
 #endif // dimension == 3
 
-@def foreach_boundary(b)
+macro foreach_boundary (int b, void reductions = None)
+{
   if (default_scalar_bc[b] != periodic_bc)
-    foreach_boundary_dir (depth(), b)
-      if (!is_boundary(point)) {
-@
-@define end_foreach_boundary() } end_foreach_boundary_dir()
-  
+    foreach_boundary_dir (depth(), b, reductions)
+      if (!is_boundary(point))
+	{...}
+}
+
 @define neighborp(k,l,o) neighbor(k,l,o)
 
 static double periodic_bc (Point point, Point neighbor, scalar s, bool * data);
@@ -695,7 +717,7 @@ static void periodic_boundary_level_x (const Boundary * b, scalar * list, int l)
 }
     
 #else // dimension != 1
-  
+
 @define VT _attribute[s.i].v.y
 
 foreach_dimension()
@@ -716,7 +738,7 @@ static void periodic_boundary_level_x (const Boundary * b, scalar * list, int l)
     return;
 
   if (l == 0) {
-    foreach_level(0)
+    foreach_level (0, noauto)
       for (scalar s in list1)
 	for (int b = 0; b < s.block; b++) {
 	  scalar sb = {s.i + b};
@@ -920,59 +942,59 @@ ivec dimensions (int nx = 0, int ny = 0, int nz = 0)
 
 #if dimension == 1
 
-@def foreach_slice_x(start, end, l) {
+macro foreach_slice_x (int start, int end, int l) {
   Point point = {0};
   point.level = l; SET_DIMENSIONS();
   for (point.i = start; point.i < end; point.i++)
-@
-@define end_foreach_slice_x() }
- 
+    {...}
+}
+
 #elif dimension == 2
 
-@def foreach_slice_x(start, end, l) {
+macro foreach_slice_x (int start, int end, int l) {
   Point point = {0};
   point.level = l; SET_DIMENSIONS();
   for (point.i = start; point.i < end; point.i++)
     for (point.j = 0; point.j < point.n.y + 2*GHOSTS; point.j++)
-@
-@define end_foreach_slice_x() }
+      {...}
+}
       
-@def foreach_slice_y(start, end, l) {
+macro foreach_slice_y (int start, int end, int l) {
   Point point = {0};
   point.level = l; SET_DIMENSIONS();
   for (point.i = 0; point.i < point.n.x + 2*GHOSTS; point.i++)
     for (point.j = start; point.j < end; point.j++)
-@
-@define end_foreach_slice_y() }
+      {...}
+}
 
 #elif dimension == 3
 
-@def foreach_slice_x(start, end, l) {
+macro foreach_slice_x (int start, int end, int l) {
   Point point = {0};
   point.level = l; SET_DIMENSIONS();
   for (point.i = start; point.i < end; point.i++)
     for (point.j = 0; point.j < point.n.y + 2*GHOSTS; point.j++)
       for (point.k = 0; point.k < point.n.z + 2*GHOSTS; point.k++)
-@
-@define end_foreach_slice_x() }
+	{...}
+}
       
-@def foreach_slice_y(start, end, l) {
+macro foreach_slice_y (int start, int end, int l) {
   Point point = {0};
   point.level = l; SET_DIMENSIONS();
   for (point.i = 0; point.i < point.n.x + 2*GHOSTS; point.i++)
     for (point.j = start; point.j < end; point.j++)
       for (point.k = 0; point.k < point.n.z + 2*GHOSTS; point.k++)
-@
-@define end_foreach_slice_y() }
+	{...}
+}
 
-@def foreach_slice_z(start, end, l) {
+macro foreach_slice_z (int start, int end, int l) {
   Point point = {0};
   point.level = l; SET_DIMENSIONS();
   for (point.i = 0; point.i < point.n.x + 2*GHOSTS; point.i++)
     for (point.j = 0; point.j < point.n.y + 2*GHOSTS; point.j++)
       for (point.k = start; point.k < end; point.k++)
-@
-@define end_foreach_slice_z() }
+	{...}
+}
   
 #endif // dimension == 3
  
@@ -981,20 +1003,21 @@ ivec dimensions (int nx = 0, int ny = 0, int nz = 0)
 #else // !_MPI
 
 #if dimension == 1
-@def foreach_cell_multigrid()
+macro foreach_cell_multigrid()
+{
   for (int ox = 0; ox < Dimensions.x; ox++)
     foreach_cell() {
       point.i += ox*(1 << point.level);
       {
 	POINT_VARIABLES;
-@
-@def end_foreach_cell_multigrid()
+	{...}
       }
       point.i -= ox*(1 << point.level);
-    } end_foreach_cell();
-@
+    }
+}
 #elif dimension == 2
-@def foreach_cell_multigrid()
+macro foreach_cell_multigrid()
+{
   for (int ox = 0; ox < Dimensions.x; ox++)
     for (int oy = 0; oy < Dimensions.y; oy++)
       foreach_cell() {
@@ -1002,15 +1025,15 @@ ivec dimensions (int nx = 0, int ny = 0, int nz = 0)
 	point.j += oy*(1 << point.level);
 	{
 	  POINT_VARIABLES;
-@
-@def end_foreach_cell_multigrid()
+	  {...}
         }
   	point.i -= ox*(1 << point.level);
 	point.j -= oy*(1 << point.level);
-      } end_foreach_cell();
-@
+      }
+}
 #elif dimension == 3
-@def foreach_cell_multigrid()
+macro foreach_cell_multigrid()
+{
   for (int ox = 0; ox < Dimensions.x; ox++)
     for (int oy = 0; oy < Dimensions.y; oy++)
       for (int oz = 0; oz < Dimensions.z; oz++)
@@ -1020,17 +1043,15 @@ ivec dimensions (int nx = 0, int ny = 0, int nz = 0)
 	  point.k += oz*(1 << point.level);
 	  {
 	    POINT_VARIABLES;
-@
-@def end_foreach_cell_multigrid()
+	    {...}
           }
 	  point.i -= ox*(1 << point.level);
 	  point.j -= oy*(1 << point.level);
 	  point.k -= oz*(1 << point.level);
-	} end_foreach_cell();
-@
+	}
+}
 #endif // dimension == 3
 
 #define foreach_cell() foreach_cell_multigrid()
-#define end_foreach_cell() end_foreach_cell_multigrid()
 
 #endif // !_MPI

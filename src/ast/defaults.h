@@ -122,9 +122,3 @@ double trunc (double x);
 # Macros */
 
 typedef void macro;
-
-/**
-These are placeholders for internally-defined macros. */
-
-macro einstein_sum() {{...}}
-macro diagonalize() {{...}}

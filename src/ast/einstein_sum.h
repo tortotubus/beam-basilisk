@@ -156,14 +156,22 @@ This function appends a block to an expression with a `+` sign separator. */
 
 Ast * ast_add_list_append (Ast * list, int item_sym, Ast * item)
 {
-  ast_set_line (item, ast_right_terminal (list));
+  ast_set_line (item, ast_right_terminal (list), false);
   Ast * parent = list->parent;
   int index = ast_child_index (list);
-  Ast * l =  ast_new_children (ast_new (parent, list->sym),
-			       list, 
-			       ast_terminal_new_char (item, "+"),
-			       ast_new (item, item_sym));
-  ast_attach (l->child[2], item);
+  Ast * l;
+  if (item->sym == item_sym)
+    l = ast_new_children (ast_new (parent, list->sym),
+                          list,
+                          ast_terminal_new_char (item, "+"),
+                          item);
+  else {
+    l =  ast_new_children (ast_new (parent, list->sym),
+                           list,
+                           ast_terminal_new_char (item, "+"),
+                           ast_new (item, item_sym));
+    ast_attach (l->child[2], item);
+  }
   ast_set_child (parent, index, l);
   return l;
 }
@@ -178,7 +186,7 @@ static void einstein_sum_id_list (Ast * n, Stack * stack, void * data)
     if (strlen (t->start) > 1){
       fprintf (stderr,
 	       "%s:%d: error: the args of einstein_sum(...,%s,...) must be of length one\n",
-              t->file, t->line,t->start);
+	       t->file, t->line, t->start);
       exit (1);
     }
     char * id_list = data, first_char[2] = {*t->start, '\0'};
@@ -194,12 +202,12 @@ static char * get_einstein_sum_args (Ast * n, Stack * stack)
   while (strcmp (identifier, "einstein_sum")) {
     ein_macro = ast_parent (n, sym_macro_statement);
     identifier = ast_terminal(ast_schema (ein_macro, sym_macro_statement,
-					  0, sym_macro_call,
 					  0, sym_MACRO))->start;
   }
   // gather the args in the buffer
   char buffer[1000] = {0}; // fixme: buffer overflows??
-  ast_traverse (ein_macro->child[0]->child[2],
+  ast_traverse (ast_schema (ein_macro, sym_macro_statement,
+			    2, sym_argument_expression_list),
 		stack, einstein_sum_id_list, buffer);
   int length = strlen (buffer);
   buffer[length] = '\0';
@@ -497,20 +505,32 @@ static void einstein_sum_expression (Ast * n, Stack * stack, void * data)
 
 void einstein_sum_global (Ast * n, Stack * stack, int dimension)
 {
-  Ast * item = ast_block_list_get_item (n->parent->parent);
+  Ast * item = ast_block_list_get_item (ast_ancestor (n, 2));
   Einstein_sumData data = {dimension, NULL, NULL}; 
-  if (n->child[0]->child[2]->sym == token_symbol(')')) {
+  if (!ast_schema (n, sym_macro_statement,
+		   2, sym_argument_expression_list)) {
     AstTerminal * t = ast_left_terminal (n);
     fprintf (stderr,
-            "%s:%d: error: missing summation indices in macro einstein_sum(...)\n",
-            t->file, t->line);
+	     "%s:%d: error: missing summation indices in macro einstein_sum(...)\n",
+	     t->file, t->line);
     exit (1);
   }
-  Ast * body = ast_last_child (n);
+  Ast * body = ast_child (n, sym_statement);
+  if (!ast_schema (body, sym_statement,
+		   0, sym_compound_statement)) {
+    AstTerminal * open = NCB(body, "{"), * close = NCA(body, "}");
+    int index = ast_child_index (body);
+    body = NN(item, sym_statement,
+	      NN(item, sym_compound_statement,
+		 open,
+		 NN(item, sym_block_item_list,
+		    NN(item, sym_block_item,
+		       body)),
+		 close));
+    ast_set_child (n, index, body);
+  }
   stack_push (stack, &body);
   ast_traverse (body, stack, einstein_sum_expression, &data);
   ast_pop_scope (stack, body);
-  // remove macro name and append the body 
-  ast_replace_child (item->child[0], 0, body);
-  ast_remove (n, ast_left_terminal (body));
+  ast_replace_child (item, 0, body);
 }

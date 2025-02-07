@@ -223,7 +223,8 @@ void  ast_traverse                 (Ast * n, Stack * stack,
        list = list->parent, arg = ast_child (list, symbol))
 
 Ast * ast_identifier_declaration (Stack * stack, const char * identifier);
-int   ast_identifier_parse_type (Stack * stack, const char * identifier, bool call, const char * file, int line);
+int   ast_identifier_parse_type (Stack * stack, const char * identifier, bool call,
+				 const char * file, int line);
 Ast * ast_identifier_declaration_from_to (Stack * stack, const char * identifier,
 					  const Ast * start, const Ast * end);
 Ast * ast_function_identifier (const Ast * function_definition);
@@ -281,6 +282,7 @@ const Ast * ast_attribute_access (const Ast * n, Stack * stack);
 Ast * ast_attribute_array_access (Ast * n);
 Ast * ast_constant_postfix_expression (const Ast * n, Stack * stack);
 Ast * ast_is_function_pointer (const Ast * n, Stack * stack);
+bool  ast_is_foreach_statement (const Ast * n);
 
 /**
 ## Types */
@@ -301,12 +303,12 @@ Ast * ast_get_array_dimensions (Ast * direct_declarator, int symbol, AstDimensio
 
 void ast_diagonalize (Ast * n, Stack * stack, void * field);
 char * ast_external_references (Ast * n, char * references, Stack * functions);
-char * ast_kernel               (Ast * n, Ast * argument, char * s);
+char * ast_kernel              (Ast * n, char * argument, bool nolineno);
 
 /**
 ## Macros */
 
-bool ast_is_macro_definition (const Ast * function_definition, const char * macro_type);
+Ast * ast_is_macro_declaration (const Ast * function_declaration, const char * macro_type);
 
 /**
 ## Interface for the generic C interpreter */

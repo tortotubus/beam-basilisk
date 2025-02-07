@@ -93,8 +93,14 @@ static int yyparse (AstRoot * parse, Ast * root);
 ## Basilisk C tokens */
 
 %token  MAYBECONST NEW_FIELD TRACE
-%token  FOREACH FOREACH_DIMENSION
+%token  FOREACH_DIMENSION
 %token  REDUCTION MACRO ELLIPSIS_MACRO
+
+/**
+The token below is only used temporarily in ast/stencil.c, not in the
+grammar. */
+
+%token  foreach_statement
 
 /**
 ## Grammar
@@ -120,6 +126,7 @@ primary_expression
 	| string
 	| '(' expression_error ')'
 	| generic_selection
+	| reduction_list /* Basilisk C extension */
 	;
 
 expression_error
@@ -355,7 +362,7 @@ storage_class_specifier
 	| THREAD_LOCAL
 	| AUTO
 	| REGISTER
-	| TRACE /* Basilisk C extension */
+	| TRACE    /* Basilisk C extension */
 	;
 
 type_specifier
@@ -489,6 +496,7 @@ direct_declarator
 generic_identifier
         : IDENTIFIER
 	| TYPEDEF_NAME
+	| MACRO
 	;
 
 pointer
@@ -519,6 +527,7 @@ parameter_declaration
 	| declaration_specifiers abstract_declarator
 	| declaration_specifiers
 	| BREAK '=' initializer /* Basilisk C extension */
+	| BREAK '=' BREAK /* Basilisk C extension */
 	;
 
 identifier_list
@@ -674,7 +683,6 @@ jump_statement
 external_declaration
 	: function_definition
 	| declaration
-	| macro_statement /* Basilisk C extension */
 	| event_definition /* Basilisk C extension */
 	| boundary_definition /* Basilisk C extension */
 	| external_foreach_dimension /* Basilisk C extension */
@@ -704,36 +712,15 @@ declaration_list
 basilisk_statements
         : ELLIPSIS_MACRO
         | macro_statement
-        | foreach_statement
 	| foreach_dimension_statement
 	| forin_declaration_statement
 	| forin_statement
 	;
 
-macro_call
-        : MACRO '(' ')'
-	| MACRO '(' argument_expression_list ')'
-	;
-
 macro_statement
-        : macro_call statement
-	| function_call compound_statement
+        : MACRO '(' ')' statement
+	| MACRO '(' argument_expression_list ')' statement
         ;
-
-foreach_statement
-        : FOREACH '(' ')' statement
-	| FOREACH '(' foreach_parameters ')' statement
-	;
-
-foreach_parameters
-        : foreach_parameter
-	| foreach_parameters ',' foreach_parameter
-	;
-
-foreach_parameter
-        : assignment_expression
-        | reduction_list
-	;
 
 reduction_list
         : reduction

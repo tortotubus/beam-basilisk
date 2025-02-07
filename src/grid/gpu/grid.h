@@ -386,8 +386,14 @@ static char glsl_preproc[] =
   "#define endforin() }\n"
 #if LAYERS
   "#define _index(a,m) ((a).i + (point.l + _layer + (m) < _attr(a,block) ? point.l + _layer + (m) : 0))\n"
+  "#define foreach_block_inner() for (point.l = 0; point.l < nl; point.l++)\n"
+  "#define end_foreach_block_inner() point.l = 0;\n"
+  "#define foreach_blockf(_f) for (point.l = 0; point.l < _attr(_f,block); point.l++)\n"
+  "#define end_foreach_blockf() point.l = 0;\n"
 #else
   "#define _index(a,m) ((a).i)\n"
+  "#define foreach_blockf(_f)\n"
+  "#define end_foreach_blockf()\n"
 #endif
   "#define forin2(a,b,c,d) for (int _i = 0; _i < c.length() - 1; _i++)"
   "  { a = c[_i]; b = d[_i];\n"

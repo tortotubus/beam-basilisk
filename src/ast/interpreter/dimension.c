@@ -1288,6 +1288,8 @@ Value * dimension_run (Ast * n, Stack * stack)
 
   case sym_primary_expression: {
     Value * v = ast_run_node (n, stack);
+    if (!v)
+      return NULL;
     if (n->child[0]->sym == sym_constant &&
 	(n->child[0]->child[0]->sym == sym_I_CONSTANT ||
 	 n->child[0]->child[0]->sym == sym_F_CONSTANT))

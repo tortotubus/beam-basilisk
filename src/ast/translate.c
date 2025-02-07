@@ -3,7 +3,7 @@
 
 Uses the [AST](README) library to transform the AST obtained when
 parsing code with the [Basilisk C grammar](basilisk.yacc) into an AST
-respecting the C99 grammar (with added macros).
+respecting the C99 grammar.
 
 ## Utility functions */
 
@@ -26,46 +26,63 @@ By default grammar checks are turned off. */
 # define CHECK(x, recursive) ((void) x)
 #endif
 
-bool ast_is_foreach_identifier (const char * identifier)
+static
+bool is_foreach_identifier (const char * identifier)
 {
-  return !strcmp (identifier, "foreach") ||
-    (strcmp (identifier, "foreach_child") &&
-     strcmp (identifier, "foreach_neighbor") &&
-     strcmp (identifier, "foreach_block") &&
-     strcmp (identifier, "foreach_block_inner") &&
-     strcmp (identifier, "foreach_blockf") &&
-     !strncmp (identifier, "foreach_", 8));
+  return identifier && (!strcmp (identifier, "foreach") ||
+			(strcmp (identifier, "foreach_child") &&
+			 strcmp (identifier, "foreach_neighbor") &&
+			 strcmp (identifier, "foreach_block") &&
+			 strcmp (identifier, "foreach_block_inner") &&
+			 strcmp (identifier, "foreach_blockf") &&
+			 !strncmp (identifier, "foreach_", 8)));
+}
+
+static
+Ast * foreach_has_stencil (const char * identifier, Stack * stack)
+{
+  if (!is_foreach_identifier (identifier))
+    return NULL;
+  char * s = strdup (identifier);
+  str_append (s, "_stencil");
+  Ast * stencil = ast_identifier_declaration (stack, s);
+  free (s);
+  return stencil;
 }
 
 int ast_identifier_parse_type (Stack * stack, const char * identifier, bool call,
 			       const char * file, int line)
 {
-  if (ast_is_foreach_identifier (identifier))
-    return FOREACH;
-  
   Ast * declaration = ast_identifier_declaration (stack, identifier);
   if (declaration) {
     if (ast_is_typedef (declaration))
       return TYPEDEF_NAME;
     if (call) {
       Ast * type;
-      if ((type = ast_schema (ast_ancestor (declaration, 6), sym_function_definition,
-			      0, sym_function_declaration,
-			      0, sym_declaration_specifiers,
-			      0, sym_type_specifier,
-			      0, sym_types,
-			      0, sym_TYPEDEF_NAME))) {
+      if ((type = ast_find (ast_schema (ast_ancestor (declaration, 6), sym_function_definition,
+					0, sym_function_declaration,
+					0, sym_declaration_specifiers),
+			    sym_declaration_specifiers,
+			    0, sym_type_specifier,
+			    0, sym_types,
+			    0, sym_TYPEDEF_NAME))) {
 	AstTerminal * t = ast_terminal (type);
 	int len;
 	if (t->after)
 	  len = t->after - t->start + 1;
 	else
 	  len = strlen (t->start);
+#if 0	
+	fprintf (stderr, "%s:%d: %s ", file, line, identifier);
+	char * s = t->start;
+	for (int i = 0; i < len; i++, s++) fputc (*s, stderr);
+	fputc ('\n', stderr);
+#endif
 	if (len == 5 && !strncmp (t->start, "macro", len))
 	  return MACRO;
       }
     }
-  }  
+  }
   
   return IDENTIFIER;
 }
@@ -358,9 +375,8 @@ Ast * ast_is_simple_expression (const Ast * n)
 		  0, sym_primary_expression);
   if (n) {
     n = n->child[0];
-    if (n->sym == sym_IDENTIFIER ||
-	n->sym == sym_constant ||
-	n->sym == sym_string)
+    if (n->sym != sym_generic_selection &&
+	n->sym != token_symbol ('('))
       return (Ast *) n;
   }
   return NULL;
@@ -368,15 +384,11 @@ Ast * ast_is_simple_expression (const Ast * n)
 
 bool ast_is_foreach_statement (const Ast * n)
 {
-#if 1
-  return n->sym == sym_foreach_statement;
-#else
   Ast * identifier;
-  return ((identifier = ast_schema (n, sym_macro_statement,
-				    0, sym_macro_call,
-				    0, sym_MACRO)) &&
-	  ast_is_foreach_identifier (ast_terminal (identifier)->start));
-#endif
+  return n && (n->sym == sym_foreach_statement ||
+	       ((identifier = ast_schema (n, sym_macro_statement,
+					  0, sym_MACRO)) &&
+		is_foreach_identifier (ast_terminal (identifier)->start)));
 }
 
 Ast * ast_is_iteration_statement (const Ast * n)
@@ -846,7 +858,7 @@ static void rotate (Ast * n, Stack * stack, void * data)
   TranslateData * d = data;
   switch (n->sym) {
     
-  case sym_IDENTIFIER: case sym_FOREACH: {
+  case sym_IDENTIFIER: case sym_MACRO: {
     AstTerminal * t = ast_terminal (n);
     int len = strlen (t->start);
     if (len >= 2 && t->start[len - 2] == '_' &&
@@ -997,6 +1009,15 @@ void maybeconstfield (Ast * n, Stack * stack,
       maybeconstfield (*c, stack, func, data);  
 }
 
+static Ast * parent_is_foreach_definition (const Ast * n)
+{  
+  Ast * parent = ast_parent (n, sym_function_definition), * identifier;
+  if ((identifier = ast_is_macro_declaration (ast_child (parent, sym_function_declaration), "macro")) &&
+      is_foreach_identifier (ast_terminal (identifier)->start))
+    return identifier;
+  return NULL;
+}
+
 Ast * ast_is_point_point (const Ast * n)
 {
   Ast * identifier = ast_schema (n, sym_IDENTIFIER);
@@ -1016,7 +1037,8 @@ Ast * ast_is_point_point (const Ast * n)
 			     0, sym_TYPEDEF_NAME);
     if (type && !strcmp (ast_terminal (type)->start, "Point")) {
       if (decl->sym == sym_declaration)
-	return (Ast *) decl;
+	return parent_is_foreach_definition (n) ? NULL :
+	  (Ast *) decl;
       else if (decl->sym == sym_parameter_declaration) {
 	while (decl->sym != sym_parameter_type_list)
 	  decl = decl->parent;
@@ -1026,7 +1048,8 @@ Ast * ast_is_point_point (const Ast * n)
 	    (decl = decl->parent)->sym != sym_function_definition)
 	  return NULL;
 	decl = ast_last_child (decl);
-	return !decl || decl == ast_placeholder ? NULL : decl->child[0];
+	return !decl || decl == ast_placeholder || parent_is_foreach_definition (n) ? NULL :
+	  decl->child[0];
       }
     }
   }
@@ -1896,11 +1919,13 @@ static void boundary_expr (Ast * n, Stack * stack, void * data)
   }
 }
 
-#define foreach_map(map)					\
-  Ast ** _m, * map;						\
-  for (int _i = 0; (_m = stack_index (stack, _i)); _i++)	\
-    if ((map = ast_schema (*_m, sym_macro_statement,		\
-			   1, sym_compound_statement,		\
+#define foreach_map(map)						           \
+  Ast ** _m, * map;							           \
+  for (int _i = 0; (_m = stack_index (stack, _i)) && (*_m)->sym != sym_root; _i++) \
+    if (*_m && (*_m)->sym == sym_IDENTIFIER &&				           \
+	!strcmp (ast_terminal (*_m)->start, "map") &&			           \
+	(map = ast_schema (ast_ancestor (*_m, 6), sym_function_definition,         \
+			   1, sym_compound_statement,			           \
 			   1, sym_block_item_list)))
 
 static Ast * boundary_function (Ast * expr, Stack * stack, TranslateData * d,
@@ -2115,7 +2140,10 @@ static char * append_initializer (char * init, Ast * initializer, const char * t
 }
 
 /**
-# First pass: user macros */
+# First pass: user macros 
+
+"einstein_sum", "diagonalize", etc. are Basilisk macros which are
+dealt with in later passes. */
 
 #include "macro.h"
 
@@ -2123,21 +2151,40 @@ static void user_macros (Ast * n, Stack * stack, void * data)
 {  
   if (n->sym == sym_statement)
     macro_replacement (n, stack, (const char *[]){
+	"einstein_sum", "diagonalize",
 	"foreach_child", "foreach_neighbor",
-	NULL});
+	"is_face_x", "is_face_y", "is_face_z",
+	"foreach", "foreach_*",
+	"OMP_PARALLEL",
+	NULL}, ((TranslateData *)data)->nolineno);
 }
 
 /**
-# Last pass: all remaining macros */
+# Last pass: all remaining macros
+
+We only keep "OMP_PARALLEL" which is a standard macro. */
 
 static void remaining_macros (Ast * n, Stack * stack, void * data)
 {
   if (n->sym == sym_statement)
-    macro_replacement (n, stack, NULL);
+    macro_replacement (n, stack, (const char *[]){
+	"OMP_PARALLEL",
+	NULL}, ((TranslateData *)data)->nolineno);
 }
 
 /**
-# Second pass: Global boundaries and stencils */
+# Second pass: Global boundaries and stencils 
+
+These are the valid foreach() parameter keywords. */
+
+static const char * keywords[] = { "serial", "cpu", "gpu", "overflow", "nowarning", NULL };
+enum {
+  fserial    = 1 << 0,
+  fcpu       = 1 << 1,
+  fgpu       = 1 << 2,
+  foverflow  = 1 << 3,
+  fnowarning = 1 << 4  
+};
 
 static void global_boundaries_and_stencils (Ast * n, Stack * stack, void * data)
 {
@@ -2156,6 +2203,18 @@ static void global_boundaries_and_stencils (Ast * n, Stack * stack, void * data)
     break;
   }
 
+  /**
+  ## Cleanup argument expression lists ending with ',' */
+    
+  case sym_argument_expression_list:
+    if (n->child[1] && !n->child[2]) {
+      assert (n->child[1]->sym == token_symbol (','));
+      ast_destroy (n->child[1]);
+      assert (n->child[0]->sym == sym_argument_expression_list);
+      ast_set_child (n->parent, ast_child_index (n), n->child[0]);
+    }
+    break;
+    
   case sym_array_access: {
 
     Ast * assign = ast_ancestor (n, 3), * scope;
@@ -2307,81 +2366,159 @@ static void global_boundaries_and_stencils (Ast * n, Stack * stack, void * data)
     break;
   }
 
-  /**
-  ## Stencils */
+  case sym_macro_statement: {
+    Ast * identifier = ast_schema (n, sym_macro_statement,
+				   0, sym_MACRO);
+    
+    /**
+    ## Einstein summation */
+    
+    if (!strcmp (ast_terminal (identifier)->start, "einstein_sum")) {
+      einstein_sum_global (n, stack, ((TranslateData *)data)->dimension);
+      break;
+    }
+    
+    /**
+    ## Stencils */
 
-  case sym_foreach_statement: {
-    if (!strcmp (ast_terminal (n->child[0])->start, "foreach") ||
-	!strcmp (ast_terminal (n->child[0])->start, "foreach_vertex") ||
-	!strcmp (ast_terminal (n->child[0])->start, "foreach_face") ||
-	!strcmp (ast_terminal (n->child[0])->start, "foreach_visible") ||
-	!strcmp (ast_terminal (n->child[0])->start, "foreach_level") ||
-	!strcmp (ast_terminal (n->child[0])->start, "foreach_level_or_leaf") ||
-	!strcmp (ast_terminal (n->child[0])->start, "foreach_coarse_level") ||
-	!strcmp (ast_terminal (n->child[0])->start, "foreach_point") ||
-	!strcmp (ast_terminal (n->child[0])->start, "foreach_region")) {
-      bool overflow = false, nowarning = false, gpu = false;
-      Ast * parameters = ast_child (n, sym_foreach_parameters);
-      foreach_item (parameters, 2, item) {
-	Ast * identifier = ast_is_identifier_expression (item->child[0]);
-	bool noauto;
-	if (identifier) {
-	  const char * start = ast_terminal (identifier)->start;
-	  if (!strcmp (start, "gpu"))
-	    gpu = true;
-	  else if ((noauto = !strcmp (start, "noauto")) ||
-		   !strcmp (start, "overflow") ||
-		   !strcmp (start, "nowarning")) {
-	    if (!strcmp (start, "overflow"))
-	      overflow = true;
-	    else if (!strcmp (start, "nowarning"))
-	      nowarning = true;
-	    parameters = ast_list_remove (parameters, item);
-	    if (parameters == NULL) {
-	      ast_destroy (n->child[2]);
-	      for (Ast ** c = n->child + 2; *c; c++)
-		*c = *(c + 1);
+    if (foreach_has_stencil (ast_terminal (identifier)->start, stack) &&
+	!parent_is_foreach_definition (n)) {
+      
+      /**
+      We first read all the optional keywords and reductions. */
+      
+      char flags = 0, order[] = "xyz";
+      Ast * arguments = ast_child (n, sym_argument_expression_list),
+	* reductions = NULL, * aflags = NULL, * aorder = NULL;
+      bool noauto = false;
+      char * s = order + 2;
+      foreach_item (arguments, 2, argument) {
+	Ast * primary = ast_is_simple_expression (argument->child[0]);
+	if (ast_schema (primary, sym_IDENTIFIER)) {
+	  const char * start = ast_terminal (primary)->start;
+	  int i = 0;
+	  const char ** keyword = keywords;
+	  while (*keyword) {
+	    if (!strcmp (start, *keyword)) {
+	      flags |= (1 << i);
+	      if (aflags) arguments = ast_list_remove (arguments, argument);
+	      else aflags = argument;
 	    }
-	    if (noauto)
-	      return;
+	    keyword++, i++;
 	  }
+	  if (start[1] == '\0' && strchr ("xyz", start[0])) {
+	    *s-- = start[0];
+	    if (aorder) arguments = ast_list_remove (arguments, argument);
+	    else aorder = argument;
+	  }
+	  else if (!strcmp (start, "noauto"))
+	    noauto = true;
+	}
+	else if (ast_schema (primary, sym_reduction_list)) {
+	  if (reductions) {
+	    fprintf (stderr, "%s:%d: error: reductions must be listed without separating commas\n",
+		     ast_left_terminal (primary)->file, ast_left_terminal (primary)->line);
+	    exit (1);
+	  }
+	  ast_set_child (argument, 0,
+			 NN(argument, sym_assignment_expression,
+			    NN(argument, sym_unary_expression,
+			       NN(argument, sym_postfix_expression,
+				  NN(argument, sym_primary_expression,
+				     NB(argument, sym_IDENTIFIER, "reductions")))),
+			    NN(argument, sym_assignment_operator,
+			       NCB(argument, "=")),
+			    argument->child[0]));
+	  reductions = argument;
+	}
+	if (arguments == NULL) {
+	  ast_destroy (n->child[2]);
+	  for (Ast ** c = n->child + 2; *c; c++)
+	    *c = *(c + 1);
 	}
       }
+      if (s != order + 2 && s >= order)
+	memmove (order, s + 1, strlen(s));
+
+      /**
+      The optional keywords and reductions are summarised in the
+      `flags`, `order` and `reductions` foreach arguments. If their
+      values are not the defaults, we set them here. */      
+
+      if (aflags) {
+	char sflags[20];
+	snprintf (sflags, 19, "%d", flags);
+	ast_replace_child (aflags, 0,
+			   NN(aflags, sym_assignment_expression,
+			      NN(aflags, sym_unary_expression,
+				 NN(aflags, sym_postfix_expression,
+				    NN(aflags, sym_primary_expression,
+				       NB(aflags, sym_IDENTIFIER, "flags")))),
+			      NN(aflags, sym_assignment_operator,
+				 NCB(aflags, "=")),
+			      ast_new_constant (aflags, sym_I_CONSTANT, sflags)));
+      }
+
+      if (aorder) {
+	char sorder[6] = "\"";
+	strcat (sorder, order); strcat (sorder, "\"");
+	ast_replace_child (aorder, 0,
+			   NN(aorder, sym_assignment_expression,
+			      NN(aorder, sym_unary_expression,
+				 NN(aorder, sym_postfix_expression,
+				    NN(aorder, sym_primary_expression,
+				       NB(aorder, sym_IDENTIFIER, "order")))),
+			      NN(aorder, sym_assignment_operator,
+				 NCB(aorder, "=")),
+			      ast_new_constant (aorder, sym_STRING_LITERAL, sorder)));
+	ast_find (aorder, sym_constant)->sym = sym_string;
+      }
+
+      if (flags & fserial) {
+	Ast * m = ast_new (n, sym_basilisk_statements);
+	ast_set_child (n->parent, ast_child_index (n),
+		       NN(n, sym_macro_statement,
+			  NB(n, sym_MACRO, "OMP_SERIAL"),
+			  NCB(n, "("),
+			  NCB(n, ")"),
+			  NN(n, sym_statement,
+			     m)));
+	ast_attach (m, n);
+      }
+
+      /**
+      If the `noauto` option is used, we do not generate automatic stencils. */
+      
+      if (noauto)
+	return;
+
+      /**
+      Otherwise we do. */
+      
       TranslateData * d = data;
-      bool parallel = d->parallel &&
-	strcmp (ast_terminal (n->child[0])->start, "foreach_visible");
+      bool parallel = d->parallel && !(flags & fserial) && strcmp (ast_terminal (identifier)->start, "foreach_visible");
+      optional_arguments (n, stack);
       Ast * stencil = ast_copy (n);
-      if (!ast_stencil (stencil, parallel, overflow, nowarning)) {
+      if (!ast_stencil (stencil, parallel, flags & foverflow, flags & fnowarning)) {
 	ast_destroy (stencil);
-	if (!gpu)
+	if (!(flags & fgpu))
 	  break;
 	else
-	  stencil = NN(n, sym_foreach_statement,
-		       NB(n, sym_FOREACH, ast_terminal (n->child[0])->start),
+	  stencil = NN(n, sym_macro_statement,
+		       NB(n, sym_MACRO, ast_terminal (identifier)->start),
 		       NCB(n, "("),
 		       NCB(n, ")"),
 		       NN(n, sym_statement,
 			  NN(n, sym_expression_statement,
 			     NCB(n, ";"))));
       }
-      str_append (ast_terminal (ast_child (stencil, sym_FOREACH))->start, "_stencil");
+      str_append (ast_terminal (ast_child (stencil, sym_MACRO))->start, "_stencil");
       if (n->child[4])
-	ast_new_children (n, n->child[0], n->child[1], n->child[2],
+	ast_new_children (n, identifier, n->child[1], n->child[2],
 			  n->child[3], n->child[4], stencil);
       else
-	ast_new_children (n, n->child[0], n->child[1], n->child[2], n->child[3], stencil);
+	ast_new_children (n, identifier, n->child[1], n->child[2], n->child[3], stencil);
     }
-    break;
-  }
-
-  /**
-  ## Einstein summation */
-    
-  case sym_macro_call: {
-    Ast * identifier = ast_schema (n, sym_macro_call,
-				   0, sym_MACRO);
-    if (!strcmp (ast_terminal (identifier)->start, "einstein_sum"))
-      einstein_sum_global (n->parent, stack, ((TranslateData *)data)->dimension);
     break;
   }
 
@@ -2408,14 +2545,26 @@ void ast_diagonalize (Ast * n, Stack * stack, void * field)
   }
 }
 
+static bool is_foreach_stencil_identifier (const Ast * identifier)
+{
+  AstTerminal * t;
+  if (!identifier || !(t = ast_terminal (identifier))->start)
+    return false;
+  int len = strlen (t->start) - 8;
+  return len > 0 && !strncmp (t->start, "foreach_", 8) && !strcmp (t->start + len, "_stencil");
+}
+
 bool ast_is_foreach_stencil (const Ast * n)
 {
-  Ast * foreach = ast_schema (n, sym_foreach_statement,
-			      0, sym_FOREACH);
-  if (!foreach || !ast_terminal (foreach)->start)
-    return false;
-  int len = strlen (ast_terminal (foreach)->start) - 8;
-  return len > 0 && !strcmp (ast_terminal (foreach)->start + len, "_stencil");
+  return is_foreach_stencil_identifier (ast_schema (n, sym_macro_statement,
+						    0, sym_MACRO)) &&
+    !is_foreach_stencil_identifier (ast_schema (ast_parent (n, sym_function_definition), sym_function_definition,
+						0, sym_function_declaration,
+						1, sym_declarator,
+						0, sym_direct_declarator,
+						0, sym_direct_declarator,
+						0, sym_generic_identifier,
+						0, sym_IDENTIFIER));
 }
 
 static Ast * higher_dimension (Ast * n)
@@ -2622,19 +2771,13 @@ static void translate (Ast * n, Stack * stack, void * data)
 
   case sym_macro_statement: {
     Ast * identifier = ast_schema (n, sym_macro_statement,
-				   0, sym_macro_call,
 				   0, sym_MACRO);
-    if (!identifier) {
-      // ast_print (n->child[0], stderr, 0);
-      break;
-    }
     
     /**
     ### Diagonalize */
     
     if (!strcmp (ast_terminal (identifier)->start, "diagonalize")) {
       Ast * field = ast_schema (n, sym_macro_statement,
-				0, sym_macro_call,
 				2, sym_argument_expression_list,
 				0, sym_argument_expression_list_item,
 				0, sym_assignment_expression);
@@ -2659,67 +2802,43 @@ static void translate (Ast * n, Stack * stack, void * data)
 		 ast_terminal (identifier)->file, ast_terminal (identifier)->line);
 	exit (1);
       }
+      break;
     }
     
-    break;
-  }
-    
-  /**
-  ## Foreach statements */
-
-  case sym_foreach_statement: {
-
     /**
+    ## Foreach statements
+
     ### foreach_face() statements */
 
-    bool is_face_stencil = !strcmp (ast_terminal (n->child[0])->start,
+    bool is_face_stencil = !strcmp (ast_terminal (identifier)->start,
 				    "foreach_face_stencil");
     if (is_face_stencil ||
-	!strcmp (ast_terminal (n->child[0])->start, "foreach_face")) {
+	!strcmp (ast_terminal (identifier)->start, "foreach_face")) {
       char order[] = "xyz";
-
-      /**
-      The complicated stuff below is just to read each (optional) x, y
-      and z arguments, in the correct order, and update the *order*
-      string. */
-
-      Ast * parameters = ast_schema (n, sym_foreach_statement, 2, sym_foreach_parameters);
-      if (parameters) {
-	char * s = order + 2;
-	foreach_item (parameters, 2, param)
-	  if (param->child[0]->sym == sym_assignment_expression) {
-	    Ast * identifier = ast_find (param, sym_postfix_expression,
-					 0, sym_primary_expression,
-					 0, sym_IDENTIFIER);
-	    if (identifier && ast_terminal (identifier)->start[1] == '\0' &&
-		strchr ("xyz", ast_terminal (identifier)->start[0])) {
-	      *s-- = ast_terminal (identifier)->start[0];
-	      parameters = ast_list_remove (parameters, param);
-	    }
-	  }
-	if (s != order + 2 && s >= order)
-	  memmove (order, s + 1, strlen(s));
-	if (parameters == NULL) {
-	  ast_destroy (n->child[2]);
-	  for (Ast ** c = n->child + 2; *c; c++)
-	    *c = *(c + 1);
-	}
-      }
+      Ast * aorder = ast_find (ast_schema (n, sym_macro_statement, 2, sym_argument_expression_list),
+			       sym_STRING_LITERAL);
+      assert (aorder);
+      const char * sorder = ast_terminal (aorder)->start + 1;
+      int len = strlen (sorder) - 1;
+      assert (len <= 3);
+      strncpy (order, sorder, fmin(len,3));
+      order[len] = '\0';
 
       /**
       Here we add the `is_face_x()` condition to the loop statement. */
 
-      Ast * expr = ast_parse_expression
-	(is_face_stencil ? "_stencil_is_face_x(){;}" : "is_face_x(){;}",
-	 ast_get_root (n));
-      Ast * cond = ast_find (expr, sym_IDENTIFIER);
-      ast_terminal (cond)->start[strlen(ast_terminal (cond)->start) - 1] = order[0];
       Ast * statement = ast_child (n, sym_statement);
       int index = ast_child_index (statement);
-      ast_replace (expr, ";", statement);
-      ast_set_line (expr, ast_left_terminal (n), false);
-      ast_replace_child (n, index, ast_new_children (ast_new (n, sym_statement), expr));
-	
+      Ast * expr = NN(n, sym_statement,
+		      NN(n, sym_basilisk_statements,
+			 NN(n, sym_macro_statement,
+			    NB(n, sym_MACRO, is_face_stencil ? "_stencil_is_face_x" : "is_face_x"),
+			    NCB(n, "("), NCB(n, ")"),
+			    statement)));
+      Ast * cond = ast_find (expr, sym_MACRO);
+      ast_terminal (cond)->start[strlen(ast_terminal (cond)->start) - 1] = order[0];
+      ast_replace_child (n, index, expr);
+      
       /**
       Finally, we "dimension-rotate" the statement. */
 
@@ -2737,7 +2856,7 @@ static void translate (Ast * n, Stack * stack, void * data)
 	  stack_push (stack, &copy);
 	  ast_traverse (copy, stack, rotate, d);
 	  ast_pop_scope (stack, copy);
-	  Ast * cond = ast_find (copy, sym_IDENTIFIER);
+	  Ast * cond = ast_find (copy, sym_MACRO);
 	  ast_terminal (cond)->start[strlen(ast_terminal (cond)->start) - 1] =
 	    order[i];
 	  list = ast_block_list_append (list, item->sym, copy);
@@ -2753,7 +2872,9 @@ static void translate (Ast * n, Stack * stack, void * data)
     /**
     ### (const) fields combinations (except for stencils) */
 
-    if (!ast_is_foreach_stencil (n)) {
+    if (ast_is_foreach_statement (n) &&
+	!is_foreach_stencil_identifier (ast_schema (n, sym_macro_statement,
+						    0, sym_MACRO))) {
       Ast ** consts = NULL;
       maybeconst (n, stack, append_const, &consts);
       if (consts) {
@@ -3323,20 +3444,23 @@ static const char * get_field_type (Ast * declaration, AstTerminal * t)
   return typename;
 }
 
-static void mpi_operator (Ast * n, Ast * op)
+static char * mpi_operator (char * s, Ast * op)
 {
   char * operator = ast_left_terminal (op)->start;
-  ast_after (n,
-	     !strcmp(operator, "min") ? "MPI_MIN" :
-	     !strcmp(operator, "max") ? "MPI_MAX" :
-	     !strcmp(operator, "+")   ? "MPI_SUM" :
-	     !strcmp(operator, "||")  ? "MPI_LOR" :
-	     "Unknown", ",");
+  str_append (s,
+	      !strcmp(operator, "min") ? "MPI_MIN" :
+	      !strcmp(operator, "max") ? "MPI_MAX" :
+	      !strcmp(operator, "+")   ? "MPI_SUM" :
+	      !strcmp(operator, "||")  ? "MPI_LOR" :
+	      "Unknown", ",");
+  return s;
 }
 
 static void maps (Ast * n, Stack * stack, void * data)
 {
-  if (n->sym == sym_foreach_statement && !ast_is_foreach_stencil (n)) {
+  if (ast_is_foreach_statement (n) &&
+      !is_foreach_stencil_identifier (ast_schema (n, sym_macro_statement,
+						  0, sym_MACRO))) {
     if (!strcmp (ast_terminal (n->child[0])->start, "foreach_face")) {
       free (ast_terminal (n->child[0])->start);
       ast_terminal (n->child[0])->start = strdup ("foreach_face_generic");
@@ -3364,6 +3488,41 @@ Ast * ast_is_function_pointer (const Ast * n, Stack * stack)
   return NULL;
 }
 
+static Ast * foreach_stencil_flags (const Ast * foreach, Stack * stack)
+{
+  Ast * arguments = ast_child (foreach->parent, sym_argument_expression_list);
+  assert (arguments);
+  AstTerminal * t = ast_terminal (ast_schema (foreach, sym_macro_statement, 0, sym_MACRO));
+  Ast * declaration = ast_identifier_declaration (stack, t->start);
+  Ast * parameters = ast_schema (ast_parent (declaration, sym_declarator), sym_declarator,
+				 0, sym_direct_declarator,
+				 2, sym_parameter_type_list,
+				 0, sym_parameter_list);
+  if (parameters) {
+    while (parameters && parameters->child[0]->sym == parameters->sym)
+      parameters = parameters->child[0];
+    foreach_item_r (arguments, sym_argument_expression_list_item, argument) {
+      Ast * parameter = ast_child (parameters, sym_parameter_declaration);
+      parameters = parameters->parent;
+      Ast * identifier = ast_schema (parameter, sym_parameter_declaration,
+				     1, sym_declarator,
+				     0, sym_direct_declarator,
+				     0, sym_generic_identifier,
+				     0, sym_IDENTIFIER);
+      if (identifier && !strcmp (ast_terminal (identifier)->start, "flags"))
+	return ast_find (argument, sym_I_CONSTANT);
+    }
+  }
+  if (!declaration)
+    fprintf (stderr, "%s:%d: error: undeclared stencil macro '%s'\n",
+	     t->file, t->line, t->start);
+  else
+    fprintf (stderr, "%s:%d: error: stencil macros must have a 'flags' parameter\n",
+	     ast_terminal (declaration)->file, ast_terminal (declaration)->line);
+  exit (1);
+  return NULL;
+}
+
 /**
 # Fourth pass: foreach stencils */
 
@@ -3371,86 +3530,62 @@ static void stencils (Ast * n, Stack * stack, void * data)
 {
   switch (n->sym) {
     
-  case sym_foreach_statement:
+  case sym_macro_statement: {
     if (ast_is_foreach_stencil (n)) {
       assert (ast_last_child(n)->sym == sym_statement); // make sure all stencils have been dealt with
-      Ast * parameters = ast_child (n, sym_foreach_parameters);
-      if (parameters) {
-	ast_destroy (parameters);
-	for (Ast ** c = n->child + 2; *c; c++)
-	  *c = *(c + 1);
-      }
-
-      Ast * params = ast_schema (n, sym_foreach_statement,
-				 1, token_symbol('('));
-      assert (params);
       Ast * foreach = n->parent;
-      parameters = ast_child (foreach, sym_foreach_parameters);
+
       bool gpu = !((TranslateData *)data)->cpu;
       int parallel = (gpu ?
 		      1 :  // parallel on CPU || GPU
 		      2 ); // parallel on CPU
-      char * args = NULL;
-      if (parameters) {
-	foreach_item_r (parameters, sym_foreach_parameter, item) {
-	  Ast * identifier = ast_is_identifier_expression (item->child[0]);
-	  bool found = true;
-	  if (identifier) {
-	    AstTerminal * t = ast_terminal (identifier);
-	    if (!strcmp (t->start, "serial"))
-	      parallel = 0, gpu = false;
-	    else if (!strcmp (t->start, "cpu"))
-	      parallel = 2, gpu = false;
-	    else if (!strcmp (t->start, "gpu"))
-	      parallel = 3, gpu = true;
-	    else
-	      found = false;
-	  }
-	  else if (item->child[0]->sym == sym_assignment_expression)
-	    found = false;
-	  if (!found) {
-	    if (args) str_append (args, ",");
-	    args = ast_str_append (item, args);
-	  }
-	}
-      }
+      int flags = atoi (ast_terminal (foreach_stencil_flags (n, stack))->start);
+      if (flags & fserial)
+	parallel = 0, gpu = false;
+      else if (flags & fcpu)
+	parallel = 2, gpu = false;
+      else if (flags & fgpu)
+	parallel = 3, gpu = true;
       
       /**
       ## Kernel for GPUs */
 
-      char sparallel[] = "0";
-      sparallel[0] = '0' + parallel;
-      ast_after (params, sparallel, ",");
-      if (args) {
-	ast_after (params, "DEPAREN({", args, "}),");
-	free (args);
-      }
-      else
-	ast_after (params, "{0},");
       TranslateData * d = data;
       if (d->gpu) {
-	assert (foreach->sym == sym_foreach_statement && ast_last_child (foreach) == n);
+	assert (ast_is_foreach_statement (foreach) && ast_last_child (foreach) == n);
 	Ast ** last;
 	for (last = foreach->child; *last; last++);
 	*(--last) = NULL;
-	char * references = ast_external_references (foreach, NULL, d->functions);
-	if (references) {
-	  ast_after (params, "DEPAREN({", references, "{0}}),");
-	  free (references);
-	}
-	else
-	  ast_after (params, "{0},");
+	char * params = ast_external_references (foreach, NULL, d->functions);
+	char par[20];
+	snprintf (par, 19, "%d", parallel);
+	str_prepend (params, "call(", par, ",{");
+	str_append (params, "{0}},");
 	if (gpu)
-	  ast_kernel (foreach, params, NULL);
+	  params = ast_kernel (foreach, params, d->nolineno);
 	else
-	  ast_after (params, "NULL");
+	  str_append (params, "NULL");
+	str_append (params, ");");
+	Ast * p = ast_parse_expression (params, ast_get_root (n));
+	free (params);
+	ast_set_line (p, ast_left_terminal (foreach), false);
+	Ast * arguments = ast_schema (n, sym_macro_statement,
+				      2, sym_argument_expression_list);
+	Ast * list = ast_find (p, sym_argument_expression_list);
+	foreach_item_r (list, sym_argument_expression_list_item, argument)
+	  arguments = ast_new_children (ast_new (n, arguments->sym),
+					arguments,
+					ast_terminal_new_char (n, ","),
+					argument);
+	ast_set_child (n, 2, arguments);
+	ast_destroy (p);
 	*last = n;
       }
 
       /**
       Cleanup loops and their stencils. */
       
-      if (foreach->sym == sym_foreach_statement && ast_last_child (foreach) == n) {
+      if (ast_is_foreach_statement (foreach) && ast_last_child (foreach) == n) {
 	if (parallel == 3) { // This can only run on the GPU so we discard the (CPU) loop
 	  Ast * statement = foreach->parent;
 	  ast_set_child (statement, 0, n);
@@ -3472,57 +3607,29 @@ static void stencils (Ast * n, Stack * stack, void * data)
 	  ast_set_child (list->child[1], 0, statement);
 	}
       }
-      
-    }
 
-    break;
+      break;
+    }
     
-  case sym_macro_statement: {
     Ast * identifier = ast_schema (n, sym_macro_statement,
-				   0, sym_function_call,
-				   0, sym_postfix_expression,
-				   0, sym_primary_expression,
-				   0, sym_IDENTIFIER);
+				   0, sym_MACRO);
     if (identifier) {
       AstTerminal * t = ast_terminal (identifier);
 
       /**
       ## is_face_... statements */
 
-      if (!strcmp (t->start, "is_face_x") ||
-	  !strcmp (t->start, "is_face_y") ||
-	  !strcmp (t->start, "is_face_z")) {
+      if (t->start && (!strcmp (t->start, "is_face_x") ||
+		       !strcmp (t->start, "is_face_y") ||
+		       !strcmp (t->start, "is_face_z"))) {
 	foreach_map (m) {
-	  Ast * list = ast_schema (n, sym_macro_statement,
-				   1, sym_compound_statement,
-				   1, sym_block_item_list);
+	  Ast * list = ast_block_list_get_item (ast_child (n, sym_statement))->parent;
 	  foreach_item (m, 1, item)
 	    ast_block_list_prepend (list, sym_block_item, ast_copy (item->child[0]));
 	}
-	ast_after (n, "end_", t->start, "()");
-      }
-
-      /**
-      ## _stencil_is_face_... statements */
-
-      else if (!strcmp (t->start, "_stencil_is_face_x") ||
-	       !strcmp (t->start, "_stencil_is_face_y") ||
-	       !strcmp (t->start, "_stencil_is_face_z"))
-	ast_after (n, "end_", t->start, "()");
-
-      /**
-      ## Map */
-
-      else if (!strcmp (ast_terminal (identifier)->start, "map")) {
-	Ast * item = n->parent;
-	if (item->sym == sym_external_declaration) {
-	  assert (ast_child_index (item) == 1);
-	  Ast * parent = item->parent, * grand_parent = parent->parent;
-	  ast_set_child (grand_parent, ast_child_index (parent),
-			 parent->child[0]);
-	}
       }
     }
+    
     break;
   }
     
@@ -3556,9 +3663,12 @@ static void stencils (Ast * n, Stack * stack, void * data)
       else {
 	Ast * list = ast_schema (decl->parent, sym_compound_statement,
 				 1, sym_block_item_list);
-	foreach_map (m)
-	  foreach_item (m, 1, item)
-	    ast_block_list_prepend (list, sym_block_item, ast_copy (item->child[0]));
+	if (list) {
+	  foreach_map (m) {
+	    foreach_item (m, 1, item)
+	      ast_block_list_prepend (list, sym_block_item, ast_copy (item->child[0]));
+	  }
+	}
       }
     }
 
@@ -3697,6 +3807,92 @@ void dotrace (Ast * n, Stack * stack, void * data)
       ast_traverse (compound_statement, stack, trace_return, adata);
     }
   }
+}
+
+/**
+This function returns "MPI" code to perform the reductions defined in
+`foreach` or NULL if no reductions are defined. */
+
+static Ast * mpi_reductions (const Ast * foreach, Stack * stack)
+{
+  Ast * reductions = ast_find (foreach, sym_reduction_list);
+  if (!reductions)
+    return NULL;
+  char * sreductions = NULL;
+  foreach_item (reductions, 1, reduction) {
+    Ast * identifier = ast_schema (reduction, sym_reduction,
+				   4, sym_reduction_array,
+				   0, sym_generic_identifier,
+				   0, sym_IDENTIFIER);
+    AstTerminal * t = ast_terminal (identifier);
+    Ast * array = ast_schema (reduction, sym_reduction,
+			      4, sym_reduction_array,
+			      3, sym_expression);
+    char * type = get_type (t->start, stack);
+    if (!type) {
+      fprintf (stderr,
+	       "%s:%d: error: cannot determine type of '%s'\n",
+	       t->file, t->line, t->start);
+      exit (1);
+    }
+    const char * mtype = NULL;
+    if (!strcmp (type, "double"))
+      mtype = "MPI_DOUBLE";
+    else if  (!strcmp (type, "int"))
+      mtype = "MPI_INT";
+    else if  (!strcmp (type, "long"))
+      mtype = "MPI_LONG";
+    else if  (!strcmp (type, "bool"))
+      mtype = "MPI_C_BOOL";
+    else if  (!strcmp (type, "unsigned char"))
+      mtype = "MPI_UNSIGNED_CHAR";
+    else if (strcmp (type, "coord") &&
+	     strcmp (type, "mat3")) {
+      fprintf (stderr,
+	       "%s:%d: error: does not know how to reduce "
+	       "type '%s' of '%s'\n",
+	       t->file, t->line, type, t->start);
+      exit (1);
+    }
+    else
+      mtype = type;
+    if (array) {
+      if (strcmp (type, "coord") && strcmp (type, "mat3")) {
+	str_append (sreductions, "mpi_all_reduce_array(", t->start, ",", mtype, ",");
+	sreductions = mpi_operator (sreductions, reduction->child[2]);
+	sreductions = ast_str_append (array, sreductions);
+	str_append (sreductions, ");");
+      } else {
+	str_append (sreductions, "mpi_all_reduce_array((double *)", t->start, ",MPI_DOUBLE,");
+	sreductions = mpi_operator (sreductions, reduction->child[2]);
+	char s[100];
+	snprintf (s, 99, "sizeof(%s)/sizeof(double)", t->start);
+	str_append (sreductions, s, ");");
+      }
+    }
+    else {
+      char s[100] = "1";
+      if (strcmp (type, "coord") && strcmp (type, "mat3"))
+	str_append (sreductions, "mpi_all_reduce_array(&", t->start,",", mtype);
+      else {
+	// cast the adress of the first member into a double for coord and mat3
+	str_append (sreductions, "mpi_all_reduce_array((double *)&", t->start,",MPI_DOUBLE");
+	snprintf (s, 99, "sizeof(%s)/sizeof(double)", t->start);
+      }
+      str_append (sreductions, ",");
+      sreductions = mpi_operator (sreductions, reduction->child[2]);
+      str_append (sreductions, s, ");");
+    }
+    free (type);
+  }
+  if (!sreductions)
+    return NULL;
+  str_prepend (sreductions, "{");
+  str_append (sreductions, "}");  
+  Ast * expr = ast_parse_expression (sreductions, ast_get_root (foreach));
+  free (sreductions);
+  assert (expr);
+  return expr;
 }
 
 /**
@@ -3897,161 +4093,60 @@ static void macros (Ast * n, Stack * stack, void * data)
     break;
   }
 
-  case sym_foreach_statement: {
-
-    assert (ast_last_child(n)->sym == sym_statement); // make sure all stencils have been dealt with
-
-    /**
-    ## Foreach stencils */
+  case sym_macro_statement:
+    if (ast_is_foreach_statement (n)) {
+      
+      assert (ast_last_child(n)->sym == sym_statement); // make sure all stencils have been dealt with
     
-    if (ast_is_foreach_stencil (n)) {
-      ast_after (n, "end_", ast_left_terminal(n)->start, "()");
-      break;
-    }
+      /**
+      ## Foreach stencils */
+      
+      if (is_foreach_stencil_identifier (ast_schema (n, sym_macro_statement,
+						     0, sym_MACRO)))
+	break;
+      
+      /**
+      ## Foreach statements */
 
-    /**
-    ## Foreach statements */
-
-    Ast * foreach = inforeach (n);
-    if (foreach) {
-      AstTerminal * t = ast_terminal (n->child[0]);
-      AstTerminal * p = ast_terminal (foreach->child[0]);
-      fprintf (stderr,
-	       "%s:%d: error: this %s cannot include\n", p->file, p->line,
-	       foreach->sym == sym_foreach_statement ?
-	       ast_is_foreach_stencil (foreach) ?
-	       "'Point point' scope" :
-	       "foreach*() iterator" :
-	       "point function");
-      fprintf (stderr,
-	       "%s:%d: error: this %s\n", t->file, t->line,
-	       n->sym == sym_foreach_statement ?
-	       ast_is_foreach_stencil (n) ?
-	       "'Point point' scope" :
-	       "foreach*() iterator" :
-	       "point function");
-      exit (1);
-    }
-        
-    ast_after (n, "end_", ast_left_terminal(n)->start, "();");
-
-    /**
-    ### Reductions */
-
-    Ast * parameters = ast_child (n, sym_foreach_parameters);
-    bool serial = false;
-    char * sreductions = NULL;
-    if (parameters) {
-      foreach_item (parameters, 2, item) {
-	Ast * identifier = ast_is_identifier_expression (item->child[0]);
-	if (identifier && !strcmp (ast_terminal (identifier)->start, "serial")) {
-	  serial = true;
-	  parameters = ast_list_remove (parameters, item);
-	}
-	else if (identifier && (!strcmp (ast_terminal (identifier)->start, "cpu") ||
-				!strcmp (ast_terminal (identifier)->start, "gpu")))
-	  parameters = ast_list_remove (parameters, item);
-	else if (item->child[0]->sym == sym_reduction_list) {
-	  Ast * reductions = item->child[0];
-	  foreach_item (reductions, 1, reduction) {
-	    Ast * identifier = ast_schema (reduction, sym_reduction,
-					   4, sym_reduction_array,
-					   0, sym_generic_identifier,
-					   0, sym_IDENTIFIER);
-	    AstTerminal * t = ast_terminal (identifier);
-	    Ast * array = ast_schema (reduction, sym_reduction,
-				      4, sym_reduction_array,
-				      3, sym_expression);
-	    char * type = get_type (t->start, stack);
-	    if (!type) {
-	      fprintf (stderr,
-		       "%s:%d: error: cannot determine type of '%s'\n",
-		       t->file, t->line, t->start);
-	      exit (1);
-	    }
-	    if (strcmp (type, "coord") &&
-		strcmp (type, "mat3") &&
-		strcmp (type, "double") &&
-		strcmp (type, "int") &&
-		strcmp (type, "long") &&
-		strcmp (type, "bool") &&
-		strcmp (type, "unsigned char")) {
-	      fprintf (stderr,
-		       "%s:%d: error: does not know how to reduce "
-		       "type '%s' of '%s'\n",
-		       t->file, t->line, type, t->start);
-	      exit (1);
-	    }
-	    if (array) {
-	      if (strcmp (type, "coord") && strcmp (type, "mat3")) {
-		ast_after (n, "mpi_all_reduce_array(", t->start, ",", type, ",");
-		mpi_operator (n, reduction->child[2]);
-		ast_right_terminal (n)->after = ast_str_append (array, ast_right_terminal (n)->after);
-		ast_after (n, ");");
-	      } else {
-		ast_after (n, "mpi_all_reduce_array((double *)", t->start, ",double,");
-		mpi_operator (n, reduction->child[2]);
-		char s[100];
-		snprintf (s, 99, "sizeof(%s)/sizeof(double)", t->start);
-		ast_after (n, s, ");");
-	      }
-	    }
-	    else {
-	      char s[100] = "1";
-	      if (strcmp (type, "coord") && strcmp (type, "mat3"))
-		ast_after (n, "mpi_all_reduce_array(&", t->start,",", type);
-	      else {
-		// cast the adress of the first member into a double for coord and mat3
-		ast_after (n, "mpi_all_reduce_array((double *)&", t->start,",double");
-		snprintf (s, 99, "sizeof(%s)/sizeof(double)", t->start);
-	      }
-	      ast_after (n, ",");
-	      mpi_operator (n, reduction->child[2]);
-	      ast_after (n, s, ");");
-	    }
-	    sreductions = ast_str_append (reduction, sreductions);
-	    free (type);
-	  }
-	  parameters = ast_list_remove (parameters, item);
-	}
+      Ast * foreach = inforeach (n);
+      if (foreach) {
+	AstTerminal * t = ast_terminal (n->child[0]);
+	AstTerminal * p = ast_terminal (foreach->child[0]);
+	fprintf (stderr,
+		 "%s:%d: error: this %s cannot include\n", p->file, p->line,
+		 ast_is_foreach_statement (foreach) ?
+		 ast_is_foreach_stencil (foreach) ?
+		 "'Point point' scope" :
+		 "foreach*() iterator" :
+		 "point function");
+	fprintf (stderr,
+		 "%s:%d: error: this %s\n", t->file, t->line,
+		 ast_is_foreach_statement (n) ?
+		 ast_is_foreach_stencil (n) ?
+		 "'Point point' scope" :
+		 "foreach*() iterator" :
+		 "point function");
+	exit (1);
       }
-      if (parameters == NULL) {
-	ast_destroy (n->child[2]);
-	for (Ast ** c = n->child + 2; *c; c++)
-	  *c = *(c + 1);
+      
+      Ast * reductions = mpi_reductions (n, stack);
+      if (reductions) {
+	Ast * statement = ast_ancestor (n, 2);	  
+	Ast * item = ast_block_list_get_item (statement), * list = item->parent;
+	list = ast_block_list_append (list, item->sym, NN(item, sym_statement, reductions));
       }
-    }
 
-    if (serial)
-      ast_before (n, "\n"
-		  "#if _OPENMP\n"
-		  "  #undef OMP\n"
-		  "  #define OMP(x)\n"
-		  "#endif\n");
-    if (sreductions) {
-      ast_before (n, "\n"
-		  "#undef OMP_PARALLEL\n"
-		  "#define OMP_PARALLEL()\n"
-		  "BEGIN_FOREACH OMP(omp parallel ", sreductions, "){");
-      ast_after (n,
-		 "\n"
-		 "#undef OMP_PARALLEL\n"
-		 "#define OMP_PARALLEL() OMP(omp parallel)\n}END_FOREACH ");
-      free (sreductions);
+      Ast * m = ast_new (n, sym_basilisk_statements);
+      ast_set_child (n->parent, ast_child_index (n),
+		     NN(n, sym_macro_statement,
+			NB(n, sym_MACRO, "BEGIN_FOREACH"),
+			NCB(n, "("),
+			NCB(n, ")"),
+			NN(n, sym_statement,
+			   m)));
+      ast_attach (m, n);
     }
-    else {
-      ast_before (n, " BEGIN_FOREACH{");
-      ast_after (n, "}END_FOREACH ");
-    }
-    if (serial)
-      ast_after (n, "\n"
-		 "#if _OPENMP\n"
-		 "  #undef OMP\n"
-		 "  #define OMP(x) _Pragma(#x)\n"
-		 "#endif\n");
-    
     break;
-  }
   
   /**
   ## forin_declaration_statement */
@@ -4574,8 +4669,31 @@ Ast * ast_push_function_definition (Stack * stack, Ast * declarator)
 {
   Ast * identifier = ast_find (declarator, sym_direct_declarator,
 			       0, sym_generic_identifier,
-			       0, sym_IDENTIFIER);
-  stack_push (stack, &identifier);
+			       0, sym_MACRO);
+  if (identifier)
+    identifier->sym = sym_IDENTIFIER;
+  else    
+    identifier = ast_find (declarator, sym_direct_declarator,
+			   0, sym_generic_identifier,
+			   0, sym_IDENTIFIER);
+  if (ast_is_macro_declaration (ast_parent (declarator, sym_function_declaration), "macro") &&
+      ast_schema (ast_parent (declarator, sym_function_declaration), sym_function_declaration,
+		  0, sym_declaration_specifiers,
+		  0, sym_storage_class_specifier,
+		  0, sym_AUTO)) {
+    AstTerminal * t = ast_terminal (identifier);
+    int len;
+    if (t->after)
+      len = t->after - t->start + 1;
+    else
+      len = strlen (t->start);
+    char s[len + 1];
+    strncpy (s, t->start, len); s[len] = '\0';
+    if (!ast_identifier_declaration (stack, s)) // only push the "auto" macro definition if it is not already declared
+      stack_push (stack, &identifier);
+  }
+  else
+    stack_push (stack, &identifier);  
   stack_push (stack, &declarator);
   Ast * parameters = ast_find (declarator, sym_parameter_list);
   if (parameters)
@@ -4606,13 +4724,15 @@ Ast * ast_push_declarations (Ast * n, Stack * stack)
     
   case sym_function_definition: {
     Ast * declarator = ast_find (n, sym_direct_declarator);
-    ast_push_function_definition (stack, declarator);
-    if (ast_is_point_function (ast_schema (n, sym_function_definition,
-					   0, sym_function_declaration,
-					   1, sym_declarator)) &&
-	!ast_is_stencil_function (n))
-      declare_point_variables (stack);
-    return declarator;
+    if (ast_push_function_definition (stack, declarator)) {
+      if (ast_is_point_function (ast_schema (n, sym_function_definition,
+					     0, sym_function_declaration,
+					     1, sym_declarator)) &&
+	  !ast_is_stencil_function (n))
+	declare_point_variables (stack);
+      return declarator;
+    }
+    return NULL;
   }
     
   case sym_compound_statement:
@@ -4625,21 +4745,13 @@ Ast * ast_push_declarations (Ast * n, Stack * stack)
     ast_push_declaration (stack, n->child[3]);
     return n;
 
-  case sym_foreach_statement:
-    stack_push (stack, &n);
-    declare_point_variables (stack);
-    return n;
-
-  case sym_macro_statement: {
-    Ast * identifier = ast_schema (n, sym_macro_statement,
-				   0, sym_function_call,
-				   0, sym_postfix_expression,
-				   0, sym_primary_expression,
-				   0, sym_IDENTIFIER);
-    if (identifier && !strcmp (ast_terminal (identifier)->start, "map"))
+  case sym_macro_statement:
+    if (ast_is_foreach_statement (n)) {
       stack_push (stack, &n);
+      declare_point_variables (stack);
+      return n;
+    }
     return NULL;
-  }
 
   case sym_declaration:
     ast_push_declaration (stack, n);
@@ -4775,7 +4887,7 @@ AstRoot * endfor (FILE * fin, FILE * fout,
     exit (1);
   }
   root->stack = d->stack; d->stack = NULL;
-  root->alloc = d->alloc; d->alloc = NULL;
+  root->alloc = d->alloc;
 
   TranslateData data = {
     .dimension = dimension, .nolineno = nolineno,
@@ -4811,8 +4923,10 @@ AstRoot * endfor (FILE * fin, FILE * fout,
   assert (data.init_events);
   ast_destroy ((Ast *) init);
 
+  checks (root, d, &data);
   typedef void (* TraverseFunc) (Ast *, Stack *, void *);
-  for (TraverseFunc * pass = (TraverseFunc[]){ user_macros, global_boundaries_and_stencils, translate, maps, stencils, NULL };
+  for (TraverseFunc * pass = (TraverseFunc[]){ user_macros, global_boundaries_and_stencils, translate, maps, stencils,
+					      NULL };
        *pass; pass++) {
     stack_push (root->stack, &root);
     ast_traverse ((Ast *) root, root->stack, *pass, &data);
@@ -4847,9 +4961,9 @@ AstRoot * endfor (FILE * fin, FILE * fout,
       Ast * func = ast_parent (*name, sym_function_definition);
       ast_after (m, "register_function ((void (*)(void))", ast_terminal (*name)->start,
 		 ",\"", ast_terminal (*name)->start, "\",");
-      char * kernel = ast_kernel (func, NULL, NULL);
+      char * kernel = ast_kernel (func, NULL, nolineno);
       char * references = ast_external_references (func, NULL, data.functions);
-      ast_after (m, kernel, ",");
+      ast_after (m, "$(", kernel, "),");
       free (kernel);
       if (references) {
 	ast_after (m, "((External[]){", references, "{0}}));\n");
@@ -4904,25 +5018,29 @@ AstRoot * endfor (FILE * fin, FILE * fout,
 
   /**
   We save the version before the final macro expansion
-  (i.e. expansions of foreach(), foreach_child(), foreach_neigbor()
+  (i.e. expansions of foreach(), foreach_child(), foreach_neighbor()
   etc...) which will be used for dimensional analysis etc. */
-  
-  Ast * copy = ast_copy (((Ast *) root)->child[0]);
+
+  Ast * child = ((Ast *) root)->child[0], * copy = ast_copy (child);
+  ast_set_child ((Ast *) root, 0, copy);
 
   /**
   We perform the expansion of remaining macros and output the source file. */
 
   stack_push (root->stack, &root);
   ast_traverse ((Ast *) root, root->stack, remaining_macros, &data);
+  ast_traverse ((Ast *) root, root->stack, remaining_macros, &data);
   ast_pop_scope (root->stack, (Ast *) root);
   ast_print ((Ast *) root, fout, 0);
 
   /**
-  We restore the version without macro expansions. */
-  
-  ast_set_child ((Ast *) root, 0, copy);
+  We restore the version before the final macro expansion. */
 
+  ast_set_child ((Ast *) root, 0, child);
+  ast_destroy (copy);
+  
   ((Ast *)root)->parent = (Ast *) d;
+  d->alloc = NULL;
   return root;
 }
 

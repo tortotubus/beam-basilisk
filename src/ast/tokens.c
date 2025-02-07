@@ -2724,7 +2724,6 @@ static int check_type (AstRoot * parse, bool call)
     
     {"reduction", REDUCTION},
     {"foreach_dimension", FOREACH_DIMENSION},
-    {"foreach",	FOREACH},
     
     {NULL}};
   for (Type * t = types; t->name; t++)

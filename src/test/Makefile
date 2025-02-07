@@ -356,9 +356,8 @@ ponds-ml.c: ponds.c
 	ln -sf ponds.c ponds-ml.c 
 ponds-ml.tst: ponds.s
 
+ponds-ml.s: CFLAGS += -DML=1
 ponds-ml.tst: CFLAGS += -DML=1
-
-stommel-ml.tst: CFLAGS += -DML=1
 
 nonlinear.tst: nonlinear-ml.tst
 
