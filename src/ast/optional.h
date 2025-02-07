@@ -121,9 +121,10 @@ static Ast * abstract_declarator_from_declarator (Ast * n)
 static void optional_arguments (Ast * call, Stack * stack)
 {
   AstTerminal * t = ast_terminal (call->sym == sym_function_call ? ast_function_call_identifier (call) :
-				  ast_schema (call, sym_macro_call, 0, sym_MACRO));
+				  ast_schema (call, sym_macro_statement, 0, sym_MACRO));
   Ast * type = ast_identifier_declaration (stack, t->start);
   if (type) {
+    AstTerminal * tname = t;
     while (type->sym != sym_declarator)
       type = type->parent;
     if (!ast_schema (type, sym_declarator,
@@ -209,6 +210,25 @@ static void optional_arguments (Ast * call, Stack * stack)
 			  0, sym_assignment_expression,
 			  1, sym_assignment_operator))) {
 	parameters = ast_copy (parameters); // fixme: memory is leaking from here
+	Ast * breaking = ast_find (parameters, sym_parameter_declaration,
+				   0, sym_BREAK);
+	if (breaking) {
+	  if (ast_ancestor (breaking, 2) != parameters) {
+	    fprintf (stderr, "%s:%d: error: 'break' must be the last parameter\n",
+		     ast_terminal (breaking)->file, ast_terminal (breaking)->line);
+	    exit (1);
+	  }
+	  if (ast_child_index (breaking->parent) == 0) {
+	    ast_destroy (parameters);
+	    parameters = NULL;
+	  }
+	  else {
+	    ast_destroy (parameters->child[1]);
+	    ast_destroy (parameters->child[2]);
+	    parameters->child[1] = parameters->child[2] = NULL;
+	    ast_set_child (parameters, 0, parameters->child[0]->child[0]);
+	  }
+	}
 	Ast * parameters1 = parameters;
 	while (parameters && parameters->child[0]->sym == parameters->sym)
 	  parameters = parameters->child[0];
@@ -238,9 +258,16 @@ static void optional_arguments (Ast * call, Stack * stack)
 	      }
 	      if (!parameter) {
 		AstTerminal * t = ast_terminal (identifier);
-		fprintf (stderr, "%s:%d: error: unknown function parameter '%s'\n",
-			 t->file, t->line, t->start);
-		exit (1);
+		fprintf (stderr, "%s:%d: error: unknown %s parameter '%s'\n",
+			 t->file, t->line,
+			 call->sym == sym_macro_statement ? "macro" : "function",
+			 ast_terminal (identifier)->start);
+		 t = ast_left_terminal (type);
+		 fprintf (stderr, "%s:%d: error: %s '%s' is defined here\n",
+			  t->file, t->line,
+			  call->sym == sym_macro_statement ? "macro" : "function",
+			  tname->start);
+		 exit (1);
 	      }
 	      argument = ast_schema (argument, sym_argument_expression_list_item,
 				     0, sym_assignment_expression)->child[2];
@@ -250,7 +277,17 @@ static void optional_arguments (Ast * call, Stack * stack)
 	      parameters = parameters->parent;
 	      argument = argument->child[0];
 	    }
-	    assert (parameter);
+	    if (!parameter) {
+	      fprintf (stderr, "%s:%d: error: too many arguments when calling '%s'\n",
+		       t->file, t->line,
+		       t->start);
+	      AstTerminal * tt = ast_left_terminal (type);
+	      fprintf (stderr, "%s:%d: error: %s '%s' is defined here\n",
+		       tt->file, tt->line,
+		       call->sym == sym_macro_statement ? "macro" : "function",
+		       tname->start);
+	      exit (1);
+	    }
 	    if (ast_schema (parameter, sym_parameter_declaration,
 			    3, sym_initializer))
 	      ast_set_child (parameter->child[3], 0, argument);
@@ -273,58 +310,67 @@ static void optional_arguments (Ast * call, Stack * stack)
 	  }
 	}
 	foreach_item (parameters1, 2, parameter) {
-	  if (parameter->child[0]->sym != sym_BREAK) {
-	    Ast * initializer = ast_schema (parameter, sym_parameter_declaration,
-					    3, sym_initializer);
-	    if (!initializer) {
-	      Ast * id = ast_find (parameter, sym_direct_declarator,
-				   0, sym_generic_identifier,
-				   0, sym_IDENTIFIER);
-	      AstTerminal * t = ast_left_terminal (call);
-	      fprintf (stderr, "%s:%d: error: missing compulsory parameter '%s' in function call\n",
-		       t->file, t->line, ast_terminal (id)->start);
-	      exit (1);
-	    }
-	    Ast * assign = ast_schema (initializer, sym_initializer,
-				       0, sym_assignment_expression);
-	    if (assign)
-	      ast_new_children (parameter, assign);
-	    else {
-	      if (ast_schema (initializer, sym_initializer,
-			      0, sym_postfix_initializer))
-		initializer = initializer->child[0];
-	      else
-		assert (ast_schema (initializer, sym_initializer,
-				    1, sym_initializer_list));
-	      initializer->sym = sym_postfix_initializer;
-	      Ast * type_specifier = ast_find (parameter, sym_declaration_specifiers,
-					       0, sym_type_specifier);
-	      Ast * declarator = ast_schema (parameter, sym_parameter_declaration,
-					     1, sym_declarator);
-	      Ast * abstract = abstract_declarator_from_declarator (declarator);
-	      assert (type_specifier);
-	      AstTerminal * ob = NCA(parameter, "("), * cb = NCA(parameter, ")");
-	      Ast * type_name = abstract ?
-		NN(call, sym_type_name,
-		   NN(call, sym_specifier_qualifier_list,
-		      type_specifier),
-		   abstract) :
-		NN(call, sym_type_name,
-		   NN(call, sym_specifier_qualifier_list,
-		      type_specifier));
-	      ast_new_children (parameter, ast_attach
-				(ast_new_unary_expression (parameter),				 
-				 NN(call, sym_postfix_expression,
-				    ob, type_name, cb,
-				    initializer)));
-	    }
+	  Ast * initializer = ast_schema (parameter, sym_parameter_declaration,
+					  3, sym_initializer);
+	  if (!initializer) {
+	    Ast * id = ast_find (parameter, sym_direct_declarator,
+				 0, sym_generic_identifier,
+				 0, sym_IDENTIFIER);
+	    AstTerminal * t = ast_left_terminal (call);
+	    fprintf (stderr, "%s:%d: error: missing compulsory parameter '%s' in %s call\n",
+		     t->file, t->line, ast_terminal (id)->start,
+		     call->sym == sym_macro_statement ? "macro" : "function");	    
+	    exit (1);
+	  }
+	  Ast * assign = ast_schema (initializer, sym_initializer,
+				     0, sym_assignment_expression);
+	  if (assign)
+	    ast_new_children (parameter, assign); // fixme: possible memory leak here
+	  else if (ast_schema (initializer, sym_initializer,
+			       0, sym_reduction_list))
+	    ast_new_children (parameter, ast_schema (initializer, sym_initializer,
+						     0, sym_reduction_list)); // fixme: possible memory leak here
+	  else {
+	    if (ast_schema (initializer, sym_initializer,
+			    0, sym_postfix_initializer))
+	      initializer = initializer->child[0];
+	    else
+	      assert (ast_schema (initializer, sym_initializer,
+				  1, sym_initializer_list));
+	    initializer->sym = sym_postfix_initializer;
+	    Ast * type_specifier = ast_find (parameter, sym_declaration_specifiers,
+					     0, sym_type_specifier);
+	    Ast * declarator = ast_schema (parameter, sym_parameter_declaration,
+					   1, sym_declarator);
+	    Ast * abstract = abstract_declarator_from_declarator (declarator);
+	    assert (type_specifier);
+	    AstTerminal * ob = NCA(parameter, "("), * cb = NCA(parameter, ")");
+	    Ast * type_name = abstract ?
+	      NN(call, sym_type_name,
+		 NN(call, sym_specifier_qualifier_list,
+		    type_specifier),
+		 abstract) :
+	      NN(call, sym_type_name,
+		 NN(call, sym_specifier_qualifier_list,
+		    type_specifier));
+	    ast_new_children (parameter, ast_attach
+			      (ast_new_unary_expression (parameter),
+			       NN(call, sym_postfix_expression,
+				  ob, type_name, cb,
+				  initializer)));
 	  }
 	  parameter->sym = sym_argument_expression_list_item;
 	  parameter->parent->sym = sym_argument_expression_list;
 	}
-	if (call->child[3])
+	
+	/**
+	Here we replace the arguments of the called function or macro with the completed arguments. */
+
+	if (call->child[2]->sym == sym_argument_expression_list)
 	  ast_set_child (call, 2, parameters1);
-	else
+	else if (call->sym == sym_macro_statement)
+	  ast_new_children (call, call->child[0], call->child[1], parameters1, call->child[2], call->child[3]);
+	else // function call
 	  ast_new_children (call, call->child[0], call->child[1], parameters1, call->child[2]);
       }	  
     }

@@ -220,73 +220,40 @@ void printWorkGroupsCapabilities()
 #endif
 
 static bool _gpu_done_ = false;
-@undef BEGIN_FOREACH
-@def BEGIN_FOREACH if (_gpu_done_)
-  _gpu_done_ = false;
- else {
-   tracing_foreach ("foreach", S__FILE__, S_LINENO);
-@
-@undef END_FOREACH
-@define END_FOREACH end_tracing_foreach ("foreach", S__FILE__, S_LINENO); }
+
+macro BEGIN_FOREACH()
+{
+  if (_gpu_done_)
+    _gpu_done_ = false;
+  else {
+    tracing_foreach ("foreach", S__FILE__, S_LINENO);
+    {...}
+    end_tracing_foreach ("foreach", S__FILE__, S_LINENO);
+  }
+}
 
 typedef struct {
   coord p, * box, n; // region
   int level; // level
 } RegionParameters;
 
-@define DEPAREN(...) S__VA_ARGS__
-
-@def foreach_stencil_generic(_parallel, _parameters, _externals, _kernel) {
+macro foreach_stencil_generic (char flags, void reductions,
+			       int _parallel, External * _externals, const char * _kernel)
+{
   tracing_foreach ("foreach", S__FILE__, S_LINENO);
   static ForeachData _loop = {
     .fname = S__FILE__, .line = S_LINENO, .first = 1, .parallel = _parallel
   };
-  static const char * _kernel_ = _kernel;
-  External _externals_[] = _externals;
   if (baseblock) for (scalar s = baseblock[0], * i = baseblock; s.i >= 0; i++, s = *i) {
     _attribute[s.i].input = _attribute[s.i].output = false;
     _attribute[s.i].width = 0;
   }
   int ig = 0, jg = 0, kg = 0; NOT_UNUSED(ig); NOT_UNUSED(jg); NOT_UNUSED(kg);
   Point point = {0}; NOT_UNUSED (point);
-@
-
-@undef foreach_stencil
-@def foreach_stencil(_parallel, _parameters, _externals, _kernel)
-  foreach_stencil_generic(_parallel, DEPAREN(_parameters), DEPAREN(_externals), _kernel)
-  RegionParameters parameters = _parameters, * _region = &parameters;
-@
-
-@undef foreach_level_stencil
-@def foreach_level_stencil(_parallel, _parameters, _externals, _kernel)
-  foreach_stencil_generic(_parallel, DEPAREN(_parameters), DEPAREN(_externals), _kernel)
-  struct  { int level; } parameters = _parameters;
-  RegionParameters _region_ = { .level = parameters.level + 1 }, * _region = &_region_;
-@
-
-@undef foreach_point_stencil
-@def foreach_point_stencil(_parallel, _parameters, _externals, _kernel)
-  foreach_stencil_generic(_parallel, DEPAREN(_parameters), DEPAREN(_externals), _kernel)
-  RegionParameters _region_ = { .p = _parameters, .n = {1,1} }, * _region = &_region_;
-@
-
-@undef foreach_region_stencil
-@def foreach_region_stencil(_parallel, _parameters, _externals, _kernel)
-  foreach_stencil(_parallel, DEPAREN(_parameters), DEPAREN(_externals), _kernel)
-@
-
-@undef foreach_vertex_stencil
-@def foreach_vertex_stencil(_parallel, _parameters, _externals, _kernel)
-  foreach_stencil(_parallel, DEPAREN(_parameters), DEPAREN(_externals), _kernel) _loop.vertex = true;
-@
- 
-@undef foreach_face_stencil
-@def foreach_face_stencil(_parallel, _parameters, _externals, _kernel)
-  foreach_stencil(_parallel, DEPAREN(_parameters), DEPAREN(_externals), _kernel)
-@
- 
-@undef end_foreach_stencil
-@def end_foreach_stencil()
+  RegionParameters _region = {0};
+  
+  {...}
+  
 #if PRINTIO
   if (baseblock) {
     fprintf (stderr, "%s:%d:", _loop.fname, _loop.line);
@@ -303,14 +270,76 @@ typedef struct {
   _loop.first = 0; // to avoid warnings in check_stencil
   check_stencil (&_loop);
   _loop.first = _first;
-  _gpu_done_ = gpu_end_stencil (&_loop, _region, _externals_, _kernel_);
+  _gpu_done_ = gpu_end_stencil (&_loop, &_region, (External[]) _externals, _kernel);
   _loop.first = 0;
   end_tracing_foreach ("foreach", S__FILE__, S_LINENO);
 }
-@
 
-@undef end_foreach_level_stencil
-@define end_foreach_level_stencil() end_foreach_stencil()
+macro foreach_stencil (char flags, void reductions,
+		       int _parallel, External * _externals, const char * _kernel)
+{
+  foreach_stencil_generic (flags, reductions, _parallel, _externals, _kernel)
+    {...}
+}
+
+macro foreach_level_stencil (int _level, char flags, void reductions,
+			     int _parallel, External * _externals, const char * _kernel)
+{
+  foreach_stencil_generic (flags, reductions, _parallel, _externals, _kernel) {
+    _region.level = _level + 1;
+    {...}
+  }
+}
+
+macro foreach_point_stencil (double _xp, double _yp, double _zp, char flags, void reductions,
+			     int _parallel, External * _externals, const char * _kernel)
+{
+  foreach_stencil_generic (flags, reductions, _parallel, _externals, _kernel) {
+    _region.p = (coord){ _xp, _yp, _zp };
+    _region.n = (coord){ 1, 1 };
+    {...}
+  }
+}
+
+macro foreach_region_stencil (coord _p, coord _box[2], coord _n,
+			      char flags, void reductions,
+			      int _parallel, External * _externals, const char * _kernel)
+{
+  foreach_stencil_generic (flags, reductions, _parallel, _externals, _kernel) {
+    _region.p = _p, _region.box = _box, _region.n = _n;
+    {...}
+  }
+}
+
+macro foreach_vertex_stencil (char flags, void reductions,
+			      int _parallel, External * _externals, const char * _kernel)
+{
+  foreach_stencil_generic (flags, reductions, _parallel, _externals, _kernel) {
+    _loop.vertex = true;
+    {...}
+  }
+}
+
+macro foreach_face_stencil (char flags, void reductions, const char * _order,
+			    int _parallel, External * _externals, const char * _kernel)
+{
+  foreach_stencil_generic (flags, reductions, _parallel, _externals, _kernel)
+    {...}
+}
+
+macro foreach_coarse_level_stencil (int _level, char flags, void reductions,
+				    int _parallel, External * _externals, const char * _kernel)
+{
+  foreach_level_stencil (_level, flags, reductions, _parallel, _externals, _kernel)
+    {...}
+}
+
+macro foreach_level_or_leaf_stencil (int _level, char flags, void reductions,
+				     int _parallel, External * _externals, const char * _kernel)
+{
+  foreach_level_stencil (_level, flags, reductions, _parallel, _externals, _kernel)
+    {...}
+}
 
 @ifndef tracing
   @ def tracing(func, file, line) do {
@@ -359,5 +388,3 @@ void gpu_boundary_level (scalar * list, int l)
 }
 
 #define realloc_scalar(size) realloc_scalar_gpu (size)
-#define foreach_level_or_leaf(...) foreach_level(__VA_ARGS__)
-#define foreach_coarse_level(...) foreach_level(__VA_ARGS__)

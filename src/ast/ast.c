@@ -325,18 +325,6 @@ static void str_print_internal (const Ast * n, int sym, int real, File * file,
     return;
   }
 
-  /**
-  Ignore macro definitions. */
-
-  if (ast_is_macro_definition (n, "macro")) {
-    AstTerminal * t = ast_left_terminal (n);
-    if (t->before && !only_spaces (t->before, file, t)) {
-      output (data, t->before, NULL);
-      update_file_line (t->before, file);
-    }
-    return;
-  }
-  
   //  ast_print_file_line (n, stderr);
   AstTerminal * t = ast_terminal (n);
   if (t) {
@@ -395,7 +383,20 @@ static void str_print_internal (const Ast * n, int sym, int real, File * file,
       file->line += count_lines (t->after);
     }
   }
-  else {
+  else { // !terminal
+
+    /**
+    Ignore macro definitions. */
+
+    if (ast_is_macro_declaration (n->child[0], "macro")) {
+      AstTerminal * t = ast_left_terminal (n);
+      if (t->before && !only_spaces (t->before, file, t)) {
+	output (data, t->before, NULL);
+	update_file_line (t->before, file);
+      }
+      return;
+    }
+
     AstRoot * r = ast_root (n);
     if (r && r->before) {
       output (data, r->before, NULL);

@@ -298,31 +298,34 @@ static void mapped_position (bview * view, coord * p, double * r)
   *r = sqrt (rm);
 }
 
-@def foreach_visible(view)
-foreach_cell() {
+macro foreach_visible (bview * view, char flags = 0, void reductions = None)
+{
+  foreach_cell() {
 #if dimension == 2
-  double _r = Delta*0.71;
+    double _r = Delta*0.71;
 #else // dimension == 3
-  double _r = Delta*0.87;
+    double _r = Delta*0.87;
 #endif
-  coord _p = {x, y, z};
-  if ((view)->map)
-    mapped_position (view, &_p, &_r);
-  if (VertexBuffer.visible &&
-      !sphere_in_frustum (_p.x, _p.y, _p.z, _r, &(view)->frustum))
-    continue;
-  if (is_leaf(cell) || point.level == (view)->maxlevel ||
-      (VertexBuffer.visible &&
-       sphere_diameter (_p.x, _p.y, _p.z, _r/L0, &(view)->frustum) < (view)->res)) {
-    if (is_active(cell) && is_local(cell)) {
-@
-@def end_foreach_visible()
+    coord _p = {x, y, z};
+    if ((view)->map)
+      mapped_position (view, &_p, &_r);
+    if (VertexBuffer.visible &&
+	!sphere_in_frustum (_p.x, _p.y, _p.z, _r, &(view)->frustum))
+      continue;
+    if (is_leaf(cell) || point.level == (view)->maxlevel ||
+	(VertexBuffer.visible &&
+	 sphere_diameter (_p.x, _p.y, _p.z, _r/L0, &(view)->frustum) < (view)->res)) {
+      if (is_active(cell) && is_local(cell))
+	{...}
+      continue;
     }
-    continue;
   }
 }
-end_foreach_cell();
-@
+
+macro foreach_visible_stencil (bview * view, char flags, void reductions) {
+  foreach_stencil (flags, reductions)
+    {...}
+}
 
 /**
 A similar technique can be used to traverse the cells which are both
@@ -341,36 +344,34 @@ static void glnormal3d (bview * view, double x, double y, double z) {
     glNormal3d (x, y, z);
 }
 
-@def foreach_visible_plane(view, n1, alpha1)
-coord _n = {(n1).x, (n1).y, (n1).z};
-double _alpha = 0.9999999*(alpha1);
+macro foreach_visible_plane (bview * view, coord n1, double alpha1)
 {
-  double norm = sqrt(sq(_n.x) + sq(_n.y) + sq(_n.z));
-  if (!norm)
-    _n.z = 1.;
-  else
-    _n.x /= norm, _n.y /= norm, _n.z /= norm, _alpha /= norm;
-}
-glnormal3d (view, _n.x, _n.y, _n.z); // do not use normal inversion
-foreach_cell() {
-  // fixme: coordinate mapping
-  double _r = Delta*0.87, alpha = (_alpha - _n.x*x - _n.y*y - _n.z*z)/Delta;
-  if (fabs(alpha) > 0.87 ||
-      (VertexBuffer.visible &&
-       !sphere_in_frustum (x, y, z, _r, &(view)->frustum)))
-    continue;
-  if (is_leaf(cell) ||
-      (VertexBuffer.visible &&
-       sphere_diameter (x, y, z, _r/L0, &(view)->frustum) < (view)->res)) {
-    if (is_active(cell) && is_local(cell)) {
-@
-@def end_foreach_visible_plane()
+  coord _n = {(n1).x, (n1).y, (n1).z};
+  double _alpha = 0.9999999*(alpha1);
+  {
+    double norm = sqrt(sq(_n.x) + sq(_n.y) + sq(_n.z));
+    if (!norm)
+      _n.z = 1.;
+    else
+      _n.x /= norm, _n.y /= norm, _n.z /= norm, _alpha /= norm;
+  }
+  glnormal3d (view, _n.x, _n.y, _n.z); // do not use normal inversion
+  foreach_cell() {
+    // fixme: coordinate mapping
+    double _r = Delta*0.87, alpha = (_alpha - _n.x*x - _n.y*y - _n.z*z)/Delta;
+    if (fabs(alpha) > 0.87 ||
+	(VertexBuffer.visible &&
+	 !sphere_in_frustum (x, y, z, _r, &(view)->frustum)))
+      continue;
+    if (is_leaf(cell) ||
+	(VertexBuffer.visible &&
+	 sphere_diameter (x, y, z, _r/L0, &(view)->frustum) < (view)->res)) {
+      if (is_active(cell) && is_local(cell))
+	{...}
+      continue;
     }
-    continue;
   }
 }
-end_foreach_cell();
-@
 #endif // dimension == 3
 
 macro draw_lines (bview * view, float color[3], float lw)

@@ -243,7 +243,7 @@ void ast_cleanup (Ast * n, Stack * stack, Ast * scope, bool init_declarator)
 
     case sym_jump_statement:
       if (n->child[0]->sym == sym_RETURN) {
-	if (scope->sym == sym_foreach_statement) {
+	if (ast_is_foreach_statement (scope)) {
 	  fprintf (stderr, "%s:%d: error: cannot return from a foreach() loop\n",
 		   ast_terminal (n->child[0])->file,
 		   ast_terminal (n->child[0])->line);
@@ -747,7 +747,7 @@ Ast * calling_foreach (Stack * stack)
 {
   Ast ** d;
   for (int i = 0; (d = stack_index (stack, i)); i++)
-    if ((*d)->sym == sym_foreach_statement)
+    if (ast_is_foreach_statement (*d))
       return *d;
   assert (false);
   return NULL;
@@ -756,26 +756,20 @@ Ast * calling_foreach (Stack * stack)
 static
 void check_missing_reductions (Ast * n, Stack * stack, Ast * scope)
 {
-  Ast * parameters = ast_schema (scope, sym_foreach_statement,
-				 2, sym_foreach_parameters);
-  foreach_item (parameters, 2, param) {
-    Ast * identifier = ast_is_identifier_expression (param->child[0]);
-    if (identifier && !strcmp (ast_terminal (identifier)->start, "serial"))
+  Ast * list = ast_find (ast_schema (scope, sym_foreach_statement,
+				     2, sym_argument_expression_list),
+			 sym_reduction_list);
+  foreach_item (list, 1, reduction) {
+    Ast * identifier = ast_schema (reduction, sym_reduction,
+				   4, sym_reduction_array,
+				   0, sym_generic_identifier,
+				   0, sym_IDENTIFIER);
+    if (!strcmp (ast_terminal (identifier)->start,
+		 ast_terminal (n)->start))
       return;
-    Ast * list = ast_schema (param, sym_foreach_parameter,
-			     0, sym_reduction_list);
-    foreach_item (list, 1, reduction) {
-      Ast * identifier = ast_schema (reduction, sym_reduction,
-				     4, sym_reduction_array,
-				     0, sym_generic_identifier,
-				     0, sym_IDENTIFIER);
-      if (!strcmp (ast_terminal (identifier)->start,
-		   ast_terminal (n)->start))
-	return;
-    }
   }
   AstTerminal * t = ast_left_terminal (scope);
-  if (scope->sym == sym_foreach_statement)
+  if (ast_is_foreach_statement (scope))
     fprintf (stderr,
 	     "%s:%d: error: non-local variable '%s' is modified by "
 	     "this foreach loop:\n"
@@ -813,6 +807,14 @@ bool is_point_variable (const Ast * ref)
   return identifier && !strcmp (ast_terminal (identifier)->start, "_Variables");
 }
 
+bool ast_is_foreach_parameter (Ast * n)
+{
+  n = ast_parent (n, sym_argument_expression_list);
+  while (n && n->sym == sym_argument_expression_list)
+    n = n->parent;
+  return ast_is_foreach_statement (n);
+}
+
 static
 void undefined_variables (Ast * n, Stack * stack, void * data)
 {
@@ -846,7 +848,7 @@ void undefined_variables (Ast * n, Stack * stack, void * data)
     
     if (n->parent->sym != sym_primary_expression ||
 	ast_ancestor (n, 3)->sym == sym_function_call ||
-	ast_parent (n, sym_foreach_parameter))
+	ast_is_foreach_parameter (n))
       break;
 
     /**
@@ -1559,19 +1561,6 @@ void remove_unused (Ast * n, Stack * stack, void * data)
     ast_cleanup (n, stack, undef->scope, true);
 }
 
-static
-bool is_serial (Ast * foreach)
-{
-  Ast * parameters = ast_schema (foreach, sym_foreach_statement,
-				 2, sym_foreach_parameters);
-  foreach_item (parameters, 2, param) {
-    Ast * identifier = ast_is_identifier_expression (param->child[0]);
-    if (identifier && !strcmp (ast_terminal (identifier)->start, "serial"))
-      return true;
-  }
-  return false;
-}
-
 /**
 ## The `ast_stencil()` function
 
@@ -1583,23 +1572,23 @@ does not contain any field access. */
 
 Ast * ast_stencil (Ast * n, bool parallel, bool overflow, bool nowarning)
 {
-  assert (n->sym == sym_foreach_statement ||
-	  n->sym == sym_function_definition);
+  if (ast_is_foreach_statement (n))
+    n->sym = sym_foreach_statement;
+  else
+    assert (n->sym == sym_function_definition);
   AstRoot * root = ast_get_root (n);
   Stack * stack = root->stack;
   stack_push (stack, &n);
-  if (parallel && is_serial (n))
-    parallel = false;
   Undefined u = {n, parallel, overflow, nowarning};
   move_field_accesses (n, stack, &u);
-  Ast * m = n->sym == sym_foreach_statement ? ast_child (n, sym_statement) : n;
+  Ast * m = ast_is_foreach_statement (n) ? ast_child (n, sym_statement) : n;
   do {
     u.undefined = false;
     ast_traverse (m, stack, undefined_variables, &u);
   } while (u.undefined);
   ast_traverse (m, stack, point_function_calls, &u);
 
-  Ast * statement =  (n->sym == sym_foreach_statement ? ast_child (n, sym_statement) :
+  Ast * statement =  (ast_is_foreach_statement (n) ? ast_child (n, sym_statement) :
 		      ast_child (n, sym_compound_statement));
   do {
     ast_traverse (n, stack, mark_unused, n);
@@ -1610,9 +1599,11 @@ Ast * ast_stencil (Ast * n, bool parallel, bool overflow, bool nowarning)
   } while (u.undefined);
   
   ast_pop_scope (stack, n);
-  if (n->sym == sym_foreach_statement && !ast_child (n, sym_statement))
+  if (ast_is_foreach_statement (n) && !ast_child (n, sym_statement))
     return NULL;
   if (n->sym == sym_function_definition && !ast_child (n, sym_compound_statement))
     return NULL;
+  if (n->sym == sym_foreach_statement)
+    n->sym = sym_macro_statement;
   return CHECK (n);
 }

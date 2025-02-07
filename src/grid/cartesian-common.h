@@ -3,7 +3,6 @@
 void (* debug)    (Point);
 
 @define _val_constant(a,k,l,m) ((const double) _constant[a.i -_NVARMAX])
-@define diagonalize(a)
 @define val_diagonal(a,k,l,m) ((k) == 0 && (l) == 0 && (m) == 0)
 
 @undef VARIABLES
@@ -45,32 +44,35 @@ void (* debug)    (Point);
 
 #include "fpe.h"
 
-@define end_foreach_face()
-
-@def foreach_point(...)
+macro foreach_point (double x = 0., double y = 0., double z = 0., char flags = 0, void reductions = None)
 {
   int ig = 0, jg = 0, kg = 0; NOT_UNUSED(ig); NOT_UNUSED(jg); NOT_UNUSED(kg);
-  coord _p = { S__VA_ARGS__ };
+  coord _p = { x, y, z };
   Point point = locate (_p.x, _p.y, _p.z); // fixme
   if (point.level >= 0) {
-    POINT_VARIABLES
-@
-@define end_foreach_point() }}
+    POINT_VARIABLES;
+    {...}
+  }
+}
 
-@def foreach_region(p, box, n)
- OMP_PARALLEL() { NOT_UNUSED (p);
-    coord p = {0, 0, box[0].z};
-    OMP(omp for schedule(static))
-      for (int _i = 0; _i < (int) n.x; _i++) {
-	p.x = box[0].x + (box[1].x - box[0].x)/n.x*(_i + 0.5);
-	for (int _j = 0; _j < (int) n.y; _j++) {
-	  p.y = box[0].y + (box[1].y - box[0].y)/n.y*(_j + 0.5);
-	  Point point = locate (p.x, p.y, p.z); // fixme
-	  if (point.level >= 0) {
-	    int ig = 0, jg = 0, kg = 0; NOT_UNUSED(ig); NOT_UNUSED(jg); NOT_UNUSED(kg);
-	    POINT_VARIABLES
-@
-@define end_foreach_region() }}}}
+macro foreach_region (coord p, coord box[2], coord n, char flags = 0, void reductions = None)
+{
+  NOT_UNUSED (p);
+  coord p = {0, 0, box[0].z};
+  //  OMP(omp for schedule(static))
+  for (int _i = 0; _i < (int) n.x; _i++) {
+    p.x = box[0].x + (box[1].x - box[0].x)/n.x*(_i + 0.5);
+    for (int _j = 0; _j < (int) n.y; _j++) {
+      p.y = box[0].y + (box[1].y - box[0].y)/n.y*(_j + 0.5);
+      Point point = locate (p.x, p.y, p.z); // fixme
+      if (point.level >= 0) {
+	int ig = 0, jg = 0, kg = 0; NOT_UNUSED(ig); NOT_UNUSED(jg); NOT_UNUSED(kg);
+	POINT_VARIABLES;
+	{...}
+      }
+    }
+  }
+}
 
 /**
 Register functions on GPUs */

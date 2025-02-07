@@ -35,15 +35,19 @@ macro mymacro3 (double field, scalar s1, double expr)
   }
 }
 
-macro mymacro4 (break = (i = j = 2))
+macro mymacro4() {}
+
+macro mymacro4 (break = (i = j = 2)) // must overload the previous definition
 {
   for (int i = 0; i < 3; i++)
     for (int j = 0; j < 3; j++)
       {...}
 }
 
+auto macro mymacro4() {} // must not overload the previous definition
+
 int main()
-{  
+{
   mymacro (end = 2)
     fprintf (stderr, "%d\n", i);
   coord p;
@@ -66,4 +70,7 @@ int main()
     if (j == 1)
       break;
   }
+
+  @define DEF M_PI
+  mymacro3 (s[], s1, DEF);
 }

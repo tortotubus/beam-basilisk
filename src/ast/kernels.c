@@ -8,6 +8,7 @@
 
 typedef struct {
   char * error;
+  bool nolineno;
 } KernelData;
 
 /**
@@ -469,7 +470,7 @@ void kernel (Ast * n, Stack * stack, void * data)
     
     break;
   }
-    
+
   /**
   ## forin_declaration_statement */
 
@@ -591,7 +592,7 @@ void kernel (Ast * n, Stack * stack, void * data)
     if (!(identifier = ast_identifier_declaration (stack, t->start))) {
       char s[1000];
       snprintf (s, 999, "\\n@error %s:%d: GLSL: error: unknown function '%s'\\n",
-		t->file, t->line, t->start);
+		t->file, d->nolineno ? 0 : t->line, t->start);
       d->error = strdup (s);
       return;
     }
@@ -616,16 +617,15 @@ void kernel (Ast * n, Stack * stack, void * data)
     break;
   }
     
-  /**
-  ## Diagonalize */
-
   case sym_macro_statement: {
     Ast * identifier = ast_schema (n, sym_macro_statement,
-				   0, sym_macro_call,
 				   0, sym_MACRO);
+    
+    /**
+    ## Diagonalize */
+
     if (identifier && !strcmp (ast_terminal (identifier)->start, "diagonalize")) {
       Ast * field = ast_schema (n, sym_macro_statement,
-				0, sym_macro_call,
 				2, sym_argument_expression_list,
 				0, sym_argument_expression_list_item,
 				0, sym_assignment_expression);
@@ -635,25 +635,26 @@ void kernel (Ast * n, Stack * stack, void * data)
 	ast_pop_scope (stack, n);
       }
     }
+
+    /**
+    ## Macro call 
+
+    These are the remaining "postmacros" which have not been expanded
+    yet. */
+
+    else {
+      ast_before (n, "{");
+      ast_after (n, "end_", ast_terminal (identifier)->start, "()}");
+    }
+
     break; 
   }
-
-  /**
-  ## Macro call */
-
-  case sym_macro_call: {
-    if (!strcmp (ast_terminal (n->child[0])->start, "foreach_child")) { // fixme: just do it for all macros??
-      ast_before (n->parent, "{");
-      ast_after (n->parent, "end_", ast_terminal (n->child[0])->start, "()}");
-    }
-    break;
-  }
-  
+    
   }
 }
 
 static
-char * stringify (Ast * n, char * output)
+char * stringify (Ast * n, char * output, bool nolineno)
 {
   AstTerminal * t = ast_left_terminal (n);
   char * before = t->before;
@@ -668,7 +669,16 @@ char * stringify (Ast * n, char * output)
     case '\\': str_append (output, "\\\\"); break;
     case '"':  str_append (output, "\\\""); break;
     case '#':
-      if (i[-1] == '\n') { str_append (output, "// #"); break; }
+      if (i[-1] == '\n') {
+	str_append (output, "// #");
+	if (nolineno && !strncmp (i, "#line ", 6)) {
+	  str_append (output, "line 0");
+	  i += 6;
+	  while (*i >= '0' && *i <= '9') i++;
+	  i--;
+	}
+	break;
+      }
       // fall through
     default:  a[0] = *i; str_append (output, a); break;
     }
@@ -678,34 +688,24 @@ char * stringify (Ast * n, char * output)
   return output;
 }
 
-char * ast_kernel (Ast * n, Ast * argument, char * s)
+char * ast_kernel (Ast * n, char * argument, bool nolineno)
 {
   AstRoot * root = ast_get_root (n);
   Stack * stack = root->stack;
   stack_push (stack, &n);
-  KernelData d = {0};
+  KernelData d = {0, nolineno};
   Ast * statement = n->sym == sym_function_definition ?
     ast_copy (n) : ast_copy (ast_child (n, sym_statement));
   ast_traverse (statement, stack, kernel, &d);
 
-  if (d.error) {
-    if (argument)
-      ast_after (argument, "$(\"", d.error, "\")");
-    else
-      str_append (s, "$(\"", d.error, "\")");
-  }
+  if (d.error)
+    str_append (argument, "\"", d.error, "\"");
   else {
-    if (argument)
-      ast_after (argument, "$(\"");
-    else
-      str_append (s, "$(\"");
-    s = stringify (statement, s);
-    if (argument)
-      ast_after (argument, s, "\")");
-    else
-      str_append (s, "\")");
+    str_append (argument, "\"");
+    argument = stringify (statement, argument, nolineno);
+    str_append (argument, "\"");
   }
   free (d.error);
   ast_pop_scope (stack, n);
-  return s;
+  return argument;
 }

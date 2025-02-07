@@ -3156,65 +3156,24 @@ Value * ast_run_node (Ast * n, Stack * stack)
     }
     break;
 
-  case sym_foreach_statement:
-    if (!ast_is_foreach_stencil (n)) {
-      if (strcmp (ast_terminal (n->child[0])->start, "foreach_face_generic")) {
-	if (!strcmp (ast_terminal (n->child[0])->start, "foreach_segment")) {
-	  Ast * segment = ast_is_identifier_expression (ast_schema (n, sym_foreach_statement,
-								    2, sym_foreach_parameters,
-								    0, sym_foreach_parameters,
-								    0, sym_foreach_parameter,
-								    0, sym_assignment_expression));
-	  Ast * p = ast_is_identifier_expression (ast_schema (n, sym_foreach_statement,
-							      2, sym_foreach_parameters,
-							      2, sym_foreach_parameter,
-							      0, sym_assignment_expression));
-	  if (segment && p) {
-	    Ast * decl = ast_parent (ast_identifier_declaration (stack, ast_terminal (segment)->start),
-				     sym_parameter_declaration);
-	    if (decl) {
-	      Ast * declaration = NN(n, sym_declaration,
-				     ast_copy (ast_child (decl, sym_declaration_specifiers)),
-				     NN(n, sym_init_declarator_list,
-					NN(n, sym_init_declarator,
-					   ast_copy (ast_child (decl, sym_declarator)),
-					   NCA(n, "="),
-					   NN(n, sym_initializer,
-					      ast_copy (ast_parent(p, sym_assignment_expression))))),
-				     NCA(n, ";"));
-	      Ast * identifier = ast_find (declaration, sym_generic_identifier,
-					   0, sym_IDENTIFIER);
-	      Ast * initializer = ast_find (declaration, sym_primary_expression,
-					    0, sym_IDENTIFIER);
-	      char * start = ast_terminal (identifier)->start;
-	      ast_terminal (identifier)->start = ast_terminal (initializer)->start;
-	      ast_terminal (initializer)->start = start;
-	      run (declaration, stack);
-	      init_point_variables (stack);
-	      default_check (stack, n);
-	      ast_destroy (declaration);
-	      break;
-	    }
-	  }
-	}
-	init_point_variables (stack);
-      }
-      default_check (stack, n);
-    }
-    else {
-      StackData * d = stack_get_data (stack);
-      run (d->stencil, stack);
-      default_check (stack, n);
-      run (d->end_stencil, stack);
-    }
-    break;
-
   case sym_macro_statement: {
+    if (ast_is_foreach_statement (n)) {
+      if (ast_is_foreach_stencil (n)) {
+	StackData * d = stack_get_data (stack);
+	run (d->stencil, stack);
+	default_check (stack, n);
+	run (d->end_stencil, stack);
+      }
+      else {
+	if (strcmp (ast_terminal (n->child[0])->start, "foreach_face_generic"))
+	  init_point_variables (stack);
+	default_check (stack, n);
+      }
+      break;
+    }
+
     Ast * identifier = ast_schema (n, sym_macro_statement,
-				   0, sym_function_call,
-				   0, sym_postfix_expression,
-				   0, sym_primary_expression,
-				   0, sym_IDENTIFIER);
+				   0, sym_MACRO);
     if (identifier && !strncmp (ast_terminal (identifier)->start, "is_face_", 8))
       init_point_variables (stack);
     value = default_check (stack, n);

@@ -62,7 +62,7 @@ Array * linear_tree (size_t size, scalar newpid)
   return a;
 }
 
-@def foreach_tree(t, size, list)
+macro foreach_tree (Array * t, size_t size, scalar * list)
 {
   const unsigned short _sent = 1 << user, _next = 1 << (user + 1);
   scalar * _list = list;
@@ -71,9 +71,7 @@ Array * linear_tree (size_t size, scalar newpid)
     Cell * c = (Cell *) _i;
     if (c->flags & _sent) {
       _i += size;
-@
-
-@def end_foreach_tree()
+      {...}
     }
     else
       _i += sizeof(Cell);
@@ -89,9 +87,8 @@ Array * linear_tree (size_t size, scalar newpid)
     }
     else
       continue;
-  } end_foreach_cell_all();
+  }
 }
-@
 
 Array * neighborhood (scalar newpid, int nextpid, FILE * fp)
 {
