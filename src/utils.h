@@ -340,38 +340,35 @@ mesh and spanning the [A:B] segment. The pair of coordinates defining
 the sub-segment contained in each cell are defined by `p[0]` and
 `p[1]`. */
 
-// fixme: this is an ugly macro....
-
-#define foreach_segment(_S, _p, expr, ...) do {			\
-  double norm = sqrt(sq((_S)[1].x - (_S)[0].x) + sq((_S)[1].y - (_S)[0].y)); \
-  if (norm > 0.) {							\
-    coord t = {((_S)[1].x - (_S)[0].x)/norm + 1e-6, ((_S)[1].y - (_S)[0].y)/norm - 1.5e-6}; \
-    double alpha = (_S)[0].x*t.y - (_S)[0].y*t.x;			\
-    foreach(__VA_ARGS__)						\
-      if (fabs(t.y*x - t.x*y - alpha) < 0.708*Delta_x) {		\
-	coord _o = {x,y}, _p[2];					\
-	int _n = 0;							\
-	foreach_dimension() {						\
-	  if (t.x)							\
-	    for (int _i = -1; _i <= 1 && _n < 2; _i += 2) {		\
-	      _p[_n].x = _o.x + _i*Delta_x/2.;				\
-	      double a = (_p[_n].x - (_S)[0].x)/t.x;			\
-	      _p[_n].y = (_S)[0].y + a*t.y;				\
-	      if (fabs(_p[_n].y - _o.y) <= Delta_x/2.) {		\
-		a = clamp (a, 0., norm);				\
-		_p[_n].x = (_S)[0].x + a*t.x, _p[_n].y = (_S)[0].y + a*t.y; \
-		if (fabs(_p[_n].x - _o.x) <= Delta_x/2. &&		\
-		    fabs(_p[_n].y - _o.y) <= Delta_x/2.)		\
-		  _n++;							\
-	      }								\
-	    }								\
-	}								\
-	if (_n == 2) {							\
-	  expr								\
-	}								\
-      }									\
-  }									\
-} while(0)
+macro foreach_segment (coord S[2], coord p[2], void reductions = None)
+{
+  double norm = sqrt(sq(S[1].x - S[0].x) + sq(S[1].y - S[0].y));
+  if (norm > 0.) {
+    coord t = {(S[1].x - S[0].x)/norm + 1e-6, (S[1].y - S[0].y)/norm - 1.5e-6};
+    double alpha = S[0].x*t.y - S[0].y*t.x;
+    foreach (reductions)
+      if (fabs(t.y*x - t.x*y - alpha) < 0.708*Delta_x) {
+	coord _o = {x,y}, p[2];
+	int _n = 0;
+	foreach_dimension()
+	  if (t.x)
+	    for (int _i = -1; _i <= 1 && _n < 2; _i += 2) {
+	      p[_n].x = _o.x + _i*Delta_x/2.;
+	      double a = (p[_n].x - S[0].x)/t.x;
+	      p[_n].y = S[0].y + a*t.y;
+	      if (fabs(p[_n].y - _o.y) <= Delta_x/2.) {
+		a = clamp (a, 0., norm);
+		p[_n].x = S[0].x + a*t.x, p[_n].y = S[0].y + a*t.y;
+		if (fabs(p[_n].x - _o.x) <= Delta_x/2. &&
+		    fabs(p[_n].y - _o.y) <= Delta_x/2.)
+		  _n++;
+	      }
+	    }
+	if (_n == 2)
+	  {...}
+      }
+  }
+}
 
 /**
 This function returns a summary of the currently-defined fields. */
