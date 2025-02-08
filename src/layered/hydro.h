@@ -673,22 +673,22 @@ double segment_flux (coord segment[2], double * flux, scalar h, vector u)
   normalize (&m);
   for (int l = 0; l < nl; l++)
     flux[l] = 0.;
-  foreach_segment (segment, p, {
-      double dl = 0.;
-      foreach_dimension() {
-	double dp = (p[1].x - p[0].x)*Delta/Delta_x*(fm.y[] + fm.y[0,1])/2.;
-	dl += sq(dp);
-      }
-      dl = sqrt (dl);    
-      for (int i = 0; i < 2; i++) {
-	coord a = p[i];
-	foreach_layer()
-	  flux[point.l] += dl/2.*
-	  interpolate_linear (point, h, a.x, a.y, 0.)*
-	  (m.x*interpolate_linear (point, u.x, a.x, a.y, 0.) +
-	   m.y*interpolate_linear (point, u.y, a.x, a.y, 0.));
-      }
-    }, reduction(+:flux[:nl]));
+  foreach_segment (segment, p, reduction(+:flux[:nl])) {
+    double dl = 0.;
+    foreach_dimension() {
+      double dp = (p[1].x - p[0].x)*Delta/Delta_x*(fm.y[] + fm.y[0,1])/2.;
+      dl += sq(dp);
+    }
+    dl = sqrt (dl);
+    for (int i = 0; i < 2; i++) {
+      coord a = p[i];
+      foreach_layer()
+	flux[point.l] += dl/2.*
+	interpolate_linear (point, h, a.x, a.y, 0.)*
+	(m.x*interpolate_linear (point, u.x, a.x, a.y, 0.) +
+	 m.y*interpolate_linear (point, u.y, a.x, a.y, 0.));
+    }
+  }
   double tot = 0.;
   for (int l = 0; l < nl; l++)
     tot += flux[l];
