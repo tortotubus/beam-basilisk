@@ -15,7 +15,7 @@
 #endif
 
 macro BEGIN_FOREACH() {{...}}
- 
+
 #if _OPENMP
 @ include <omp.h>
 @ define OMP(x) Pragma(#x)

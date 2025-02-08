@@ -54,7 +54,7 @@ macro solve (scalar _a, double _func, scalar _rhs)
   {
     double maxres = 0.;
     foreach (reduction(max:maxres)) {
-      _res[] = _rhs[] - (_func);
+      _res[] = _rhs[] - _func;
       if (fabs (_res[]) > maxres)
 	maxres = fabs (_res[]);
     }
@@ -99,7 +99,7 @@ macro solve (scalar _a, double _func, scalar _rhs)
     {
       double maxres = 0.;
       foreach (reduction(max:maxres)) {
-	_res[] = _rhs[] - (_func);
+	_res[] = _rhs[] - _func;
 	if (fabs (_res[]) > maxres)
 	  maxres = fabs (_res[]);
       }

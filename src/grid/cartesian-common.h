@@ -44,7 +44,8 @@ void (* debug)    (Point);
 
 #include "fpe.h"
 
-macro foreach_point (double x = 0., double y = 0., double z = 0., char flags = 0, void reductions = None)
+macro foreach_point (double x = 0., double y = 0., double z = 0.,
+		    char flags = 0, void reductions = None)
 {
   int ig = 0, jg = 0, kg = 0; NOT_UNUSED(ig); NOT_UNUSED(jg); NOT_UNUSED(kg);
   coord _p = { x, y, z };

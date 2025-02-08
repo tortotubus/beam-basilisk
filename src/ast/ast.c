@@ -388,7 +388,7 @@ static void str_print_internal (const Ast * n, int sym, int real, File * file,
     /**
     Ignore macro definitions. */
 
-    if (ast_is_macro_declaration (n->child[0], "macro")) {
+    if (ast_is_macro_declaration (n->child[0])) {
       AstTerminal * t = ast_left_terminal (n);
       if (t->before && !only_spaces (t->before, file, t)) {
 	output (data, t->before, NULL);

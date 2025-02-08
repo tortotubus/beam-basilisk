@@ -2,15 +2,13 @@
 
 #include "cartesian-common.h"
 
-auto
-macro foreach_level_or_leaf (int l, char flags = 0, void reductions = None)
+auto macro foreach_level_or_leaf (int l, char flags = 0, void reductions = None)
 {
   foreach_level (l, flags, reductions)
     {...}
 }
 
-auto
-macro foreach_coarse_level (int l, char flags = 0, void reductions = None)
+auto macro foreach_coarse_level (int l, char flags = 0, void reductions = None)
 {
   foreach_level (l, flags, reductions)
     {...}

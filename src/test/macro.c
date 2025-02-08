@@ -46,6 +46,11 @@ macro mymacro4 (break = (i = j = 2)) // must overload the previous definition
 
 auto macro mymacro4() {} // must not overload the previous definition
 
+macro int myreturn (double x)
+{
+  return x*x;
+}
+
 int main()
 {
   mymacro (end = 2)
@@ -73,4 +78,6 @@ int main()
 
   @define DEF M_PI
   mymacro3 (s[], s1, DEF);
+
+  fprintf (stderr, "%d\n", myreturn(12));
 }

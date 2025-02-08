@@ -57,33 +57,14 @@ int ast_identifier_parse_type (Stack * stack, const char * identifier, bool call
   if (declaration) {
     if (ast_is_typedef (declaration))
       return TYPEDEF_NAME;
-    if (call) {
-      Ast * type;
-      if ((type = ast_find (ast_schema (ast_ancestor (declaration, 6), sym_function_definition,
-					0, sym_function_declaration,
-					0, sym_declaration_specifiers),
-			    sym_declaration_specifiers,
-			    0, sym_type_specifier,
-			    0, sym_types,
-			    0, sym_TYPEDEF_NAME))) {
-	AstTerminal * t = ast_terminal (type);
-	int len;
-	if (t->after)
-	  len = t->after - t->start + 1;
-	else
-	  len = strlen (t->start);
-#if 0	
-	fprintf (stderr, "%s:%d: %s ", file, line, identifier);
-	char * s = t->start;
-	for (int i = 0; i < len; i++, s++) fputc (*s, stderr);
-	fputc ('\n', stderr);
-#endif
-	if (len == 5 && !strncmp (t->start, "macro", len))
-	  return MACRO;
-      }
-    }
-  }
-  
+    if (call && ast_find (ast_schema (ast_ancestor (declaration, 6), sym_function_definition,
+				      0, sym_function_declaration,
+				      0, sym_declaration_specifiers),
+			  sym_declaration_specifiers,
+			  0, sym_storage_class_specifier,
+			  0, sym_MACRODEF))
+      return MACRO;
+  }  
   return IDENTIFIER;
 }
 
@@ -129,10 +110,15 @@ Ast * ast_function_identifier (const Ast * function_definition)
 
 Ast * ast_function_call_identifier (const Ast * n)
 {
+  Ast * identifier = ast_schema (n, sym_function_call,
+				 0, sym_postfix_expression,
+				 0, sym_primary_expression,
+				 0, sym_IDENTIFIER);
+  if (identifier) return identifier;
   return ast_schema (n, sym_function_call,
 		     0, sym_postfix_expression,
 		     0, sym_primary_expression,
-		     0, sym_IDENTIFIER);
+		     0, sym_MACRO);
 }
 
 /**
@@ -1012,7 +998,7 @@ void maybeconstfield (Ast * n, Stack * stack,
 static Ast * parent_is_foreach_definition (const Ast * n)
 {  
   Ast * parent = ast_parent (n, sym_function_definition), * identifier;
-  if ((identifier = ast_is_macro_declaration (ast_child (parent, sym_function_declaration), "macro")) &&
+  if ((identifier = ast_is_macro_declaration (ast_child (parent, sym_function_declaration))) &&
       is_foreach_identifier (ast_terminal (identifier)->start))
     return identifier;
   return NULL;
@@ -2149,7 +2135,7 @@ dealt with in later passes. */
 
 static void user_macros (Ast * n, Stack * stack, void * data)
 {  
-  if (n->sym == sym_statement)
+  if (n->sym == sym_statement || n->sym == sym_function_call)
     macro_replacement (n, stack, (const char *[]){
 	"einstein_sum", "diagonalize",
 	"foreach_child", "foreach_neighbor",
@@ -4676,7 +4662,7 @@ Ast * ast_push_function_definition (Stack * stack, Ast * declarator)
     identifier = ast_find (declarator, sym_direct_declarator,
 			   0, sym_generic_identifier,
 			   0, sym_IDENTIFIER);
-  if (ast_is_macro_declaration (ast_parent (declarator, sym_function_declaration), "macro") &&
+  if (ast_is_macro_declaration (ast_parent (declarator, sym_function_declaration)) &&
       ast_schema (ast_parent (declarator, sym_function_declaration), sym_function_declaration,
 		  0, sym_declaration_specifiers,
 		  0, sym_storage_class_specifier,

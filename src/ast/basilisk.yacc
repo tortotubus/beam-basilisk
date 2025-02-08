@@ -94,7 +94,7 @@ static int yyparse (AstRoot * parse, Ast * root);
 
 %token  MAYBECONST NEW_FIELD TRACE
 %token  FOREACH_DIMENSION
-%token  REDUCTION MACRO ELLIPSIS_MACRO
+%token  REDUCTION MACRO ELLIPSIS_MACRO MACRODEF
 
 /**
 The token below is only used temporarily in ast/stencil.c, not in the
@@ -122,6 +122,7 @@ translation_unit
 
 primary_expression
         : IDENTIFIER
+	| MACRO
 	| constant
 	| string
 	| '(' expression_error ')'
@@ -363,6 +364,7 @@ storage_class_specifier
 	| AUTO
 	| REGISTER
 	| TRACE    /* Basilisk C extension */
+	| MACRODEF /* Basilisk C extension */
 	;
 
 type_specifier

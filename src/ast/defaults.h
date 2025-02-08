@@ -117,8 +117,3 @@ double sqrt (double x);
 double tan (double x);
 double tanh (double x);
 double trunc (double x);
-
-/**
-# Macros */
-
-typedef void macro;
