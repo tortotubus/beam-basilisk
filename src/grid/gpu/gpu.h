@@ -238,7 +238,7 @@ typedef struct {
 } RegionParameters;
 
 macro foreach_stencil_generic (char flags, void reductions,
-			       int _parallel, External * _externals, const char * _kernel)
+			      int _parallel, External * _externals, const char * _kernel)
 {
   tracing_foreach ("foreach", S__FILE__, S_LINENO);
   static ForeachData _loop = {
@@ -276,14 +276,14 @@ macro foreach_stencil_generic (char flags, void reductions,
 }
 
 macro foreach_stencil (char flags, void reductions,
-		       int _parallel, External * _externals, const char * _kernel)
+		      int _parallel, External * _externals, const char * _kernel)
 {
   foreach_stencil_generic (flags, reductions, _parallel, _externals, _kernel)
     {...}
 }
 
 macro foreach_level_stencil (int _level, char flags, void reductions,
-			     int _parallel, External * _externals, const char * _kernel)
+			    int _parallel, External * _externals, const char * _kernel)
 {
   foreach_stencil_generic (flags, reductions, _parallel, _externals, _kernel) {
     _region.level = _level + 1;
@@ -292,7 +292,7 @@ macro foreach_level_stencil (int _level, char flags, void reductions,
 }
 
 macro foreach_point_stencil (double _xp, double _yp, double _zp, char flags, void reductions,
-			     int _parallel, External * _externals, const char * _kernel)
+			    int _parallel, External * _externals, const char * _kernel)
 {
   foreach_stencil_generic (flags, reductions, _parallel, _externals, _kernel) {
     _region.p = (coord){ _xp, _yp, _zp };
@@ -302,8 +302,8 @@ macro foreach_point_stencil (double _xp, double _yp, double _zp, char flags, voi
 }
 
 macro foreach_region_stencil (coord _p, coord _box[2], coord _n,
-			      char flags, void reductions,
-			      int _parallel, External * _externals, const char * _kernel)
+			     char flags, void reductions,
+			     int _parallel, External * _externals, const char * _kernel)
 {
   foreach_stencil_generic (flags, reductions, _parallel, _externals, _kernel) {
     _region.p = _p, _region.box = _box, _region.n = _n;
@@ -312,7 +312,7 @@ macro foreach_region_stencil (coord _p, coord _box[2], coord _n,
 }
 
 macro foreach_vertex_stencil (char flags, void reductions,
-			      int _parallel, External * _externals, const char * _kernel)
+			     int _parallel, External * _externals, const char * _kernel)
 {
   foreach_stencil_generic (flags, reductions, _parallel, _externals, _kernel) {
     _loop.vertex = true;
@@ -321,21 +321,21 @@ macro foreach_vertex_stencil (char flags, void reductions,
 }
 
 macro foreach_face_stencil (char flags, void reductions, const char * _order,
-			    int _parallel, External * _externals, const char * _kernel)
+			   int _parallel, External * _externals, const char * _kernel)
 {
   foreach_stencil_generic (flags, reductions, _parallel, _externals, _kernel)
     {...}
 }
 
 macro foreach_coarse_level_stencil (int _level, char flags, void reductions,
-				    int _parallel, External * _externals, const char * _kernel)
+				   int _parallel, External * _externals, const char * _kernel)
 {
   foreach_level_stencil (_level, flags, reductions, _parallel, _externals, _kernel)
     {...}
 }
 
 macro foreach_level_or_leaf_stencil (int _level, char flags, void reductions,
-				     int _parallel, External * _externals, const char * _kernel)
+				    int _parallel, External * _externals, const char * _kernel)
 {
   foreach_level_stencil (_level, flags, reductions, _parallel, _externals, _kernel)
     {...}

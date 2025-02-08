@@ -547,9 +547,6 @@ typedef struct {
 # define avector(x, y, z)   {x, y, z}
 #endif
 
-@define BEGIN_FOREACH
-@define END_FOREACH
-
 /**
 These are placeholders for internally-defined macros. */
 

@@ -201,15 +201,13 @@ static void replace_ellipsis (Ast * n, Stack * stack, void * data)
   }
 }
 
-Ast * ast_is_macro_declaration (const Ast * function_declaration, const char * macro_type)
+Ast * ast_is_macro_declaration (const Ast * function_declaration)
 {
-  Ast * type = ast_find (ast_schema (function_declaration, sym_function_declaration,
-				     0, sym_declaration_specifiers),
-			 sym_declaration_specifiers,
-			 0, sym_type_specifier,
-			 0, sym_types,
-			 0, sym_TYPEDEF_NAME);
-  return (type && !strcmp (ast_terminal (type)->start, macro_type)) ?
+  return ast_find (ast_schema (function_declaration, sym_function_declaration,
+			       0, sym_declaration_specifiers),
+		   sym_declaration_specifiers,
+		   0, sym_storage_class_specifier,
+		   0, sym_MACRODEF) ?
     ast_schema (function_declaration, sym_function_declaration,
 		1, sym_declarator,
 		0, sym_direct_declarator,
@@ -264,13 +262,19 @@ static void replace_break (Ast * n, Ast * breaking, Ast * parent)
 
 static void macro_replacement (Ast * statement, Stack * stack, const char * exclude[], bool nolineno)
 {
-  Ast * macro_statement = ast_schema (statement, sym_statement,
-				      0, sym_basilisk_statements,
-				      0, sym_macro_statement);
+  Ast * identifier, * macro_statement = ast_schema (statement, sym_statement,
+						    0, sym_basilisk_statements,
+						    0, sym_macro_statement);
+  if (macro_statement)
+    identifier = ast_child (macro_statement, sym_MACRO);
+  else if ((identifier = ast_schema (statement, sym_function_call,
+				     0, sym_postfix_expression,
+				     0, sym_primary_expression,
+				     0, sym_MACRO)))
+    macro_statement = statement;
   if (!macro_statement)
     return;
-  Ast * identifier = ast_schema (macro_statement, sym_macro_statement,
-				 0, sym_MACRO);
+  
   if (!strcmp (ast_terminal (identifier)->start, "foreach_block") &&
       (inforeach (statement) || point_declaration (stack)))
     str_append (ast_terminal (identifier)->start, "_inner");
@@ -285,7 +289,7 @@ static void macro_replacement (Ast * statement, Stack * stack, const char * excl
   }
   
   // fixme: should just be based on the names for "diagonalize" and "einstein_sum"
-  if (!ast_is_macro_declaration (macro_definition->child[0], "macro"))
+  if (!ast_is_macro_declaration (macro_definition->child[0]))
     return;
 
   if (exclude)
@@ -299,8 +303,7 @@ static void macro_replacement (Ast * statement, Stack * stack, const char * excl
 
   MacroReplacement r = {
     .statement = ast_child (macro_statement, sym_statement),
-    .arguments = ast_schema (macro_statement, sym_macro_statement,
-			     2, sym_argument_expression_list),
+    .arguments = ast_child (macro_statement, sym_argument_expression_list),
     .parameters = ast_schema (macro_definition, sym_function_definition,
 			      0, sym_function_declaration,
 			      1, sym_declarator,
@@ -311,7 +314,7 @@ static void macro_replacement (Ast * statement, Stack * stack, const char * excl
   };
 
   Ast * definition = ast_parent (statement, sym_function_definition);
-  if (definition && ast_is_macro_declaration (definition->child[0], "macro"))
+  if (definition && ast_is_macro_declaration (definition->child[0]))
     r.in_a_macro_definition = true;
 
   if (!r.parameters)
@@ -334,7 +337,7 @@ static void macro_replacement (Ast * statement, Stack * stack, const char * excl
   }
 
   if (na != np) {
-    AstTerminal * t = ast_left_terminal (macro_statement);
+    AstTerminal * t = ast_terminal (identifier);
     fprintf (stderr, "%s:%d: error: too %s arguments for macro '%s'\n",
 	     t->file, t->line, na > np ? "many" : "few", ast_terminal (identifier)->start);
     t = ast_left_terminal (macro_definition);
@@ -358,24 +361,72 @@ static void macro_replacement (Ast * statement, Stack * stack, const char * excl
   /**
   Replace 'break' with its macro definition (if it exists). */
 
-  Ast * breaking = NULL;
-  if (r.parameters &&
-      !(breaking = ast_find (r.parameters, sym_parameter_declaration,
-			     2, sym_initializer,
-			     0, sym_assignment_expression)))
-    breaking = ast_find (r.parameters, sym_parameter_declaration,
-			 2, sym_BREAK);
-  replace_break (r.statement, breaking, r.statement);
+  if (r.statement) {
+    Ast * breaking = NULL;
+    if (r.parameters &&
+	!(breaking = ast_find (r.parameters, sym_parameter_declaration,
+			       2, sym_initializer,
+			       0, sym_assignment_expression)))
+      breaking = ast_find (r.parameters, sym_parameter_declaration,
+			   2, sym_BREAK);
+    replace_break (r.statement, breaking, r.statement);
+  }
   
   Ast * copy = ast_copy (ast_find (macro_definition, sym_compound_statement));
   stack_push (stack, &copy);
   ast_push_function_definition (stack, ast_find (macro_definition, sym_direct_declarator));
-  stack_push (stack, &r.statement);
+  if (r.statement)
+    stack_push (stack, &r.statement);
   if (r.parameters)
     ast_traverse (copy, stack, replace_arguments, &r);
-  ast_traverse (copy, stack, replace_ellipsis, &r);
+  if (r.statement)
+    ast_traverse (copy, stack, replace_ellipsis, &r);
   ast_pop_scope (stack, copy);
   str_prepend (ast_left_terminal (copy)->before, ast_left_terminal (macro_statement)->before);
-  ast_set_child (statement, 0, copy);  
-  ast_destroy (macro_statement);
+
+  /**
+  Statement */
+  
+  if (statement->sym == sym_statement) {
+    ast_set_child (statement, 0, copy);
+    ast_destroy (macro_statement);
+  }
+  
+  /**
+  Function call */
+  
+  else {
+    assert (statement->sym == sym_function_call);
+    Ast * jump = ast_schema (copy, sym_compound_statement,
+			     1, sym_block_item_list,
+			     0, sym_block_item,
+			     0, sym_statement,
+			     0, sym_jump_statement);
+    if (ast_schema (jump, sym_jump_statement,
+		    0, sym_RETURN)) {
+      /**
+      This a simple macro i.e. 'macro int func(...){ return ...; }'. */
+      Ast * expr = ast_schema (jump, sym_jump_statement,
+			       1, sym_expression);
+      if (!expr) {
+	AstTerminal * t = ast_terminal (identifier);
+	fprintf (stderr, "%s:%d: error: using value of macro '%s' returning void\n",
+		 t->file, t->line, ast_terminal (identifier)->start);
+	t = ast_terminal (ast_schema (jump, sym_jump_statement,
+				      0, sym_RETURN));
+	fprintf (stderr, "%s:%d: error: return value is defined here\n", t->file, t->line);
+	exit (1);
+      }
+      AstTerminal * o = NCB(statement, "("), * c = NCB(statement, ")");
+      statement->sym = sym_primary_expression;
+      for (Ast ** c = statement->child; *c; c++)
+	ast_destroy (*c);
+      ast_new_children (statement, o,
+			NN(expr, sym_expression_error,
+			   expr), c);
+      ast_destroy (copy);
+    }
+    else
+      abort();
+  }
 }

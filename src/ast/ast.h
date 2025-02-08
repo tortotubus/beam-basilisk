@@ -308,7 +308,7 @@ char * ast_kernel              (Ast * n, char * argument, bool nolineno);
 /**
 ## Macros */
 
-Ast * ast_is_macro_declaration (const Ast * function_declaration, const char * macro_type);
+Ast * ast_is_macro_declaration (const Ast * function_declaration);
 
 /**
 ## Interface for the generic C interpreter */

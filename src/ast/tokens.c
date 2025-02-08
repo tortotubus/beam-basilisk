@@ -2692,6 +2692,7 @@ static int check_type (AstRoot * parse, bool call)
     {"inline",	       INLINE},
     {"int",	       INT},
     {"long",	       LONG},
+    {"macro",          MACRODEF},
     {"register",       REGISTER},
     {"restrict",       RESTRICT},
     {"return",	       RETURN},
