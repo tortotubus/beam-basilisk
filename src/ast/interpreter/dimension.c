@@ -506,7 +506,6 @@ Ast * binary_expression_parent (Ast * n)
   while (n->child &&
 	 (!n->child[1] ||
 	  n->sym == sym_primary_expression ||
-	  n->sym == sym_conditional_expression ||
 	  n->child[0]->sym == sym_unary_operator))
     n = n->parent;
   for (int * op = (int[]){
