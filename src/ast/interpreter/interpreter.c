@@ -1475,6 +1475,39 @@ Ast * identifier_type (Ast * n, Dimensions * d, Stack * stack)
 }
 
 static
+Ast * return_type (Ast * function_declaration, Dimensions * d, Stack * stack)
+{
+  if (!function_declaration)
+    return NULL;
+  
+  Ast * declarator = ast_child (function_declaration, sym_declarator);
+  while (declarator) {
+    Ast * pointer = declarator;
+    while ((pointer = ast_child (pointer, sym_pointer)))
+      d->pointer++;
+    if (ast_child (declarator, token_symbol ('[')))
+      d->pointer++;
+    if (ast_child (declarator, sym_direct_declarator))
+      declarator = ast_child (declarator, sym_direct_declarator);
+    else
+      declarator = ast_child (declarator, sym_declarator);
+  }
+  
+  Ast * specifiers = ast_child (function_declaration, sym_declaration_specifiers);
+  assert (specifiers);
+  Ast * type = ast_find (specifiers, sym_types);
+  assert (type);
+  type = type->child[0];
+  if (type->sym == sym_struct_or_union_specifier &&
+      !ast_child (type, sym_struct_declaration_list)) {
+    if (ast_child (type, sym_YYerror))
+      return NULL;
+    type = ast_child (type, sym_generic_identifier)->child[0];
+  }
+  return base_type (type, d, stack);
+}
+
+static
 Ast * type_name_type (Ast * type_name, Dimensions * d, Stack * stack)
 {
   Ast * declarator = ast_child (type_name, sym_abstract_declarator);
@@ -2798,10 +2831,10 @@ Value * ast_run_node (Ast * n, Stack * stack)
       value = run (n->child[0], stack);
     else { // '(' type_name ')' cast_expression
       value = run (n->child[3], stack);
-      if (value && value->pointer) { // fixme: only apply cast to pointers??!!
+      if (value) {
 	Dimensions d = { .size = 1 };
 	Ast * type = type_name_type (n->child[1], &d, stack);
-	if (!d.pointer)
+	if (value->pointer && !d.pointer)
 	  return message (scope, n->child[1], "can only cast from pointers to pointers\n",
 			  warning_verbosity, stack);
 	Value * v = new_value (stack, n, type, d.pointer);
@@ -2913,6 +2946,22 @@ Value * ast_run_node (Ast * n, Stack * stack)
 	value_set_parent (value, n);
 	if (ast_assign_hook)
 	  value = ast_assign_hook (n, value, value, stack);
+	/**
+	Cast the value to the proper return type, if necessary. */
+	if (value && value->type->sym != sym_struct_or_union_specifier) {
+	  Dimensions d = { .size = 1 };
+	  Ast * type = return_type (ast_schema (ast_parent (n, sym_function_definition), sym_function_definition,
+						0, sym_function_declaration), &d, stack);
+	  if (type && type->sym != value->type->sym) {
+#if 0	    
+	    ast_print_tree (type, stderr, 0, 0, -1);
+	    ast_print_tree (value->type, stderr, 0, 0, -1);
+#endif
+	    Value * v = new_value (stack, n, type, d.pointer);
+	    assign (n, v, value, stack);
+	    value = v;
+	  }
+	}
       }
       else
 	value = new_value (stack, n, (Ast *)&ast_void, 0);
