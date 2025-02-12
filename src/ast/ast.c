@@ -104,7 +104,7 @@ static void ast_destroy_internal (Ast * n)
 
 void ast_destroy (Ast * n)
 {
-  if (n == ast_placeholder)
+  if (!n || n == ast_placeholder)
     return;
   if (n->parent && n->parent->child) {
     Ast ** c;
@@ -245,7 +245,7 @@ AstTerminal * ast_replace (Ast * n, const char * terminal, Ast * with)
 
 typedef struct {
   const char * name;
-  int line;
+  int line, macro;
 } File;
 
 static void update_file_line (const char * preproc, File * file)
@@ -373,6 +373,33 @@ static void str_print_internal (const Ast * n, int sym, int real, File * file,
     }
     if (real && (n->sym == sym_DOUBLE || n->sym == sym_FLOAT))
       output (data, "real", NULL);
+    else if (n->sym == sym_MACRODEF) {
+      if (ast_schema (ast_ancestor (n, 2), sym_declaration_specifiers,
+		      1, sym_declaration_specifiers))
+	output (data, "", NULL);
+      else
+	output (data, "void", NULL);
+    }
+    else if (n->sym == sym_AUTO) {
+      if (ast_schema (ast_ancestor (n, 2), sym_declaration_specifiers,
+		      1, sym_declaration_specifiers,
+		      0, sym_storage_class_specifier,
+		      0, sym_MACRODEF) ||
+	  ast_schema (ast_ancestor (n, 3), sym_parameter_declaration))
+	output (data, "    ", NULL);
+      else
+	output (data, t->start, NULL);
+    }
+    else if (n->sym == sym_ELLIPSIS_MACRO)
+      output (data, "{}", NULL);
+    else if (n->sym == sym_IDENTIFIER) {
+      if (ast_find (ast_schema (ast_ancestor (n, 5), sym_function_declaration,
+				0, sym_declaration_specifiers), sym_MACRODEF)) {
+	char s[20]; snprintf (s, 19, "%d", file->macro++);
+	output (data, "macro", s, "_", NULL);
+      }
+      output (data, t->start, NULL);
+    }
     else
       output (data, t->start, NULL);
     file->line += count_lines (t->start);
@@ -386,14 +413,13 @@ static void str_print_internal (const Ast * n, int sym, int real, File * file,
   else { // !terminal
 
     /**
-    Ignore macro definitions. */
-
-    if (ast_is_macro_declaration (n->child[0])) {
-      AstTerminal * t = ast_left_terminal (n);
-      if (t->before && !only_spaces (t->before, file, t)) {
-	output (data, t->before, NULL);
-	update_file_line (t->before, file);
-      }
+    Ignore 'break =' macro parameters. */
+    
+    if (ast_schema (ast_child (n, sym_parameter_declaration), sym_parameter_declaration,
+		    0, sym_BREAK)) {
+      Ast * list = ast_child (n, sym_parameter_list);
+      if (list)
+	str_print_internal (list, sym, real, file, output, data);
       return;
     }
 

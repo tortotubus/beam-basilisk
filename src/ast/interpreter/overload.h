@@ -168,52 +168,6 @@ void reset (void * alist, double val)
       reset_field_value (p + s->i, _attribute[s->i].name, 0.);
 }
 
-static double _dirichlet (double expr, Point point, Point neighbor, scalar _s, bool * data)
-{
-  if (data) {
-    *((bool *)data) = true;
-    return expr;
-  }
-  return 2.*expr - val(_s,0,0,0);
-}
-
-static double _dirichlet_homogeneous (double expr, Point point, Point neighbor, scalar _s, bool * data)
-{
-  if (data) {
-    *((bool *)data) = true;
-    return 0;
-  }
-  return - val(_s,0,0,0);
-}
-
-static double _dirichlet_face (double expr, Point point, Point neighbor, scalar _s, bool * data)
-{
-  return expr;
-}
-
-static double _dirichlet_face_homogeneous (double expr, Point point, Point neighbor, scalar _s, bool * data)
-{
-  return 0.;
-}
-
-static double _neumann (double expr, Point point, Point neighbor, scalar _s, bool * data)
-{
-  if (data) {
-    *((bool *)data) = false;
-    return expr;
-  }
-  return Delta*expr + val(_s,0,0,0);
-}
-
-static double _neumann_homogeneous (double expr, Point point, Point neighbor, scalar _s, bool * data)
-{
-  if (data) {
-    *((bool *)data) = false;
-    return 0;
-  }
-  return val(_s,0,0,0);
-}
-
 static const int o_stencil = -2;
 
 /**
@@ -461,62 +415,24 @@ double constant (scalar s)
   return is_constant(s) ? _constant[s.i - _NVARMAX] : 1e30;
 }
 
-double max (double a, double b)
-{
-  return a > b ? a : b;
-}
-
-double min (double a, double b)
-{
-  return a < b ? a : b;
-}
-
-double fmax (double a, double b)
-{
-  return a > b ? a : b;
-}
-
-double fmin (double a, double b)
-{
-  return a < b ? a : b;
-}
-
-int sign (double x)
-{
-  const int i = 1;
-  return x > 0 ? i : - i;
-}
-
-int sign2 (double x)
-{
-  const int i = 1;
-  return x > 0 ? i : x < 0 ? - i : 0;
-}
-
-double clamp (double x, double a, double b)
-{
-  return x < a ? a : x > b ? b : x;
-}
-
-int abs (int i)
-{
-  return i < 0 ? - i : i;
-}
-
 int depth() { int undef; return undef; }
 int pid()   { int undef; return undef; }
 int tid()   { int undef; return undef; }
 int npe()   { int undef; return undef; }
 
-double noise() { return 0. [0]; }
-
 void dimensional (int a) {}
 void show_dimension_internal (double a) {}
 
 /**
-## Emulations of macros in <math.h> */
+## Emulations of macros and functions in <math.h> */
 
 const double M_PI = 3.14159265358979 [0];
+const int RAND_MAX = 1;
+
+double fmax (double a, double b) { return a > b ? a : b; }
+double fmin (double a, double b) { return a < b ? a : b; }
+int abs (int i) { return i < 0 ? - i : i; }
+int rand() { int undef; return undef; }
 
 /**
 ## Events 

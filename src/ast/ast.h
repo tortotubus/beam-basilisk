@@ -140,11 +140,11 @@ static inline int ast_child_index (const Ast * n)
   return *c == n ? index : - 1;
 }
 
-static inline Ast * ast_ancestor (Ast * n, int i)
+static inline Ast * ast_ancestor (const Ast * n, int i)
 {
   while (n && i)
     n = n->parent, i--;
-  return n;
+  return (Ast *) n;
 }
 
 char * str_append_realloc (char * dst, ...);

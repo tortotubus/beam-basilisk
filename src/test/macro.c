@@ -51,6 +51,13 @@ macro int myreturn (double x)
   return x*x;
 }
 
+macro
+double myreturn2 (Point point, scalar s, auto double expr)
+{
+  double b = s[]*expr;
+  return b;
+}
+
 int main()
 {
   mymacro (end = 2)
@@ -80,4 +87,9 @@ int main()
   mymacro3 (s[], s1, DEF);
 
   fprintf (stderr, "%d\n", myreturn(12));
+
+  foreach()
+    fprintf (stderr, "%g %g %g %g\n", x, y,
+	     myreturn2 (point, s, x + y),
+	     myreturn2 (point, s1, s[]*(x + y)));
 }

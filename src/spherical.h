@@ -13,7 +13,8 @@ $[-180:180]$ degrees and *y* is the latitude within $[-90:90]$
 degrees. $\Delta$ is the characteristic cell length expressed in the
 same units as *Radius*. */
 
-macro map()
+macro map (double x = x, double y = y, double Delta = Delta,
+	   double Delta_x = Delta_x, double Delta_y = Delta_y)
 {
   x = x < -180. ? x + 360. : x > 180. ? x - 360. : x;
   Delta_x = Delta_y = Delta;

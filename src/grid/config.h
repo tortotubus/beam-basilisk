@@ -14,7 +14,11 @@
  @include <nvtx3/nvToolsExt.h>
 #endif
 
-macro BEGIN_FOREACH() {{...}}
+@define unmap(x,y)
+@define trash(x)  // data trashing is disabled by default. Turn it on with
+                  // -DTRASH=1
+
+auto macro BEGIN_FOREACH() {{...}}
 
 #if _OPENMP
 @ include <omp.h>
@@ -524,6 +528,7 @@ void mpi_init()
 
 #endif // not MPI, not OpenMP
 
+postmacro OMP_PARALLEL() {{...}}
 @define OMP_PARALLEL(...) OMP(omp parallel S__VA_ARGS__)
 
 @define NOT_UNUSED(x) (void)(x)
@@ -634,3 +639,16 @@ enum typedef_kind_t {
   sym_VEC4,
   sym_IVEC
 };
+
+@define attroffset(x) (offsetof(_Attributes,x))
+
+/**
+These are placeholders for internally-defined macros. */
+
+typedef int Reduce;
+
+postmacro foreach_face (char flags = 0, Reduce reductions = None,
+			const char * order = "xyz")
+{{...}}
+postmacro einstein_sum() {{...}}
+postmacro diagonalize (int a) {{...}}

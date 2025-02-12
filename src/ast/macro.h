@@ -1,65 +1,151 @@
 /**
 # Macros
 
-This implements the macro replacement of the form
+The [C preprocessor](https://gcc.gnu.org/onlinedocs/cpp/Macros.html)
+macros are familiar to C programmers (and are briefly introduced in
+the [Tutorial](/Tutorial#using-macros)). While they are very useful,
+their shortcomings are also well-known, for example:
+
+* multiline macros are hard to write, read and debug,
+* macros only deal with text i.e. they do not enforce the C syntax/grammar 
+  (which also makes them hard to write and debug),
+* while macros can be used to implement simple iterators, the syntax is cumbersome.
+
+As an illustration, consider the following simple iteration macro
 
 ~~~c
-macro func (double a) {
-  do_something (a);
-  {...}
-  do_something_else();
+#define iterator(start, end, index, expr) do {    \
+  for (int index = start; index <= end; index++)  \
+    expr                                          \
+} while(0)
+
+int main() {
+  iterator (0, 10, i, { printf ("%d\n", i); });
 }
-...
-  func (pi)
-    do_yet_another_thing();
 ~~~
 
-into
+Using Basilisk macros, this would be written
 
-~~~c
-macro func (double a) {
-  do_something (a);
-
-  do_something_else();
+~~~literatec
+macro iterator (int start, int end, int index) {
+  for (int index = start; index <= end; index++)
+    {...}
 }
+
+int main() {
+  iterator (0, 10, i)
+    printf ("%d\n", i);
+}
+~~~
+
+The syntax/grammar of the macro definition is now almost identical to
+the definition of a standard C function and is checked as such by the
+compiler. Using the macro also respects the C grammar (i.e. that of
+standard C iterators: `for`, `while` etc.).
+
+Two new reserved keywords have been introduced: 
+
+* `macro` which indicates that what follows is a macro definition, and 
+* `{...}` which is expanded to the statement used when the macro is
+  called (i.e. to `printf ("%d\n", i);` in this example).
+
+## Macro expansion
+
+The expansion of the arguments passed to Basilisk macros is what
+makes them different from functions. To illustrate this, consider the
+following example
+
+~~~literatec
+macro initialize (scalar s, double expr)
+{
+  foreach()
+    s[] = expr;
+}
+
+int main() {
+  init_grid (16);
+  scalar a[];
+  initialize (a, sqrt (x*x + y*y));
+}
+~~~
+
+It is clear that if `initialize` was a function (i.e. `macro
+initialize...` would just be replaced by `void initialize...`), this
+would not compile, because `x` and `y` are not defined when
+`initialize` is called in `main`. This works because Basilisk macros
+are expanded before compilation (like their C counterpart). After
+macro expansion the code would read
+
+~~~literatec
 ...
+int main() {
+  init_grid (16);
+  scalar a[];
   {
-    do_something (pi);
-    do_yet_another_thing();
-    do_something_else();
+    foreach()
+      a[] = sqrt (x*x + y*y);
   }
+}
 ~~~
-*/
+
+## Macros returning a value
+
+* return type (non)-casting
+
+## Optional arguments
+
+Since macros share their syntax with that of functions, they can also
+define [optional arguments](/Basilisk
+C#namedoptional-arguments-in-function-calls). The default value `None`
+is specific to macros and will be expanded to nothing.
+
+## Breaking out of macro iterators
+
+By default trying to `break` out of a macro iterator (like the
+`iterator` example above) will cause an error. Breaking must
+explicitly be set when defining the macro, for example
+
+~~~literatec
+macro iterator (int start, int end, int index, break = break) {
+  ...
+}
+~~~
+
+where breaking uses the standard `break` statement, or
+
+~~~literatec
+macro iterator (int start, int end, int index, break = (index = end + 1)) {
+  ...
+}
+~~~
+
+where the given expression will be expanded in replacement of the
+`break` statement.
+
+## Postmacros
+
+Macros defined using the `postmacro` reserved keyword will be expanded
+after preprocessing by [qcc](/src/qcc.c). They will thus not be seen
+by the [interpreter](interpreter/interpreter.c) or by [computation
+kernels](kernels.c). 
+
+*This is a low-level functionality which should not be used for "user"
+macros.*
+
+## See also
+
+* [Macro tests](/src/test/macro.c)
+
+# Implementation */
 
 typedef struct {
   Ast * statement, * arguments, * parameters, * call;
   bool in_a_macro_definition, nolineno;
+  int * complex_call;
 } MacroReplacement;
 
 static Ast * argument_value (Ast * identifier, Stack * stack, const MacroReplacement * r)
 {
-
-  /**
-  The parameters are just a list of identifiers. */
-  
-  if (r->parameters->sym == sym_identifier_list) {
-    Ast * parameters = r->parameters;
-    while (parameters && parameters->child[0]->sym == parameters->sym)
-      parameters = parameters->child[0];
-    Ast * arguments = r->arguments;
-    foreach_item_r (arguments, sym_argument_expression_list_item, argument) {
-      Ast * parameter = ast_child (parameters, sym_IDENTIFIER);
-      parameters = parameters->parent;
-      assert (parameter);
-      if (!strcmp (ast_terminal (parameter)->start, ast_terminal (identifier)->start))
-	return argument;
-    }
-    return NULL;
-  }
-
-  /**
-  The parameters are a list of declarations. */
-  
   Ast * decl = ast_identifier_declaration_from_to (stack, ast_terminal (identifier)->start,
 						   r->statement, NULL);
   if (decl && ast_parent (decl, sym_parameter_type_list) == r->parameters) {
@@ -77,14 +163,12 @@ static Ast * argument_value (Ast * identifier, Stack * stack, const MacroReplace
 	if (parameter == parent) {
 
 	  /**
-	  Structure members can only be substituted with 'void' parameters. */
+	  For complex return macros, only substitute parameters marked 'auto'. */
 
-	  if (ast_ancestor (identifier, 2)->sym == sym_member_identifier &&
-	      !ast_schema (parameter, sym_parameter_declaration,
-			   0, sym_declaration_specifiers,
-			   0, sym_type_specifier,
-			   0, sym_types,
-			   0, sym_VOID))
+	  if (r->complex_call && !ast_schema (parameter, sym_parameter_declaration,
+					      0, sym_declaration_specifiers,
+					      0, sym_storage_class_specifier,
+					      0, sym_AUTO))
 	    return NULL;
 
 	  value = argument;
@@ -165,9 +249,6 @@ static void replace_arguments (Ast * n, Stack * stack, void * data)
   }
   else if ((identifier = ast_schema (n, sym_direct_declarator,
 				     0, sym_generic_identifier,
-				     0, sym_IDENTIFIER)) ||
-	   (identifier = ast_schema (n, sym_member_identifier,
-				     0, sym_generic_identifier,
 				     0, sym_IDENTIFIER))) {
     Ast * value = argument_value (identifier, stack, r);
     if (value) {
@@ -179,8 +260,8 @@ static void replace_arguments (Ast * n, Stack * stack, void * data)
 	fprintf (stderr, "%s:%d: error: macro argument '%s' must be a simple identifier\n",
 		 t->file, t->line, ast_terminal (identifier)->start);
 	t = ast_terminal (identifier);
-	fprintf (stderr, "%s:%d: error: because it is used here as a %s\n",
-		 t->file, t->line, n->sym == sym_direct_declarator ? "declarator" : "structure member");
+	fprintf (stderr, "%s:%d: error: because it is used here as a declarator\n",
+		 t->file, t->line);
 	exit (1);
       }
       free (ast_terminal (identifier)->start);
@@ -260,7 +341,8 @@ static void replace_break (Ast * n, Ast * breaking, Ast * parent)
       replace_break (*c, breaking, parent);
 }
 
-static void macro_replacement (Ast * statement, Stack * stack, const char * exclude[], bool nolineno)
+static void macro_replacement (Ast * statement, Stack * stack, bool nolineno, bool postmacros,
+			       int * return_macro_index)
 {
   Ast * identifier, * macro_statement = ast_schema (statement, sym_statement,
 						    0, sym_basilisk_statements,
@@ -273,6 +355,9 @@ static void macro_replacement (Ast * statement, Stack * stack, const char * excl
 				     0, sym_MACRO)))
     macro_statement = statement;
   if (!macro_statement)
+    return;
+
+  if (!strcmp (ast_terminal (identifier)->start, "OMP_PARALLEL"))
     return;
   
   if (!strcmp (ast_terminal (identifier)->start, "foreach_block") &&
@@ -287,17 +372,17 @@ static void macro_replacement (Ast * statement, Stack * stack, const char * excl
 	     ast_terminal (identifier)->file, ast_terminal (identifier)->line, ast_terminal (identifier)->start);
     exit (1);
   }
-  
-  // fixme: should just be based on the names for "diagonalize" and "einstein_sum"
-  if (!ast_is_macro_declaration (macro_definition->child[0]))
-    return;
 
-  if (exclude)
-    for (const char ** s = exclude; *s; s++)
-      if (((*s)[strlen(*s) - 1] == '*' &&
-	   !strncmp(ast_terminal (identifier)->start, *s, strlen(*s) - 1)) ||
-	  !strcmp (ast_terminal (identifier)->start, *s))
-	return;
+  if (!postmacros) {
+    Ast * macrodef = ast_find (ast_schema (macro_definition, sym_function_definition,
+					   0, sym_function_declaration),
+			       sym_declaration_specifiers,
+			       0, sym_storage_class_specifier,
+			       0, sym_MACRODEF);
+    assert (macrodef);
+    if (!strcmp (ast_terminal (macrodef)->start, "postmacro"))
+      return;
+  }
   
   optional_arguments (macro_statement, stack);
 
@@ -310,26 +395,27 @@ static void macro_replacement (Ast * statement, Stack * stack, const char * excl
 			      0, sym_direct_declarator,
 			      2, sym_parameter_type_list),
     .call = macro_statement,
-    .nolineno = nolineno
+    .nolineno = nolineno,
+    .complex_call = (statement->sym == sym_function_call &&
+		     !ast_schema (ast_find (macro_definition, sym_compound_statement),
+				  sym_compound_statement,
+				  1, sym_block_item_list,
+				  0, sym_block_item,
+				  0, sym_statement,
+				  0, sym_jump_statement,
+				  0, sym_RETURN)) ? return_macro_index : NULL
   };
 
   Ast * definition = ast_parent (statement, sym_function_definition);
   if (definition && ast_is_macro_declaration (definition->child[0]))
     r.in_a_macro_definition = true;
 
-  if (!r.parameters)
-    r.parameters = ast_schema (macro_definition, sym_function_definition,
-			       0, sym_function_declaration,
-			       1, sym_declarator,
-			       0, sym_direct_declarator,
-			       2, sym_identifier_list);
-
   int na = 0;
   if (r.arguments)
     foreach_item (r.arguments, 2, argument) na++;
   int np = 0;
   if (r.parameters) {
-    Ast * list = r.parameters->sym == sym_identifier_list ? r.parameters : r.parameters->child[0];
+    Ast * list = r.parameters->child[0];
     foreach_item (list, 2, parameter)
       if (!ast_schema (parameter, sym_parameter_declaration,
 		       0, sym_BREAK))
@@ -363,16 +449,30 @@ static void macro_replacement (Ast * statement, Stack * stack, const char * excl
 
   if (r.statement) {
     Ast * breaking = NULL;
-    if (r.parameters &&
-	!(breaking = ast_find (r.parameters, sym_parameter_declaration,
-			       2, sym_initializer,
-			       0, sym_assignment_expression)))
+    if (r.parameters && !(breaking = ast_find (r.parameters, sym_parameter_declaration,
+					       2, sym_initializer,
+					       0, sym_assignment_expression)))
       breaking = ast_find (r.parameters, sym_parameter_declaration,
 			   2, sym_BREAK);
-    replace_break (r.statement, breaking, r.statement);
+    Ast * copy = breaking;
+    if (breaking) {
+      if (r.parameters) {
+	copy = ast_copy (breaking);
+	stack_push (stack, &copy);
+	ast_push_function_definition (stack, ast_find (macro_definition, sym_direct_declarator));
+	if (r.statement)
+	  stack_push (stack, &r.statement);
+	ast_traverse (copy, stack, replace_arguments, &r);
+	ast_pop_scope (stack, copy);
+      }
+    }
+    replace_break (r.statement, copy, r.statement);
+    if (copy != breaking)
+      ast_destroy (copy);
   }
-  
-  Ast * copy = ast_copy (ast_find (macro_definition, sym_compound_statement));
+
+  Ast * defcopy = ast_copy (macro_definition);
+  Ast * copy = ast_find (defcopy, sym_compound_statement);
   stack_push (stack, &copy);
   ast_push_function_definition (stack, ast_find (macro_definition, sym_direct_declarator));
   if (r.statement)
@@ -404,8 +504,15 @@ static void macro_replacement (Ast * statement, Stack * stack, const char * excl
 			     0, sym_jump_statement);
     if (ast_schema (jump, sym_jump_statement,
 		    0, sym_RETURN)) {
+      assert (!r.complex_call);
+
+      Ast * autoparam = ast_find (r.parameters, sym_AUTO);
+      if (autoparam)
+	fprintf (stderr, "%s:%d: warning: 'auto' declaration is useless for simple return macros\n",
+		 ast_terminal (autoparam)->file, ast_terminal (autoparam)->line);
+      
       /**
-      This a simple macro i.e. 'macro int func(...){ return ...; }'. */
+      This a simple return macro i.e. 'macro int func(...){ return ...; }'. */
       Ast * expr = ast_schema (jump, sym_jump_statement,
 			       1, sym_expression);
       if (!expr) {
@@ -421,12 +528,84 @@ static void macro_replacement (Ast * statement, Stack * stack, const char * excl
       statement->sym = sym_primary_expression;
       for (Ast ** c = statement->child; *c; c++)
 	ast_destroy (*c);
+      ast_set_line (expr, o, true);
       ast_new_children (statement, o,
 			NN(expr, sym_expression_error,
 			   expr), c);
       ast_destroy (copy);
     }
-    else
-      abort();
+    else {
+      assert (r.complex_call);
+      
+      /**
+      This is a "complex" return macro. We first remove the 'auto'
+      parameters from the macro definition and the corresponding
+      arguments in the function call. */
+      
+      if (r.arguments) {
+	Ast * parameters = ast_schema (defcopy, sym_function_definition,
+				       0, sym_function_declaration,
+				       1, sym_declarator,
+				       0, sym_direct_declarator,
+				       2, sym_parameter_type_list,
+				       0, sym_parameter_list);
+	Ast * arguments = r.arguments, * aparent = arguments->parent;
+	Ast * _list1 = parameters, * parameter = _list1->child[1] ? _list1->child[2] : _list1->child[0];
+	foreach_item (arguments, 2, argument) {
+	  if (ast_schema (parameter, sym_parameter_declaration,
+			  0, sym_declaration_specifiers,
+			  0, sym_storage_class_specifier,
+			  0, sym_AUTO)) {
+	    arguments = ast_list_remove (arguments, argument);
+	    parameters = ast_list_remove (parameters, parameter);
+	    if (arguments == NULL) {
+	      assert (parameters == NULL);
+	      ast_destroy (aparent->child[2]);
+	      for (Ast ** c = aparent->child + 2; *c; c++)
+		*c = *(c + 1);
+	      aparent = ast_schema (defcopy, sym_function_definition,
+				    0, sym_function_declaration,
+				    1, sym_declarator,
+				    0, sym_direct_declarator);
+	      ast_destroy (aparent->child[2]);
+	      for (Ast ** c = aparent->child + 2; *c; c++)
+		*c = *(c + 1);
+	      break;
+	    }
+	  }
+	  if (!((_list1 = _list1 && _list1 != ast_placeholder &&
+		 _list1->child[1] ? _list1->child[0] : NULL), parameter))
+	    break;
+	  parameter = _list1 && _list1 != ast_placeholder ?
+	    (_list1->child[1] ? _list1->child[2] : _list1->child[0]) : NULL;
+	}
+      }
+
+      /**
+      We then turn the macro into a (unique) function. */
+
+      Ast * macrodef = ast_schema (statement, sym_function_call,
+				   0, sym_postfix_expression,
+				   0, sym_primary_expression,
+				   0, sym_MACRO);
+      macrodef->sym = sym_IDENTIFIER;
+      char s[20]; snprintf (s, 19, "_%d", (*r.complex_call)++);
+      str_append (ast_terminal (macrodef)->start, s);
+      macrodef = ast_find (defcopy->child[0], sym_IDENTIFIER);
+      str_append (ast_terminal (macrodef)->start, s);
+      macrodef = ast_find (defcopy->child[0], sym_MACRODEF);
+      macrodef->sym = sym_STATIC;
+      free (ast_terminal (macrodef)->start);
+      ast_terminal (macrodef)->start = strdup ("static");
+
+      /**
+      We append the new function after the existing one. */
+
+      ast_block_list_append (ast_parent (macro_definition, sym_translation_unit),
+			     sym_external_declaration, defcopy);
+      defcopy = NULL;
+    }
   }
+
+  ast_destroy (defcopy);
 }

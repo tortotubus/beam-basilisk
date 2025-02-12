@@ -576,17 +576,6 @@ void kernel (Ast * n, Stack * stack, void * data)
       break;
     
     /**
-    ## Dirichlet and Neumann boundary conditions */
-
-    if (!strcmp (t->start, "_dirichlet") ||
-	!strcmp (t->start, "_dirichlet_homogeneous") ||
-	!strcmp (t->start, "_dirichlet_face") ||
-	!strcmp (t->start, "_dirichlet_face_homogeneous") ||
-	!strcmp (t->start, "_neumann") ||
-	!strcmp (t->start, "_neumann_homogeneous"))
-      break;
-    
-    /**
     ## Undeclared or unsupported functions */
     
     if (!(identifier = ast_identifier_declaration (stack, t->start))) {
