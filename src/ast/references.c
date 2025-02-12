@@ -29,7 +29,7 @@ bool is_local_declaration (Ast * n, Stack * stack, Ast * scope)
 }
 
 static
-void external_references (Ast * n, Stack * stack, void * data);
+void external_references (Ast * n, Stack * stack, Accelerator * a);
 
 static
 void add_external_reference (const char * name, Stack * stack, Accelerator * a)
@@ -61,7 +61,7 @@ void add_external_reference (const char * name, Stack * stack, Accelerator * a)
       Accelerator b = *a;
       b.scope = definition;
       stack_push (stack, &definition);
-      ast_traverse (definition, stack, external_references, &b);
+      external_references (definition, stack, &b);
       ast_pop_scope (stack, definition);
       a->nonlocals = b.nonlocals;
       a->attributes = b.attributes;
@@ -72,19 +72,28 @@ void add_external_reference (const char * name, Stack * stack, Accelerator * a)
 }
 
 static
-void external_references (Ast * n, Stack * stack, void * data)
+void external_references (Ast * n, Stack * stack, Accelerator * a)
 {
+  if (!n || n == ast_placeholder ||
+      (n->sym == sym_initializer && n->parent->sym == sym_parameter_declaration))
+    return;
+
+  Ast * scope = ast_push_declarations (n, stack);
+
+  if (n->child)
+    for (Ast ** c = n->child; *c; c++)
+      external_references (*c, stack, a);
+  
   if (ast_schema (n->parent, sym_primary_expression,
 		  0, sym_IDENTIFIER) &&
       strcmp (ast_terminal (n)->start, "_attribute"))
-    add_external_reference (ast_terminal (n)->start, stack, data);
+    add_external_reference (ast_terminal (n)->start, stack, a);
   else if ((n->sym == sym_IDENTIFIER && ast_attribute_access (ast_ancestor (n, 3), stack)) ||
 	   (n = ast_attribute_array_access (ast_ancestor (n, 3)))) {
       
     /**
     Scalar attribute */
 
-    Accelerator * a = data;
     Ast * found = fast_stack_find (a->attributes, ast_terminal (n)->start);
     if (!found) {
       Ast * attributes = ast_find (ast_ancestor (ast_identifier_declaration (stack, "_Attributes"), 6),
@@ -107,6 +116,8 @@ void external_references (Ast * n, Stack * stack, void * data)
 	stack_push (a->attributes, &found);
     }
   }
+
+  ast_pop_scope (stack, scope);
 }
 
 static
@@ -306,7 +317,7 @@ char * ast_external_references (Ast * scope, char * references, Stack * function
   Accelerator a = { scope };
   a.nonlocals = stack_new (sizeof (Ast *));
   a.attributes = stack_new (sizeof (Ast *));
-  ast_traverse (scope, stack, external_references, &a);
+  external_references (scope, stack, &a);
   ast_pop_scope (stack, scope);
 
   Ast ** n;
