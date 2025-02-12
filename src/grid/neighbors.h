@@ -1,5 +1,6 @@
 #if dimension == 1
-macro foreach_neighbor (int _s = GHOSTS, break = (_k = _nn + 1)) {
+postmacro foreach_neighbor (int _s = GHOSTS,
+			    Point point = point, break = (_k = _nn + 1)) {
   const int _nn = _s;
   const int _i = point.i;
   for (int _k = - _nn; _k <= _nn; _k++) {
@@ -10,7 +11,8 @@ macro foreach_neighbor (int _s = GHOSTS, break = (_k = _nn + 1)) {
   point.i = _i;
 }
 #elif dimension == 2
-macro foreach_neighbor (int _s = GHOSTS, break = (_k = _l = _nn + 1)) {
+postmacro foreach_neighbor (int _s = GHOSTS,
+			    Point point = point, break = (_k = _l = _nn + 1)) {
   const int _nn = _s;
   const int _i = point.i, _j = point.j;
   for (int _k = - _nn; _k <= _nn; _k++) {
@@ -24,7 +26,8 @@ macro foreach_neighbor (int _s = GHOSTS, break = (_k = _l = _nn + 1)) {
   point.i = _i; point.j = _j;
 }
 #else // dimension == 3
-macro foreach_neighbor (int _s = GHOSTS, break = (_l = _m = _n = _nn + 1)) {
+postmacro foreach_neighbor (int _s = GHOSTS,
+			    Point point = point, break = (_l = _m = _n = _nn + 1)) {
   const int _nn = _s;
   const int _i = point.i, _j = point.j, _k = point.k;
   for (int _l = - _nn; _l <= _nn; _l++) {

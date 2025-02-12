@@ -226,7 +226,7 @@ static void optional_arguments (Ast * call, Stack * stack)
 	    ast_destroy (parameters->child[1]);
 	    ast_destroy (parameters->child[2]);
 	    parameters->child[1] = parameters->child[2] = NULL;
-	    ast_set_child (parameters, 0, parameters->child[0]->child[0]);
+	    parameters = parameters->child[0];
 	  }
 	}
 	Ast * parameters1 = parameters;
@@ -319,7 +319,7 @@ static void optional_arguments (Ast * call, Stack * stack)
 	    AstTerminal * t = ast_left_terminal (call);
 	    fprintf (stderr, "%s:%d: error: missing compulsory parameter '%s' in %s call\n",
 		     t->file, t->line, ast_terminal (id)->start,
-		     call->sym == sym_macro_statement ? "macro" : "function");	    
+		     call->sym == sym_macro_statement ? "macro" : "function");
 	    exit (1);
 	  }
 	  Ast * assign = ast_schema (initializer, sym_initializer,

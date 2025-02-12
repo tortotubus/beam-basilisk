@@ -1,23 +1,24 @@
+typedef double number; // used in macros to indicate "any numeric type"
 #define pi 3.14159265358979
 #undef HUGE
 #define HUGE 1e30f
 #define nodata HUGE
 
-@define max(a,b) ((a) > (b) ? (a) : (b))
-@define min(a,b) ((a) < (b) ? (a) : (b))
-@define sq(x) ((x)*(x))
-@define cube(x) ((x)*(x)*(x))
-@define sign(x) ((x) > 0 ? 1 : -1)
-@define sign2(x) ((x) > 0 ? 1 : (x) < 0 ? -1 : 0)
-@define noise() (1. - 2.*rand()/(double)RAND_MAX)
-@define clamp(x,a,b) ((x) < (a) ? (a) : (x) > (b) ? (b) : (x))
-#define swap(type,a,b) do { type _tmp_ = a; a = b; b = _tmp_; } while(false)
-@define unmap(x,y)
+macro number max (number a, number b) { return a > b ? a : b; }
+macro number min (number a, number b) { return a < b ? a : b; }
+macro number sq (number x) { return x*x; }
+macro number cube (number x) { return x*x*x; }
+macro int sign (number x) { return (int)(x > 0 ? 1 : -1); }
+macro int sign2 (number x) { return (int)(x > 0 ? 1 : x < 0 ? -1 : 0); }
+macro number clamp (number x, number a, number b) {
+  return x < a ? a : x > b ? b : x;
+}
 
-@define trash(x)  // data trashing is disabled by default. Turn it on with
-                  // -DTRASH=1
+#define swap(type,a,b) do { type _tmp_ = a; a = b; b = _tmp_; } while(false)
 
 #include "grid/config.h"
+
+static inline double noise() { return 1. - 2.*rand()/(double)RAND_MAX; }
 
 // the grid
 typedef struct {
@@ -124,13 +125,6 @@ double zero (double s0, double s1, double s2) { return 0.; }
 int nboundary = 2*dimension;
 
 #define none -1
-
-@define _dirichlet(expr, ...)             (2.*(expr) - val(_s,0,0,0))
-@define _dirichlet_homogeneous(...)       (- val(_s,0,0,0))
-@define _dirichlet_face(expr,...)         (expr)
-@define _dirichlet_face_homogeneous(...)  (0.)
-@define _neumann(expr,...)                (Delta*(expr) + val(_s,0,0,0))
-@define _neumann_homogeneous(...)         (val(_s,0,0,0))
 
 double  * _constant = NULL;
 size_t datasize = 0;
@@ -398,8 +392,6 @@ const scalar zeroc[] = 0.;
 (const) face vector fm[] = {1.[0],1.[0],1.[0]};
 (const) scalar cm[] = 1.[0];
 
-
-
 // Embedded boundaries
 // these macros are overloaded in embed.h
 
@@ -537,8 +529,6 @@ typedef struct {
   float r, g, b, a;
 } vec4;
 
-@define attroffset(x) (offsetof(_Attributes,x))
-
 #if dimension == 1
 # define avector(x, ...)    {x}
 #elif dimension == 2
@@ -546,24 +536,6 @@ typedef struct {
 #else // dimension == 3
 # define avector(x, y, z)   {x, y, z}
 #endif
-
-/**
-These are placeholders for internally-defined macros. */
-
-macro foreach_face (char flags = 0, void reductions = None, const char * order = "xyz") {{...}}
-macro einstein_sum() {{...}}
-macro diagonalize (void a) {{...}}
-macro OMP_PARALLEL() {{...}}
- 
-#if LAYERS
-# include "grid/layers.h"
-#endif
-
-#include "grid/stencils.h"
-
-#define dirichlet(expr)                 _dirichlet(expr, point, neighbor, _s, data)
-#define dirichlet_face(expr)            _dirichlet_face(expr, point, neighbor, _s, data)
-#define neumann(expr)                   _neumann(expr, point, neighbor, _s, data)
 
 typedef struct {
   coord x, y, z;

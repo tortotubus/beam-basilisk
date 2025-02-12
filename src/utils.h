@@ -340,7 +340,7 @@ mesh and spanning the [A:B] segment. The pair of coordinates defining
 the sub-segment contained in each cell are defined by `p[0]` and
 `p[1]`. */
 
-macro foreach_segment (coord S[2], coord p[2], void reductions = None)
+macro foreach_segment (coord S[2], coord p[2], Reduce reductions = None)
 {
   double norm = sqrt(sq(S[1].x - S[0].x) + sq(S[1].y - S[0].y));
   if (norm > 0.) {

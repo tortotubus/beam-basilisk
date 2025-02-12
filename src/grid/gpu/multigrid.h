@@ -49,7 +49,10 @@
   "        _shift[point.level - 1] +"					\
   "        _index(a,m)*field_size()]\n"
 
+static bool _gpu_done_ = false;
+
 #include "../multigrid.h"
+#include "../stencils.h"
 #include "gpu.h"
 #include "../multigrid-common.h"
 

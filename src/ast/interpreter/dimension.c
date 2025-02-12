@@ -694,13 +694,14 @@ Dimension * get_dimension (Value * v, Stack * stack)
     }
 
     /**
-    Constants in multiplicative expressions are dimensionless. */
+    Non-zero constants in multiplicative expressions are dimensionless. */
 
     Ast * parent = binary_expression_parent (n);
     if (parent && (parent->sym == sym_multiplicative_expression ||
 		   (parent->sym == sym_assignment_expression &&
 		    (parent->child[1]->child[0]->sym == sym_MUL_ASSIGN ||
-		     parent->child[1]->child[0]->sym == sym_DIV_ASSIGN))))
+		     parent->child[1]->child[0]->sym == sym_DIV_ASSIGN))) &&
+	(!ast_terminal(n) || atof (ast_terminal(n)->start)))
       return (value_dimension (v) = dimension_zero (stack_static_alloc (stack), (Ast *) v));
     
     /**
@@ -1557,11 +1558,7 @@ static
 Value * dimension_internal_functions (Ast * call, Ast * identifier, Value ** params, Stack * stack, Value * value)
 {
   const char * name = ast_terminal (identifier)->start;
-  if (!strcmp (name, "sq"))
-    value_dimension (value) = dimension_pow (call, stack, get_dimension (params[0], stack), 2.);
-  else if (!strcmp (name, "cube"))
-    value_dimension (value) = dimension_pow (call, stack, get_dimension (params[0], stack), 3.);
-  else if (!strcmp (name, "sqrt"))
+  if (!strcmp (name, "sqrt"))
     value_dimension (value) = dimension_pow (call, stack, get_dimension (params[0], stack), 0.5);
   else if (!strcmp (name, "atan2")) {
     Dimension * constraint = dimensions_multiply (call, stack_static_alloc (stack),

@@ -2693,6 +2693,7 @@ static int check_type (AstRoot * parse, bool call)
     {"int",	       INT},
     {"long",	       LONG},
     {"macro",          MACRODEF},
+    {"postmacro",      MACRODEF},
     {"register",       REGISTER},
     {"restrict",       RESTRICT},
     {"return",	       RETURN},

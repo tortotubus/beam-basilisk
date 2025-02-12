@@ -5,47 +5,11 @@ void (* debug)    (Point);
 @define _val_constant(a,k,l,m) ((const double) _constant[a.i -_NVARMAX])
 @define val_diagonal(a,k,l,m) ((k) == 0 && (l) == 0 && (m) == 0)
 
-@undef VARIABLES
-@def VARIABLES
-  double Delta = L0*_DELTA; /* cell size */
-  double Delta_x = Delta; /* cell size (with mapping) */
-#if dimension > 1
-  double Delta_y = Delta; /* cell size (with mapping) */
-#endif
-#if dimension > 2
-  double Delta_z = Delta; /* cell size (with mapping) */
-#endif
-  /* cell/face center coordinates */
-  double x = (ig/2. + _I + 0.5)*Delta + X0; NOT_UNUSED(x);
-#if dimension > 1
-  double y = (jg/2. + _J + 0.5)*Delta + Y0;
-#else
-  double y = 0.;
-#endif
- NOT_UNUSED(y);
-#if dimension > 2
-  double z = (kg/2. + _K + 0.5)*Delta + Z0;
-#else
-  double z = 0.;
-#endif
-  NOT_UNUSED(z);
-  /* we need this to avoid compiler warnings */
-  NOT_UNUSED(Delta);
-  NOT_UNUSED(Delta_x);
-#if dimension > 1
-  NOT_UNUSED(Delta_y);
-#endif
-#if dimension > 2
-  NOT_UNUSED(Delta_z);
-#endif
-  /* and this when catching FPEs */
-  _CATCH;
-@
-
 #include "fpe.h"
+#include "stencils.h"
 
-macro foreach_point (double x = 0., double y = 0., double z = 0.,
-		    char flags = 0, void reductions = None)
+postmacro foreach_point (double x = 0., double y = 0., double z = 0.,
+			 char flags = 0, Reduce reductions = None)
 {
   int ig = 0, jg = 0, kg = 0; NOT_UNUSED(ig); NOT_UNUSED(jg); NOT_UNUSED(kg);
   coord _p = { x, y, z };
@@ -56,10 +20,10 @@ macro foreach_point (double x = 0., double y = 0., double z = 0.,
   }
 }
 
-macro foreach_region (coord p, coord box[2], coord n, char flags = 0, void reductions = None)
+postmacro foreach_region (coord p, coord box[2], coord n,
+			  char flags = 0, Reduce reductions = None)
 {
-  NOT_UNUSED (p);
-  coord p = {0, 0, box[0].z};
+  p = (coord){0, 0, box[0].z};
   //  OMP(omp for schedule(static))
   for (int _i = 0; _i < (int) n.x; _i++) {
     p.x = box[0].x + (box[1].x - box[0].x)/n.x*(_i + 0.5);
@@ -73,6 +37,45 @@ macro foreach_region (coord p, coord box[2], coord n, char flags = 0, void reduc
       }
     }
   }
+}
+
+/**
+Dirichlet and Neumann boundary conditions */
+
+static inline
+double dirichlet (double expr, Point point = point, scalar s = _s)
+{
+  return 2.*expr - s[];
+}
+
+static inline
+double dirichlet_homogeneous (double expr, Point point = point, scalar s = _s)
+{
+  return - s[];
+}
+
+static inline
+double dirichlet_face (double expr)
+{
+  return expr;
+}
+
+static inline
+double dirichlet_face_homogeneous (double expr)
+{
+  return 0.;
+}
+
+static inline
+double neumann (double expr, Point point = point, scalar s = _s)
+{
+  return Delta*expr + s[];
+}
+
+static inline
+double neumann_homogeneous (double expr, Point point = point, scalar s = _s)
+{
+  return s[];
 }
 
 /**

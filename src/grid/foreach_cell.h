@@ -63,7 +63,7 @@ void recursive (Point point)
     stage = stack[_s].stage; _s--; }
 #endif
 
-macro foreach_cell_root (Point root)
+postmacro foreach_cell_root (Point root)
 {
   int ig = 0, jg = 0;	NOT_UNUSED(ig); NOT_UNUSED(jg);
   Point point = {0};
@@ -121,7 +121,7 @@ macro foreach_cell_root (Point root)
   }
 }
 
-macro foreach_cell()
+postmacro foreach_cell()
 {
 #if dimension == 1
   Point root = {GHOSTS,0};
@@ -134,7 +134,7 @@ macro foreach_cell()
     {...}
 }
 
-macro foreach_cell_all() {
+postmacro foreach_cell_all() {
   Point root = {0};
   for (root.i = GHOSTS*Period.x; root.i <= GHOSTS*(2 - Period.x); root.i++)
 #if dimension >= 2
@@ -147,7 +147,7 @@ macro foreach_cell_all() {
 	  {...}
 }
 
-macro foreach_cell_post_root (bool condition, Point root)
+postmacro foreach_cell_post_root (bool condition, Point root)
 {
   int ig = 0, jg = 0;	NOT_UNUSED(ig); NOT_UNUSED(jg);
   Point point = {0};
@@ -248,7 +248,7 @@ macro foreach_cell_post_root (bool condition, Point root)
   }
 }
 
-macro foreach_cell_post (bool condition)
+postmacro foreach_cell_post (bool condition)
 {
 #if dimension == 1
   Point root = {GHOSTS,0};
@@ -261,7 +261,7 @@ macro foreach_cell_post (bool condition)
     {...}
 }
 
-macro foreach_cell_post_all (condition)
+postmacro foreach_cell_post_all (bool condition)
 {
   Point root = {0};
   for (root.i = 0; root.i <= 2*GHOSTS; root.i++)
@@ -275,7 +275,7 @@ macro foreach_cell_post_all (condition)
 	  {...}
 }
 
-macro foreach_leaf()
+postmacro foreach_leaf()
 {
   foreach_cell()
     if (is_leaf (cell)) {

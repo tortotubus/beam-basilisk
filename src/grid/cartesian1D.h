@@ -25,7 +25,7 @@ static Point last_point;
 
 @define POINT_VARIABLES VARIABLES
 
-macro foreach (char flags = 0, void reductions = None)
+postmacro foreach (char flags = 0, Reduce reductions = None)
 {
   OMP_PARALLEL (reductions) {
     int ig = 0, jg = 0; NOT_UNUSED(ig); NOT_UNUSED(jg);
@@ -41,7 +41,8 @@ macro foreach (char flags = 0, void reductions = None)
   }
 }
   
-macro foreach_face_generic (char flags = 0, void reductions = None)
+postmacro foreach_face_generic (char flags = 0, Reduce reductions = None,
+				const char * order = "xyz")
 {
   OMP_PARALLEL (reductions) {
     int ig = 0, jg = 0; NOT_UNUSED(ig); NOT_UNUSED(jg);
@@ -57,15 +58,7 @@ macro foreach_face_generic (char flags = 0, void reductions = None)
   }
 }
 
-macro foreach_vertex (char flags = 0, void reductions = None)
-{
-  foreach_face_generic (flags, reductions) {
-    x -= Delta/2.;
-    {...}
-  }
-}
-
-macro is_face_x() { int ig = -1; VARIABLES; {...} }
+macro is_face_x() { int ig = -1; NOT_UNUSED(ig); VARIABLES; {...} }
 
 // ghost cell coordinates for each direction
 static int _ig[] = {1,-1};
@@ -232,7 +225,16 @@ Point locate (double xp = 0, double yp = 0, double zp = 0)
   return point;
 }
 
+#include "variables.h"
 #include "cartesian-common.h"
+
+postmacro foreach_vertex (char flags = 0, Reduce reductions = None)
+{
+  foreach_face_generic (flags, reductions) {
+    x -= Delta/2.;
+    {...}
+  }
+}
 
 void cartesian1D_methods()
 {

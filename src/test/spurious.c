@@ -49,6 +49,7 @@ int main() {
   We neglect the advection terms and vary the Laplace, for a constant
   resolution of 5 levels. */
 
+  DT = HUGE [0];
   TOLERANCE = 1e-6 [*];
   stokes = true;
   c.sigma = 1;

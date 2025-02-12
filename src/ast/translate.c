@@ -809,6 +809,7 @@ typedef struct {
   Ast * boundary;
   char * swigname, * swigdecl, * swiginit;
   Stack * functions;
+  int return_macro_index;
 } TranslateData;
 
 static Ast * in_stencil_point_function (Ast * n)
@@ -1771,25 +1772,30 @@ static Ast * compound_jump (Ast * return_statement, Ast * function_definition,
 /**
 ### Boundary conditions 
 
-This function replaces neumann/dirichlet(...) with
-neumann/dirichlet(0) and returns the number of replacements. */
+This function replaces function calls within boundary conditions with
+their ..._homogeneous versions if they exist. It returns the number of
+replacements. */
 
-static int homogeneize (Ast * n)
+static int homogeneize (Ast * n, Stack * stack)
 {
   int nh = 0;
   if (n->sym == sym_function_call) {
     Ast * identifier = ast_function_call_identifier (n);
-    if (identifier &&
-	(!strcmp (ast_terminal (identifier)->start, "_neumann") ||
-	 !strcmp (ast_terminal (identifier)->start, "_dirichlet") ||
-	 !strcmp (ast_terminal (identifier)->start, "_dirichlet_face"))) {
-      str_append (ast_terminal (identifier)->start, "_homogeneous");
-      nh = 1;
+    if (identifier) {
+      char * s = strdup (ast_terminal (identifier)->start);
+      str_append (s, "_homogeneous");
+      if (ast_identifier_declaration (stack, s)) {
+	free (ast_terminal (identifier)->start);
+	ast_terminal (identifier)->start = s;
+	nh = 1;
+      }
+      else
+	free (s);
     }
   }
   if (n->child)
     for (Ast ** c = n->child; *c; c++)
-      nh += homogeneize (*c);
+      nh += homogeneize (*c, stack);
   return nh;
 }
 
@@ -1890,7 +1896,7 @@ static void boundary_expr (Ast * n, Stack * stack, void * data)
     if (member && !strcmp (ast_terminal(member)->start, "x")) {
       Ast * identifier = ast_function_call_identifier (n);
       if (identifier &&
-	  !strcmp (ast_terminal (identifier)->start, "_dirichlet")) {
+	  !strcmp (ast_terminal (identifier)->start, "dirichlet")) {
 	const char * typename =
 	  ast_typedef_name (ast_expression_type
 			    (d->boundary->child[0]->child[0],
@@ -2126,36 +2132,76 @@ static char * append_initializer (char * init, Ast * initializer, const char * t
 }
 
 /**
-# First pass: user macros 
-
-"einstein_sum", "diagonalize", etc. are Basilisk macros which are
-dealt with in later passes. */
+# First pass: standard macros */
 
 #include "macro.h"
 
 static void user_macros (Ast * n, Stack * stack, void * data)
-{  
-  if (n->sym == sym_statement || n->sym == sym_function_call)
-    macro_replacement (n, stack, (const char *[]){
-	"einstein_sum", "diagonalize",
-	"foreach_child", "foreach_neighbor",
-	"is_face_x", "is_face_y", "is_face_z",
-	"foreach", "foreach_*",
-	"OMP_PARALLEL",
-	NULL}, ((TranslateData *)data)->nolineno);
+{
+  /**
+  ## Warnings for Basilisk C parse errors */
+    
+  if (n->sym == sym_YYerror) {
+    AstTerminal * t = ast_left_terminal (n);
+    char * s = NULL;
+    s = ast_str_append (n, s);
+    fprintf (stderr, "%s:%d: warning: Basilisk C parse error near `%s'\n",
+	     t->file, t->line, ast_crop_before (s));
+    free (s);
+  }
+  else if (n->sym == sym_statement || n->sym == sym_function_call) {
+    TranslateData * d = data;
+    macro_replacement (n, stack, d->nolineno, false, &d->return_macro_index);
+  }
 }
 
 /**
-# Last pass: all remaining macros
+# Last pass: postmacros */
 
-We only keep "OMP_PARALLEL" which is a standard macro. */
-
-static void remaining_macros (Ast * n, Stack * stack, void * data)
+static void postmacros (Ast * n, Stack * stack, void * data)
 {
-  if (n->sym == sym_statement)
-    macro_replacement (n, stack, (const char *[]){
-	"OMP_PARALLEL",
-	NULL}, ((TranslateData *)data)->nolineno);
+  if (n->sym == sym_statement || n->sym == sym_function_call) {
+    TranslateData * d = data;
+    macro_replacement (n, stack, d->nolineno, true, &d->return_macro_index);
+  }
+}
+
+/**
+After all macros have been expanded, we replace None default values in
+the macro definitions. */
+
+static void replace_none (Ast * n, Stack * stack, void * data)
+{
+  Ast * identifier = ast_schema (n, sym_primary_expression,
+				 0, sym_IDENTIFIER);
+  if (identifier &&
+      data == ast_identifier_declaration (stack, ast_terminal (identifier)->start))
+    ast_terminal (identifier)->start[0] = '\0';
+}
+
+static void postmacros_cleanup (Ast * n, Stack * stack, void * data)
+{
+  if (n->sym == sym_MACRODEF) {
+    Ast * declaration = ast_parent (n, sym_function_declaration);
+    Ast * parameters = ast_schema (declaration, sym_function_declaration,
+				   1, sym_declarator,
+				   0, sym_direct_declarator,
+				   2, sym_parameter_type_list,
+				   0, sym_parameter_list);
+    foreach_item (parameters, 2, parameter) {
+      Ast * identifier;
+      if ((identifier = ast_is_identifier_expression (ast_schema (parameter, sym_parameter_declaration,
+								  3, sym_initializer,
+								  0, sym_assignment_expression))) &&
+	  !strcmp (ast_terminal (identifier)->start, "None")) {
+	stack_push (stack, &identifier);
+	ast_traverse (declaration->parent, stack, replace_none, ast_find (parameter, sym_direct_declarator,
+									  0, sym_generic_identifier,
+									  0, sym_IDENTIFIER));
+	ast_pop_scope (stack, identifier);
+      }
+    }
+  }
 }
 
 /**
@@ -2175,19 +2221,6 @@ enum {
 static void global_boundaries_and_stencils (Ast * n, Stack * stack, void * data)
 {
   switch (n->sym) {
-
-  /**
-  ## Warnings for Basilisk C parse errors */
-    
-  case sym_YYerror: {
-    AstTerminal * t = ast_left_terminal (n);
-    char * s = NULL;
-    s = ast_str_append (n, s);
-    fprintf (stderr, "%s:%d: warning: Basilisk C parse error near `%s'\n",
-	     t->file, t->line, ast_crop_before (s));
-    free (s);
-    break;
-  }
 
   /**
   ## Cleanup argument expression lists ending with ',' */
@@ -2291,11 +2324,21 @@ static void global_boundaries_and_stencils (Ast * n, Stack * stack, void * data)
 	ast_block_list_insert_before (scope, boundary);
 	
 	Ast * homogeneous = ast_copy (boundary);
-	if (!homogeneize (homogeneous)) {
+	if (!homogeneize (homogeneous, stack)) {
 	  ast_destroy (homogeneous);
 	  str_append (set, ";\n");
 	}
 	else {
+
+	  /**
+	  If the functions contain homogeneous boundary conditions, we
+	  expand postmacros. */
+	  
+	  stack_push (stack, &homogeneous);
+	  ast_traverse (boundary, stack, postmacros, data);
+	  ast_traverse (homogeneous, stack, postmacros, data);
+	  ast_pop_scope (stack, homogeneous);
+
 	  Ast * func = ast_find (homogeneous, sym_IDENTIFIER);
 	  str_append (ast_terminal (func)->start, "_homogeneous");
 	  str_append (set, "_homogeneous;\n");
@@ -2335,11 +2378,21 @@ static void global_boundaries_and_stencils (Ast * n, Stack * stack, void * data)
       ast_replace_child (n->parent, 0, boundary);
       
       Ast * homogeneous = ast_copy (boundary);
-      if (!homogeneize (homogeneous)) {
+      if (!homogeneize (homogeneous, stack)) {
 	ast_destroy (homogeneous);
 	str_append (set, ";\n");
       }
       else {
+
+	/**
+	If the functions contain homogeneous boundary conditions, we
+	expand postmacros. */
+	
+	stack_push (stack, &homogeneous);
+	ast_traverse (boundary, stack, postmacros, data);
+	ast_traverse (homogeneous, stack, postmacros, data);
+	ast_pop_scope (stack, homogeneous);
+
 	Ast * func = ast_find (homogeneous, sym_IDENTIFIER);
 	str_append (ast_terminal (func)->start, "_homogeneous");
 	str_append (set, "_homogeneous;\n");
@@ -2482,7 +2535,8 @@ static void global_boundaries_and_stencils (Ast * n, Stack * stack, void * data)
       Otherwise we do. */
       
       TranslateData * d = data;
-      bool parallel = d->parallel && !(flags & fserial) && strcmp (ast_terminal (identifier)->start, "foreach_visible");
+      bool parallel = d->parallel && !(flags & fserial) &&
+	strcmp (ast_terminal (identifier)->start, "foreach_visible");
       optional_arguments (n, stack);
       Ast * stencil = ast_copy (n);
       if (!ast_stencil (stencil, parallel, flags & foverflow, flags & fnowarning)) {
@@ -4835,6 +4889,19 @@ static void checks (AstRoot * root, AstRoot * d, TranslateData * data)
   CHECK (data->init_solver, true);
 }
 
+static void macros_to_functions (Ast * n)
+{
+  Ast * macro = ast_schema (n, sym_function_call,
+			    0, sym_postfix_expression,
+			    0, sym_primary_expression,
+			    0, sym_MACRO);
+  if (macro)
+    macro->sym = sym_IDENTIFIER;
+  if (n->child)
+    for (Ast ** c = n->child; *c; c++)
+      macros_to_functions (*c);
+}
+
 /**
 # The entry function
 
@@ -5003,27 +5070,32 @@ AstRoot * endfor (FILE * fin, FILE * fout,
   free (data.constants);
 
   /**
-  We save the version before the final macro expansion
-  (i.e. expansions of foreach(), foreach_child(), foreach_neighbor()
-  etc...) which will be used for dimensional analysis etc. */
+  We save the version before the expansion of postmacros, which will
+  be used for dimensional analysis etc. */
 
   Ast * child = ((Ast *) root)->child[0], * copy = ast_copy (child);
   ast_set_child ((Ast *) root, 0, copy);
 
   /**
-  We perform the expansion of remaining macros and output the source file. */
+  We perform the expansion of postmacros and output the source file. */
 
   stack_push (root->stack, &root);
-  ast_traverse ((Ast *) root, root->stack, remaining_macros, &data);
-  ast_traverse ((Ast *) root, root->stack, remaining_macros, &data);
+  ast_traverse ((Ast *) root, root->stack, postmacros, &data);
+  ast_traverse ((Ast *) root, root->stack, postmacros, &data);
+  ast_traverse ((Ast *) root, root->stack, postmacros_cleanup, &data);
   ast_pop_scope (root->stack, (Ast *) root);
   ast_print ((Ast *) root, fout, 0);
 
   /**
-  We restore the version before the final macro expansion. */
+  We restore the version before the expansion of postmacros. */
 
   ast_set_child ((Ast *) root, 0, child);
   ast_destroy (copy);
+
+  /**
+  Any remaining macro call is a standard function call. */
+
+  macros_to_functions ((Ast *)root);
   
   ((Ast *)root)->parent = (Ast *) d;
   d->alloc = NULL;

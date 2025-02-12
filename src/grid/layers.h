@@ -13,7 +13,7 @@ usable outside foreach() loops, which uses a global `_layer` index... */
 int _layer = 0;
 
 #undef foreach_block
-macro foreach_block() {
+postmacro foreach_block() {
   for (_layer = 0; _layer < nl; _layer++)
     {...}
   _layer = 0;
@@ -24,20 +24,20 @@ macro foreach_block() {
 uses the `point.l` index as local layer index. */
 
 #undef foreach_block_inner
-macro foreach_block_inner() {
-  for (point.l = 0; point.l < nl; point.l++)
+postmacro foreach_block_inner (Point p = point) {
+  for (p.l = 0; p.l < nl; p.l++)
     {...}
-  point.l = 0;
+  p.l = 0;
 }
   
 /**
 We also redefine the "per field" (inner) traversal. */
 
 #undef foreach_blockf
-macro foreach_blockf (scalar _f) {
-  for (point.l = 0; point.l < _attribute[_f.i].block; point.l++)
+postmacro foreach_blockf (scalar _f, Point p = point) {
+  for (p.l = 0; p.l < _attribute[_f.i].block; p.l++)
     {...}
-  point.l = 0;
+  p.l = 0;
 }
   
 /**

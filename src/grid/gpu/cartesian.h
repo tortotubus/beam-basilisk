@@ -16,8 +16,11 @@
   " point.j + (l)]\n"							\
   "#define val_red_(s) _data[(s).i*field_size() + (point.i - 1)*NY + point.j - 1]\n"
 
+static bool _gpu_done_ = false;
+
 #include "../cartesian.h"
 @define neighborp(k,l,o) neighbor(k,l,o)
+#include "../stencils.h"
 #include "gpu.h"
 #include "../cartesian-common.h"
 
