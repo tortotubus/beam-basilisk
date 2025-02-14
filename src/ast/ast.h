@@ -328,5 +328,7 @@ Called by [qcc](/src/qcc.c) to trigger the translation. */
 
 AstRoot * endfor (FILE * fin, FILE * fout,
 		  const char * grid, int dimension,
-		  bool nolineno, bool progress, bool catch, bool parallel, bool cpu, bool gpu,
+		  bool nolineno, bool progress, bool catch,
+		  bool parallel, bool cpu, bool gpu,
+		  bool prepost,
 		  FILE * swigfp, char * swigname);

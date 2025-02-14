@@ -4909,7 +4909,9 @@ Called by [qcc](/src/qcc.c) to trigger the translation. */
 
 AstRoot * endfor (FILE * fin, FILE * fout,
 		  const char * grid, int dimension,
-		  bool nolineno, bool progress, bool catch, bool parallel, bool cpu, bool gpu,
+		  bool nolineno, bool progress, bool catch,
+		  bool parallel, bool cpu, bool gpu,
+		  bool prepost,
 		  FILE * swigfp, char * swigname)
 {
   char * buffer = NULL;
@@ -5069,28 +5071,34 @@ AstRoot * endfor (FILE * fin, FILE * fout,
   
   free (data.constants);
 
-  /**
-  We save the version before the expansion of postmacros, which will
-  be used for dimensional analysis etc. */
+  if (prepost)
+    ast_print ((Ast *) root, fout, 0);
+  else {
+    
+    /**
+    We save the version before the expansion of postmacros, which will
+    be used for dimensional analysis etc. */
 
-  Ast * child = ((Ast *) root)->child[0], * copy = ast_copy (child);
-  ast_set_child ((Ast *) root, 0, copy);
+    Ast * child = ((Ast *) root)->child[0], * copy = ast_copy (child);
+    ast_set_child ((Ast *) root, 0, copy);
 
-  /**
-  We perform the expansion of postmacros and output the source file. */
+    /**
+    We perform the expansion of postmacros and output the source file. */
 
-  stack_push (root->stack, &root);
-  ast_traverse ((Ast *) root, root->stack, postmacros, &data);
-  ast_traverse ((Ast *) root, root->stack, postmacros, &data);
-  ast_traverse ((Ast *) root, root->stack, postmacros_cleanup, &data);
-  ast_pop_scope (root->stack, (Ast *) root);
-  ast_print ((Ast *) root, fout, 0);
+    stack_push (root->stack, &root);
+    ast_traverse ((Ast *) root, root->stack, postmacros, &data);
+    ast_traverse ((Ast *) root, root->stack, postmacros, &data);
+    ast_traverse ((Ast *) root, root->stack, postmacros_cleanup, &data);
+    ast_pop_scope (root->stack, (Ast *) root);
+    ast_print ((Ast *) root, fout, 0);
 
-  /**
-  We restore the version before the expansion of postmacros. */
+    /**
+    We restore the version before the expansion of postmacros. */
 
-  ast_set_child ((Ast *) root, 0, child);
-  ast_destroy (copy);
+    ast_set_child ((Ast *) root, 0, child);
+    ast_destroy (copy);
+
+  }
 
   /**
   Any remaining macro call is a standard function call. */
