@@ -20,6 +20,7 @@ A summary of the options/switches:
 * `-events` : displays a trace of events on standard error
 * `-catch` : catch floating point errors
 * `-source` : generates C99 source file (with an underscore prefix)
+* `-prepost` : as -source but before expansion of postmacros
 * `-autolink` : uses the 'autolink' pragma to link required libraries
 * `-progress` : the running code will generate a 'progress' file
 * `-cadna` : support for CADNA
@@ -113,7 +114,8 @@ AstRoot * compdir (FILE * fin, FILE * fout, FILE * swigfp,
 		   char * swigname, char * grid)
 {
   FILE * fout1 = dopen ("_endfor.c", "w");
-  AstRoot * ast = endfor (fin, fout1, grid, dimension, nolineno, progress, catch, parallel, cpu, gpu,
+  AstRoot * ast = endfor (fin, fout1, grid, dimension, nolineno, progress, catch,
+			  parallel, cpu, gpu, source == 2,
 			  swigfp, swigname);
   fclose (fout1);
   
@@ -157,6 +159,8 @@ int main (int argc, char ** argv)
       catch = 1;
     else if (!strcmp (argv[i], "-source"))
       source = 1;
+    else if (!strcmp (argv[i], "-prepost"))
+      source = 2;
     else if (!strcmp (argv[i], "-autolink"))
       autolinks = 1;
     else if (!strcmp (argv[i], "-progress"))
