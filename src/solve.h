@@ -24,13 +24,11 @@ solve (a, (a[1] + a[-1] + a[0,1] + a[0,-1] - 4.*a[])/sq(Delta), b);
 ~~~
 
 The macro can take the same optional arguments as
-[mg_solve()](poisson.h#mg_solve) to tune the multigrid solver. 
+[mg_solve()](poisson.h#mg_solve) to tune the multigrid solver.
 
-The [multigrid statistics](poisson.h#mgstats) are stored in
-`solve_stats`. */
+The macro returns [multigrid statistics](poisson.h#mgstats). */
 
 #include "poisson.h"
-static mgstats solve_stats;
 
 /**
 ## Implementation
@@ -40,85 +38,82 @@ the [mg_solve()](poisson.h#mg_solve) and
 [mg_cycle()](poisson.h#mg_cycle) functions where more
 documentation can be found. */
 
-macro solve (scalar _a, double _func, scalar _rhs)
+macro
+mgstats solve (scalar a, double func, double rhs,
+	       int nrelax = 4,
+	       int minlevel = 0,
+	       double tolerance = TOLERANCE)
 {
-  solve_stats = (mgstats){0};
-  struct { int dummy, nrelax, minlevel; double tolerance; }
-    p = {0};
+  mgstats _s = (mgstats){0};
   scalar _res[], _da[];
-  scalar_clone (_da, _a);
+  scalar_clone (_da, a);
   for (int b = 0; b < nboundary; b++)
     _da.boundary[b] = _da.boundary_homogeneous[b];
-  solve_stats.nrelax = p.nrelax > 0 ? p.nrelax : 4;
-  double resb;
+  _s.nrelax = nrelax;
+  double _resb;
   {
     double maxres = 0.;
     foreach (reduction(max:maxres)) {
-      _res[] = _rhs[] - _func;
+      _res[] = rhs - func;
       if (fabs (_res[]) > maxres)
 	maxres = fabs (_res[]);
     }
-    resb = solve_stats.resb = solve_stats.resa = maxres;
+    _resb = _s.resb = _s.resa = maxres;
   }
-  if (p.tolerance == 0.)
-    p.tolerance = TOLERANCE;
-  for (solve_stats.i = 0;
-       solve_stats.i < NITERMAX &&
-	 (solve_stats.i < NITERMIN || solve_stats.resa > p.tolerance);
-       solve_stats.i++) {
+  for (_s.i = 0; _s.i < NITERMAX && (_s.i < NITERMIN || _s.resa > tolerance); _s.i++) {
     {
       restriction ({_res});
-      int maxlevel = grid->maxdepth;
-      int minlevel = min (p.minlevel, maxlevel);
-      for (int l = minlevel; l <= maxlevel; l++) {
-	if (l == minlevel)
+      int _maxlevel = grid->maxdepth;
+      int _minlevel = min (minlevel, _maxlevel);
+      for (int l = _minlevel; l <= _maxlevel; l++) {
+	if (l == _minlevel)
 	  foreach_level_or_leaf (l)
 	    foreach_blockf (_da)
-	    _da[] = 0.;
+	      _da[] = 0.;
 	else
 	  foreach_level (l)
 	    foreach_blockf (_da)
 	    _da[] = bilinear (point, _da);
 	boundary_level ({_da}, l);
-	for (int i = 0; i < solve_stats.nrelax; i++) {
-	  scalar _a = _da;
+	for (int i = 0; i < _s.nrelax; i++) {
+	  scalar a = _da;
 	  foreach_level_or_leaf (l) {
-	    _a[] = 0.;
-	    double n = _res[] - _func, d;
-	    diagonalize(_a)
-	      d = _func;
-	    _a[] = n/d;
+	    a[] = 0.;
+	    double _n = _res[] - func, _d;
+	    diagonalize(a)
+	      _d = func;
+	    a[] = _n/_d;
 	  }
 	  boundary_level ({_da}, l);
 	}
       }      
       foreach()
-	foreach_blockf (_a)
-	_a[] += _da[];
+	foreach_blockf (a)
+	  a[] += _da[];
     }
     {
       double maxres = 0.;
       foreach (reduction(max:maxres)) {
-	_res[] = _rhs[] - _func;
+	_res[] = rhs - func;
 	if (fabs (_res[]) > maxres)
 	  maxres = fabs (_res[]);
       }
-      solve_stats.resa = maxres;
+      _s.resa = maxres;
     }
-    if (solve_stats.resa > p.tolerance) {
-      if (resb/solve_stats.resa < 1.2 && solve_stats.nrelax < 100)
-	solve_stats.nrelax++;
-      else if (resb/solve_stats.resa > 10 && solve_stats.nrelax > 2)
-	solve_stats.nrelax--;
+    if (_s.resa > tolerance) {
+      if (_resb/_s.resa < 1.2 && _s.nrelax < 100)
+	_s.nrelax++;
+      else if (_resb/_s.resa > 10 && _s.nrelax > 2)
+	_s.nrelax--;
     }
-    resb = solve_stats.resa;
+    _resb = _s.resa;
   }
-  solve_stats.minlevel = p.minlevel;
-  if (solve_stats.resa > p.tolerance)
+  _s.minlevel = minlevel;
+  if (_s.resa > tolerance)
     fprintf (stderr,
-	     "src/solve.h:%d: warning: convergence for %s not reached "
-	     "after %d iterations\n"
-	     "  res: %g nrelax: %d\n", LINENO, _a.name,
-	     solve_stats.i, solve_stats.resa, solve_stats.nrelax),
+	     "src/solve.h:%d: warning: convergence for %s not reached after %d iterations\n"
+	     "  res: %g nrelax: %d\n", LINENO, a.name,
+	     _s.i, _s.resa, _s.nrelax),
       fflush (ferr);
+  return _s;
 }
