@@ -52,10 +52,24 @@ macro int myreturn (double x)
 }
 
 macro
-double myreturn2 (Point point, scalar s, auto double expr)
+double myreturn2 (Point point, double expr)
 {
-  double b = s[]*expr;
+#if 0 // simple macro
+  return expr;
+#else // complex macro
+  double b = expr;
   return b;
+#endif
+}
+
+macro
+void withreturn (int i)
+{
+  if (i) {
+    fprintf (stderr, "i != 0\n");
+    return;
+  }
+  fprintf (stderr, "i == 0\n");  
 }
 
 int main()
@@ -88,8 +102,11 @@ int main()
 
   fprintf (stderr, "%d\n", myreturn(12));
 
-  foreach()
+  foreach_face()
     fprintf (stderr, "%g %g %g %g\n", x, y,
-	     myreturn2 (point, s, x + y),
-	     myreturn2 (point, s1, s[]*(x + y)));
+	     myreturn2 (point, x + y),
+	     myreturn2 (point, 2.*(x + y)));
+
+  withreturn (0);
+  withreturn (1);
 }

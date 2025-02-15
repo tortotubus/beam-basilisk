@@ -158,6 +158,23 @@ macro iterator (int start, int end, int index, break = (index = end + 1)) {
 where the given expression will be expanded in replacement of the
 `break` statement.
 
+## Overloading
+
+Unlike for C functions, one is allowed to define the same macro
+several times. The latest definition (in order of appearance in the
+source file) "overloads" the previous ones.
+
+It is sometimes useful to break this rule to specify a "default"
+definition which will only apply if no other definition is
+present. This can be done by adding the `auto` "storage class
+specifier" to the macro definition.
+
+## Non-casting of arguments
+
+The comment made above regarding the non-type-casting of the return
+values of inlined macros, also applies to the arguments of any
+macro. This is different from what happens for standard C functions.
+
 ## Postmacros
 
 Macros defined using the `postmacro` reserved keyword will be expanded
@@ -175,15 +192,15 @@ macros.*
 # Implementation */
 
 typedef struct {
-  Ast * statement, * arguments, * parameters, * call;
-  bool in_a_macro_definition, nolineno;
-  int * complex_call;
+  Ast * statement, * arguments, * parameters, * call, * label;
+  bool in_a_macro_definition, nolineno, complex_call;
+  int * returnindex;
 } MacroReplacement;
 
 static Ast * argument_value (Ast * identifier, Stack * stack, const MacroReplacement * r)
 {
   Ast * decl = ast_identifier_declaration_from_to (stack, ast_terminal (identifier)->start,
-						   r->statement, NULL);
+						   r->call, NULL);
   if (decl && ast_parent (decl, sym_parameter_type_list) == r->parameters) {
     Ast * value = NULL;
     if (r->arguments) {
@@ -197,16 +214,6 @@ static Ast * argument_value (Ast * identifier, Stack * stack, const MacroReplace
 	parameters = parameters->parent;
 	assert (parameter);
 	if (parameter == parent) {
-
-	  /**
-	  For complex return macros, only substitute parameters marked 'auto'. */
-
-	  if (r->complex_call && !ast_schema (parameter, sym_parameter_declaration,
-					      0, sym_declaration_specifiers,
-					      0, sym_storage_class_specifier,
-					      0, sym_AUTO))
-	    return NULL;
-
 	  value = argument;
 	  break;
 	}
@@ -222,7 +229,17 @@ static Ast * argument_value (Ast * identifier, Stack * stack, const MacroReplace
   }
   return NULL;
 }
-			     
+
+static Ast * remove_leading_spaces (Ast * n)
+{
+  AstTerminal * t = ast_left_terminal (n);
+  for (char * s = t->before; s && *s != '\0'; s++)
+    if (!strchr (" \t\n", *s))
+      return n;
+  free (t->before); t->before = NULL;
+  return n;
+}
+
 static void replace_arguments (Ast * n, Stack * stack, void * data)
 {
   const MacroReplacement * r = data;
@@ -235,7 +252,7 @@ static void replace_arguments (Ast * n, Stack * stack, void * data)
       if (value->child[0]->sym == sym_assignment_expression) {
 	Ast * primary = ast_is_simple_expression (value->child[0]);
 	if (primary) {
-	  primary = ast_copy (primary->parent);
+	  primary = remove_leading_spaces (ast_copy (primary->parent));
 	  ast_set_line (primary, ast_terminal (identifier), true);
 	  Ast * identifier = ast_schema (primary, sym_primary_expression,
 					 0, sym_IDENTIFIER);
@@ -247,7 +264,7 @@ static void replace_arguments (Ast * n, Stack * stack, void * data)
 		       NCA(n, "("),
 		       NN(n, sym_expression_error,
 			  NN(n, sym_expression,
-			     ast_copy (value->child[0]))),
+			     remove_leading_spaces (ast_copy (value->child[0])))),
 		       NCA(n, ")"));
 	ast_replace_child (n, 0, primary);
       }
@@ -377,6 +394,75 @@ static void replace_break (Ast * n, Ast * breaking, Ast * parent)
       replace_break (*c, breaking, parent);
 }
 
+static void replace_return (Ast * n, Stack * stack, void * data)
+{
+  if (n->sym == sym_RETURN) {
+    Ast * expr = ast_schema (n->parent, sym_jump_statement,
+			     1, sym_expression);
+
+    n->sym = sym_GOTO;
+    free (ast_terminal (n)->start);
+    ast_terminal (n)->start = strdup ("goto");
+    MacroReplacement * r = data;
+    if (!r->label) {
+      char rindex[25]; snprintf (rindex, 24, "_return_%d", (*r->returnindex)++);
+      r->label = NN(n, sym_generic_identifier,
+		    NA(n, sym_IDENTIFIER, rindex));
+    }
+    Ast * label = ast_copy (r->label);
+    ast_before (label, " ");
+    ast_set_line (label, ast_terminal (n), true);
+    if (expr) // 'return expr;' replaced with 'goto label;'
+      ast_set_child (n->parent, 1, label);
+    else // 'return;' replaced with 'goto label;'
+      ast_new_children (n->parent, n->parent->child[0], label, n->parent->child[1]);
+      
+    Ast * statement = ast_parent (n, sym_statement);
+    Ast * parent = statement->parent;
+    int index = ast_child_index (statement);
+
+    Ast * compound;
+    if (r->call->sym == sym_function_call) {
+      if (!expr) {
+	fprintf (stderr, "%s:%d: error: 'void' return value in a macro returning non-void\n",
+		 ast_terminal (n)->file, ast_terminal (n)->line);
+	exit (1);
+      }
+      char * val = strdup (ast_terminal (ast_child(label, sym_IDENTIFIER))->start);
+      str_append (val, "val");
+      AstTerminal * open = NCB(parent, "{"), * close = NCB(parent, "}");
+      Ast * assign = NN(n, sym_statement,
+			NN(n, sym_expression_statement,
+			   NN(n, sym_expression,
+			      NN(n, sym_assignment_expression,
+				 NN(n, sym_unary_expression,
+				    NN(n, sym_postfix_expression,
+				       NN(n, sym_primary_expression,
+					  NB(n, sym_IDENTIFIER, val)))),
+				 NN(n, sym_assignment_operator,
+				    NCB(n, "=")),
+				 ast_child (expr, sym_assignment_expression))),	  
+			   NCB(n, ";")));
+      free (val);
+
+      compound = NN(parent, sym_statement,
+		    NN(parent, sym_compound_statement,
+		       open,
+		       NN(parent, sym_block_item_list,
+			  NN(parent, sym_block_item_list,
+			     NN(parent, sym_block_item,
+				assign)),
+			  NN(parent, sym_block_item,
+			     statement)),
+		       close));
+    }
+    else
+      compound = statement;
+
+    ast_set_child (parent, index, compound);
+  }
+}
+
 static void macro_replacement (Ast * statement, Stack * stack, bool nolineno, bool postmacros,
 			       int * return_macro_index)
 {
@@ -432,14 +518,14 @@ static void macro_replacement (Ast * statement, Stack * stack, bool nolineno, bo
 			      2, sym_parameter_type_list),
     .call = macro_statement,
     .nolineno = nolineno,
-    .complex_call = (statement->sym == sym_function_call &&
-		     !ast_schema (ast_find (macro_definition, sym_compound_statement),
-				  sym_compound_statement,
-				  1, sym_block_item_list,
-				  0, sym_block_item,
-				  0, sym_statement,
-				  0, sym_jump_statement,
-				  0, sym_RETURN)) ? return_macro_index : NULL
+    .complex_call = !ast_schema (ast_find (macro_definition, sym_compound_statement),
+				 sym_compound_statement,
+				 1, sym_block_item_list,
+				 0, sym_block_item,
+				 0, sym_statement,
+				 0, sym_jump_statement,
+				 0, sym_RETURN),
+    .returnindex = return_macro_index
   };
 
   Ast * definition = ast_parent (statement, sym_function_definition);
@@ -496,8 +582,7 @@ static void macro_replacement (Ast * statement, Stack * stack, bool nolineno, bo
 	copy = ast_copy (breaking);
 	stack_push (stack, &copy);
 	ast_push_function_definition (stack, ast_find (macro_definition, sym_direct_declarator));
-	if (r.statement)
-	  stack_push (stack, &r.statement);
+	stack_push (stack, &r.call);
 	ast_traverse (copy, stack, replace_arguments, &r);
 	ast_pop_scope (stack, copy);
       }
@@ -507,19 +592,36 @@ static void macro_replacement (Ast * statement, Stack * stack, bool nolineno, bo
       ast_destroy (copy);
   }
 
-  Ast * defcopy = ast_copy (macro_definition);
-  Ast * copy = ast_find (defcopy, sym_compound_statement);
+  Ast * copy = ast_copy (ast_find (macro_definition, sym_compound_statement));
   stack_push (stack, &copy);
   ast_push_function_definition (stack, ast_find (macro_definition, sym_direct_declarator));
-  if (r.statement)
-    stack_push (stack, &r.statement);
-  if (r.parameters)
+  if (r.parameters) {
+    stack_push (stack, &r.call);
     ast_traverse (copy, stack, replace_arguments, &r);
+  }
+  if (r.complex_call)
+    ast_traverse (copy, stack, replace_return, &r);
   if (r.statement)
     ast_traverse (copy, stack, replace_ellipsis, &r);
   ast_pop_scope (stack, copy);
   str_prepend (ast_left_terminal (copy)->before, ast_left_terminal (macro_statement)->before);
 
+  /**
+  Return label */
+  
+  if (r.label) {
+    ast_set_line (r.label, ast_right_terminal (copy), true);
+    ast_block_list_append (ast_schema (copy, sym_compound_statement,
+				       1, sym_block_item_list), sym_block_item,
+			   NN(copy, sym_statement,
+			      NN(copy, sym_labeled_statement,
+				 r.label,
+				 NCA(copy, ":"),
+				 NN(copy, sym_statement,
+				    NN(copy, sym_expression_statement,
+				       NCA(copy, ";"))))));
+  }
+  
   /**
   Statement */
   
@@ -542,13 +644,9 @@ static void macro_replacement (Ast * statement, Stack * stack, bool nolineno, bo
 		    0, sym_RETURN)) {
       assert (!r.complex_call);
 
-      Ast * autoparam = ast_find (r.parameters, sym_AUTO);
-      if (autoparam)
-	fprintf (stderr, "%s:%d: warning: 'auto' declaration is useless for simple return macros\n",
-		 ast_terminal (autoparam)->file, ast_terminal (autoparam)->line);
-      
       /**
-      This a simple return macro i.e. 'macro int func(...){ return ...; }'. */
+      This is a simple return macro i.e. 'macro int func(...){ return ...; }'. */
+      
       Ast * expr = ast_schema (jump, sym_jump_statement,
 			       1, sym_expression);
       if (!expr) {
@@ -571,77 +669,75 @@ static void macro_replacement (Ast * statement, Stack * stack, bool nolineno, bo
       ast_destroy (copy);
     }
     else {
-      assert (r.complex_call);
-      
+
       /**
-      This is a "complex" return macro. We first remove the 'auto'
-      parameters from the macro definition and the corresponding
-      arguments in the function call. */
+      This is a complex return macro. */
       
-      if (r.arguments) {
-	Ast * parameters = ast_schema (defcopy, sym_function_definition,
-				       0, sym_function_declaration,
-				       1, sym_declarator,
-				       0, sym_direct_declarator,
-				       2, sym_parameter_type_list,
-				       0, sym_parameter_list);
-	Ast * arguments = r.arguments, * aparent = arguments->parent;
-	Ast * _list1 = parameters, * parameter = _list1->child[1] ? _list1->child[2] : _list1->child[0];
-	foreach_item (arguments, 2, argument) {
-	  if (ast_schema (parameter, sym_parameter_declaration,
-			  0, sym_declaration_specifiers,
-			  0, sym_storage_class_specifier,
-			  0, sym_AUTO)) {
-	    arguments = ast_list_remove (arguments, argument);
-	    parameters = ast_list_remove (parameters, parameter);
-	    if (arguments == NULL) {
-	      assert (parameters == NULL);
-	      ast_destroy (aparent->child[2]);
-	      for (Ast ** c = aparent->child + 2; *c; c++)
-		*c = *(c + 1);
-	      aparent = ast_schema (defcopy, sym_function_definition,
-				    0, sym_function_declaration,
-				    1, sym_declarator,
-				    0, sym_direct_declarator);
-	      ast_destroy (aparent->child[2]);
-	      for (Ast ** c = aparent->child + 2; *c; c++)
-		*c = *(c + 1);
-	      break;
-	    }
-	  }
-	  if (!((_list1 = _list1 && _list1 != ast_placeholder &&
-		 _list1->child[1] ? _list1->child[0] : NULL), parameter))
-	    break;
-	  parameter = _list1 && _list1 != ast_placeholder ?
-	    (_list1->child[1] ? _list1->child[2] : _list1->child[0]) : NULL;
-	}
+      assert (r.complex_call);
+      assert (r.label);
+      
+      Ast * returntype = ast_schema (macro_definition, sym_function_definition,
+				     0, sym_function_declaration,
+				     0, sym_declaration_specifiers,
+				     1, sym_declaration_specifiers);
+      if (!returntype) {
+	fprintf (stderr, "%s:%d: error: the type of a macro returning a value must be defined\n",
+		 ast_left_terminal (macro_definition)->file,
+		 ast_left_terminal (macro_definition)->line);
+	exit (1);
       }
 
-      /**
-      We then turn the macro into a (unique) function. */
+      char * label = strdup (ast_terminal (ast_schema (r.label, sym_generic_identifier,
+						       0, sym_IDENTIFIER))->start);
+      str_append (label, "val");
+      Ast * declaration = NN(copy, sym_declaration,
+			     ast_copy (returntype),
+			     NN(copy, sym_init_declarator_list,
+				NN(copy, sym_init_declarator,
+				   NN(copy, sym_declarator,
+				      NN(copy, sym_direct_declarator,
+					 NN(copy, sym_generic_identifier,
+					    NB(copy, sym_IDENTIFIER, label)))))),
+			     NCB(copy, ";"));
 
-      Ast * macrodef = ast_schema (statement, sym_function_call,
-				   0, sym_postfix_expression,
-				   0, sym_primary_expression,
-				   0, sym_MACRO);
-      macrodef->sym = sym_IDENTIFIER;
-      char s[20]; snprintf (s, 19, "_%d", (*r.complex_call)++);
-      str_append (ast_terminal (macrodef)->start, s);
-      macrodef = ast_find (defcopy->child[0], sym_IDENTIFIER);
-      str_append (ast_terminal (macrodef)->start, s);
-      macrodef = ast_find (defcopy->child[0], sym_MACRODEF);
-      macrodef->sym = sym_STATIC;
-      free (ast_terminal (macrodef)->start);
-      ast_terminal (macrodef)->start = strdup ("static");
+      AstTerminal * val =  NB(statement, sym_IDENTIFIER, label);
+      for (Ast ** c = statement->child; *c; c++)
+	ast_destroy (*c), *c = NULL;
+      statement->sym = sym_primary_expression;
+      ast_set_child (statement, 0, (Ast *) val);
+      
+      Ast * parent = statement->parent;
+      while (parent->sym != sym_statement && parent->sym != sym_declaration)
+	parent = parent->parent;
+      
+      Ast * gp = parent->parent;
+      if (gp->sym == sym_block_item) {
+	Ast * s = NN(gp, sym_statement, copy);
+	ast_block_list_insert_before2 (gp, s);
+	assert (s->parent->sym == sym_block_item);
+	ast_block_list_insert_before2 (s->parent, declaration);
+      }
+      else {
+	int index = ast_child_index (parent);
+	AstTerminal * open = NCB(gp, "{"), * close = NCA(parent, "}");
+	Ast * compound = NN(gp, sym_statement,
+			    NN(gp, sym_compound_statement,
+			       open,
+			       NN(gp, sym_block_item_list,
+				  NN(gp, sym_block_item_list,
+				     NN(gp, sym_block_item_list,
+					NN(gp, sym_block_item,
+					   declaration)),
+				     NN(gp, sym_block_item,
+					NN(gp, sym_statement,
+					   copy))),
+				  NN(gp, sym_block_item,
+				     parent)),
+			       close));
+	ast_set_child (gp, index, compound);
+      }
 
-      /**
-      We append the new function after the existing one. */
-
-      ast_block_list_append (ast_parent (macro_definition, sym_translation_unit),
-			     sym_external_declaration, defcopy);
-      defcopy = NULL;
+      free (label);
     }
   }
-
-  ast_destroy (defcopy);
 }

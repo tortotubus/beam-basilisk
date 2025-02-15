@@ -265,6 +265,13 @@ void ast_cleanup (Ast * n, Stack * stack, Ast * scope, bool init_declarator)
 	    n->child[2] = NULL;
 	  }
       }
+      
+      /**
+      Remove goto statements. */
+
+      else if (n->child[0]->sym == sym_GOTO)
+	ast_erase (n);
+      
       break;
 
     /**
@@ -275,6 +282,14 @@ void ast_cleanup (Ast * n, Stack * stack, Ast * scope, bool init_declarator)
 	ast_erase (n);
       break;
       
+    /**
+    Remove labeled (goto) statements. */
+
+    case sym_labeled_statement:
+      if (n->child[0]->sym == sym_generic_identifier)
+	ast_erase (n);
+      break;
+	 
     }
       
     return;

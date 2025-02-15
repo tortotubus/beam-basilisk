@@ -270,7 +270,7 @@ macro foreach_stencil_generic (char flags, Reduce reductions,
   _loop.first = 0; // to avoid warnings in check_stencil
   check_stencil (&_loop);
   _loop.first = _first;
-  _gpu_done_ = gpu_end_stencil (&_loop, &_region, (External[]) _externals, _kernel);
+  _gpu_done_ = gpu_end_stencil (&_loop, &_region, _externals, _kernel);
   _loop.first = 0;
   end_tracing_foreach ("foreach", S__FILE__, S_LINENO);
 }
