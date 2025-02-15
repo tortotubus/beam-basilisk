@@ -729,11 +729,29 @@ Dimension * get_dimension (Value * v, Stack * stack)
   Dimension * d = dimension_zero (stack_static_alloc (stack), (Ast *) v);
   if ((value_flags (v) & unset) && v->type->sym != sym_LONG &&
       ((System *)interpreter_get_data (stack))->output) {
-    AstTerminal * t = ast_left_terminal ((Ast *) v);    
+    AstTerminal * t = ast_left_terminal ((Ast *) v);
     char * s = ast_str_append ((Ast *) v, NULL), warn[200];
+    s = simplified_expression (ast_crop_before (s));
+    Ast * n = (Ast *) v, * call = ast_function_call_identifier ((Ast *) v);
+    if (call && !strcmp (ast_terminal (call)->start, "val")) {
+      call = NN(n, sym_function_call,
+		NN(n, sym_postfix_expression,
+		   NN(n, sym_primary_expression,
+		      NA(n, sym_IDENTIFIER, "_field_name"))),
+		NCA(n, "("),
+		NN(n, sym_argument_expression_list,
+		   ast_copy (ast_find ((Ast *) v, sym_argument_expression_list_item))),
+		NCA(n, ")"));
+      Value * vname = run (call, stack);
+      ast_destroy (call);
+      char * s1 = NULL;
+      str_append (s1, value_data (vname, void *), strchr (s, '['), NULL);
+      free (s);
+      s = s1;
+    }
     snprintf (warn, 199,
 	      "%s:%d: warning: '%s' is unset: assuming it has dimension [0]\n",
-	      ast_file_crop (t->file), t->line, ast_crop_before (s));
+	      ast_file_crop (t->file), t->line, s);
     free (s);
     int len = strlen (warn) + 1;
     d->warn = allocate (stack_static_alloc (stack), len*sizeof (char));
