@@ -2035,6 +2035,36 @@ void * static_realloc (void * ptr, size_t size, Stack * stack)
 }
 
 static
+bool continue_iterations (Ast * n, Stack * stack, int iter, int calls)
+{
+  if (iter <= 0) {
+    message (NULL, n, "reached maximum number of iterations\n", warning_verbosity, stack);
+    return false;
+  }    
+  return true;
+#if 0  
+  iter = maximum_iterations - iter;
+  calls = calls - ((StackData *)stack_get_data (stack))->maxcalls;
+
+  //  if (iter == maximum_iterations)
+#if 0  
+  fprintf (stderr, "%s:%d: %d #iterations %d\n",
+	   ast_left_terminal (n)->file, ast_left_terminal (n)->line,
+	   iter, 20000000/(calls/iter));
+#endif
+#if 1
+  if (iter > 2 && 20000000/(calls/iter) < 1000) {
+    if (!strncmp (ast_left_terminal (n)->file, "ast/", 4) && iter < 32)
+      return true;
+    message (NULL, n, "could reach maximum number of iterations\n", error_verbosity, stack);
+    return false;
+  }
+#endif
+  return true;
+#endif
+}
+
+static
 Value * internal_functions (Ast * call, Ast * identifier, Ast ** parameters, bool constant_arguments, Stack * stack)
 {
   const char * name = ast_terminal (identifier)->start;
@@ -2975,6 +3005,7 @@ Value * ast_run_node (Ast * n, Stack * stack)
   case sym_for_declaration_statement:
   case sym_iteration_statement: {
     int maxiter = maximum_iterations;
+    int maxcalls = ((StackData *)stack_get_data (stack))->maxcalls;
     if (n->child[0]->sym == sym_WHILE) { // while ...
       Value * condition = run (n->child[2], stack);
       if (!condition)
@@ -2989,15 +3020,15 @@ Value * ast_run_node (Ast * n, Stack * stack)
 	  }
 	  if (value_flags (condition) & unset) {
 	    message (NULL, n->child[2], "undefined condition '%s'\n", warning_verbosity, stack);
-	    maxiter = 0;
+	    cond = false;
 	  }
 	  else if (!cond)
 	    break;
 	  value = run (n->child[4], stack);
-	  if (value && ((Ast *)value)->sym == sym_jump_statement)
+	  if (!cond || (value && ((Ast *)value)->sym == sym_jump_statement))
 	    break;
 	  condition = run (n->child[2], stack);
-	} while (maxiter-- && condition);
+	} while (condition && continue_iterations (n, stack, --maxiter, maxcalls));
     }
     else if (n->child[0]->sym == sym_DO) { // do ... while
       do {
@@ -3021,7 +3052,7 @@ Value * ast_run_node (Ast * n, Stack * stack)
 	}
 	else if (!cond)
 	  break;
-      } while (maxiter--);
+      } while (continue_iterations (n, stack, --maxiter, maxcalls));
     }
     else if (n->child[0]->sym == sym_for_declaration_statement)
       value = run (n->child[0], stack);
@@ -3041,7 +3072,7 @@ Value * ast_run_node (Ast * n, Stack * stack)
 	  }
 	  if (value_flags (condition) & unset) {
 	    message (NULL, n->child[3], "undefined condition '%s'\n", warning_verbosity, stack);
-	    maxiter = 0;
+	    cond = false;
 	  }
 	  else if (!cond)
 	    break;
@@ -3050,12 +3081,10 @@ Value * ast_run_node (Ast * n, Stack * stack)
 	    break;
 	  Value * expr = run (ast_child (n, sym_expression), stack);
 	  condition = run (n->child[3], stack);
-	  if (!expr || !condition)
+	  if (!cond || !expr || !condition)
 	    break;
-	} while (maxiter--);
+	} while (continue_iterations (n, stack, --maxiter, maxcalls));
     }
-    if (maxiter < 0)
-      message (NULL, n, "reached maximum number of iterations\n", warning_verbosity, stack);
     break;
   }
 
