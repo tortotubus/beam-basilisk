@@ -2,13 +2,15 @@
 # Macros
 
 The [C preprocessor](https://gcc.gnu.org/onlinedocs/cpp/Macros.html)
-macros are familiar to C programmers (and are briefly introduced in
-the [Tutorial](/Tutorial#using-macros)). While they are very useful,
-their shortcomings are also well-known, for example:
+(also known as CPP) macros are familiar to C programmers (and are
+briefly introduced in the [Tutorial](/Tutorial#using-macros)). While
+they are very useful, their shortcomings are also well-known, for
+example:
 
 * multiline macros are hard to write, read and debug,
 * macros only deal with text i.e. they do not enforce the C syntax/grammar 
   (which also makes them hard to write and debug),
+* macro statements cannot 'return' a value,
 * while macros can be used to implement simple iterators, the syntax is cumbersome.
 
 As an illustration, consider the following simple iteration macro
@@ -38,8 +40,8 @@ int main() {
 }
 ~~~
 
-The syntax/grammar of the macro definition is now almost identical to
-the definition of a standard C function and is checked as such by the
+The syntax/grammar of the macro definition is almost identical to the
+definition of a standard C function and is checked as such by the
 compiler. Using the macro also respects the C grammar (i.e. that of
 standard C iterators: `for`, `while` etc.).
 
@@ -73,7 +75,7 @@ It is clear that if `initialize` was a function (i.e. `macro
 initialize...` would just be replaced by `void initialize...`), this
 would not compile, because `x` and `y` are not defined when
 `initialize` is called in `main`. This works because Basilisk macros
-are expanded before compilation (like their C counterpart). After
+are expanded before compilation (like their CPP counterpart). After
 macro expansion the code would read
 
 ~~~literatec
@@ -88,9 +90,43 @@ int main() {
 }
 ~~~
 
+Note also that in this example the macro does not use the "ellipsis
+macro" operator `{...}`.
+
 ## Macros returning a value
 
-* return type (non)-casting
+As mentioned above, standard C macros cannot 'return' a value like
+functions do. Basilisk macros can. There are two types of "return
+macros" in Basilisk.
+
+### Inlined return macros
+
+They are simple macros which behave very much like their standard CPP
+counterpart. The body of the macro must consist of a single return
+statement e.g.
+
+~~~literatec
+macro number sq (number x) {
+  return x*x;
+}
+~~~
+
+The returned expression (`x*x` here) is expanded directly where the
+macro is called (i.e. it is "inlined"). Note that, unlike what the
+equivalent C function (not macro) would do, the arguments and the
+returned value are not implicitly cast to the specified type (`number`
+here). So the sq() macro will preserve the type of its arguments
+i.e. it will work with any numeric type (`int`, `double`, `float`
+etc.).
+
+### Complex return macros
+
+Complex return macros return a value which is more complex than a
+simple expression. They cannot be inlined, because they are composed
+of several statements. Instead they are expanded as additional
+statements, which are inserted before the calling statement. In
+contrast with inlined macros, the type of the return value is
+automatically cast to the type given in the macro definition.
 
 ## Optional arguments
 
@@ -129,7 +165,7 @@ after preprocessing by [qcc](/src/qcc.c). They will thus not be seen
 by the [interpreter](interpreter/interpreter.c) or by [computation
 kernels](kernels.c). 
 
-*This is a low-level functionality which should not be used for "user"
+*This is a low-level functionality which must not be used for "user"
 macros.*
 
 ## See also
