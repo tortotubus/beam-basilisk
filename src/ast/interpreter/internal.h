@@ -40,4 +40,4 @@ double pow (double x, double y) {}
 void interpreter_verbosity (int verbosity) {}
 void interpreter_maximum_iterations (int maximum_iterations) {}
 void display_value (void * value) {}
-void reset_field_value (real * field, const char * name, real val) {}
+void reset_field_value (real * field, const char * name, real val, int block) {}

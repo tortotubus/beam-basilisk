@@ -2329,7 +2329,10 @@ Value * internal_functions (Ast * call, Ast * identifier, Ast ** parameters, boo
   else if (!strcmp (name, "interpreter_maximum_iterations"))
     maximum_iterations = value_data (run (parameters[0], stack), int);
   else if (!strcmp (name, "reset_field_value")) {
-    Value * params[] = { run (parameters[0], stack), run (parameters[1], stack), run (parameters[2], stack) };
+    Value * params[] = {
+      run (parameters[0], stack), run (parameters[1], stack),
+      run (parameters[2], stack), run (parameters[3], stack)
+    };
     char * field = value_data (params[0], char *);
     memcpy (field, params[2]->data.p, params[2]->size);
     *((Flags *)(field + params[2]->size - sizeof (Flags))) |= unset;

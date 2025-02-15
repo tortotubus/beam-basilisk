@@ -1605,13 +1605,17 @@ Value * dimension_internal_functions (Ast * call, Ast * identifier, Value ** par
   else if (!strcmp (name, "reset_field_value")) {
     char * field = value_data (params[0], char *);
     Dimension * d = *((Dimension **)(field + ast_base_type_size (params[2]->type)));
-    const char * name = value_data (params[1], char *);
-    if (name) {
-      d->c[0]->field = allocate (stack_static_alloc (stack), (strlen(name) + 1)*sizeof (char));
-      strcpy (d->c[0]->field, name);
+    if (value_data (params[3], int)) // block != 0
+      d->c = NULL; // block scalars are not used, set their dimension to zero
+    else { // block == 0
+      const char * name = value_data (params[1], char *);
+      if (name) {
+	d->c[0]->field = allocate (stack_static_alloc (stack), (strlen(name) + 1)*sizeof (char));
+	strcpy (d->c[0]->field, name);
+      }
+      else
+	d->c[0]->field = NULL;
     }
-    else
-      d->c[0]->field = NULL;
   }
   else {
     static char * funcs[] = {
