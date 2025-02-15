@@ -165,7 +165,8 @@ void reset (void * alist, double val)
   real * p = igrid->d;
   if (alist)
     for (scalar * s = alist; s->i >= 0; s++)
-      reset_field_value (p + s->i, _attribute[s->i].name, 0.);
+      for (int b = 0; b < _attribute[s->i].block; b++)
+	reset_field_value (p + s->i + b, _attribute[s->i].name, 0., b);
 }
 
 static const int o_stencil = -2;
