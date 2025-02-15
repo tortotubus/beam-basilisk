@@ -20,7 +20,7 @@ respecting the C99 grammar.
 /**
 By default grammar checks are turned off. */
 
-#if 0
+#if CHECK_GRAMMAR
 # define CHECK(x, recursive) ast_check_grammar(x, recursive, true)
 #else
 # define CHECK(x, recursive) ((void) x)
@@ -890,6 +890,16 @@ static void rotate (Ast * n, Stack * stack, void * data)
     }
     break;
   }
+
+  // fixme: this assumes that the goto label is within the scope being rotated
+  case sym_jump_statement:
+  case sym_labeled_statement:
+    if (ast_child (n, sym_generic_identifier)) {
+      AstTerminal * t = ast_terminal (ast_schema (ast_child (n, sym_generic_identifier), sym_generic_identifier,
+						  0, sym_IDENTIFIER));
+      str_append (t->start, "r");
+    }
+    break;
     
   }
 }
@@ -3353,10 +3363,14 @@ static void translate (Ast * n, Stack * stack, void * data)
 
   case sym_jump_statement: {
     if (n->child[0]->sym == sym_GOTO) {
-      AstTerminal * t = ast_terminal (n->child[0]);
-      fprintf (stderr, "%s:%d: warning: goto statements are unsafe in Basilisk "
-	       "(and are bad programming style)\n",
-	       t->file, t->line);
+      if (strncmp (ast_terminal (ast_schema (n, sym_jump_statement,
+					     1, sym_generic_identifier,
+					     0, sym_IDENTIFIER))->start, "_return_", 8)) {
+	AstTerminal * t = ast_terminal (n->child[0]);
+	fprintf (stderr, "%s:%d: warning: goto statements are unsafe in Basilisk C "
+		 "(and are bad programming style)\n",
+		 t->file, t->line);
+      }
       break;
     }
 
@@ -3505,11 +3519,15 @@ static void maps (Ast * n, Stack * stack, void * data)
       free (ast_terminal (n->child[0])->start);
       ast_terminal (n->child[0])->start = strdup ("foreach_face_generic");
     }
-    else { // maps for !foreach_face() loops
-      foreach_map (m) {
-	Ast * list = ast_block_list_get_item (ast_child (n, sym_statement))->parent;
-	foreach_item (m, 1, item)
-	  ast_block_list_prepend (list, sym_block_item, ast_copy (item->child[0]));
+    else { // maps for !foreach_face() loops && not for macro definitions
+      Ast * definition = ast_parent (n, sym_function_definition), * identifier;
+      if (!definition || !(identifier = ast_is_macro_declaration (definition->child[0])) ||
+	  !is_foreach_identifier (ast_terminal (identifier)->start)) {
+	foreach_map (m) {
+	  Ast * list = ast_block_list_get_item (ast_child (n, sym_statement))->parent;
+	  foreach_item (m, 1, item)
+	    ast_block_list_prepend (list, sym_block_item, ast_copy (item->child[0]));
+	}
       }
     }    
   }
@@ -3599,7 +3617,7 @@ static void stencils (Ast * n, Stack * stack, void * data)
 	char * params = ast_external_references (foreach, NULL, d->functions);
 	char par[20];
 	snprintf (par, 19, "%d", parallel);
-	str_prepend (params, "call(", par, ",{");
+	str_prepend (params, "call(", par, ",(External[]){");
 	str_append (params, "{0}},");
 	if (gpu)
 	  params = ast_kernel (foreach, params, d->nolineno);
