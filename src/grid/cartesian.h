@@ -37,7 +37,7 @@ static Point last_point;
 @define val(a,k,l,m) (((real *)cartesian->d)[(point.i + k + _index(a,m)*(point.n + 2))*(point.n + 2) + point.j + l])
 @define allocated(...) true
 
-@define POINT_VARIABLES VARIABLES
+@define POINT_VARIABLES() VARIABLES()
 
 postmacro foreach (char flags = 0, Reduce reductions = None)
 {
@@ -50,7 +50,7 @@ postmacro foreach (char flags = 0, Reduce reductions = None)
       for (_k = 1; _k <= point.n; _k++) {
 	point.i = _k;
 	for (point.j = 1; point.j <= point.n; point.j++) {
-	  POINT_VARIABLES;
+	  POINT_VARIABLES();
 	  {...}
 	}
       }
@@ -69,7 +69,7 @@ postmacro foreach_face_generic (char flags = 0, Reduce reductions = None,
       for (_k = 1; _k <= point.n + 1; _k++) {
 	point.i = _k;
 	for (point.j = 1; point.j <= point.n + 1; point.j++) {
-	  POINT_VARIABLES;
+	  POINT_VARIABLES();
 	  {...}
 	}
       }
@@ -79,15 +79,19 @@ postmacro foreach_face_generic (char flags = 0, Reduce reductions = None,
 #define foreach_edge() foreach_face(y,x)
 
 macro is_face_x (Point p = point) {
-  int ig = -1; NOT_UNUSED (ig); VARIABLES;
-  if (p.j <= p.n)
-    {...}
+  {
+    int ig = -1; NOT_UNUSED (ig); VARIABLES();
+    if (p.j <= p.n)
+      {...}
+  }
 }
 
 macro is_face_y (Point p = point) {
-  int jg = -1; NOT_UNUSED (jg); VARIABLES;
-  if (p.i <= p.n)
-    {...}
+  {
+    int jg = -1; NOT_UNUSED (jg); VARIABLES();
+    if (p.i <= p.n)
+      {...}
+  }
 }
   
 @if TRASH
@@ -139,7 +143,7 @@ postmacro foreach_boundary_dir (int l, int d)
       for (_l = 0; _l < point.n + 2*GHOSTS; _l++) {
 	*_i = _l;
 	{
-	  POINT_VARIABLES;
+	  POINT_VARIABLES();
 	  {...}
 	}
       }
@@ -376,7 +380,7 @@ Point locate (double xp = 0, double yp = 0, double zp = 0)
 postmacro foreach_vertex (char flags = 0, Reduce reductions = None)
 {
   foreach_face_generic (flags, reductions) {
-    x -= Delta/2.; y -= Delta/2.;
+    x -= Delta_x/2.; y -= Delta_y/2.;
     {...}
   }
 }

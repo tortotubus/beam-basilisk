@@ -311,22 +311,24 @@ void boundary_stencil (ForeachData * loop)
 
 macro foreach_stencil (char flags, Reduce reductions)
 {
-  static int _first = 1.;
-  ForeachData _loop = {
-    .fname = S__FILE__, .line = S_LINENO, .first = _first
-  };
-  if (baseblock) for (scalar s = baseblock[0], * i = baseblock; s.i >= 0; i++, s = *i) {
-    _attribute[s.i].input = _attribute[s.i].output = _attribute[s.i].nowarning = false;
-    _attribute[s.i].width = 0;
+  {
+    static int _first = 1.;
+    ForeachData _loop = {
+      .fname = S__FILE__, .line = S_LINENO, .first = _first
+    };
+    if (baseblock) for (scalar s = baseblock[0], * i = baseblock; s.i >= 0; i++, s = *i) {
+	_attribute[s.i].input = _attribute[s.i].output = _attribute[s.i].nowarning = false;
+	_attribute[s.i].width = 0;
+      }
+    int ig = 0, jg = 0, kg = 0; NOT_UNUSED(ig); NOT_UNUSED(jg); NOT_UNUSED(kg);
+    Point point = {0}; NOT_UNUSED (point);
+    
+    {...}
+    
+    check_stencil (&_loop);
+    boundary_stencil (&_loop);
+    _first = 0;
   }
-  int ig = 0, jg = 0, kg = 0; NOT_UNUSED(ig); NOT_UNUSED(jg); NOT_UNUSED(kg);
-  Point point = {0}; NOT_UNUSED (point);
-
-  {...}
-  
-  check_stencil (&_loop);
-  boundary_stencil (&_loop);
-  _first = 0;
 }
 
 macro foreach_vertex_stencil (char flags, Reduce reductions) {

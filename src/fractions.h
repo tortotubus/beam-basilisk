@@ -356,18 +356,22 @@ fraction fields directly from a function. */
 
 macro fraction (scalar f, double func)
 {
-  vertex scalar phi[];
-  foreach_vertex()
-    phi[] = func;
-  fractions (phi, f);
+  {
+    vertex scalar phi[];
+    foreach_vertex()
+      phi[] = func;
+    fractions (phi, f);
+  }
 }
 
 macro solid (scalar cs, face vector fs, double func)
 {
-  vertex scalar phi[];
-  foreach_vertex()
-    phi[] = func;
-  fractions (phi, cs, fs);
+  {
+    vertex scalar phi[];
+    foreach_vertex()
+      phi[] = func;
+    fractions (phi, cs, fs);
+  }
 }
 
 /**

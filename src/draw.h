@@ -213,17 +213,19 @@ coordinate system. */
 
 macro translate (float x = 0, float y = 0., float z = 0.)
 {
-  bview * _view = draw();
-  glMatrixMode (GL_MODELVIEW);
-  glPushMatrix();
-  glTranslatef (x, y, z);
-  gl_get_frustum (&_view->frustum);
+  {
+    bview * _view = draw();
+    glMatrixMode (GL_MODELVIEW);
+    glPushMatrix();
+    glTranslatef (x, y, z);
+    gl_get_frustum (&_view->frustum);
 
-  {...}
+    {...}
   
-  glMatrixMode (GL_MODELVIEW);
-  glPopMatrix();
-  gl_get_frustum (&_view->frustum);
+    glMatrixMode (GL_MODELVIEW);
+    glPopMatrix();
+    gl_get_frustum (&_view->frustum);
+  }
 }
 
 /**
@@ -236,43 +238,45 @@ $\alpha$ as explained in
 
 macro mirror (coord n = {0}, double alpha = 0.)
 {
-  bview * _view = draw();
   {
-    glMatrixMode (GL_MODELVIEW);
-    glPushMatrix();
-    normalize (&n);
-    GLfloat s[16], t[16];
-    s[0] = 1. - 2.*n.x*n.x;
-    s[1] = - 2.*n.x*n.y;  s[2] = - 2.*n.x*n.z;
-    s[3] = 0.;
-    s[4] = s[1];
-    s[5] = 1. - 2.*n.y*n.y; s[6] = - 2.*n.y*n.z;
-    s[7] = 0.;
-    s[8] = s[2];   s[9] = s[6];  s[10] = 1. - 2.*n.z*n.z; 
-    s[11] = 0.;
-    s[12] = 0.;    s[13] = 0.;   s[14] = 0.;                    
-    s[15] = 1.;
+    bview * _view = draw();
+    {
+      glMatrixMode (GL_MODELVIEW);
+      glPushMatrix();
+      normalize (&n);
+      GLfloat s[16], t[16];
+      s[0] = 1. - 2.*n.x*n.x;
+      s[1] = - 2.*n.x*n.y;  s[2] = - 2.*n.x*n.z;
+      s[3] = 0.;
+      s[4] = s[1];
+      s[5] = 1. - 2.*n.y*n.y; s[6] = - 2.*n.y*n.z;
+      s[7] = 0.;
+      s[8] = s[2];   s[9] = s[6];  s[10] = 1. - 2.*n.z*n.z; 
+      s[11] = 0.;
+      s[12] = 0.;    s[13] = 0.;   s[14] = 0.;                    
+      s[15] = 1.;
 
-    t[0] = 1.;  t[1] = 0.;   t[2] = 0.;  t[3] = 0.;
-    t[4] = 0.;  t[5] = 1.;   t[6] = 0.;  t[7] = 0.;
-    t[8] = 0.;  t[9] = 0.;   t[10] = 1.; t[11] = 0.;
-    t[12] = - 2.*n.x*alpha; 
-    t[13] = - 2.*n.y*alpha;  
-    t[14] = - 2.*n.z*alpha; 
-    t[15] = 1.;
-    matrix_multiply (s, t);
-    glMultMatrixf (s);
-    gl_get_frustum (&_view->frustum);
-    _view->reversed = !_view->reversed;
-  }
+      t[0] = 1.;  t[1] = 0.;   t[2] = 0.;  t[3] = 0.;
+      t[4] = 0.;  t[5] = 1.;   t[6] = 0.;  t[7] = 0.;
+      t[8] = 0.;  t[9] = 0.;   t[10] = 1.; t[11] = 0.;
+      t[12] = - 2.*n.x*alpha; 
+      t[13] = - 2.*n.y*alpha;  
+      t[14] = - 2.*n.z*alpha; 
+      t[15] = 1.;
+      matrix_multiply (s, t);
+      glMultMatrixf (s);
+      gl_get_frustum (&_view->frustum);
+      _view->reversed = !_view->reversed;
+    }
     
-  {...}
+    {...}
 
-  {
-    glMatrixMode (GL_MODELVIEW);
-    glPopMatrix();
-    gl_get_frustum (&_view->frustum);
-    _view->reversed = !_view->reversed;
+    {
+      glMatrixMode (GL_MODELVIEW);
+      glPopMatrix();
+      gl_get_frustum (&_view->frustum);
+      _view->reversed = !_view->reversed;
+    }
   }
 }
 
@@ -346,29 +350,31 @@ static void glnormal3d (bview * view, double x, double y, double z) {
 
 postmacro foreach_visible_plane (bview * view, coord n1, double alpha1)
 {
-  coord _n = {(n1).x, (n1).y, (n1).z};
-  double _alpha = 0.9999999*(alpha1);
   {
-    double norm = sqrt(sq(_n.x) + sq(_n.y) + sq(_n.z));
-    if (!norm)
-      _n.z = 1.;
-    else
-      _n.x /= norm, _n.y /= norm, _n.z /= norm, _alpha /= norm;
-  }
-  glnormal3d (view, _n.x, _n.y, _n.z); // do not use normal inversion
-  foreach_cell() {
-    // fixme: coordinate mapping
-    double _r = Delta*0.87, alpha = (_alpha - _n.x*x - _n.y*y - _n.z*z)/Delta;
-    if (fabs(alpha) > 0.87 ||
-	(VertexBuffer.visible &&
-	 !sphere_in_frustum (x, y, z, _r, &(view)->frustum)))
-      continue;
-    if (is_leaf(cell) ||
-	(VertexBuffer.visible &&
-	 sphere_diameter (x, y, z, _r/L0, &(view)->frustum) < (view)->res)) {
-      if (is_active(cell) && is_local(cell))
-	{...}
-      continue;
+    coord _n = {(n1).x, (n1).y, (n1).z};
+    double _alpha = 0.9999999*(alpha1);
+    {
+      double norm = sqrt(sq(_n.x) + sq(_n.y) + sq(_n.z));
+      if (!norm)
+	_n.z = 1.;
+      else
+	_n.x /= norm, _n.y /= norm, _n.z /= norm, _alpha /= norm;
+    }
+    glnormal3d (view, _n.x, _n.y, _n.z); // do not use normal inversion
+    foreach_cell() {
+      // fixme: coordinate mapping
+      double _r = Delta*0.87, alpha = (_alpha - _n.x*x - _n.y*y - _n.z*z)/Delta;
+      if (fabs(alpha) > 0.87 ||
+	  (VertexBuffer.visible &&
+	   !sphere_in_frustum (x, y, z, _r, &(view)->frustum)))
+	continue;
+      if (is_leaf(cell) ||
+	  (VertexBuffer.visible &&
+	   sphere_diameter (x, y, z, _r/L0, &(view)->frustum) < (view)->res)) {
+	if (is_active(cell) && is_local(cell))
+	  {...}
+	continue;
+      }
     }
   }
 }
@@ -376,17 +382,19 @@ postmacro foreach_visible_plane (bview * view, coord n1, double alpha1)
 
 macro draw_lines (bview * view, float color[3], float lw)
 {
-  glMatrixMode (GL_PROJECTION);
-  glPushMatrix();
-  glTranslatef (0., 0., view->lc*view->fov/24.);
-  glColor3f (color[0], color[1], color[2]);
-  glLineWidth (view->samples*(lw > 0. ? lw : 1.));
-  bool _reversed = view->reversed;
-  view->reversed = false;
-  {...}
-  glMatrixMode (GL_PROJECTION);
-  glPopMatrix();
-  view->reversed = _reversed;
+  {
+    glMatrixMode (GL_PROJECTION);
+    glPushMatrix();
+    glTranslatef (0., 0., view->lc*view->fov/24.);
+    glColor3f (color[0], color[1], color[2]);
+    glLineWidth (view->samples*(lw > 0. ? lw : 1.));
+    bool _reversed = view->reversed;
+    view->reversed = false;
+    {...}
+    glMatrixMode (GL_PROJECTION);
+    glPopMatrix();
+    view->reversed = _reversed;
+  }
 }
 
 static inline double interp (Point point, coord p, scalar col) {

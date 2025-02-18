@@ -65,214 +65,226 @@ void recursive (Point point)
 
 postmacro foreach_cell_root (Point root)
 {
-  int ig = 0, jg = 0;	NOT_UNUSED(ig); NOT_UNUSED(jg);
-  Point point = {0};
+  {
+    int ig = 0, jg = 0;	NOT_UNUSED(ig); NOT_UNUSED(jg);
+    Point point = {0};
 #if dimension == 1
-  struct { int l, i, stage; } stack[STACKSIZE];
+    struct { int l, i, stage; } stack[STACKSIZE];
 #elif dimension == 2
-  struct { int l, i, j, stage; } stack[STACKSIZE];
+    struct { int l, i, j, stage; } stack[STACKSIZE];
 #else // dimension == 3
-  int kg = 0; NOT_UNUSED(kg);
-  struct { int l, i, j, k, stage; } stack[STACKSIZE];
+    int kg = 0; NOT_UNUSED(kg);
+    struct { int l, i, j, k, stage; } stack[STACKSIZE];
 #endif
-  int _s = -1;
-  _push (0, root.i, root.j, root.k, 0);
-  while (_s >= 0) {
-    int stage;
-    _pop();
-    if (!allocated (0,0,0))
-      continue;
-    switch (stage) {
-    case 0: {
-      POINT_VARIABLES;
+    int _s = -1;
+    _push (0, root.i, root.j, root.k, 0);
+    while (_s >= 0) {
+      int stage;
+      _pop();
+      if (!allocated (0,0,0))
+	continue;
+      switch (stage) {
+      case 0: {
+	POINT_VARIABLES();
 
-      {...}
+	{...}
 
-      if (point.level < grid->depth) {
-	_push (point.level, point.i, point.j, point.k, 1);
-	_push (point.level + 1, _LEFT, _BOTTOM, _BACK, 0);
+	if (point.level < grid->depth) {
+	  _push (point.level, point.i, point.j, point.k, 1);
+	  _push (point.level + 1, _LEFT, _BOTTOM, _BACK, 0);
+	}
+	break;
       }
-      break;
-    }
 #if dimension == 1
-    case 1: _push (point.level + 1, _RIGHT, _BOTTOM, _BACK, 0); break;
+      case 1: _push (point.level + 1, _RIGHT, _BOTTOM, _BACK, 0); break;
 #elif dimension == 2
-    case 1: _push (point.level, point.i, point.j, point.k, 2);
-      _push (point.level + 1, _LEFT,  _TOP, _BACK, 0); break;
-    case 2: _push (point.level, point.i, point.j, point.k, 3);
-      _push (point.level + 1, _RIGHT, _BOTTOM, _BACK, 0); break;
-    case 3: _push (point.level + 1, _RIGHT, _TOP, _BACK, 0); break;
+      case 1: _push (point.level, point.i, point.j, point.k, 2);
+	_push (point.level + 1, _LEFT,  _TOP, _BACK, 0); break;
+      case 2: _push (point.level, point.i, point.j, point.k, 3);
+	_push (point.level + 1, _RIGHT, _BOTTOM, _BACK, 0); break;
+      case 3: _push (point.level + 1, _RIGHT, _TOP, _BACK, 0); break;
 #elif dimension == 3
-    case 1: _push (point.level, point.i, point.j, point.k, 2);
-      _push (point.level + 1, _LEFT, _BOTTOM, _FRONT, 0); break;
-    case 2: _push (point.level, point.i, point.j, point.k, 3);
-      _push (point.level + 1, _LEFT, _TOP, _BACK, 0); break;
-    case 3: _push (point.level, point.i, point.j, point.k, 4);
-      _push (point.level + 1, _LEFT, _TOP, _FRONT, 0); break;
-    case 4: _push (point.level, point.i, point.j, point.k, 5);
-      _push (point.level + 1, _RIGHT, _BOTTOM, _BACK, 0); break;
-    case 5: _push (point.level, point.i, point.j, point.k, 6);
-      _push (point.level + 1, _RIGHT, _BOTTOM, _FRONT, 0); break;
-    case 6: _push (point.level, point.i, point.j, point.k, 7);
-      _push (point.level + 1, _RIGHT, _TOP, _BACK, 0); break;
-    case 7: _push (point.level + 1, _RIGHT, _TOP, _FRONT, 0); break;
+      case 1: _push (point.level, point.i, point.j, point.k, 2);
+	_push (point.level + 1, _LEFT, _BOTTOM, _FRONT, 0); break;
+      case 2: _push (point.level, point.i, point.j, point.k, 3);
+	_push (point.level + 1, _LEFT, _TOP, _BACK, 0); break;
+      case 3: _push (point.level, point.i, point.j, point.k, 4);
+	_push (point.level + 1, _LEFT, _TOP, _FRONT, 0); break;
+      case 4: _push (point.level, point.i, point.j, point.k, 5);
+	_push (point.level + 1, _RIGHT, _BOTTOM, _BACK, 0); break;
+      case 5: _push (point.level, point.i, point.j, point.k, 6);
+	_push (point.level + 1, _RIGHT, _BOTTOM, _FRONT, 0); break;
+      case 6: _push (point.level, point.i, point.j, point.k, 7);
+	_push (point.level + 1, _RIGHT, _TOP, _BACK, 0); break;
+      case 7: _push (point.level + 1, _RIGHT, _TOP, _FRONT, 0); break;
 #endif
+      }
     }
   }
 }
 
 postmacro foreach_cell()
 {
+  {
 #if dimension == 1
-  Point root = {GHOSTS,0};
+    Point root = {GHOSTS,0};
 #elif dimension == 2
-  Point root = {GHOSTS,GHOSTS,0};
+    Point root = {GHOSTS,GHOSTS,0};
 #else // dimension == 3
-  Point root = {GHOSTS,GHOSTS,GHOSTS,0};
+    Point root = {GHOSTS,GHOSTS,GHOSTS,0};
 #endif
-  foreach_cell_root (root)
-    {...}
+    foreach_cell_root (root)
+      {...}
+  }
 }
 
 postmacro foreach_cell_all() {
-  Point root = {0};
-  for (root.i = GHOSTS*Period.x; root.i <= GHOSTS*(2 - Period.x); root.i++)
+  {
+    Point root = {0};
+    for (root.i = GHOSTS*Period.x; root.i <= GHOSTS*(2 - Period.x); root.i++)
 #if dimension >= 2
-    for (root.j = GHOSTS*Period.y; root.j <= GHOSTS*(2 - Period.y); root.j++)
+      for (root.j = GHOSTS*Period.y; root.j <= GHOSTS*(2 - Period.y); root.j++)
 #endif
 #if dimension >= 3
-      for (root.k = GHOSTS*Period.z; root.k <= GHOSTS*(2 - Period.z); root.k++)
+	for (root.k = GHOSTS*Period.z; root.k <= GHOSTS*(2 - Period.z); root.k++)
 #endif
-	foreach_cell_root (root)
-	  {...}
+	  foreach_cell_root (root)
+	    {...}
+  }
 }
 
 postmacro foreach_cell_post_root (bool condition, Point root)
 {
-  int ig = 0, jg = 0;	NOT_UNUSED(ig); NOT_UNUSED(jg);
-  Point point = {0};
+  {
+    int ig = 0, jg = 0;	NOT_UNUSED(ig); NOT_UNUSED(jg);
+    Point point = {0};
 #if dimension == 1
-  struct { int l, i, stage; } stack[STACKSIZE];
+    struct { int l, i, stage; } stack[STACKSIZE];
 #elif dimension == 2
-  struct { int l, i, j, stage; } stack[STACKSIZE];
+    struct { int l, i, j, stage; } stack[STACKSIZE];
 #else // dimension == 3
-  int kg = 0; NOT_UNUSED(kg);
-  struct { int l, i, j, k, stage; } stack[STACKSIZE];
+    int kg = 0; NOT_UNUSED(kg);
+    struct { int l, i, j, k, stage; } stack[STACKSIZE];
 #endif
-  int _s = -1;
-  _push (0, root.i, root.j, root.k, 0); /* the root cell */
-  while (_s >= 0) {
-    int stage;
-    _pop();
-    if (!allocated (0,0,0))
-      continue;
-    switch (stage) {
-    case 0: {
-      POINT_VARIABLES;
-      if (point.level == grid->depth) {
-	_push (point.level, point.i, point.j, point.k, 8);
+    int _s = -1;
+    _push (0, root.i, root.j, root.k, 0); /* the root cell */
+    while (_s >= 0) {
+      int stage;
+      _pop();
+      if (!allocated (0,0,0))
+	continue;
+      switch (stage) {
+      case 0: {
+	POINT_VARIABLES();
+	if (point.level == grid->depth) {
+	  _push (point.level, point.i, point.j, point.k, 8);
+	}
+	else {
+	  _push (point.level, point.i, point.j, point.k, 1);
+	  if (condition)
+	    _push (point.level + 1, _LEFT, _BOTTOM, _BACK, 0);
+	}
+	break;
       }
-      else {
-	_push (point.level, point.i, point.j, point.k, 1);
-	if (condition)
-	  _push (point.level + 1, _LEFT, _BOTTOM, _BACK, 0);
-      }
-      break;
-    }
 #if dimension == 1
-    case 1:
-      _push (point.level, point.i, point.j, point.k, 2);
-      if (condition)
-	_push (point.level + 1, _RIGHT, _BOTTOM, _BACK, 0);
-      break;
+      case 1:
+	_push (point.level, point.i, point.j, point.k, 2);
+	if (condition)
+	  _push (point.level + 1, _RIGHT, _BOTTOM, _BACK, 0);
+	break;
 #elif dimension == 2
-    case 1:
-      _push (point.level, point.i, point.j, point.k, 2);
-      if (condition)
-	_push (point.level + 1, _LEFT, _TOP, _BACK, 0);
-      break;
-    case 2:
-      _push (point.level, point.i, point.j, point.k, 3);
-      if (condition)
-	_push (point.level + 1, _RIGHT, _BOTTOM, _BACK, 0);
-      break;
-    case 3:
-      _push (point.level, point.i, point.j, point.k, 4);
-      if (condition)
-	_push (point.level + 1, _RIGHT, _TOP, _BACK, 0);
-      break;
+      case 1:
+	_push (point.level, point.i, point.j, point.k, 2);
+	if (condition)
+	  _push (point.level + 1, _LEFT, _TOP, _BACK, 0);
+	break;
+      case 2:
+	_push (point.level, point.i, point.j, point.k, 3);
+	if (condition)
+	  _push (point.level + 1, _RIGHT, _BOTTOM, _BACK, 0);
+	break;
+      case 3:
+	_push (point.level, point.i, point.j, point.k, 4);
+	if (condition)
+	  _push (point.level + 1, _RIGHT, _TOP, _BACK, 0);
+	break;
 #elif dimension == 3
-    case 1:
-      _push (point.level, point.i, point.j, point.k, 2);
-      if (condition)
-	_push (point.level + 1, _LEFT, _BOTTOM, _FRONT, 0);
-      break;
-    case 2:
-      _push (point.level, point.i, point.j, point.k, 3);
-      if (condition)
-	_push (point.level + 1, _LEFT, _TOP, _BACK, 0);
-      break;
-    case 3:
-      _push (point.level, point.i, point.j, point.k, 4);
-      if (condition)
-	_push (point.level + 1, _LEFT, _TOP, _FRONT, 0);
-      break;
-    case 4:
-      _push (point.level, point.i, point.j, point.k, 5);
-      if (condition)
-	_push (point.level + 1, _RIGHT, _BOTTOM, _BACK, 0);
-      break;
-    case 5:
-      _push (point.level, point.i, point.j, point.k, 6);
-      if (condition)
-	_push (point.level + 1, _RIGHT, _BOTTOM, _FRONT, 0);
-      break;
-    case 6:
-      _push (point.level, point.i, point.j, point.k, 7);
-      if (condition)
-	_push (point.level + 1, _RIGHT, _TOP, _BACK, 0);
-      break;
-    case 7:
-      _push (point.level, point.i, point.j, point.k, 8);
-      if (condition)
+      case 1:
+	_push (point.level, point.i, point.j, point.k, 2);
+	if (condition)
+	  _push (point.level + 1, _LEFT, _BOTTOM, _FRONT, 0);
+	break;
+      case 2:
+	_push (point.level, point.i, point.j, point.k, 3);
+	if (condition)
+	  _push (point.level + 1, _LEFT, _TOP, _BACK, 0);
+	break;
+      case 3:
+	_push (point.level, point.i, point.j, point.k, 4);
+	if (condition)
+	  _push (point.level + 1, _LEFT, _TOP, _FRONT, 0);
+	break;
+      case 4:
+	_push (point.level, point.i, point.j, point.k, 5);
+	if (condition)
+	  _push (point.level + 1, _RIGHT, _BOTTOM, _BACK, 0);
+	break;
+      case 5:
+	_push (point.level, point.i, point.j, point.k, 6);
+	if (condition)
+	  _push (point.level + 1, _RIGHT, _BOTTOM, _FRONT, 0);
+	break;
+      case 6:
+	_push (point.level, point.i, point.j, point.k, 7);
+	if (condition)
+	  _push (point.level + 1, _RIGHT, _TOP, _BACK, 0);
+	break;
+      case 7:
+	_push (point.level, point.i, point.j, point.k, 8);
+	if (condition)
 	  _push (point.level + 1, _RIGHT, _TOP, _FRONT, 0);
-      break;	
+	break;	
 #endif
-    default: {
-      POINT_VARIABLES;
+      default: {
+	POINT_VARIABLES();
 
-      {...}
+	{...}
       
-    }
+      }
+      }
     }
   }
 }
 
 postmacro foreach_cell_post (bool condition)
 {
+  {
 #if dimension == 1
-  Point root = {GHOSTS,0};
+    Point root = {GHOSTS,0};
 #elif dimension == 2
-  Point root = {GHOSTS,GHOSTS,0};
+    Point root = {GHOSTS,GHOSTS,0};
 #else // dimension == 3
-  Point root = {GHOSTS,GHOSTS,GHOSTS,0};
+    Point root = {GHOSTS,GHOSTS,GHOSTS,0};
 #endif
-  foreach_cell_post_root (condition, root)
-    {...}
+    foreach_cell_post_root (condition, root)
+      {...}
+  }
 }
 
 postmacro foreach_cell_post_all (bool condition)
 {
-  Point root = {0};
-  for (root.i = 0; root.i <= 2*GHOSTS; root.i++)
+  {
+    Point root = {0};
+    for (root.i = 0; root.i <= 2*GHOSTS; root.i++)
 #if dimension >= 2
-    for (root.j = 0; root.j <= 2*GHOSTS; root.j++)
+      for (root.j = 0; root.j <= 2*GHOSTS; root.j++)
 #endif
 #if dimension >= 3
-      for (root.k = 0; root.k <= 2*GHOSTS; root.k++)
+	for (root.k = 0; root.k <= 2*GHOSTS; root.k++)
 #endif
-	foreach_cell_post_root (condition, root)
-	  {...}
+	  foreach_cell_post_root (condition, root)
+	    {...}
+  }
 }
 
 postmacro foreach_leaf()

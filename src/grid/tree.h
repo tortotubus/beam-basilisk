@@ -350,49 +350,55 @@ void cache_shrink (Cache * c)
 #include "foreach_cell.h"
 
 #if dimension == 1
-postmacro foreach_child (Point point = point, break = (_k = 2)) {
-  int _i = 2*point.i - GHOSTS;
-  point.level++;
-  for (int _k = 0; _k < 2; _k++) {
-    point.i = _i + _k;
-    POINT_VARIABLES;
-    {...}
-  }
-  point.i = (_i + GHOSTS)/2;
-  point.level--;
-}
-#elif dimension == 2
-postmacro foreach_child (Point point = point, break = (_k = _l = 2)) {
-  int _i = 2*point.i - GHOSTS, _j = 2*point.j - GHOSTS;
-  point.level++;
-  for (int _k = 0; _k < 2; _k++) {
-    point.i = _i + _k;
-    for (int _l = 0; _l < 2; _l++) {
-      point.j = _j + _l;
-      POINT_VARIABLES;
+postmacro foreach_child (Point _p = point, break = (_k = 2)) {
+  {
+    int _i = 2*_p.i - GHOSTS;
+    _p.level++;
+    for (int _k = 0; _k < 2; _k++) {
+      _p.i = _i + _k;
+      POINT_VARIABLES (_p);
       {...}
     }
+    _p.i = (_i + GHOSTS)/2;
+    _p.level--;
   }
-  point.i = (_i + GHOSTS)/2; point.j = (_j + GHOSTS)/2;
-  point.level--;
 }
-#else // dimension == 3
-postmacro foreach_child (Point point = point, break = (_l = _m = _n = 2)) {
-  int _i = 2*point.i - GHOSTS, _j = 2*point.j - GHOSTS, _k = 2*point.k - GHOSTS;
-  point.level++;
-  for (int _l = 0; _l < 2; _l++) {
-    point.i = _i + _l;
-    for (int _m = 0; _m < 2; _m++) {
-      point.j = _j + _m;
-      for (int _n = 0; _n < 2; _n++) {
-	point.k = _k + _n;
-	POINT_VARIABLES;
+#elif dimension == 2
+postmacro foreach_child (Point _p = point, break = (_k = _l = 2)) {
+  {
+    int _i = 2*_p.i - GHOSTS, _j = 2*_p.j - GHOSTS;
+    _p.level++;
+    for (int _k = 0; _k < 2; _k++) {
+      _p.i = _i + _k;
+      for (int _l = 0; _l < 2; _l++) {
+	_p.j = _j + _l;
+	POINT_VARIABLES (_p);
 	{...}
       }
     }
+    _p.i = (_i + GHOSTS)/2; _p.j = (_j + GHOSTS)/2;
+    _p.level--;
   }
-  point.i = (_i + GHOSTS)/2;point.j = (_j + GHOSTS)/2;point.k = (_k + GHOSTS)/2;
-  point.level--;
+}
+#else // dimension == 3
+postmacro foreach_child (Point _p = point, break = (_l = _m = _n = 2)) {
+  {
+    int _i = 2*_p.i - GHOSTS, _j = 2*_p.j - GHOSTS, _k = 2*_p.k - GHOSTS;
+    _p.level++;
+    for (int _l = 0; _l < 2; _l++) {
+      _p.i = _i + _l;
+      for (int _m = 0; _m < 2; _m++) {
+	_p.j = _j + _m;
+	for (int _n = 0; _n < 2; _n++) {
+	  _p.k = _k + _n;
+	  POINT_VARIABLES (_p);
+	  {...}
+	}
+      }
+    }
+    _p.i = (_i + GHOSTS)/2;_p.j = (_j + GHOSTS)/2;_p.k = (_k + GHOSTS)/2;
+    _p.level--;
+  }
 }
 #endif // dimension == 3
   
@@ -437,7 +443,7 @@ postmacro foreach_cache (Cache cache, Reduce reductions = None)
 #endif
 	point.level = cache.p[_k].level;
 	_flags = cache.p[_k].flags;
-	POINT_VARIABLES;
+	POINT_VARIABLES();
 	{...}
       }
   }
@@ -466,7 +472,7 @@ postmacro foreach_cache_level (Cache cache, int _l, Reduce reductions = None)
 #if dimension >= 3
 	point.k = cache.p[_k].k;
 #endif
-	POINT_VARIABLES;
+	POINT_VARIABLES();
 	{...}
       }
   }
@@ -692,23 +698,29 @@ postmacro foreach_face_generic (char flags = 0, Reduce reductions = None,
 }
  
 macro is_face_x (unsigned short _f = _flags) {
-  int ig = -1; NOT_UNUSED(ig); VARIABLES;
-  if (_f & face_x)
-    {...}
+  {
+    int ig = -1; NOT_UNUSED(ig); VARIABLES();
+    if (_f & face_x)
+      {...}
+  }
 }
       
 #if dimension >= 2
 macro is_face_y (unsigned short _f = _flags) {
-  int jg = -1; NOT_UNUSED(jg); VARIABLES;
-  if (_f & face_y)
-    {...}
+  {
+    int jg = -1; NOT_UNUSED(jg); VARIABLES();
+    if (_f & face_y)
+      {...}
+  }
 }
 #endif
 #if dimension >= 3
 macro is_face_z (unsigned short _f = _flags) {
-  int kg = -1; NOT_UNUSED(kg); VARIABLES;
-  if (_f & face_z)
-    {...}
+  {
+    int kg = -1; NOT_UNUSED(kg); VARIABLES();
+    if (_f & face_z)
+      {...}
+  }
 }
 #endif
 
@@ -1596,8 +1608,9 @@ void check_two_one (void)
 	  /* fixme: all this mess is just to ignore ghost cells */
 	  int i = (point.i + GHOSTS)/2 + k;
 	  int j = (point.j + GHOSTS)/2 + l;
-	  double x = ((i - GHOSTS + 0.5)*_DELTA*2. - 0.5);
-	  double y = ((j - GHOSTS + 0.5)*_DELTA*2. - 0.5);
+	  double Delta = 1./(1 << point.level);
+	  double x = ((i - GHOSTS + 0.5)*Delta*2. - 0.5);
+	  double y = ((j - GHOSTS + 0.5)*Delta*2. - 0.5);
 	  if (x > -0.5 && x < 0.5 && y > -0.5 && y < 0.5 && 
 	      !(aparent(k,l).flags & active)) {
 	    FILE * fp = fopen("check_two_one_loc", "w");
@@ -1605,8 +1618,8 @@ void check_two_one (void)
 		     "# %d %d\n"
 		     "%g %g\n%g %g\n",
 		     k, l,
-		     ((_I + 0.5)*_DELTA - 0.5),
-		     ((_J + 0.5)*_DELTA - 0.5),
+		     ((point.i - GHOSTS + 0.5)* - 0.5),
+		     ((point.j - GHOSTS + 0.5)*Delta - 0.5),
 		     x, y);
 	    fclose (fp);
 #if 0
