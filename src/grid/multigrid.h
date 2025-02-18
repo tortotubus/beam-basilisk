@@ -144,8 +144,8 @@ static Point last_point;
 			multigrid->shift[point.level - 1] +
 			_index(a,m)*multigrid->shift[depth() + 1]])
 @
-@def POINT_VARIABLES
-  VARIABLES
+@def POINT_VARIABLES()
+  VARIABLES();
   int level = point.level; NOT_UNUSED(level);
   struct { int x; } child = { 2*((point.i+GHOSTS)%2)-1 }; NOT_UNUSED(child);
   Point parent = point;	NOT_UNUSED(parent);
@@ -165,8 +165,8 @@ static Point last_point;
 			multigrid->shift[point.level - 1] +
 			_index(a,m)*multigrid->shift[depth() + 1]])
 @
-@def POINT_VARIABLES
-  VARIABLES
+@def POINT_VARIABLES()
+  VARIABLES();
   int level = point.level; NOT_UNUSED(level);
   struct { int x, y; } child = {
     2*((point.i+GHOSTS)%2)-1, 2*((point.j+GHOSTS)%2)-1
@@ -192,8 +192,8 @@ static Point last_point;
 			multigrid->shift[point.level - 1] +
 			_index(a,0)*multigrid->shift[depth() + 1]])
 @
-@def POINT_VARIABLES
-  VARIABLES
+@def POINT_VARIABLES()
+  VARIABLES();
   int level = point.level; NOT_UNUSED(level);
   struct { int x, y, z; } child = {
     2*((point.i + GHOSTS)%2) - 1,
@@ -250,7 +250,7 @@ postmacro foreach_level (int l, char flags = 0, Reduce reductions = None) {
 #endif
 	  {
 #endif
-	    POINT_VARIABLES;
+	    POINT_VARIABLES();
 	    {...}
 #if dimension > 1
 	  }
@@ -276,7 +276,7 @@ postmacro foreach (char flags = 0, Reduce reductions = None) {
 #endif
 	    {
 #endif
-	      POINT_VARIABLES;
+	      POINT_VARIABLES();
 	      {...}
 #if dimension > 1
 	    }
@@ -316,7 +316,7 @@ postmacro foreach_face_generic (char flags = 0, Reduce reductions = None,
 #endif
 	    {
 #endif
-	      POINT_VARIABLES;
+	      POINT_VARIABLES();
 	      {...}
 #if dimension > 1
 	    }
@@ -329,95 +329,113 @@ postmacro foreach_face_generic (char flags = 0, Reduce reductions = None,
 
 #if dimension == 1
 macro is_face_x() {
-  int ig = -1; NOT_UNUSED(ig); VARIABLES;
-  {...}
+  {
+    int ig = -1; NOT_UNUSED(ig); VARIABLES();
+    {...}
+  }
 }
 
 // foreach_edge?
 
 postmacro foreach_child (Point point = point, break = (_k = 2)) {
-  int _i = 2*point.i - GHOSTS;
-  point.level++;
-  point.n.x *= 2;
-  for (int _k = 0; _k < 2; _k++) {
-    point.i = _i + _k;
-    POINT_VARIABLES;
-    {...}
+  {
+    int _i = 2*point.i - GHOSTS;
+    point.level++;
+    point.n.x *= 2;
+    for (int _k = 0; _k < 2; _k++) {
+      point.i = _i + _k;
+      POINT_VARIABLES();
+      {...}
+    }
+    point.i = (_i + GHOSTS)/2;
+    point.level--;
+    point.n.x /= 2;
   }
-  point.i = (_i + GHOSTS)/2;
-  point.level--;
-  point.n.x /= 2;
 }
 
 #elif dimension == 2
 #define foreach_edge() foreach_face(y,x)
 
 macro is_face_x (Point p = point) {
-  int ig = -1; NOT_UNUSED(ig); VARIABLES;
-  if (p.j < p.n.y + GHOSTS)
-    {...}
+  {
+    int ig = -1; NOT_UNUSED(ig); VARIABLES();
+    if (p.j < p.n.y + GHOSTS)
+      {...}
+  }
 }
 
 macro is_face_y (Point p = point) {
-  int jg = -1; NOT_UNUSED(jg); VARIABLES;
-  if (p.i < p.n.x + GHOSTS)
-    {...}
+  {
+    int jg = -1; NOT_UNUSED(jg); VARIABLES();
+    if (p.i < p.n.x + GHOSTS)
+      {...}
+  }
 }
 
 postmacro foreach_child (Point point = point, break = (_k = _l = 2))
 {
-  int _i = 2*point.i - GHOSTS, _j = 2*point.j - GHOSTS;
-  point.level++;
-  point.n.x *= 2, point.n.y *= 2;
-  for (int _k = 0; _k < 2; _k++)
-    for (int _l = 0; _l < 2; _l++) {
-      point.i = _i + _k; point.j = _j + _l;
-      POINT_VARIABLES;
-      {...}
+  {
+    int _i = 2*point.i - GHOSTS, _j = 2*point.j - GHOSTS;
+    point.level++;
+    point.n.x *= 2, point.n.y *= 2;
+    for (int _k = 0; _k < 2; _k++)
+      for (int _l = 0; _l < 2; _l++) {
+	point.i = _i + _k; point.j = _j + _l;
+	POINT_VARIABLES();
+	{...}
+      }
+    point.i = (_i + GHOSTS)/2; point.j = (_j + GHOSTS)/2;
+    point.level--;
+    point.n.x /= 2, point.n.y /= 2;
   }
-  point.i = (_i + GHOSTS)/2; point.j = (_j + GHOSTS)/2;
-  point.level--;
-  point.n.x /= 2, point.n.y /= 2;
 }
 
 #elif dimension == 3
 macro is_face_x (Point p = point) {
-  int ig = -1; NOT_UNUSED(ig); VARIABLES;
-  if (p.j < p.n.y + GHOSTS && p.k < p.n.z + GHOSTS)
-    {...}
+  {
+    int ig = -1; NOT_UNUSED(ig); VARIABLES();
+    if (p.j < p.n.y + GHOSTS && p.k < p.n.z + GHOSTS)
+      {...}
+  }
 }
 
 macro is_face_y (Point p = point) {
-  int jg = -1; NOT_UNUSED(jg); VARIABLES;
-  if (p.i < p.n.x + GHOSTS && p.k < p.n.z + GHOSTS)
-    {...}
+  {
+    int jg = -1; NOT_UNUSED(jg); VARIABLES();
+    if (p.i < p.n.x + GHOSTS && p.k < p.n.z + GHOSTS)
+      {...}
+  }
 }
 
 macro is_face_z (Point p = point) {
-  int kg = -1; NOT_UNUSED(kg); VARIABLES;
-  if (p.i < p.n.x + GHOSTS && p.j < p.n.y + GHOSTS)
-    {...}
+  {
+    int kg = -1; NOT_UNUSED(kg); VARIABLES();
+    if (p.i < p.n.x + GHOSTS && p.j < p.n.y + GHOSTS)
+      {...}
+  }
 }
 
 postmacro foreach_child (Point point = point, break = (_l = _m = _n = 2))
 {
-  int _i = 2*point.i - GHOSTS;
-  int _j = 2*point.j - GHOSTS;
-  int _k = 2*point.k - GHOSTS;
-  point.level++;
-  point.n.x *= 2, point.n.y *= 2, point.n.z *= 2;
-  for (int _l = 0; _l < 2; _l++)
-    for (int _m = 0; _m < 2; _m++)
-      for (int _n = 0; _n < 2; _n++) {
-	point.i = _i + _l; point.j = _j + _m; point.k = _k + _n;
-	POINT_VARIABLES;
-	{...}
+  {
+    int _i = 2*point.i - GHOSTS;
+    int _j = 2*point.j - GHOSTS;
+    int _k = 2*point.k - GHOSTS;
+    point.level++;
+    point.n.x *= 2, point.n.y *= 2, point.n.z *= 2;
+    for (int _l = 0; _l < 2; _l++)
+      for (int _m = 0; _m < 2; _m++)
+	for (int _n = 0; _n < 2; _n++) {
+	  point.i = _i + _l; point.j = _j + _m; point.k = _k + _n;
+	  POINT_VARIABLES();
+	  {...}
+	}
+    point.i = (_i + GHOSTS)/2;
+    point.j = (_j + GHOSTS)/2;
+    point.k = (_k + GHOSTS)/2;
+    point.level--;
+    point.n.x /= 2, point.n.y /= 2, point.n.z /= 2;
   }
-  point.i = (_i + GHOSTS)/2;
-  point.j = (_j + GHOSTS)/2;
-  point.k = (_k + GHOSTS)/2;
-  point.level--;
-  point.n.x /= 2, point.n.y /= 2, point.n.z /= 2;
 }
 #endif
   
@@ -446,21 +464,23 @@ void reset (void * alist, double val)
 #if dimension == 1
 postmacro foreach_boundary_dir (int l, int d, Reduce reductions = None)
 {
-  int ig = 0, jg = 0, kg = 0; NOT_UNUSED(ig); NOT_UNUSED(jg); NOT_UNUSED(kg);
-  Point point = {0};
-  point.level = l < 0 ? depth() : l;
-  SET_DIMENSIONS();
-  if (d == left) {
-    point.i = GHOSTS;
-    ig = -1;
-  }
-  else if (d == right) {
-    point.i = point.n.x + GHOSTS - 1;
-    ig = 1;
-  }
   {
-    POINT_VARIABLES;
-    {...}
+    int ig = 0, jg = 0, kg = 0; NOT_UNUSED(ig); NOT_UNUSED(jg); NOT_UNUSED(kg);
+    Point point = {0};
+    point.level = l < 0 ? depth() : l;
+    SET_DIMENSIONS();
+    if (d == left) {
+      point.i = GHOSTS;
+      ig = -1;
+    }
+    else if (d == right) {
+      point.i = point.n.x + GHOSTS - 1;
+      ig = 1;
+    }
+    {
+      POINT_VARIABLES();
+      {...}
+    }
   }
 }
 
@@ -499,7 +519,7 @@ postmacro foreach_boundary_dir (int l, int d, Reduce reductions = None)
       for (_l = 0; _l < _n + 2*GHOSTS; _l++) {
 	*_i = _l;
 	{
-	  POINT_VARIABLES;
+	  POINT_VARIABLES();
 	  {...}
 	}
       }
@@ -558,7 +578,7 @@ postmacro foreach_boundary_dir (int l, int d, Reduce reductions = None) {
 	*_i = _l;
 	for (int _m = 0; _m < _n[1] + 2*GHOSTS; _m++) {
 	  *_j = _m;
-	  POINT_VARIABLES;
+	  POINT_VARIABLES();
 	  {...}
 	}
       }
@@ -910,12 +930,12 @@ Point locate (double xp = 0, double yp = 0, double zp = 0)
 
 postmacro foreach_vertex (char flags = 0, Reduce reductions = None) {
   foreach_face_generic (reductions) {
-    x -= Delta/2.;
+    x -= Delta_x/2.;
 #if dimension > 1  
-    y -= Delta/2.;  
+    y -= Delta_y/2.;  
 #endif
 #if dimension > 2
-    z -= Delta/2.;  
+    z -= Delta_z/2.;  
 #endif
     {...}
   }
@@ -951,57 +971,69 @@ ivec dimensions (int nx = 0, int ny = 0, int nz = 0)
 #if dimension == 1
 
 postmacro foreach_slice_x (int start, int end, int l) {
-  Point point = {0};
-  point.level = l; SET_DIMENSIONS();
-  for (point.i = start; point.i < end; point.i++)
-    {...}
+  {
+    Point point = {0};
+    point.level = l; SET_DIMENSIONS();
+    for (point.i = start; point.i < end; point.i++)
+      {...}
+  }
 }
 
 #elif dimension == 2
 
 postmacro foreach_slice_x (int start, int end, int l) {
-  Point point = {0};
-  point.level = l; SET_DIMENSIONS();
-  for (point.i = start; point.i < end; point.i++)
-    for (point.j = 0; point.j < point.n.y + 2*GHOSTS; point.j++)
-      {...}
+  {
+    Point point = {0};
+    point.level = l; SET_DIMENSIONS();
+    for (point.i = start; point.i < end; point.i++)
+      for (point.j = 0; point.j < point.n.y + 2*GHOSTS; point.j++)
+	{...}
+  }
 }
 
 postmacro foreach_slice_y (int start, int end, int l) {
-  Point point = {0};
-  point.level = l; SET_DIMENSIONS();
-  for (point.i = 0; point.i < point.n.x + 2*GHOSTS; point.i++)
-    for (point.j = start; point.j < end; point.j++)
-      {...}
+  {
+    Point point = {0};
+    point.level = l; SET_DIMENSIONS();
+    for (point.i = 0; point.i < point.n.x + 2*GHOSTS; point.i++)
+      for (point.j = start; point.j < end; point.j++)
+	{...}
+  }
 }
 
 #elif dimension == 3
 
 postmacro foreach_slice_x (int start, int end, int l) {
-  Point point = {0};
-  point.level = l; SET_DIMENSIONS();
-  for (point.i = start; point.i < end; point.i++)
-    for (point.j = 0; point.j < point.n.y + 2*GHOSTS; point.j++)
-      for (point.k = 0; point.k < point.n.z + 2*GHOSTS; point.k++)
-	{...}
+  {
+    Point point = {0};
+    point.level = l; SET_DIMENSIONS();
+    for (point.i = start; point.i < end; point.i++)
+      for (point.j = 0; point.j < point.n.y + 2*GHOSTS; point.j++)
+	for (point.k = 0; point.k < point.n.z + 2*GHOSTS; point.k++)
+	  {...}
+  }
 }
 
 postmacro foreach_slice_y (int start, int end, int l) {
-  Point point = {0};
-  point.level = l; SET_DIMENSIONS();
-  for (point.i = 0; point.i < point.n.x + 2*GHOSTS; point.i++)
-    for (point.j = start; point.j < end; point.j++)
-      for (point.k = 0; point.k < point.n.z + 2*GHOSTS; point.k++)
-	{...}
+  {
+    Point point = {0};
+    point.level = l; SET_DIMENSIONS();
+    for (point.i = 0; point.i < point.n.x + 2*GHOSTS; point.i++)
+      for (point.j = start; point.j < end; point.j++)
+	for (point.k = 0; point.k < point.n.z + 2*GHOSTS; point.k++)
+	  {...}
+  }
 }
 
 macro foreach_slice_z (int start, int end, int l) {
-  Point point = {0};
-  point.level = l; SET_DIMENSIONS();
-  for (point.i = 0; point.i < point.n.x + 2*GHOSTS; point.i++)
-    for (point.j = 0; point.j < point.n.y + 2*GHOSTS; point.j++)
-      for (point.k = start; point.k < end; point.k++)
-	{...}
+  {
+    Point point = {0};
+    point.level = l; SET_DIMENSIONS();
+    for (point.i = 0; point.i < point.n.x + 2*GHOSTS; point.i++)
+      for (point.j = 0; point.j < point.n.y + 2*GHOSTS; point.j++)
+	for (point.k = start; point.k < end; point.k++)
+	  {...}
+  }
 }
 
 #endif // dimension == 3
@@ -1017,7 +1049,7 @@ postmacro foreach_cell_multigrid()
     foreach_cell() {
       point.i += ox*(1 << point.level);
       {
-	POINT_VARIABLES;
+	POINT_VARIABLES();
 	{...}
       }
       point.i -= ox*(1 << point.level);
@@ -1032,7 +1064,7 @@ postmacro foreach_cell_multigrid()
 	point.i += ox*(1 << point.level);
 	point.j += oy*(1 << point.level);
 	{
-	  POINT_VARIABLES;
+	  POINT_VARIABLES();
 	  {...}
         }
   	point.i -= ox*(1 << point.level);
@@ -1050,7 +1082,7 @@ postmacro foreach_cell_multigrid()
 	  point.j += oy*(1 << point.level);
 	  point.k += oz*(1 << point.level);
 	  {
-	    POINT_VARIABLES;
+	    POINT_VARIABLES();
 	    {...}
           }
 	  point.i -= ox*(1 << point.level);

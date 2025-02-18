@@ -8,32 +8,36 @@ void (* debug)    (Point);
 #include "fpe.h"
 #include "stencils.h"
 
-postmacro foreach_point (double x = 0., double y = 0., double z = 0.,
+postmacro foreach_point (double _x = 0., double _y = 0., double _z = 0.,
 			 char flags = 0, Reduce reductions = None)
 {
-  int ig = 0, jg = 0, kg = 0; NOT_UNUSED(ig); NOT_UNUSED(jg); NOT_UNUSED(kg);
-  coord _p = { x, y, z };
-  Point point = locate (_p.x, _p.y, _p.z); // fixme
-  if (point.level >= 0) {
-    POINT_VARIABLES;
-    {...}
+  {
+    int ig = 0, jg = 0, kg = 0; NOT_UNUSED(ig); NOT_UNUSED(jg); NOT_UNUSED(kg);
+    coord _p = { _x, _y, _z };
+    Point point = locate (_p.x, _p.y, _p.z); // fixme
+    if (point.level >= 0) {
+      POINT_VARIABLES();
+      {...}
+    }
   }
 }
 
 postmacro foreach_region (coord p, coord box[2], coord n,
 			  char flags = 0, Reduce reductions = None)
 {
-  p = (coord){0, 0, box[0].z};
-  //  OMP(omp for schedule(static))
-  for (int _i = 0; _i < (int) n.x; _i++) {
-    p.x = box[0].x + (box[1].x - box[0].x)/n.x*(_i + 0.5);
-    for (int _j = 0; _j < (int) n.y; _j++) {
-      p.y = box[0].y + (box[1].y - box[0].y)/n.y*(_j + 0.5);
-      Point point = locate (p.x, p.y, p.z); // fixme
-      if (point.level >= 0) {
-	int ig = 0, jg = 0, kg = 0; NOT_UNUSED(ig); NOT_UNUSED(jg); NOT_UNUSED(kg);
-	POINT_VARIABLES;
-	{...}
+  {
+    p = (coord){0, 0, box[0].z};
+    //  OMP(omp for schedule(static))
+    for (int _i = 0; _i < (int) n.x; _i++) {
+      p.x = box[0].x + (box[1].x - box[0].x)/n.x*(_i + 0.5);
+      for (int _j = 0; _j < (int) n.y; _j++) {
+	p.y = box[0].y + (box[1].y - box[0].y)/n.y*(_j + 0.5);
+	Point point = locate (p.x, p.y, p.z); // fixme
+	if (point.level >= 0) {
+	  int ig = 0, jg = 0, kg = 0; NOT_UNUSED(ig); NOT_UNUSED(jg); NOT_UNUSED(kg);
+	  POINT_VARIABLES();
+	  {...}
+	}
       }
     }
   }

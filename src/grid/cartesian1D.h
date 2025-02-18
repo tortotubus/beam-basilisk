@@ -23,7 +23,7 @@ static Point last_point;
 @define data(k,l,m) ((double *)&cartesian->d[(point.i + k)*datasize])
 @define allocated(...) true
 
-@define POINT_VARIABLES VARIABLES
+@define POINT_VARIABLES() VARIABLES()
 
 postmacro foreach (char flags = 0, Reduce reductions = None)
 {
@@ -35,7 +35,7 @@ postmacro foreach (char flags = 0, Reduce reductions = None)
     OMP(omp for schedule(static))
       for (_k = 1; _k <= point.n; _k++) {
 	point.i = _k;
-	POINT_VARIABLES;
+	POINT_VARIABLES();
 	{...}
       }
   }
@@ -52,13 +52,13 @@ postmacro foreach_face_generic (char flags = 0, Reduce reductions = None,
     OMP(omp for schedule(static))
       for (_k = 1; _k <= point.n + 1; _k++) {
 	point.i = _k;
-	POINT_VARIABLES;
+	POINT_VARIABLES();
 	{...}
       }
   }
 }
 
-macro is_face_x() { int ig = -1; NOT_UNUSED(ig); VARIABLES; {...} }
+macro is_face_x() {{ int ig = -1; NOT_UNUSED(ig); VARIABLES(); {...} }}
 
 // ghost cell coordinates for each direction
 static int _ig[] = {1,-1};
@@ -231,7 +231,7 @@ Point locate (double xp = 0, double yp = 0, double zp = 0)
 postmacro foreach_vertex (char flags = 0, Reduce reductions = None)
 {
   foreach_face_generic (flags, reductions) {
-    x -= Delta/2.;
+    x -= Delta_x/2.;
     {...}
   }
 }

@@ -1947,7 +1947,7 @@ static Ast * boundary_function (Ast * expr, Stack * stack, TranslateData * d,
 		dir[i], ";",
 		"NOT_UNUSED(", index[i], "g);");
   assert (before);
-  str_append (src, "POINT_VARIABLES;");
+  str_append (src, "POINT_VARIABLES();");
   str_append (src, "{return(", before, "_expr_);}}}");
   free (before);
   Ast * boundary =

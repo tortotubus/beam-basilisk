@@ -18,7 +18,8 @@ As an illustration, consider the following simple iteration macro
 ~~~c
 #define iterator(start, end, index, expr) do {    \
   for (int index = start; index <= end; index++)  \
-    expr                                          \
+    expr					  \
+  printf ("do something after the loop\n");	  \
 } while(0)
 
 int main() {
@@ -32,6 +33,7 @@ Using Basilisk macros, this would be written
 macro iterator (int start, int end, int index) {
   for (int index = start; index <= end; index++)
     {...}
+  printf ("do something after the loop\n");
 }
 
 int main() {
@@ -83,10 +85,8 @@ macro expansion the code would read
 int main() {
   init_grid (16);
   scalar a[];
-  {
-    foreach()
-      a[] = sqrt (x*x + y*y);
-  }
+  foreach()
+    a[] = sqrt (x*x + y*y);
 }
 ~~~
 
@@ -528,9 +528,11 @@ static void macro_replacement (Ast * statement, Stack * stack, bool nolineno, bo
     .returnindex = return_macro_index
   };
 
-  Ast * definition = ast_parent (statement, sym_function_definition);
-  if (definition && ast_is_macro_declaration (definition->child[0]))
-    r.in_a_macro_definition = true;
+  {
+    Ast * definition = ast_parent (statement, sym_function_definition);
+    if (definition && ast_is_macro_declaration (definition->child[0]))
+      r.in_a_macro_definition = true;
+  }
 
   int na = 0;
   if (r.arguments)
@@ -626,8 +628,26 @@ static void macro_replacement (Ast * statement, Stack * stack, bool nolineno, bo
   Statement */
   
   if (statement->sym == sym_statement) {
-    ast_set_child (statement, 0, copy);
-    ast_destroy (macro_statement);
+    if (statement->parent->sym == sym_block_item) {
+      Ast * list = ast_schema (copy, sym_compound_statement,
+			       1, sym_block_item_list);
+      Ast * parent = ast_ancestor (statement, 2);
+      assert (parent->sym == sym_block_item_list);
+      foreach_item (list, 1, item) {
+	if (ast_child_index (item))
+	  ast_block_list_append (parent, sym_block_item, item->child[0]);
+	else {
+	  ast_before (item, ast_left_terminal (statement)->before);
+	  ast_set_child (parent, parent->child[1] ? 1 : 0, item);
+	}
+      }
+      ast_destroy (copy);
+      ast_destroy (macro_statement);
+    }
+    else {
+      ast_set_child (statement, 0, copy);
+      ast_destroy (macro_statement);
+    }
   }
   
   /**
