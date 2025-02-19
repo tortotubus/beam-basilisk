@@ -249,14 +249,14 @@ void mem_assign (Memindex m, int i, int j, int k, int len, void * b)
 The `mem_free()` function frees a given index. */
 
 #if dimension == 1
-void mem_free (Memindex m, int i, int len)
+void mem_free (Memindex m, int i, int len, void * b)
 {
   Memalloc mem[] = {{(void **)&m->b, sizeof(char *)},
 		    {NULL}};
   memrange_free (&m->r1, mem, i);
 }
 #elif dimension == 2
-void mem_free (Memindex m, int i, int j, int len)
+void mem_free (Memindex m, int i, int j, int len, void * b)
 {
   Memalloc mem[] = {{(void **)&m->b[i], sizeof(char *)},
 		    {NULL}};
@@ -268,7 +268,7 @@ void mem_free (Memindex m, int i, int j, int len)
   }
 }
 #else // dimension == 3
-void mem_free (Memindex m, int i, int j, int k, int len)
+void mem_free (Memindex m, int i, int j, int k, int len, void * b)
 {
   Memalloc mem[] = {{(void **)&m->b[i][j], sizeof(char *)},		    
 		    {NULL}};
