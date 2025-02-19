@@ -424,6 +424,9 @@ static FILE * ppm_fallback (const char * file, const char * mode)
 
 FILE * open_image (const char * file, const char * options)
 {
+@if __EMSCRIPTEN__
+  return ppm_fallback (file, "w");
+@else // !__EMSCRIPTEN__
   assert (pid() == 0);
   const char * ext;
   if ((ext = is_animation (file))) {
@@ -496,6 +499,7 @@ FILE * open_image (const char * file, const char * options)
     strcat (command, file);
     return popen (command, "w");
   }
+@endif // !__EMSCRIPTEN__
 }
 
 void close_image (const char * file, FILE * fp)
@@ -505,8 +509,10 @@ void close_image (const char * file, FILE * fp)
     if (!open_image_lookup (file))
       fclose (fp);
   }
+@if !__EMSCRIPTEN__
   else if (which ("convert"))
     pclose (fp);
+@endif // !__EMSCRIPTEN__
   else
     fclose (fp);
 }

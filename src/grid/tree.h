@@ -861,7 +861,7 @@ static void assign_periodic (Memindex m, int i, int j, int len, void * b)
 
 static void free_periodic (Memindex m, int i, int j, int len)
 {
-  periodic_function (m, i, j, len, NULL, (PeriodicFunction) mem_free);
+  periodic_function (m, i, j, len, NULL, mem_free);
 }
 #else // dimension == 3
 typedef void (* PeriodicFunction) (Memindex, int, int, int, int, void *);
