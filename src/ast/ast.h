@@ -116,8 +116,9 @@ Ast * ast_new_internal (Ast * parent, ...);
 #define ast_new(parent,...) ast_new_internal (parent, __VA_ARGS__, -1)
 Ast * ast_schema_internal (const Ast * n, ...);
 #define ast_schema(n,...) ast_schema_internal (n, __VA_ARGS__, -1)
-Ast * ast_find_internal (const Ast * n, ...);
-#define ast_find(n,...) ast_find_internal (n, __VA_ARGS__, -1)
+Ast * ast_find_internal (const Ast * n, const char * identifier, ...);
+#define ast_find(n,...) ast_find_internal (n, NULL, __VA_ARGS__, -1)
+#define ast_find_identifier(id,n,...) ast_find_internal (n, id, __VA_ARGS__, -1)
 Ast * ast_copy_single (const Ast * n,
 		       AstRoot ** dst_root, AstRoot ** src_root);
 Ast * ast_copy_internal (const Ast * n, ...);

@@ -413,6 +413,24 @@ static void str_print_internal (const Ast * n, int sym, int real, File * file,
   else { // !terminal
 
     /**
+    Do not output macro definitions. */
+
+    if (ast_is_macro_declaration (ast_schema (n, sym_function_definition,
+					      0, sym_function_declaration))) {
+      AstTerminal * t = ast_left_terminal (n);
+      if (t->before) {
+	const char * spaces = only_spaces (t->before, file, t);
+	if (spaces)
+	  output (data, spaces, NULL);
+	else {
+	  output (data, t->before, NULL);
+	  update_file_line (t->before, file);
+	}
+      }
+      return;
+    }
+    
+    /**
     Ignore 'break =' macro parameters. */
     
     if (ast_schema (ast_child (n, sym_parameter_declaration), sym_parameter_declaration,
@@ -673,7 +691,7 @@ Ast * ast_schema_internal (const Ast * n, ...)
   return (Ast *) n;
 }
 
-static Ast * vast_find_internal (const Ast * n, va_list ap)
+static Ast * vast_find_internal (const Ast * n, const char * identifier, va_list ap)
 {
   if (n == ast_placeholder)
     return NULL;
@@ -681,22 +699,23 @@ static Ast * vast_find_internal (const Ast * n, va_list ap)
   va_copy (bp, ap);
   Ast * found = vast_schema_internal (n, bp);
   va_end (bp);
-  if (found)
+  if (found && (!identifier ||
+		(ast_terminal (found) && !strcmp (ast_terminal (found)->start, identifier))))
     return found;
   if (!ast_terminal(n))
     for (Ast ** c = n->child; *c; c++)
-      if ((found = vast_find_internal (*c, ap)))
+      if ((found = vast_find_internal (*c, identifier, ap)))
 	return found;
   return NULL;
 }
 
-Ast * ast_find_internal (const Ast * n, ...)
+Ast * ast_find_internal (const Ast * n, const char * identifier, ...)
 {
   if (!n)
     return NULL;
   va_list ap;
-  va_start (ap, n);
-  n = vast_find_internal (n, ap);
+  va_start (ap, identifier);
+  n = vast_find_internal (n, identifier, ap);
   va_end (ap);
   return (Ast *) n;
 }

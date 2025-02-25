@@ -15,10 +15,8 @@ postmacro foreach_point (double _x = 0., double _y = 0., double _z = 0.,
     int ig = 0, jg = 0, kg = 0; NOT_UNUSED(ig); NOT_UNUSED(jg); NOT_UNUSED(kg);
     coord _p = { _x, _y, _z };
     Point point = locate (_p.x, _p.y, _p.z); // fixme
-    if (point.level >= 0) {
-      POINT_VARIABLES();
+    if (point.level >= 0)
       {...}
-    }
   }
 }
 
@@ -35,7 +33,6 @@ postmacro foreach_region (coord p, coord box[2], coord n,
 	Point point = locate (p.x, p.y, p.z); // fixme
 	if (point.level >= 0) {
 	  int ig = 0, jg = 0, kg = 0; NOT_UNUSED(ig); NOT_UNUSED(jg); NOT_UNUSED(kg);
-	  POINT_VARIABLES();
 	  {...}
 	}
       }
@@ -1113,12 +1110,3 @@ void stencil_val_a (Point p, scalar s, int i, int j, int k, bool input,
     s.input = true;
   s.output = true;
 }
-
-/**
-Macros overloaded by the interpreter. */
-
-@define dimensional(...)
-#define show_dimension(...) show_dimension_internal (__VA_ARGS__ + 10293847566574839201.)
-@define show_dimension_internal(...)
-@define display_value(...)
-@define interpreter_verbosity(...)

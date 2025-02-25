@@ -18,7 +18,7 @@
 @define trash(x)  // data trashing is disabled by default. Turn it on with
                   // -DTRASH=1
 
-auto macro BEGIN_FOREACH() {{...}}
+auto postmacro BEGIN_FOREACH() {{...}}
 
 #if _OPENMP
 @ include <omp.h>
@@ -533,7 +533,7 @@ postmacro OMP_PARALLEL() {{...}}
 
 @define NOT_UNUSED(x) (void)(x)
 
-@define VARIABLES      _CATCH;
+postmacro VARIABLES() { _CATCH; }
 @define _index(a,m)    (a.i)
 @define val(a,k,l,m)   data(k,l,m)[_index(a,m)]
 
@@ -652,3 +652,12 @@ postmacro foreach_face (char flags = 0, Reduce reductions = None,
 {{...}}
 postmacro einstein_sum() {{...}}
 postmacro diagonalize (int a) {{...}}
+
+/**
+Macros overloaded by the interpreter. */
+
+@define dimensional(...)
+#define show_dimension(...) show_dimension_internal (__VA_ARGS__ + 10293847566574839201.)
+@define show_dimension_internal(...)
+@define display_value(...)
+@define interpreter_verbosity(...)

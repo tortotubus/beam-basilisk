@@ -85,7 +85,6 @@ postmacro foreach_cell_root (Point root)
 	continue;
       switch (stage) {
       case 0: {
-	POINT_VARIABLES();
 
 	{...}
 
@@ -175,7 +174,6 @@ postmacro foreach_cell_post_root (bool condition, Point root)
 	continue;
       switch (stage) {
       case 0: {
-	POINT_VARIABLES();
 	if (point.level == grid->depth) {
 	  _push (point.level, point.i, point.j, point.k, 8);
 	}
@@ -245,12 +243,9 @@ postmacro foreach_cell_post_root (bool condition, Point root)
 	  _push (point.level + 1, _RIGHT, _TOP, _FRONT, 0);
 	break;	
 #endif
-      default: {
-	POINT_VARIABLES();
-
+      default:
 	{...}
-      
-      }
+
       }
     }
   }

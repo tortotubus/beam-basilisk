@@ -305,6 +305,7 @@ static void mapped_position (bview * view, coord * p, double * r)
 postmacro foreach_visible (bview * view, char flags = 0, Reduce reductions = None)
 {
   foreach_cell() {
+    POINT_VARIABLES();
 #if dimension == 2
     double _r = Delta*0.71;
 #else // dimension == 3
@@ -362,6 +363,7 @@ postmacro foreach_visible_plane (bview * view, coord n1, double alpha1)
     }
     glnormal3d (view, _n.x, _n.y, _n.z); // do not use normal inversion
     foreach_cell() {
+      POINT_VARIABLES();
       // fixme: coordinate mapping
       double _r = Delta*0.87, alpha = (_alpha - _n.x*x - _n.y*y - _n.z*z)/Delta;
       if (fabs(alpha) > 0.87 ||
