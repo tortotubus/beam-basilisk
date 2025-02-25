@@ -103,21 +103,9 @@ bool overload_event()
 /**
 Foreach variables */
 
-typedef struct {
-  int i, j, k, l;
-  int level;
-} Point;
-
-typedef struct {
-  int x, y, z;
-} ChildPos;
-
 void _Variables() {
   Point point;
-  double x, y, z;
-  double Delta, Delta_x, Delta_y, Delta_z;
-  int level;
-  ChildPos child;
+  int ig, jg, kg;
 }
 
 enum {
@@ -133,12 +121,7 @@ void unset_double (double * x)
 
 void _init_point_variables (void)
 {
-  Delta = L0;
-  unset_double (&Delta);
-  Delta_x = Delta_y = Delta_z = Delta;
-  x = X0 + Delta;
-  y = Y0 + Delta;
-  z = Z0 + Delta;
+  ig = jg = kg = 0;
 }
 
 /**
@@ -391,6 +374,9 @@ void output_ppm (scalar f, FILE * fp, int n, char * file,
 		 double min, double max, double spread,
 		 double z, bool linear, double box[2][2],
 		 scalar mask, colormap map, char * opt)
+{}
+
+void coarsen_cell_recursive (Point point, scalar * list)
 {}
 
 /**

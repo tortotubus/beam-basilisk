@@ -687,6 +687,8 @@ static Ast * get_variable_reference (Ast * n, Stack * stack, Ast * scope)
 			 0, sym_IDENTIFIER);
   if (!identifier || ast_ancestor (identifier, 3)->sym == sym_function_call)
     return NULL;
+  if (!strcmp (ast_terminal (identifier)->start, "point"))
+    return NULL;
   Ast * ref = ast_identifier_declaration_from_to
     (stack, ast_terminal (identifier)->start, NULL, scope);
   if (!ref) {
@@ -819,7 +821,7 @@ bool is_point_variable (const Ast * ref)
 		0, sym_direct_declarator,
 		0, sym_generic_identifier,
 		0, sym_IDENTIFIER);
-  return identifier && !strcmp (ast_terminal (identifier)->start, "_Variables");
+  return identifier && !strcmp (ast_terminal (identifier)->start, "POINT_VARIABLES");
 }
 
 bool ast_is_foreach_parameter (Ast * n)

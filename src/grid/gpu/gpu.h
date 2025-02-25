@@ -219,7 +219,7 @@ void printWorkGroupsCapabilities()
 # define end_tracing_foreach(name, file, line)
 #endif
 
-macro BEGIN_FOREACH()
+postmacro BEGIN_FOREACH()
 {
   if (_gpu_done_)
     _gpu_done_ = false;
@@ -238,8 +238,8 @@ typedef struct {
 bool gpu_end_stencil (ForeachData * loop, const RegionParameters * region,
 		      External * externals, const char * kernel);
 
-macro foreach_stencil_generic (char flags, Reduce reductions,
-			       int _parallel, External * _externals, const char * _kernel)
+postmacro foreach_stencil_generic (char flags, Reduce reductions,
+				   int _parallel, External * _externals, const char * _kernel)
 {
   tracing_foreach ("foreach", S__FILE__, S_LINENO);
   static ForeachData _loop = { .fname = S__FILE__, .line = S_LINENO, .first = 1 };
@@ -275,15 +275,15 @@ macro foreach_stencil_generic (char flags, Reduce reductions,
   end_tracing_foreach ("foreach", S__FILE__, S_LINENO);
 }
 
-macro foreach_stencil (char flags, Reduce reductions,
-		       int _parallel, External * _externals, const char * _kernel)
+postmacro foreach_stencil (char flags, Reduce reductions,
+			   int _parallel, External * _externals, const char * _kernel)
 {
   foreach_stencil_generic (flags, reductions, _parallel, _externals, _kernel)
     {...}
 }
 
-macro foreach_level_stencil (int _level, char flags, Reduce reductions,
-			    int _parallel, External * _externals, const char * _kernel)
+postmacro foreach_level_stencil (int _level, char flags, Reduce reductions,
+				 int _parallel, External * _externals, const char * _kernel)
 {
   foreach_stencil_generic (flags, reductions, _parallel, _externals, _kernel) {
     _region.level = _level + 1;
@@ -291,9 +291,9 @@ macro foreach_level_stencil (int _level, char flags, Reduce reductions,
   }
 }
 
-macro foreach_point_stencil (double _xp, double _yp, double _zp,
-			     char flags, Reduce reductions,
-			     int _parallel, External * _externals, const char * _kernel)
+postmacro foreach_point_stencil (double _xp, double _yp, double _zp,
+				 char flags, Reduce reductions,
+				 int _parallel, External * _externals, const char * _kernel)
 {
   foreach_stencil_generic (flags, reductions, _parallel, _externals, _kernel) {
     _region.p = (coord){ _xp, _yp, _zp };
@@ -302,9 +302,9 @@ macro foreach_point_stencil (double _xp, double _yp, double _zp,
   }
 }
 
-macro foreach_region_stencil (coord _p, coord _box[2], coord _n,
-			     char flags, Reduce reductions,
-			     int _parallel, External * _externals, const char * _kernel)
+postmacro foreach_region_stencil (coord _p, coord _box[2], coord _n,
+				  char flags, Reduce reductions,
+				  int _parallel, External * _externals, const char * _kernel)
 {
   foreach_stencil_generic (flags, reductions, _parallel, _externals, _kernel) {
     _region.p = _p, _region.box = _box, _region.n = _n;
@@ -312,9 +312,9 @@ macro foreach_region_stencil (coord _p, coord _box[2], coord _n,
   }
 }
 
-macro foreach_vertex_stencil (char flags, Reduce reductions,
-			      int _parallel, External * _externals,
-			      const char * _kernel)
+postmacro foreach_vertex_stencil (char flags, Reduce reductions,
+				  int _parallel, External * _externals,
+				  const char * _kernel)
 {
   foreach_stencil_generic (flags, reductions, _parallel, _externals, _kernel) {
     _loop.vertex = true;
@@ -322,25 +322,25 @@ macro foreach_vertex_stencil (char flags, Reduce reductions,
   }
 }
 
-macro foreach_face_stencil (char flags, Reduce reductions, const char * _order,
-			    int _parallel, External * _externals,
-			    const char * _kernel)
+postmacro foreach_face_stencil (char flags, Reduce reductions, const char * _order,
+				int _parallel, External * _externals,
+				const char * _kernel)
 {
   foreach_stencil_generic (flags, reductions, _parallel, _externals, _kernel)
     {...}
 }
 
-macro foreach_coarse_level_stencil (int _level, char flags, Reduce reductions,
-				    int _parallel, External * _externals,
-				    const char * _kernel)
+postmacro foreach_coarse_level_stencil (int _level, char flags, Reduce reductions,
+					int _parallel, External * _externals,
+					const char * _kernel)
 {
   foreach_level_stencil (_level, flags, reductions, _parallel, _externals, _kernel)
     {...}
 }
 
-macro foreach_level_or_leaf_stencil (int _level, char flags, Reduce reductions,
-				     int _parallel, External * _externals,
-				     const char * _kernel)
+postmacro foreach_level_or_leaf_stencil (int _level, char flags, Reduce reductions,
+					 int _parallel, External * _externals,
+					 const char * _kernel)
 {
   foreach_level_stencil (_level, flags, reductions, _parallel, _externals, _kernel)
     {...}

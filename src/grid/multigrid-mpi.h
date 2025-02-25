@@ -1,5 +1,81 @@
 #define MULTIGRID_MPI 1
 
+#if dimension == 1
+
+postmacro foreach_slice_x (int start, int end, int l) {
+  {
+    int ig = 0; NOT_UNUSED(ig);
+    Point point = {0};
+    point.level = l; SET_DIMENSIONS();
+    for (point.i = start; point.i < end; point.i++)
+      {...}
+  }
+}
+
+#elif dimension == 2
+
+postmacro foreach_slice_x (int start, int end, int l) {
+  {
+    int ig = 0, jg = 0; NOT_UNUSED(ig); NOT_UNUSED(jg);
+    Point point = {0};
+    point.level = l; SET_DIMENSIONS();
+    for (point.i = start; point.i < end; point.i++)
+      for (point.j = 0; point.j < point.n.y + 2*GHOSTS; point.j++)
+	{...}
+  }
+}
+
+postmacro foreach_slice_y (int start, int end, int l) {
+  {
+    int ig = 0, jg = 0; NOT_UNUSED(ig); NOT_UNUSED(jg);
+    Point point = {0};
+    point.level = l; SET_DIMENSIONS();
+    for (point.i = 0; point.i < point.n.x + 2*GHOSTS; point.i++)
+      for (point.j = start; point.j < end; point.j++)
+	{...}
+  }
+}
+
+#elif dimension == 3
+
+postmacro foreach_slice_x (int start, int end, int l) {
+  {
+    int ig = 0, jg = 0, kg = 0; NOT_UNUSED(ig); NOT_UNUSED(jg); NOT_UNUSED(kg);
+    Point point = {0};
+    point.level = l; SET_DIMENSIONS();
+    for (point.i = start; point.i < end; point.i++)
+      for (point.j = 0; point.j < point.n.y + 2*GHOSTS; point.j++)
+	for (point.k = 0; point.k < point.n.z + 2*GHOSTS; point.k++)
+	  {...}
+  }
+}
+
+postmacro foreach_slice_y (int start, int end, int l) {
+  {
+    int ig = 0, jg = 0, kg = 0; NOT_UNUSED(ig); NOT_UNUSED(jg); NOT_UNUSED(kg);
+    Point point = {0};
+    point.level = l; SET_DIMENSIONS();
+    for (point.i = 0; point.i < point.n.x + 2*GHOSTS; point.i++)
+      for (point.j = start; point.j < end; point.j++)
+	for (point.k = 0; point.k < point.n.z + 2*GHOSTS; point.k++)
+	  {...}
+  }
+}
+
+postmacro foreach_slice_z (int start, int end, int l) {
+  {
+    int ig = 0, jg = 0, kg = 0; NOT_UNUSED(ig); NOT_UNUSED(jg); NOT_UNUSED(kg);
+    Point point = {0};
+    point.level = l; SET_DIMENSIONS();
+    for (point.i = 0; point.i < point.n.x + 2*GHOSTS; point.i++)
+      for (point.j = 0; point.j < point.n.y + 2*GHOSTS; point.j++)
+	for (point.k = start; point.k < end; point.k++)
+	  {...}
+  }
+}
+
+#endif // dimension == 3
+
 typedef struct {
   Boundary b;
   MPI_Comm cartcomm;
@@ -132,6 +208,7 @@ Boundary * mpi_boundary_new()
   }
 
   // rescale the resolution
+  Dimensions_scale = Dimensions.x;
   N /= Dimensions.x;
   int r = 0;
   while (N > 1)

@@ -72,6 +72,44 @@ void withreturn (int i)
   fprintf (stderr, "i == 0\n");  
 }
 
+macro m1() {
+  fprintf (stderr, "m1\n");
+}
+
+macro m2() {
+  m1();
+}
+
+void print_m2()
+{
+  m2(); // should print "m1"
+}
+
+macro m1() {
+  fprintf (stderr, "m1bis\n");
+}
+
+void print_m2bis()
+{
+  m2(); // should print "m1bis"
+}
+
+/**
+## Macro "inheritance" */
+
+macro rmacro()
+{
+  fprintf (stderr, "rmacro\n");
+  {...}
+}
+
+macro rmacro()
+{
+  rmacro() {{...}}
+  fprintf (stderr, "rmacro1\n");
+  {...}
+}
+
 int main()
 {
   mymacro (end = 2)
@@ -109,4 +147,10 @@ int main()
 
   withreturn (0);
   withreturn (1);
+
+  print_m2();
+  print_m2bis();
+
+  rmacro()
+    fprintf (stderr, "rmacro test\n");
 }

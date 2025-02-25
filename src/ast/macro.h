@@ -169,6 +169,13 @@ definition which will only apply if no other definition is
 present. This can be done by adding the `auto` "storage class
 specifier" to the macro definition.
 
+## Inheritance
+
+Macros implement a simple mechanism for "inheritance". A "recursive"
+definition of macros is possible, which allows to include the
+expansion of a previous definition of a macro into the new
+(overloaded) definition.
+
 ## Non-casting of arguments
 
 The comment made above regarding the non-type-casting of the return
@@ -192,8 +199,8 @@ macros.*
 # Implementation */
 
 typedef struct {
-  Ast * statement, * arguments, * parameters, * call, * label;
-  bool in_a_macro_definition, nolineno, complex_call;
+  Ast * statement, * arguments, * parameters, * call, * label, * initial;
+  bool nolineno, complex_call, postmacros;
   int * returnindex;
 } MacroReplacement;
 
@@ -283,16 +290,16 @@ static void replace_arguments (Ast * n, Stack * stack, void * data)
 			     parent)));
       }
     }
-    else if (!r->in_a_macro_definition) {
+    else if (r->initial) {
       if (!strcmp (ast_terminal (identifier)->start, "S__FILE__")) {
 	char * filename = NULL;
-	str_append (filename, "\"", ast_left_terminal (r->call)->file, "\"");
+	str_append (filename, "\"", ast_left_terminal (r->initial)->file, "\"");
 	ast_replace_child (identifier->parent, 0, NN(n, sym_string,
 						     NB(n, sym_STRING_LITERAL, filename)));
 	free (filename);
       }
       else if (!strcmp (ast_terminal (identifier)->start, "S_LINENO")) {
-	int line = r->nolineno ? 0 : ast_left_terminal (r->call)->line;
+	int line = r->nolineno ? 0 : ast_left_terminal (r->initial)->line;
 	char sline[20];
 	snprintf (sline, 19, "%d", line);
 	ast_replace_child (identifier->parent, 0, NN(n, sym_constant,
@@ -463,7 +470,59 @@ static void replace_return (Ast * n, Stack * stack, void * data)
   }
 }
 
-static void macro_replacement (Ast * statement, Stack * stack, bool nolineno, bool postmacros,
+Ast * get_macro_definition (Stack * stack, const Ast * identifier)
+{
+  Ast * decl = ast_identifier_declaration (stack, ast_terminal (identifier)->start);
+  Ast * macro_definition = ast_schema (ast_ancestor (decl, 6), sym_function_definition);
+
+  if (!macro_definition) {
+    fprintf (stderr, "%s:%d: error: undefined macro '%s'\n",
+	     ast_terminal (identifier)->file, ast_terminal (identifier)->line, ast_terminal (identifier)->start);
+    exit (1);
+  }
+
+  Ast * non_auto_macro = macro_definition;
+  while (ast_find (ast_schema (non_auto_macro, sym_function_definition,
+			       0, sym_function_declaration),
+		   sym_declaration_specifiers,
+		   0, sym_storage_class_specifier,
+		   0, sym_AUTO)) {
+    Ast * other = ast_identifier_declaration_from_to (stack, ast_terminal (identifier)->start, decl, NULL);
+    if (other == decl)
+      break;
+    non_auto_macro = ast_schema (ast_ancestor (other, 6), sym_function_definition);
+    decl = other;
+  }
+  if (non_auto_macro)
+    macro_definition = non_auto_macro;
+  
+  if (macro_definition == ast_parent (identifier, sym_function_definition)) { // This is a "recursive" macro
+    Ast * other = ast_identifier_declaration_from_to (stack, ast_terminal (identifier)->start, decl, NULL);
+    if (other == decl) {
+      fprintf (stderr, "%s:%d: error: cannot find ancestor of recursive macro '%s'\n",
+	       ast_terminal (decl)->file, ast_terminal (decl)->line, ast_terminal (decl)->start);
+      exit (1);
+    }
+    macro_definition = ast_schema (ast_ancestor (other, 6), sym_function_definition);
+  }  
+
+  return macro_definition;
+}
+
+static void macro_replacement (Ast * statement, Ast * initial, Stack * stack,
+			       bool nolineno, bool postmacros, bool expand_definitions,
+			       int * return_macro_index);
+
+static void replace_macros (Ast * n, Stack * stack, void * data)
+{
+  if (n->sym == sym_statement || n->sym == sym_function_call) {
+    MacroReplacement * r = data;
+    macro_replacement (n, r->initial, stack, r->nolineno, r->postmacros, true, r->returnindex);
+  }
+}
+
+static void macro_replacement (Ast * statement, Ast * initial, Stack * stack,
+			       bool nolineno, bool postmacros, bool expand_definitions,
 			       int * return_macro_index)
 {
   Ast * identifier, * macro_statement = ast_schema (statement, sym_statement,
@@ -481,20 +540,18 @@ static void macro_replacement (Ast * statement, Stack * stack, bool nolineno, bo
 
   if (!strcmp (ast_terminal (identifier)->start, "OMP_PARALLEL"))
     return;
-  
+
+  if (!expand_definitions) {
+    Ast * definition = ast_parent (statement, sym_function_definition);
+    if (definition && ast_is_macro_declaration (definition->child[0]))
+      return;
+  }
+    
   if (!strcmp (ast_terminal (identifier)->start, "foreach_block") &&
       (inforeach (statement) || point_declaration (stack)))
     str_append (ast_terminal (identifier)->start, "_inner");
-  Ast * macro_definition =
-    ast_schema (ast_ancestor (ast_identifier_declaration (stack, ast_terminal (identifier)->start), 6),
-		sym_function_definition);
 
-  if (!macro_definition) {
-    fprintf (stderr, "%s:%d: error: undefined macro '%s'\n",
-	     ast_terminal (identifier)->file, ast_terminal (identifier)->line, ast_terminal (identifier)->start);
-    exit (1);
-  }
-
+  Ast * macro_definition = get_macro_definition (stack, identifier);  
   if (!postmacros) {
     Ast * macrodef = ast_find (ast_schema (macro_definition, sym_function_definition,
 					   0, sym_function_declaration),
@@ -525,13 +582,16 @@ static void macro_replacement (Ast * statement, Stack * stack, bool nolineno, bo
 				 0, sym_statement,
 				 0, sym_jump_statement,
 				 0, sym_RETURN),
-    .returnindex = return_macro_index
+    .returnindex = return_macro_index,
+    .postmacros = postmacros
   };
 
-  {
-    Ast * definition = ast_parent (statement, sym_function_definition);
+  if (initial) {
+    Ast * definition = ast_parent (initial, sym_function_definition);
     if (definition && ast_is_macro_declaration (definition->child[0]))
-      r.in_a_macro_definition = true;
+      r.initial = NULL;
+    else
+      r.initial = initial;
   }
 
   int na = 0;
@@ -608,6 +668,10 @@ static void macro_replacement (Ast * statement, Stack * stack, bool nolineno, bo
   ast_pop_scope (stack, copy);
   str_prepend (ast_left_terminal (copy)->before, ast_left_terminal (macro_statement)->before);
 
+  stack_push (stack, &copy);
+  ast_traverse (copy, stack, replace_macros, &r);
+  ast_pop_scope (stack, copy);
+
   /**
   Return label */
   
@@ -642,12 +706,10 @@ static void macro_replacement (Ast * statement, Stack * stack, bool nolineno, bo
 	}
       }
       ast_destroy (copy);
-      ast_destroy (macro_statement);
     }
-    else {
+    else
       ast_set_child (statement, 0, copy);
-      ast_destroy (macro_statement);
-    }
+    ast_destroy (macro_statement);
   }
   
   /**

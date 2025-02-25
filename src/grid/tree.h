@@ -310,14 +310,14 @@ void cache_shrink (Cache * c)
     _BLOCK_INDEX
 }
 @
-			
+
 /***** Data macros *****/
 @define data(k,l,n)     ((double *) (NEIGHBOR(k,l,n) + sizeof(Cell)))
 @define fine(a,k,p,n)   ((double *) (CHILD(k,p,n) + sizeof(Cell)))[_index(a,n)]
 @define coarse(a,k,p,n) ((double *) (PARENT(k,p,n) + sizeof(Cell)))[_index(a,n)]
 
-@def POINT_VARIABLES
-  VARIABLES
+macro POINT_VARIABLES (Point point = point) {
+  VARIABLES();
   int level = point.level; NOT_UNUSED(level);
 #if dimension == 1
   struct { int x; } child = { 2*((point.i+GHOSTS)%2)-1 };
@@ -345,59 +345,59 @@ void cache_shrink (Cache * c)
     (Cell *) NEIGHBOR(0,0,0) : NULL;
   NOT_UNUSED(cellp);
 #endif
-@
+}
 
 #include "foreach_cell.h"
 
 #if dimension == 1
-postmacro foreach_child (Point _p = point, break = (_k = 2)) {
+macro foreach_child (Point point = point, break = (_k = 2)) {
   {
-    int _i = 2*_p.i - GHOSTS;
-    _p.level++;
+    int _i = 2*point.i - GHOSTS;
+    point.level++;
     for (int _k = 0; _k < 2; _k++) {
-      _p.i = _i + _k;
-      POINT_VARIABLES (_p);
+      point.i = _i + _k;
+      POINT_VARIABLES();
       {...}
     }
-    _p.i = (_i + GHOSTS)/2;
-    _p.level--;
+    point.i = (_i + GHOSTS)/2;
+    point.level--;
   }
 }
 #elif dimension == 2
-postmacro foreach_child (Point _p = point, break = (_k = _l = 2)) {
+macro foreach_child (Point point = point, break = (_k = _l = 2)) {
   {
-    int _i = 2*_p.i - GHOSTS, _j = 2*_p.j - GHOSTS;
-    _p.level++;
+    int _i = 2*point.i - GHOSTS, _j = 2*point.j - GHOSTS;
+    point.level++;
     for (int _k = 0; _k < 2; _k++) {
-      _p.i = _i + _k;
+      point.i = _i + _k;
       for (int _l = 0; _l < 2; _l++) {
-	_p.j = _j + _l;
-	POINT_VARIABLES (_p);
+	point.j = _j + _l;
+	POINT_VARIABLES();
 	{...}
       }
     }
-    _p.i = (_i + GHOSTS)/2; _p.j = (_j + GHOSTS)/2;
-    _p.level--;
+    point.i = (_i + GHOSTS)/2; point.j = (_j + GHOSTS)/2;
+    point.level--;
   }
 }
 #else // dimension == 3
-postmacro foreach_child (Point _p = point, break = (_l = _m = _n = 2)) {
+macro foreach_child (Point point = point, break = (_l = _m = _n = 2)) {
   {
-    int _i = 2*_p.i - GHOSTS, _j = 2*_p.j - GHOSTS, _k = 2*_p.k - GHOSTS;
-    _p.level++;
+    int _i = 2*point.i - GHOSTS, _j = 2*point.j - GHOSTS, _k = 2*point.k - GHOSTS;
+    point.level++;
     for (int _l = 0; _l < 2; _l++) {
-      _p.i = _i + _l;
+      point.i = _i + _l;
       for (int _m = 0; _m < 2; _m++) {
-	_p.j = _j + _m;
+	point.j = _j + _m;
 	for (int _n = 0; _n < 2; _n++) {
-	  _p.k = _k + _n;
-	  POINT_VARIABLES (_p);
+	  point.k = _k + _n;
+	  POINT_VARIABLES();
 	  {...}
 	}
       }
     }
-    _p.i = (_i + GHOSTS)/2;_p.j = (_j + GHOSTS)/2;_p.k = (_k + GHOSTS)/2;
-    _p.level--;
+    point.i = (_i + GHOSTS)/2;point.j = (_j + GHOSTS)/2;point.k = (_k + GHOSTS)/2;
+    point.level--;
   }
 }
 #endif // dimension == 3
@@ -423,7 +423,7 @@ postmacro foreach_cache (Cache cache, Reduce reductions = None)
 {
   OMP_PARALLEL (reductions) {
     int ig = 0, jg = 0, kg = 0; NOT_UNUSED(ig); NOT_UNUSED(jg); NOT_UNUSED(kg);
-    Point point = {0};
+    Point point = {0}; NOT_UNUSED (point);
     point.i = GHOSTS;
 #if dimension > 1
     point.j = GHOSTS;
@@ -443,7 +443,6 @@ postmacro foreach_cache (Cache cache, Reduce reductions = None)
 #endif
 	point.level = cache.p[_k].level;
 	_flags = cache.p[_k].flags;
-	POINT_VARIABLES();
 	{...}
       }
   }
@@ -453,7 +452,7 @@ postmacro foreach_cache_level (Cache cache, int _l, Reduce reductions = None)
 {
   OMP_PARALLEL (reductions) {
     int ig = 0, jg = 0, kg = 0; NOT_UNUSED(ig); NOT_UNUSED(jg); NOT_UNUSED(kg);
-    Point point = {0};
+    Point point = {0}; NOT_UNUSED (point);
     point.i = GHOSTS;
 #if dimension > 1
     point.j = GHOSTS;
@@ -472,7 +471,6 @@ postmacro foreach_cache_level (Cache cache, int _l, Reduce reductions = None)
 #if dimension >= 3
 	point.k = cache.p[_k].k;
 #endif
-	POINT_VARIABLES();
 	{...}
       }
   }
@@ -688,7 +686,7 @@ postmacro foreach (char flags = 0, Reduce reductions = None) {
   foreach_cache (tree->leaves, reductions)
     {...}
 }
- 
+
 postmacro foreach_face_generic (char flags = 0, Reduce reductions = None,
 				const char * order = "xyz")
 {
@@ -696,30 +694,27 @@ postmacro foreach_face_generic (char flags = 0, Reduce reductions = None,
   foreach_cache (tree->faces, reductions)
     {...}
 }
- 
-macro is_face_x (unsigned short _f = _flags) {
-  {
-    int ig = -1; NOT_UNUSED(ig); VARIABLES();
-    if (_f & face_x)
-      {...}
+
+macro is_face_x (unsigned short _f = _flags, Point point = point) {
+  if (_f & face_x) {
+    int ig = -1; NOT_UNUSED(ig); POINT_VARIABLES();
+    {...}
   }
 }
-      
+
 #if dimension >= 2
-macro is_face_y (unsigned short _f = _flags) {
-  {
-    int jg = -1; NOT_UNUSED(jg); VARIABLES();
-    if (_f & face_y)
-      {...}
+macro is_face_y (unsigned short _f = _flags, Point point = point) {
+  if (_f & face_y) {
+    int jg = -1; NOT_UNUSED(jg); POINT_VARIABLES();
+    {...}
   }
 }
 #endif
 #if dimension >= 3
-macro is_face_z (unsigned short _f = _flags) {
-  {
-    int kg = -1; NOT_UNUSED(kg); VARIABLES();
-    if (_f & face_z)
-      {...}
+macro is_face_z (unsigned short _f = _flags, Point point = point) {
+  if (_f & face_z) {
+    int kg = -1; NOT_UNUSED(kg); POINT_VARIABLES();
+    {...}
   }
 }
 #endif
@@ -1434,27 +1429,27 @@ static void masked_boundary_restriction (const Boundary * b,
   free (faces);  
 }
 
-#define mask(func) {					\
-  foreach_cell_post(!is_leaf(cell)) {			\
-    if (is_leaf(cell)) {				\
-      int bid = (func);					\
-      if (bid >= 0)					\
-	cell.pid = - bid - 1;				\
-    }							\
-    else { /* not a leaf */				\
-      int pid = -1;					\
-      foreach_child()					\
-	if (cell.pid >= 0 || pid < 0)			\
-	  pid = cell.pid;				\
-      cell.pid = pid;					\
-      if (pid < 0) {					\
-	/* fixme: call coarsen_cell()? */		\
-	cell.flags |= leaf;				\
-	decrement_neighbors (point);			\
-      }							\
-    }							\
-  }							\
-  tree->dirty = true;					\
+macro mask (double func) {
+  foreach_cell_post(!is_leaf(cell)) {
+    if (is_leaf(cell)) {
+      int bid = (func);
+      if (bid >= 0)
+	cell.pid = - bid - 1;
+    }
+    else { /* not a leaf */
+      int pid = -1;
+      foreach_child()
+	if (cell.pid >= 0 || pid < 0)
+	  pid = cell.pid;
+      cell.pid = pid;
+      if (pid < 0) {
+	/* fixme: call coarsen_cell()? */
+	cell.flags |= leaf;
+	decrement_neighbors (point);
+      }
+    }
+  }
+  tree->dirty = true;
 }
 
 static void free_cache (CacheLevel * c)
@@ -1678,6 +1673,7 @@ bool tree_is_full()
 postmacro foreach_boundary (int _b, Reduce reductions = None) {
   for (int _l = depth(); _l >= 0; _l--)
     foreach_boundary_level (_l, reductions) {
+      POINT_VARIABLES();
       if (bid(cell) == _b)
 	for (int _d = 0; _d < dimension; _d++) {
 	  for (int _i = -1; _i <= 1; _i += 2) {
@@ -1712,13 +1708,13 @@ postmacro foreach_vertex (char flags = 0, Reduce reductions = None)
 {
   update_cache();
   foreach_cache (tree->vertices, reductions) {
-    x -= Delta/2.;
+    int ig = -1; NOT_UNUSED (ig);
 #if dimension >= 2
-    y -= Delta/2.;
+    int jg = -1; NOT_UNUSED (jg);
 #endif
 #if dimension >= 3
-    z -= Delta/2.;
-#endif
+    int kg = -1; NOT_UNUSED (kg);
+#endif    
     {...}
   }
 }

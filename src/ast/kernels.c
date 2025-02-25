@@ -251,6 +251,25 @@ void kernel (Ast * n, Stack * stack, void * data)
     ast_terminal (n)->start[0] = '\0';
     break;
 
+  /**
+  ## 'unsigned' or 'unsigned int' is replaced by 'uint' */
+
+  case sym_UNSIGNED: {
+    Ast * identifier;
+    if ((identifier = ast_schema (ast_ancestor (n, 3), sym_declaration_specifiers,
+				  1, sym_declaration_specifiers,
+				  0, sym_type_specifier,
+				  0, sym_types,
+				  0, sym_INT))) {
+      ast_terminal (n)->start[0] = '\0';
+      free (ast_terminal (identifier)->start);
+      ast_terminal (identifier)->start = strdup ("uint");
+    }
+    else if (ast_ancestor (n, 4)->sym == sym_declaration)
+      strcpy (ast_terminal (n)->start, "uint");
+    break;
+  }
+
   /** 
   ## Initialization of `coord` (must include three components) */
 

@@ -23,7 +23,7 @@ static Point last_point;
 @define data(k,l,m) ((double *)&cartesian->d[(point.i + k)*datasize])
 @define allocated(...) true
 
-@define POINT_VARIABLES() VARIABLES()
+macro POINT_VARIABLES (Point point = point) { VARIABLES(); }
 
 postmacro foreach (char flags = 0, Reduce reductions = None)
 {
@@ -35,7 +35,6 @@ postmacro foreach (char flags = 0, Reduce reductions = None)
     OMP(omp for schedule(static))
       for (_k = 1; _k <= point.n; _k++) {
 	point.i = _k;
-	POINT_VARIABLES();
 	{...}
       }
   }
@@ -52,13 +51,12 @@ postmacro foreach_face_generic (char flags = 0, Reduce reductions = None,
     OMP(omp for schedule(static))
       for (_k = 1; _k <= point.n + 1; _k++) {
 	point.i = _k;
-	POINT_VARIABLES();
 	{...}
       }
   }
 }
 
-macro is_face_x() {{ int ig = -1; NOT_UNUSED(ig); VARIABLES(); {...} }}
+macro is_face_x() {{ int ig = -1; NOT_UNUSED(ig); POINT_VARIABLES(); {...} }}
 
 // ghost cell coordinates for each direction
 static int _ig[] = {1,-1};
@@ -74,7 +72,7 @@ static void box_boundary_level_normal (const Boundary * b, scalar * list, int l)
 
   Point point;
   point.n = cartesian->n;
-  ig = _ig[d];
+  int ig = _ig[d];
   assert (d <= left);
   point.i = d == right ? point.n + GHOSTS : GHOSTS;
   Point neighbor = {point.i + ig};
@@ -108,7 +106,7 @@ static void box_boundary_level (const Boundary * b, scalar * list, int l)
   if (centered) {
     Point point;
     point.n = cartesian->n;
-    ig = _ig[d];
+    int ig = _ig[d];
     point.i = d == right ? point.n + GHOSTS - 1 : GHOSTS;
     Point neighbor = {point.i + ig};
     for (scalar s in centered)
@@ -213,8 +211,6 @@ void realloc_scalar (int size)
   datasize += size;
 }
 
-
-
 Point locate (double xp = 0, double yp = 0, double zp = 0)
 {
   Point point;
@@ -231,7 +227,7 @@ Point locate (double xp = 0, double yp = 0, double zp = 0)
 postmacro foreach_vertex (char flags = 0, Reduce reductions = None)
 {
   foreach_face_generic (flags, reductions) {
-    x -= Delta_x/2.;
+    int ig = -1; NOT_UNUSED(ig);
     {...}
   }
 }

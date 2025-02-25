@@ -12,7 +12,7 @@ typedef double real;
 
 #define _I     (point.i - 1)
 #define _J     (point.j - 1)
-#define _DELTA (1./N)
+#define _DELTA (1./(real)N)
 
 typedef struct {
   Grid g;
@@ -37,7 +37,7 @@ static Point last_point;
 @define val(a,k,l,m) (((real *)cartesian->d)[(point.i + k + _index(a,m)*(point.n + 2))*(point.n + 2) + point.j + l])
 @define allocated(...) true
 
-@define POINT_VARIABLES() VARIABLES()
+macro POINT_VARIABLES (Point point = point) { VARIABLES(); }
 
 postmacro foreach (char flags = 0, Reduce reductions = None)
 {
@@ -49,10 +49,8 @@ postmacro foreach (char flags = 0, Reduce reductions = None)
     OMP(omp for schedule(static))
       for (_k = 1; _k <= point.n; _k++) {
 	point.i = _k;
-	for (point.j = 1; point.j <= point.n; point.j++) {
-	  POINT_VARIABLES();
+	for (point.j = 1; point.j <= point.n; point.j++)
 	  {...}
-	}
       }
   }
 }
@@ -68,29 +66,25 @@ postmacro foreach_face_generic (char flags = 0, Reduce reductions = None,
     OMP(omp for schedule(static))
       for (_k = 1; _k <= point.n + 1; _k++) {
 	point.i = _k;
-	for (point.j = 1; point.j <= point.n + 1; point.j++) {
-	  POINT_VARIABLES();
+	for (point.j = 1; point.j <= point.n + 1; point.j++)
 	  {...}
-	}
       }
   }
 }
 
 #define foreach_edge() foreach_face(y,x)
 
-macro is_face_x (Point p = point) {
-  {
-    int ig = -1; NOT_UNUSED (ig); VARIABLES();
-    if (p.j <= p.n)
-      {...}
+macro is_face_x (Point point = point) {
+  if (point.j <= point.n) {
+    int ig = -1; NOT_UNUSED(ig); POINT_VARIABLES();
+    {...}
   }
 }
 
-macro is_face_y (Point p = point) {
-  {
-    int jg = -1; NOT_UNUSED (jg); VARIABLES();
-    if (p.i <= p.n)
-      {...}
+macro is_face_y (Point point = point) {
+  if (point.i <= point.n) {
+    int jg = -1; NOT_UNUSED(jg); POINT_VARIABLES();
+    {...}
   }
 }
   
@@ -142,10 +136,7 @@ postmacro foreach_boundary_dir (int l, int d)
     OMP(omp for schedule(static))
       for (_l = 0; _l < point.n + 2*GHOSTS; _l++) {
 	*_i = _l;
-	{
-	  POINT_VARIABLES();
-	  {...}
-	}
+	{...}
       }
   }
 }
@@ -164,6 +155,7 @@ static void box_boundary_level_normal (const Boundary * b, scalar * list, int l)
 
   OMP_PARALLEL() {
     Point point = {0};
+    int ig, jg;
     point.n = cartesian->n;
     if (d % 2)
       ig = jg = 0;
@@ -192,7 +184,7 @@ static void box_boundary_level_tangent (const Boundary * b,
   OMP_PARALLEL() {
     Point point = {0};
     point.n = cartesian->n;
-    ig = _ig[d]; jg = _jg[d];
+    int ig = _ig[d], jg = _jg[d];
     int _start = GHOSTS, _end = point.n + 2*GHOSTS, _k;
   
     OMP(omp for schedule(static))
@@ -246,7 +238,7 @@ static void box_boundary_level (const Boundary * b, scalar * list, int l)
   OMP_PARALLEL() {
     Point point = {0};
     point.n = cartesian->n;
-    ig = _ig[d]; jg = _jg[d];
+    int ig = _ig[d], jg = _jg[d];
     int _start = 1, _end = point.n, _k;
     /* traverse corners only for top and bottom */
     if (d > left) { _start--; _end++; }
@@ -380,7 +372,7 @@ Point locate (double xp = 0, double yp = 0, double zp = 0)
 postmacro foreach_vertex (char flags = 0, Reduce reductions = None)
 {
   foreach_face_generic (flags, reductions) {
-    x -= Delta_x/2.; y -= Delta_y/2.;
+    int ig = -1, jg = -1; NOT_UNUSED(ig); NOT_UNUSED(jg);
     {...}
   }
 }
