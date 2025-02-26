@@ -200,41 +200,40 @@ macros.*
 
 typedef struct {
   Ast * statement, * arguments, * parameters, * call, * label, * initial;
+  Stack * sparameters;
+  int * returnindex;  
   bool nolineno, complex_call, postmacros;
-  int * returnindex;
 } MacroReplacement;
 
 static Ast * argument_value (Ast * identifier, Stack * stack, const MacroReplacement * r)
 {
-  Ast * decl = ast_identifier_declaration_from_to (stack, ast_terminal (identifier)->start,
-						   r->call, NULL);
-  if (decl && ast_parent (decl, sym_parameter_type_list) == r->parameters) {
-    Ast * value = NULL;
-    if (r->arguments) {
-      Ast * parent = ast_parent (decl, sym_parameter_declaration);
-      Ast * parameters = r->parameters->child[0];
-      while (parameters && parameters->child[0]->sym == parameters->sym)
+  Ast * decl = ast_identifier_declaration (r->sparameters, ast_terminal (identifier)->start);
+  if (!decl)
+    return NULL;
+  Ast * value = NULL;
+  if (r->arguments) {
+    Ast * parent = ast_parent (decl, sym_parameter_declaration);
+    Ast * parameters = r->parameters->child[0];
+    while (parameters && parameters->child[0]->sym == parameters->sym)
       parameters = parameters->child[0];
-      Ast * arguments = r->arguments;
-      foreach_item_r (arguments, sym_argument_expression_list_item, argument) {
-	Ast * parameter = ast_child (parameters, sym_parameter_declaration);
-	parameters = parameters->parent;
-	assert (parameter);
-	if (parameter == parent) {
-	  value = argument;
-	  break;
-	}
+    Ast * arguments = r->arguments;
+    foreach_item_r (arguments, sym_argument_expression_list_item, argument) {
+      Ast * parameter = ast_child (parameters, sym_parameter_declaration);
+      parameters = parameters->parent;
+      assert (parameter);
+      if (parameter == parent) {
+	value = argument;
+	break;
       }
     }
-    if (!value) {
-      AstTerminal * t = ast_left_terminal (r->call);
-      fprintf (stderr, "%s:%d: error: missing '%s' macro parameter\n",
-	       t->file, t->line, ast_terminal (identifier)->start);
-      exit (1);
-    }
-    return value;
   }
-  return NULL;
+  if (!value) {
+    AstTerminal * t = ast_left_terminal (r->call);
+    fprintf (stderr, "%s:%d: error: missing '%s' macro parameter\n",
+	     t->file, t->line, ast_terminal (identifier)->start);
+    exit (1);
+  }
+  return value;
 }
 
 static Ast * remove_leading_spaces (Ast * n)
@@ -586,6 +585,11 @@ static void macro_replacement (Ast * statement, Ast * initial, Stack * stack,
     .postmacros = postmacros
   };
 
+  if (r.parameters) {
+    r.sparameters = stack_new (sizeof (Ast *));
+    ast_push_declaration (r.sparameters, ast_child (r.parameters, sym_parameter_list));
+  }
+  
   if (initial) {
     Ast * definition = ast_parent (initial, sym_function_definition);
     if (definition && ast_is_macro_declaration (definition->child[0]))
@@ -643,8 +647,6 @@ static void macro_replacement (Ast * statement, Ast * initial, Stack * stack,
       if (r.parameters) {
 	copy = ast_copy (breaking);
 	stack_push (stack, &copy);
-	ast_push_function_definition (stack, ast_find (macro_definition, sym_direct_declarator));
-	stack_push (stack, &r.call);
 	ast_traverse (copy, stack, replace_arguments, &r);
 	ast_pop_scope (stack, copy);
       }
@@ -656,10 +658,9 @@ static void macro_replacement (Ast * statement, Ast * initial, Stack * stack,
 
   Ast * copy = ast_copy (ast_find (macro_definition, sym_compound_statement));
   stack_push (stack, &copy);
-  ast_push_function_definition (stack, ast_find (macro_definition, sym_direct_declarator));
   if (r.parameters) {
-    stack_push (stack, &r.call);
     ast_traverse (copy, stack, replace_arguments, &r);
+    stack_destroy (r.sparameters);
   }
   if (r.complex_call)
     ast_traverse (copy, stack, replace_return, &r);
