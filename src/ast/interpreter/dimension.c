@@ -201,17 +201,17 @@ struct _Key {
 };
 
 static
-void key_add_dimension (Key * k, Dimension * d)
+void key_add_dimension (Key * k, Dimension * d, Stack * stack)
 {
   k->refs++;
   if (!k->dimensions) {
-    k->dimensions = calloc (1, sizeof (List)); // fixme: memory leak
+    k->dimensions = static_calloc (1, sizeof (List), stack);
     k->dimensions->d = d;
     return;
   }
   List * l = k->dimensions;
   while (l->next) l = l->next;
-  l->next = calloc (1, sizeof (List)); // fixme: memory leak
+  l->next = static_calloc (1, sizeof (List), stack);
   l->next->d = d;
 }
 
@@ -224,7 +224,6 @@ bool key_remove_dimension (Key * k, const Dimension * d)
 	k->dimensions = l->next;
       else
 	prev->next = l->next;
-      free (l);
       k->refs--;
       return true;
     }
@@ -950,7 +949,7 @@ void add_constraint (System * s, Dimension * constraint, Stack * stack)
     constraint_print (constraint, stderr, LINENO);
   if (system_append (s, constraint)) {
     foreach_key (constraint, c) {
-      key_add_dimension (c, constraint);
+      key_add_dimension (c, constraint, stack);
       c->used = 1;
     }
   }
@@ -1119,7 +1118,7 @@ void set_row (System * s, int row, Dimension * d)
   s->r[row] = d; d->row = row;
 }
 
-static bool system_pivot (System * s)
+static bool system_pivot (System * s, Stack * stack)
 {
   system_index (s);
 
@@ -1175,7 +1174,7 @@ static bool system_pivot (System * s)
 	      assert (key_remove_dimension (c, r));
 	    Dimension * d = dimensions_multiply (r->origin, s->alloc, r, s->r[h], - f);
 	    foreach_key(d, c)
-	      key_add_dimension (c, d);
+	      key_add_dimension (c, d, stack);
 	    DEBUG (fprintf (stderr, "      gives "), constraint_print (d, stderr, LINENO | INDEX | NORIGIN));
 	    /* If l.h.s. is zero and r.h.s. is not zero the system does not have a solution */
 	    if (!d->c && d->a) {
@@ -1239,14 +1238,14 @@ Key ** system_unconstrained (const System * s)
   return unconstrained;
 }
 
-static bool system_solve (System * s)
+static bool system_solve (System * s, Stack * stack)
 {
 #if WRITE_GRAPH  
   system_write_graph (s, "dimensions0.dot");
   { FILE * fp = fopen ("system0", "w"); system_print (s, fp), fclose (fp); }
 #endif
   
-  if (!system_pivot (s))
+  if (!system_pivot (s, stack))
     return false;
   
   DEBUG (fprintf (stderr, "@@ %d unknowns, %d constraints\n", s->n, s->m));
@@ -1798,11 +1797,11 @@ void dimension_after_run (Ast * n, Stack * stack)
   System * s = interpreter_get_data (stack);
   s->alloc = stack_alloc (stack);
   if (!s->output) {
-    if (!system_pivot (s))
+    if (!system_pivot (s, stack))
       ((StackData *)stack_get_data (stack))->maxcalls = -1;
     return;
   }
-  if (!system_solve (s)) {
+  if (!system_solve (s, stack)) {
     ((StackData *)stack_get_data (stack))->maxcalls = -1;
     return;
   }
