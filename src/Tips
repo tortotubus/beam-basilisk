@@ -61,10 +61,9 @@ executable. See also the following examples:
 
 ## Non-cubic domains
 
-For the moment, the only way to combine non-cubic domains and MPI
-parallelism implies using multigrids rather than tree grids. This also
-means that MPI-parallel, non-cubic and adaptive simulations are not
-possible yet.
+It is possible to define non-cubic domains when running with MPI but
+also when running on GPUs or in OpenMP or serial mode. It is not
+possible yet to define non-cubic domains on tree grids.
 
 Not that for MPI multigrid, each of the parallel sub-domain is cubic,
 so that the number of processes $n_p$ must verify the relation
@@ -90,31 +89,21 @@ integer.
 ### Examples
 
 A $[0:1]\times[0:1/3]\times[0:1/3]$ channel, periodic along the x-axis
-(with slip walls), on 3 MPI processes, with 96 points along the
-x-axis:
+(with slip walls), with 96 points along the x-axis:
 
 ~~~literatec
 #include "grid/multigrid3D.h"
 ...
 int main() {
+  dimensions (nx = 3, ny = 1, nz = 1);
   periodic (right);
   init_grid (128);
   ...
 }
 ~~~
 
-The same simulation but on 24 processes:
-
-~~~literatec
-#include "grid/multigrid3D.h"
-...
-int main() {
-  dimensions (nx = 6);
-  periodic (right);
-  init_grid (128);
-  ...
-}
-~~~
+The simulation above can run in OpenMP/GPU/serial or on 3, 24, 192,
+1536 etc. MPI processes.
 
 A cube centered on the origin, of size 1.5, all-periodic, with 512
 points along each axis, on 8 = 2^3^ or 64 = 4^3^ or 512 = 8^3^ or 4096
