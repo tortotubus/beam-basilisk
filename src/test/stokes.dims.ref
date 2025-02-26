@@ -77,7 +77,6 @@
 [1]  /src/layered/remap.h: 'H = 0.'
 [1]  /src/layered/remap.h: 'znew[0] = 0.'
 [1]  /src/common.h: 'L0 = 1. [1]'
-[1]  /src/common.h: '0.'
 [1]  /src/poisson.h: 's[] = 0.'
 [1]  /src/poisson.h: 'sum = 0.'
 [1]  /src/utils.h: '0.'

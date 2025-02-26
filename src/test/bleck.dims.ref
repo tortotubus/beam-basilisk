@@ -42,7 +42,6 @@
 [1]  /src/layered/implicit.h: '0.'
 [1]  /src/layered/implicit.h: '0.'
 [1]  /src/layered/implicit.h: '0.'
-[1]  /src/common.h: '0.'
 [1]  /src/poisson.h: 'sum = 0.'
 [1]  /src/utils.h: 'max = -1e100'
 [1]  /src/utils.h: 'min = 1e100'
