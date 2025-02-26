@@ -1,5 +1,5 @@
 dimension-tests/test22.c:9: warning: 's1' is unset: assuming it has dimension [0]
-11 constraints, 11 unknowns
+10 constraints, 10 unknowns
 Dimensions of finite constants
   [0]
     dimension-tests/test22.c:11: '1 [0]'

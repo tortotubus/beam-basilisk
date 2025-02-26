@@ -54,8 +54,6 @@
 [1]  /src/layered/rpe.h: '0.'
 [1]  /src/layered/rpe.h: '0'
 [1]  /src/common.h: 'X0 = 0.'
-[1]  /src/common.h: 'Y0 = 0.'
-[1]  /src/common.h: 'Z0 = 0.'
 [1]  /src/poisson.h: 'sum = 0.'
 [1]  /src/utils.h: 'max = -1e100'
 [1]  /src/utils.h: 'min = 1e100'

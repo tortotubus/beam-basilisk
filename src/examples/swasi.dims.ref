@@ -1,3 +1,4 @@
+[0]  /src/radial.h: 'fmv.x[] = 1.'
 [0]  /src/radial.h: 'fmv.y[] = 1.'
 [0]  /src/radial.h: '1e-20'
 [0]  /src/utils.h: 'CFL = 0.5 [0]'
@@ -6,7 +7,6 @@
 [0]  swasi.c: '1.'
 [0]  swasi.c: '1.'
 [0]  swasi.c: '1e30f'
-[1]  /src/common.h: '0.'
 [1]  /src/saint-venant.h: 'dry = 1e-10'
 [1]  /src/saint-venant.h: '0.'
 [1]  /src/saint-venant.h: '0.'

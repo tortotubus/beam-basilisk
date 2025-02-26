@@ -7,8 +7,6 @@
 [0]  wind-driven-stvt.c: 's = 1./1000.'
 [0]  wind-driven-stvt.c: '1.'
 [1]  ast/interpreter/overload.h: 'zb[] = 0.'
-[1]  /src/common.h: 'Y0 = 0.'
-[1]  /src/common.h: 'Z0 = 0.'
 [1]  /src/multilayer.h: '0'
 [1]  /src/saint-venant.h: 'dry = 1e-10'
 [1]  /src/saint-venant.h: '0.'
