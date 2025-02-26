@@ -167,23 +167,25 @@ int main (int argc, char ** argv)
       progress = 1;
     else if (!strncmp (argv[i], "-run=", 5))
       run = atoi (argv[i] + 5);
-    else if (!strncmp (argv[i], "-dimensions", 11)) {
-      if (*(argv[i] + 11) == '=') {
-	if (!strcmp (argv[i] + 12, "dims"))
-	  dimensions = stdin;
-	else {
-	  dimensions = fopen (argv[i] + 12, "w");
-	  if (!dimensions) {
-	    perror (argv[i] + 12);
-	    exit (1);
-	  }
-	}
-      }
-      else
-	dimensions = stderr;
-    }
     else if (!strcmp (argv[i], "-disable-dimensions"))
       dimensions = stdout;
+    else if (!strncmp (argv[i], "-dimensions", 11)) {
+      if (dimensions != stdout) { // dimensions have been disabled
+	if (*(argv[i] + 11) == '=') {
+	  if (!strcmp (argv[i] + 12, "dims"))
+	    dimensions = stdin;
+	  else {
+	    dimensions = fopen (argv[i] + 12, "w");
+	    if (!dimensions) {
+	      perror (argv[i] + 12);
+	      exit (1);
+	    }
+	  }
+	}
+	else
+	  dimensions = stderr;
+      }
+    }
     else if (!strcmp (argv[i], "-non-finite"))
       finite = 0;
     else if (!strcmp (argv[i], "-redundant"))
