@@ -1318,21 +1318,22 @@ Value * dimension_run (Ast * n, Stack * stack)
   }
 
   /**
-  All initializers of `double *` or `double []` arrays have the same dimensions. */
+  All initializers of `double, float *` or `double, float []` arrays
+  have the same dimensions. */
 
   case sym_init_declarator: {
-    Ast * list;
+    Ast * list, * type;
     if (!(list = ast_find (n, sym_initializer_list)) ||
-	!ast_find (ast_parent (n, sym_declaration), sym_declaration_specifiers,
-		   0, sym_type_specifier,
-		   0, sym_types,
-		   0, sym_DOUBLE))
+	!(type = ast_find (ast_parent (n, sym_declaration), sym_declaration_specifiers,
+			   0, sym_type_specifier,
+			   0, sym_types)) ||
+	(type->child[0]->sym != sym_DOUBLE && type->child[0]->sym != sym_FLOAT))
       return ast_run_node (n, stack);
     Ast * array = NULL;
     if (ast_schema (n, sym_init_declarator,
 		    0, sym_declarator,
 		    0, sym_direct_declarator,
-		    1, token_symbol('['))) { // a `double []` array
+		    1, token_symbol('['))) { // a `[]` array
       if (!(array = ast_schema (n, sym_init_declarator,
 				0, sym_declarator,
 				0, sym_direct_declarator,
@@ -1343,7 +1344,7 @@ Value * dimension_run (Ast * n, Stack * stack)
     }
     else if (ast_schema (n, sym_init_declarator,
 			 0, sym_declarator,
-			 0, sym_pointer)) { // a `double *` array
+			 0, sym_pointer)) { // a `*` array
       if (!(array = ast_schema (n, sym_init_declarator,
 				0, sym_declarator,
 				1, sym_direct_declarator,
@@ -1359,11 +1360,14 @@ Value * dimension_run (Ast * n, Stack * stack)
     if (len > 1) {
       char slen[20];
       snprintf (slen, 19, "%d", len);
+      char * func = strdup ("_set_element_dimensions");
+      if (type->child[0]->sym == sym_FLOAT)
+	str_append (func, "_float");
       Ast * call =
 	NN(n, sym_function_call,
 	   NN(n, sym_postfix_expression,
 	      NN(n, sym_primary_expression,
-		 NA(n, sym_IDENTIFIER, "_set_element_dimensions"))),
+		 NA(n, sym_IDENTIFIER, func))),
 	   NCA(n, "("),
 	   NN(n, sym_argument_expression_list,
 	      NN(n, sym_argument_expression_list,
@@ -1374,6 +1378,7 @@ Value * dimension_run (Ast * n, Stack * stack)
 	      NN(n, sym_argument_expression_list_item,
 		 ast_new_constant (n, sym_I_CONSTANT, slen))),
 	   NCA(n, ")"));
+      free (func);
       // fprintf (stderr, "%d ", len); ast_print_tree (array, stderr, 0, 0, -1);
       ast_run_node (call, stack);
       ast_destroy (call);
