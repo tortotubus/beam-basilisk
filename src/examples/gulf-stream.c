@@ -147,10 +147,11 @@ representation proposed by [Hurlburt & Hogan,
 /**
 ## main() 
 
-The simulation needs to be run on a multigrid and with a multiple of
-four parallel MPI processes: 8, 32, 128, 512, 2048 etc. (see
-[Tips](/src/Tips#non-cubic-domains) for explanations). This can be
-done using the [Makefile](/Tutorial#using-makefiles) with:
+The simulation can be run in OpenMP/serial/GPU or with MPI. With MPI
+the number of processes must be of the form 2^(i+1) i.e.: 8, 32, 128,
+512, 2048 etc. (see [Tips](/src/Tips#non-cubic-domains) for
+explanations). This can be done using the
+[Makefile](/Tutorial#using-makefiles) with:
 
 ~~~bash
 CC='mpicc -D_MPI=8' make gulf-stream.tst
