@@ -19,7 +19,7 @@ int main (int argc, char * argv[])
   
   timer t = timer_start();
 
-  double sum;
+  double sum = 0.;
   int iter;
   for (iter = 0; iter < 400*1024/N; iter++) {
     sum = 0.;
