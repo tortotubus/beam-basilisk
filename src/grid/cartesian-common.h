@@ -24,16 +24,21 @@ postmacro foreach_region (coord p, coord box[2], coord n,
 			  char flags = 0, Reduce reductions = None)
 {
   {
-    p = (coord){0, 0, box[0].z};
+    if (n.x < 1) n.x = 1;
+    if (n.y < 1) n.y = 1;
+    if (n.z < 1) n.z = 1;
     //  OMP(omp for schedule(static))
     for (int _i = 0; _i < (int) n.x; _i++) {
       p.x = box[0].x + (box[1].x - box[0].x)/n.x*(_i + 0.5);
       for (int _j = 0; _j < (int) n.y; _j++) {
 	p.y = box[0].y + (box[1].y - box[0].y)/n.y*(_j + 0.5);
-	Point point = locate (p.x, p.y, p.z); // fixme
-	if (point.level >= 0) {
-	  int ig = 0, jg = 0, kg = 0; NOT_UNUSED(ig); NOT_UNUSED(jg); NOT_UNUSED(kg);
-	  {...}
+	for (int _k = 0; _k < (int) n.z; _k++) {
+	  p.z = box[0].z + (box[1].z - box[0].z)/n.z*(_k + 0.5);
+	  Point point = locate (p.x, p.y, p.z);
+	  if (point.level >= 0) {
+	    int ig = 0, jg = 0, kg = 0; NOT_UNUSED(ig); NOT_UNUSED(jg); NOT_UNUSED(kg);
+	    {...}
+	  }
 	}
       }
     }
