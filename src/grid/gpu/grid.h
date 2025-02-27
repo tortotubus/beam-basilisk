@@ -682,8 +682,8 @@ static char * type_string (const External * g)
     return "double"; break;
 #endif
   case sym_FLOAT: return "float";
-  case sym_function_declaration: case sym_enumeration_constant: case sym_INT:
-    return "int";
+  case sym_function_declaration: case sym_enumeration_constant:
+  case sym_INT: case sym_LONG: return "int";
   case sym_BOOL: return "bool";
   case sym_SCALAR: return "scalar";
   case sym_VECTOR: return "vector";
@@ -1384,6 +1384,7 @@ static Shader * compile_shader (ForeachData * loop,
       else if (g->type != sym_FLOAT &&
 	       g->type != sym_DOUBLE &&
 	       g->type != sym_INT &&
+	       g->type != sym_LONG &&
 	       g->type != sym_BOOL &&
 	       g->type != sym_enumeration_constant &&
 	       g->type != sym_IVEC &&
@@ -1514,6 +1515,7 @@ static Shader * compile_shader (ForeachData * loop,
 			       !strcmp (g->name, "bc_period_y")))
       continue;
     if (g->type == sym_INT ||
+	g->type == sym_LONG ||
 	g->type == sym_FLOAT ||
 	g->type == sym_DOUBLE ||
 	g->type == sym__COORD ||
@@ -1703,6 +1705,14 @@ static Shader * setup_shader (ForeachData * loop, const RegionParameters * regio
       glUniform1iv (g->location, g->nd, p);
       break;
     }
+    case sym_LONG: {
+      int p[g->nd];
+      long * data = pointer;
+      for (int i = 0; i < g->nd; i++)
+	p[i] = data[i];
+      glUniform1iv (g->location, g->nd, p);
+      break;
+    }
 #if SINGLE_PRECISION
     case sym_DOUBLE: {
       float p[g->nd];
@@ -1736,6 +1746,8 @@ static Shader * setup_shader (ForeachData * loop, const RegionParameters * regio
     case sym_COORD:
       glUniform3dv (g->location, g->nd, pointer); break;
 #endif // DOUBLE_PRECISION
+    default:
+      assert (false);
     }
   }
 
