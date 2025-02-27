@@ -370,9 +370,27 @@ static void gpu_cpu_sync_scalar (scalar s, char * sep, GLenum mode);
 void realloc_scalar_gpu (int size)
 {
   realloc_scalar (size);
+#if PRINTCOPYGPU
+  bool copy = false;
+#endif
   for (scalar s in baseblock)
-    if (s.gpu.stored < 0)
+    if (s.gpu.stored < 0) {
+#if PRINTCOPYGPU
+      if (!copy) {
+	fprintf (stderr, "%s:%d: importing ", __FILE__, LINENO);
+	copy = true;
+	gpu_cpu_sync_scalar (s, "{", GL_MAP_READ_BIT);
+      }
+      else
+	gpu_cpu_sync_scalar (s, ",", GL_MAP_READ_BIT);
+#else
       gpu_cpu_sync_scalar (s, NULL, GL_MAP_READ_BIT);
+#endif
+    }
+#if PRINTCOPYGPU
+  if (copy)
+    fprintf (stderr, "} from GPU\n");
+#endif
   realloc_ssbo();
 }
 
