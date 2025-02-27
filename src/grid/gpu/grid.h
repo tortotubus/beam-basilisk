@@ -1175,8 +1175,8 @@ static void gpu_cpu_sync (scalar * list, GLenum mode, const char * fname, int li
   bool copy = false;
 #endif
   for (scalar s in list)
-    if (s.input && ((mode == GL_MAP_READ_BIT && s.gpu.stored < 0) ||
-		    (mode == GL_MAP_WRITE_BIT && s.gpu.stored > 0))) {
+    if ((s.input || s.output) && ((mode == GL_MAP_READ_BIT && s.gpu.stored < 0) ||
+				  (mode == GL_MAP_WRITE_BIT && s.gpu.stored > 0))) {
 #if PRINTCOPYGPU
       if (!copy) {
 	fprintf (stderr, "%s:%d: %s ", fname, line,
