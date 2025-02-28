@@ -398,6 +398,23 @@ int main (int argc, char * argv[])
     fprintf (stderr, "26c) %g %g\n", sum, max);
   }
 
+  {
+    dimensions (nx = 4);
+    init_grid (8);
+    face vector uf[];
+    foreach_face()
+      uf.x[] = 1;
+    double min = 100, sum = 0;
+    foreach_face(reduction(min:min) reduction(+:sum)) {
+      if (uf.x[] < min)
+	min = uf.x[];
+      sum++;
+    }
+    fprintf (stderr, "26e) %g %g\n", min, sum);
+    dimensions (nx = 1);
+    init_grid (512);
+  }
+  
   /**
   ## Reduction on vertices */
 
