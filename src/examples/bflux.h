@@ -32,11 +32,6 @@ specified in H&H, 2000 (see Note b of Table 2 in H&H, 2000). */
 #define northern_flux() (x > -50 && x < - 40 && y > 50.5 && val(zbs,0,0,0) < -4000)
 #define southern_flux() (x > -60 && x < - 50 && y < 9.5 && val(zbs,0,0,0) < - 4000)
 
-/**
-The AMOC (see below) is balanced using (vertical) fluxes between layers. */
-
-#include "layered/conservation.h"
-
 event viscous_term (i++)
 {
 
