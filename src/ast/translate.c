@@ -2535,7 +2535,8 @@ static void global_boundaries_and_stencils (Ast * n, Stack * stack, void * data)
 	    keyword++, i++;
 	  }
 	  if (!(*keyword)) {
-	    if (start[1] == '\0' && strchr ("xyz", start[0])) {
+	    if (start[1] == '\0' && strchr ("xyz", start[0]) &&
+		!strcmp (ast_terminal (identifier)->start, "foreach_face")) {
 	      *s-- = start[0];
 	      if (aorder)
 		arguments = ast_list_remove (arguments, argument);
