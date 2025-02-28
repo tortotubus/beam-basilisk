@@ -1090,8 +1090,11 @@ void stencil_val (Point p, scalar s, int i, int j, int k,
 void stencil_val_a (Point p, scalar s, int i, int j, int k, bool input,
 		    const char * file, int line)
 {
-  if (is_constant(s) || s.i < 0)
-    abort();
+  if (is_constant(s) || s.i < 0) {
+    fprintf (stderr, "%s:%d: error: trying to modify a%s field\n",
+	     file, line, s.i < 0 ? "n undefined" : " constant");
+    exit (1);
+  }
   if (s.block < 0)
     s.i += s.block;
   if (!s.name) {
