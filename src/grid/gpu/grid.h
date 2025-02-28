@@ -1816,10 +1816,10 @@ static bool doloop_on_gpu (ForeachData * loop, const RegionParameters * region,
     if (g->reduct) {
       scalar s = g->s;
       double result = gpu_reduction (field_offset(s, region->level), g->reduct, region,
-				     loop->face == 1 || loop->face == 2 ?
-				     Nl*Dimensions.x*(Nl*Dimensions.y + 1) :
+				     loop->face == 1 ?  (Nl*Dimensions.x + 1)*Nl*Dimensions.y :
+				     loop->face == 2 ?   Nl*Dimensions.x*(Nl*Dimensions.y + 1) :
 				     loop->face == 3 || loop->vertex ?
-				     sq(Nl + 1)*Dimensions.x*Dimensions.y - 1 :
+				     (Nl*Dimensions.x + 1)*(Nl*Dimensions.y + 1) :
 				     sq(Nl)*Dimensions.x*Dimensions.y);
 #if PRINTREDUCT
       fprintf (stderr, "%s:%d: %s %c %g\n",
