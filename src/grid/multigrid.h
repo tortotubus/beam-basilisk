@@ -321,9 +321,9 @@ postmacro foreach_face_generic (char flags = 0, Reduce reductions = None,
 @define is_coarse() (point.level < depth())
 
 #if dimension == 1
-macro is_face_x (Point point = point) {
+macro is_face_x() {
   {
-    int ig = -1; NOT_UNUSED(ig); POINT_VARIABLES();
+    int ig = -1; NOT_UNUSED(ig);
     {...}
   }
 }
@@ -349,16 +349,16 @@ macro foreach_child (Point point = point, break = (_k = 2)) {
 #elif dimension == 2
 #define foreach_edge() foreach_face(y,x)
 
-macro is_face_x (Point point = point) {
-  if (point.j < point.n.y + GHOSTS) {
-    int ig = -1; NOT_UNUSED(ig); POINT_VARIABLES();
+macro is_face_x (Point p = point) {
+  if (p.j < p.n.y + GHOSTS) {
+    int ig = -1; NOT_UNUSED(ig);
     {...}
   }
 }
 
-macro is_face_y (Point point = point) {
-  if (point.i < point.n.x + GHOSTS) {
-    int jg = -1; NOT_UNUSED(jg); POINT_VARIABLES();
+macro is_face_y (Point p = point) {
+  if (p.i < p.n.x + GHOSTS) {
+    int jg = -1; NOT_UNUSED(jg);
     {...}
   }
 }
@@ -382,23 +382,23 @@ macro foreach_child (Point point = point, break = (_k = _l = 2))
 }
 
 #elif dimension == 3
-macro is_face_x (Point point = point) {
-  if (point.j < point.n.y + GHOSTS && point.k < point.n.z + GHOSTS) {
-    int ig = -1; NOT_UNUSED(ig); POINT_VARIABLES();
+macro is_face_x (Point p = point) {
+  if (p.j < p.n.y + GHOSTS && p.k < p.n.z + GHOSTS) {
+    int ig = -1; NOT_UNUSED(ig);
     {...}
   }
 }
 
-macro is_face_y (Point point = point) {
-  if (point.i < point.n.x + GHOSTS && point.k < point.n.z + GHOSTS) {
-    int jg = -1; NOT_UNUSED(jg); POINT_VARIABLES();
+macro is_face_y (Point p = point) {
+  if (p.i < p.n.x + GHOSTS && p.k < p.n.z + GHOSTS) {
+    int jg = -1; NOT_UNUSED(jg);
     {...}
   }
 }
 
-macro is_face_z (Point point = point) {
-  if (point.i < point.n.x + GHOSTS && point.j < point.n.y + GHOSTS) {
-    int kg = -1; NOT_UNUSED(kg); POINT_VARIABLES();
+macro is_face_z (Point p = point) {
+  if (p.i < p.n.x + GHOSTS && p.j < p.n.y + GHOSTS) {
+    int kg = -1; NOT_UNUSED(kg);
     {...}
   }
 }
