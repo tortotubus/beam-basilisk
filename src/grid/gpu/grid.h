@@ -380,6 +380,7 @@ static char glsl_preproc[] =
   "#define ast_pointer(x) (x)\n"
   GPU_CODE()
   "#define _NVARMAX 65536\n"
+  "#define is_constant(v) ((v).i >= _NVARMAX)\n"
   "#define NULL 0\n"
   "#define val(s,k,l,m) ((s).i < _NVARMAX ? valt(s,k,l,m)"
   " : _constant[clamp((s).i -_NVARMAX,0,_nconst-1)])\n"
