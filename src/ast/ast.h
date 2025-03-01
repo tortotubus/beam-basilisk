@@ -310,6 +310,9 @@ char * ast_kernel              (Ast * n, char * argument, bool nolineno);
 ## Macros */
 
 Ast * ast_is_macro_declaration (const Ast * function_declaration);
+void ast_macro_replacement (Ast * statement, Ast * initial, Stack * stack,
+			    bool nolineno, int postmacros, bool expand_definitions,
+			    int * return_macro_index);
 
 /**
 ## Interface for the generic C interpreter */

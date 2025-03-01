@@ -302,7 +302,7 @@ static void mapped_position (bview * view, coord * p, double * r)
   *r = sqrt (rm);
 }
 
-postmacro foreach_visible (bview * view, char flags = 0, Reduce reductions = None)
+macro2 foreach_visible (bview * view, char flags = 0, Reduce reductions = None)
 {
   foreach_cell() {
     POINT_VARIABLES();
@@ -327,7 +327,7 @@ postmacro foreach_visible (bview * view, char flags = 0, Reduce reductions = Non
   }
 }
 
-postmacro foreach_visible_stencil (bview * view, char flags, Reduce reductions) {
+macro2 foreach_visible_stencil (bview * view, char flags, Reduce reductions) {
   foreach_stencil (flags, reductions)
     {...}
 }
@@ -349,7 +349,7 @@ static void glnormal3d (bview * view, double x, double y, double z) {
     glNormal3d (x, y, z);
 }
 
-postmacro foreach_visible_plane (bview * view, coord n1, double alpha1)
+macro2 foreach_visible_plane (bview * view, coord n1, double alpha1)
 {
   {
     coord _n = {(n1).x, (n1).y, (n1).z};

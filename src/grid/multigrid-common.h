@@ -3,13 +3,13 @@
 #include "variables.h"
 #include "cartesian-common.h"
 
-auto postmacro foreach_level_or_leaf (int l, char flags = 0, Reduce reductions = None)
+auto macro2 foreach_level_or_leaf (int l, char flags = 0, Reduce reductions = None)
 {
   foreach_level (l, flags, reductions)
     {...}
 }
 
-auto postmacro foreach_coarse_level (int l, char flags = 0, Reduce reductions = None)
+auto macro2 foreach_coarse_level (int l, char flags = 0, Reduce reductions = None)
 {
   foreach_level (l, flags, reductions)
     {...}

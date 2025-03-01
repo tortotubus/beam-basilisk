@@ -25,7 +25,7 @@ static Point last_point;
 
 macro POINT_VARIABLES (Point point = point) { VARIABLES(); }
 
-postmacro foreach (char flags = 0, Reduce reductions = None)
+macro2 foreach (char flags = 0, Reduce reductions = None)
 {
   OMP_PARALLEL (reductions) {
     int ig = 0, jg = 0; NOT_UNUSED(ig); NOT_UNUSED(jg);
@@ -40,7 +40,7 @@ postmacro foreach (char flags = 0, Reduce reductions = None)
   }
 }
   
-postmacro foreach_face_generic (char flags = 0, Reduce reductions = None,
+macro2 foreach_face_generic (char flags = 0, Reduce reductions = None,
 				const char * order = "xyz")
 {
   OMP_PARALLEL (reductions) {
@@ -56,7 +56,7 @@ postmacro foreach_face_generic (char flags = 0, Reduce reductions = None,
   }
 }
 
-macro is_face_x() {{ int ig = -1; NOT_UNUSED(ig); {...} }}
+macro1 is_face_x() {{ int ig = -1; NOT_UNUSED(ig); {...} }}
 
 // ghost cell coordinates for each direction
 static int _ig[] = {1,-1};
@@ -224,7 +224,7 @@ Point locate (double xp = 0, double yp = 0, double zp = 0)
 #include "variables.h"
 #include "cartesian-common.h"
 
-postmacro foreach_vertex (char flags = 0, Reduce reductions = None)
+macro2 foreach_vertex (char flags = 0, Reduce reductions = None)
 {
   foreach_face_generic (flags, reductions) {
     int ig = -1; NOT_UNUSED(ig);

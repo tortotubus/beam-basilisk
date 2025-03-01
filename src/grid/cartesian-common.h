@@ -8,8 +8,8 @@ void (* debug)    (Point);
 #include "fpe.h"
 #include "stencils.h"
 
-postmacro foreach_point (double _x = 0., double _y = 0., double _z = 0.,
-			 char flags = 0, Reduce reductions = None)
+macro2 foreach_point (double _x = 0., double _y = 0., double _z = 0.,
+		      char flags = 0, Reduce reductions = None)
 {
   {
     int ig = 0, jg = 0, kg = 0; NOT_UNUSED(ig); NOT_UNUSED(jg); NOT_UNUSED(kg);
@@ -20,8 +20,8 @@ postmacro foreach_point (double _x = 0., double _y = 0., double _z = 0.,
   }
 }
 
-postmacro foreach_region (coord p, coord box[2], coord n,
-			  char flags = 0, Reduce reductions = None)
+macro2 foreach_region (coord p, coord box[2], coord n,
+		       char flags = 0, Reduce reductions = None)
 {
   {
     if (n.x < 1) n.x = 1;

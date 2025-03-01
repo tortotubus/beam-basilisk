@@ -309,7 +309,7 @@ void boundary_stencil (ForeachData * loop)
   }
 }
 
-postmacro foreach_stencil (char flags, Reduce reductions)
+macro2 foreach_stencil (char flags, Reduce reductions)
 {
   {
     static int _first = 1.;
@@ -331,19 +331,19 @@ postmacro foreach_stencil (char flags, Reduce reductions)
   }
 }
 
-postmacro foreach_vertex_stencil (char flags, Reduce reductions) {
+macro2 foreach_vertex_stencil (char flags, Reduce reductions) {
   foreach_stencil (flags, reductions) {
     _loop.vertex = true;
     {...}
   }
 }
 
-postmacro foreach_face_stencil (char flags, Reduce reductions, const char * order) {
+macro2 foreach_face_stencil (char flags, Reduce reductions, const char * order) {
   foreach_stencil (flags, reductions)
     {...}
 }
 
-postmacro foreach_level_stencil (int l, char flags, Reduce reductions) {
+macro2 foreach_level_stencil (int l, char flags, Reduce reductions) {
   if (0) {
     // automatic boundary conditions are not implemented yet so we don't do anything for the moment
     int ig = 0, jg = 0, kg = 0; NOT_UNUSED(ig); NOT_UNUSED(jg); NOT_UNUSED(kg);
@@ -352,31 +352,31 @@ postmacro foreach_level_stencil (int l, char flags, Reduce reductions) {
   }
 }
 
-postmacro foreach_coarse_level_stencil (int l, char flags, Reduce reductions) {
+macro2 foreach_coarse_level_stencil (int l, char flags, Reduce reductions) {
   foreach_level_stencil (l, flags, reductions)
     {...}
 }
 
-postmacro foreach_level_or_leaf_stencil (int l, char flags, Reduce reductions) {
+macro2 foreach_level_or_leaf_stencil (int l, char flags, Reduce reductions) {
   foreach_level_stencil (l, flags, reductions)
     {...}
 }
 
-postmacro foreach_point_stencil (double xp, double yp, double zp, char flags, Reduce reductions)
+macro2 foreach_point_stencil (double xp, double yp, double zp, char flags, Reduce reductions)
 {
   foreach_stencil (flags, reductions)
     {...}
 }
 
-postmacro foreach_region_stencil (coord p, coord box[2], coord n, char flags, Reduce reductions)
+macro2 foreach_region_stencil (coord p, coord box[2], coord n, char flags, Reduce reductions)
 {
   foreach_stencil (flags, reductions)
     {...}
 }
 
-postmacro _stencil_is_face_x (ForeachData l = _loop) { l.face |= (1 << 0); {...} }
-postmacro _stencil_is_face_y (ForeachData l = _loop) { l.face |= (1 << 1); {...} }
-postmacro _stencil_is_face_z (ForeachData l = _loop) { l.face |= (1 << 2); {...} }
+macro2 _stencil_is_face_x (ForeachData l = _loop) { l.face |= (1 << 0); {...} }
+macro2 _stencil_is_face_y (ForeachData l = _loop) { l.face |= (1 << 1); {...} }
+macro2 _stencil_is_face_z (ForeachData l = _loop) { l.face |= (1 << 2); {...} }
 
 void stencil_val (Point p, scalar s, int i, int j, int k,
 		  const char * file, int line, bool overflow);

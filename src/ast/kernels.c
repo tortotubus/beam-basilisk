@@ -9,6 +9,7 @@
 typedef struct {
   char * error;
   bool nolineno;
+  int return_macro_index;
 } KernelData;
 
 /**
@@ -696,14 +697,23 @@ char * stringify (Ast * n, char * output, bool nolineno)
   return output;
 }
 
+static void postmacros (Ast * n, Stack * stack, void * data)
+{
+  if (n->sym == sym_statement || n->sym == sym_function_call) {
+    KernelData * d = data;
+    ast_macro_replacement (n, n, stack, d->nolineno, 1, false, &d->return_macro_index);
+  }
+}
+
 char * ast_kernel (Ast * n, char * argument, bool nolineno)
 {
   AstRoot * root = ast_get_root (n);
   Stack * stack = root->stack;
   stack_push (stack, &n);
-  KernelData d = {0, nolineno};
+  KernelData d = {0, nolineno, 0};
   Ast * statement = n->sym == sym_function_definition ?
     ast_copy (n) : ast_copy (ast_child (n, sym_statement));
+  ast_traverse (statement, stack, postmacros, &d);
   ast_traverse (statement, stack, kernel, &d);
 
   if (d.error)

@@ -2,7 +2,7 @@
 
 #if dimension == 1
 
-postmacro foreach_slice_x (int start, int end, int l) {
+macro2 foreach_slice_x (int start, int end, int l) {
   {
     int ig = 0; NOT_UNUSED(ig);
     Point point = {0};
@@ -14,7 +14,7 @@ postmacro foreach_slice_x (int start, int end, int l) {
 
 #elif dimension == 2
 
-postmacro foreach_slice_x (int start, int end, int l) {
+macro2 foreach_slice_x (int start, int end, int l) {
   {
     int ig = 0, jg = 0; NOT_UNUSED(ig); NOT_UNUSED(jg);
     Point point = {0};
@@ -25,7 +25,7 @@ postmacro foreach_slice_x (int start, int end, int l) {
   }
 }
 
-postmacro foreach_slice_y (int start, int end, int l) {
+macro2 foreach_slice_y (int start, int end, int l) {
   {
     int ig = 0, jg = 0; NOT_UNUSED(ig); NOT_UNUSED(jg);
     Point point = {0};
@@ -38,7 +38,7 @@ postmacro foreach_slice_y (int start, int end, int l) {
 
 #elif dimension == 3
 
-postmacro foreach_slice_x (int start, int end, int l) {
+macro2 foreach_slice_x (int start, int end, int l) {
   {
     int ig = 0, jg = 0, kg = 0; NOT_UNUSED(ig); NOT_UNUSED(jg); NOT_UNUSED(kg);
     Point point = {0};
@@ -50,7 +50,7 @@ postmacro foreach_slice_x (int start, int end, int l) {
   }
 }
 
-postmacro foreach_slice_y (int start, int end, int l) {
+macro2 foreach_slice_y (int start, int end, int l) {
   {
     int ig = 0, jg = 0, kg = 0; NOT_UNUSED(ig); NOT_UNUSED(jg); NOT_UNUSED(kg);
     Point point = {0};
@@ -62,7 +62,7 @@ postmacro foreach_slice_y (int start, int end, int l) {
   }
 }
 
-postmacro foreach_slice_z (int start, int end, int l) {
+macro2 foreach_slice_z (int start, int end, int l) {
   {
     int ig = 0, jg = 0, kg = 0; NOT_UNUSED(ig); NOT_UNUSED(jg); NOT_UNUSED(kg);
     Point point = {0};

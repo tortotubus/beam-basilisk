@@ -262,8 +262,6 @@ static int check_type (AstRoot * parse, bool call)
     {"inline",	       INLINE},
     {"int",	       INT},
     {"long",	       LONG},
-    {"macro",          MACRODEF},
-    {"postmacro",      MACRODEF},
     {"register",       REGISTER},
     {"restrict",       RESTRICT},
     {"return",	       RETURN},
@@ -301,6 +299,13 @@ static int check_type (AstRoot * parse, bool call)
   for (Type * t = types; t->name; t++)
     if (!strcmp (yytext, t->name))
       return t->type;
+
+  if (!strncmp (yytext, "macro", 5)) {
+    char * s;
+    for (s = yytext + 5; *s != '\0' && *s >= '0' && *s <= '9'; s++);
+    if (*s == '\0')
+      return MACRODEF;
+  }
   
   if (parse->type_already_specified)
     return IDENTIFIER;
