@@ -2188,7 +2188,7 @@ static void user_macros (Ast * n, Stack * stack, void * data)
 
   case sym_statement: case sym_function_call: {
     TranslateData * d = data;
-    macro_replacement (n, n, stack, d->nolineno, false, false, &d->return_macro_index);
+    ast_macro_replacement (n, n, stack, d->nolineno, 0, false, &d->return_macro_index);
     break;
   }
 
@@ -2288,7 +2288,7 @@ static void postmacros (Ast * n, Stack * stack, void * data)
   }
   else if (n->sym == sym_statement || n->sym == sym_function_call) {
     TranslateData * d = data;
-    macro_replacement (n, n, stack, d->nolineno, true, false, &d->return_macro_index);
+    ast_macro_replacement (n, n, stack, d->nolineno, 2, false, &d->return_macro_index);
   }
 }
 
@@ -2966,7 +2966,7 @@ static void translate (Ast * n, Stack * stack, void * data)
 						 NCB(list, ";"))))));
 	  ast_block_list_prepend (list, sym_block_item, point_variables);
 	  TranslateData * d = data;
-	  macro_replacement (point_variables, point_variables, stack, d->nolineno, false, false,
+	  ast_macro_replacement (point_variables, point_variables, stack, d->nolineno, 0, false,
 			     &d->return_macro_index);
 	}
       }
@@ -3127,7 +3127,7 @@ static void translate (Ast * n, Stack * stack, void * data)
 								   0, sym_MACRO), sym_statement);
 	  foreach_item (point, 1, item)
 	    ast_block_list_prepend (list, sym_block_item, item->child[0]);
-	  macro_replacement (point_variables, point_variables, stack, d->nolineno, false, false, &d->return_macro_index);
+	  ast_macro_replacement (point_variables, point_variables, stack, d->nolineno, 0, false, &d->return_macro_index);
 	}
       }
     }
@@ -3857,7 +3857,7 @@ static void stencils (Ast * n, Stack * stack, void * data)
 
   case sym_function_call: case sym_statement: {
     TranslateData * d = data;
-    macro_replacement (n, n, stack, d->nolineno, false, false, &d->return_macro_index);
+    ast_macro_replacement (n, n, stack, d->nolineno, 0, false, &d->return_macro_index);
     break;
   }        
     

@@ -350,7 +350,7 @@ macro POINT_VARIABLES (Point point = point) {
 #include "foreach_cell.h"
 
 #if dimension == 1
-macro foreach_child (Point point = point, break = (_k = 2)) {
+macro1 foreach_child (Point point = point, break = (_k = 2)) {
   {
     int _i = 2*point.i - GHOSTS;
     point.level++;
@@ -364,7 +364,7 @@ macro foreach_child (Point point = point, break = (_k = 2)) {
   }
 }
 #elif dimension == 2
-macro foreach_child (Point point = point, break = (_k = _l = 2)) {
+macro1 foreach_child (Point point = point, break = (_k = _l = 2)) {
   {
     int _i = 2*point.i - GHOSTS, _j = 2*point.j - GHOSTS;
     point.level++;
@@ -381,7 +381,7 @@ macro foreach_child (Point point = point, break = (_k = _l = 2)) {
   }
 }
 #else // dimension == 3
-macro foreach_child (Point point = point, break = (_l = _m = _n = 2)) {
+macro1 foreach_child (Point point = point, break = (_l = _m = _n = 2)) {
   {
     int _i = 2*point.i - GHOSTS, _j = 2*point.j - GHOSTS, _k = 2*point.k - GHOSTS;
     point.level++;
@@ -419,7 +419,7 @@ macro foreach_child (Point point = point, break = (_l = _m = _n = 2)) {
 			 )
 @
 
-postmacro foreach_cache (Cache cache, Reduce reductions = None)
+macro2 foreach_cache (Cache cache, Reduce reductions = None)
 {
   OMP_PARALLEL (reductions) {
     int ig = 0, jg = 0, kg = 0; NOT_UNUSED(ig); NOT_UNUSED(jg); NOT_UNUSED(kg);
@@ -448,7 +448,7 @@ postmacro foreach_cache (Cache cache, Reduce reductions = None)
   }
 }
 
-postmacro foreach_cache_level (Cache cache, int _l, Reduce reductions = None)
+macro2 foreach_cache_level (Cache cache, int _l, Reduce reductions = None)
 {
   OMP_PARALLEL (reductions) {
     int ig = 0, jg = 0, kg = 0; NOT_UNUSED(ig); NOT_UNUSED(jg); NOT_UNUSED(kg);
@@ -478,7 +478,7 @@ postmacro foreach_cache_level (Cache cache, int _l, Reduce reductions = None)
 
 static void update_cache_f (void);
 
-postmacro foreach_boundary_level (int _l, Reduce reductions = None)
+macro2 foreach_boundary_level (int _l, Reduce reductions = None)
 {
   if (_l <= depth()) {
     update_cache();
@@ -490,7 +490,7 @@ postmacro foreach_boundary_level (int _l, Reduce reductions = None)
 
 #define bid(cell) (- cell.pid - 1)
 
-postmacro foreach_halo_prolongation (int _l)
+macro2 foreach_halo_prolongation (int _l)
 {
   if (_l <= depth()) {
     update_cache();
@@ -500,7 +500,7 @@ postmacro foreach_halo_prolongation (int _l)
   }
 }
 
-postmacro foreach_halo_restriction (int _l)
+macro2 foreach_halo_restriction (int _l)
 {
   if (_l <= depth()) {
     update_cache();
@@ -681,13 +681,13 @@ static void update_cache_f (void)
 @endif
 }
 
-postmacro foreach (char flags = 0, Reduce reductions = None) {
+macro2 foreach (char flags = 0, Reduce reductions = None) {
   update_cache();
   foreach_cache (tree->leaves, reductions)
     {...}
 }
 
-postmacro foreach_face_generic (char flags = 0, Reduce reductions = None,
+macro2 foreach_face_generic (char flags = 0, Reduce reductions = None,
 				const char * order = "xyz")
 {
   update_cache();
@@ -695,7 +695,7 @@ postmacro foreach_face_generic (char flags = 0, Reduce reductions = None,
     {...}
 }
 
-macro is_face_x (unsigned short _f = _flags) {
+macro1 is_face_x (unsigned short _f = _flags) {
   if (_f & face_x) {
     int ig = -1; NOT_UNUSED(ig);
     {...}
@@ -703,7 +703,7 @@ macro is_face_x (unsigned short _f = _flags) {
 }
 
 #if dimension >= 2
-macro is_face_y (unsigned short _f = _flags) {
+macro1 is_face_y (unsigned short _f = _flags) {
   if (_f & face_y) {
     int jg = -1; NOT_UNUSED(jg);
     {...}
@@ -711,7 +711,7 @@ macro is_face_y (unsigned short _f = _flags) {
 }
 #endif
 #if dimension >= 3
-macro is_face_z (unsigned short _f = _flags) {
+macro1 is_face_z (unsigned short _f = _flags) {
   if (_f & face_z) {
     int kg = -1; NOT_UNUSED(kg);
     {...}
@@ -728,7 +728,7 @@ macro is_face_z (unsigned short _f = _flags) {
 # define foreach_edge(...) foreach_face(y,x,__VA_ARGS__)
 #endif
 
-postmacro foreach_level (int l, char flags = 0, Reduce reductions = None) {
+macro2 foreach_level (int l, char flags = 0, Reduce reductions = None) {
   if (l <= depth()) {
     update_cache();
     CacheLevel _active = tree->active[l];
@@ -737,13 +737,13 @@ postmacro foreach_level (int l, char flags = 0, Reduce reductions = None) {
   }
 }
 
-postmacro foreach_coarse_level (int l, char flags = 0, Reduce reductions = None) {
+macro2 foreach_coarse_level (int l, char flags = 0, Reduce reductions = None) {
   foreach_level(l, flags, reductions)
     if (!is_leaf(cell))
       {...}
 }
 
-postmacro foreach_level_or_leaf (int l, char flags = 0, Reduce reductions = None) {
+macro2 foreach_level_or_leaf (int l, char flags = 0, Reduce reductions = None) {
   for (int _l1 = l; _l1 >= 0; _l1--)
     foreach_level(_l1, flags, reductions)
       if (_l1 == l || is_leaf (cell))
@@ -1670,7 +1670,7 @@ bool tree_is_full()
 
 #include "variables.h"
 
-postmacro foreach_boundary (int _b, Reduce reductions = None) {
+macro2 foreach_boundary (int _b, Reduce reductions = None) {
   for (int _l = depth(); _l >= 0; _l--)
     foreach_boundary_level (_l, reductions) {
       POINT_VARIABLES();
@@ -1704,7 +1704,7 @@ postmacro foreach_boundary (int _b, Reduce reductions = None) {
     }
 }
 
-postmacro foreach_vertex (char flags = 0, Reduce reductions = None)
+macro2 foreach_vertex (char flags = 0, Reduce reductions = None)
 {
   update_cache();
   foreach_cache (tree->vertices, reductions) {

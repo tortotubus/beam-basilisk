@@ -184,10 +184,11 @@ macro. This is different from what happens for standard C functions.
 
 ## Postmacros
 
-Macros defined using the `postmacro` reserved keyword will be expanded
-after preprocessing by [qcc](/src/qcc.c). They will thus not be seen
-by the [interpreter](interpreter/interpreter.c) or by [computation
-kernels](kernels.c). 
+Macro definitions can use an "order" parameter which define their
+expansion priority when preprocessing by [qcc](/src/qcc.c). This is
+used to control which macros are expanded and thus seen or not by the
+[interpreter](interpreter/interpreter.c) (only `macro` are expanded)
+or by [computation kernels](kernels.c) (`macro` and `macro1` are expanded).
 
 *This is a low-level functionality which must not be used for "user"
 macros.*
@@ -202,7 +203,8 @@ typedef struct {
   Ast * statement, * arguments, * parameters, * call, * label, * initial;
   Stack * sparameters;
   int * returnindex;  
-  bool nolineno, complex_call, postmacros;
+  bool nolineno, complex_call;
+  int postmacros;
 } MacroReplacement;
 
 static Ast * argument_value (Ast * identifier, Stack * stack, const MacroReplacement * r)
@@ -508,21 +510,17 @@ Ast * get_macro_definition (Stack * stack, const Ast * identifier)
   return macro_definition;
 }
 
-static void macro_replacement (Ast * statement, Ast * initial, Stack * stack,
-			       bool nolineno, bool postmacros, bool expand_definitions,
-			       int * return_macro_index);
-
 static void replace_macros (Ast * n, Stack * stack, void * data)
 {
   if (n->sym == sym_statement || n->sym == sym_function_call) {
     MacroReplacement * r = data;
-    macro_replacement (n, r->initial, stack, r->nolineno, r->postmacros, true, r->returnindex);
+    ast_macro_replacement (n, r->initial, stack, r->nolineno, r->postmacros, true, r->returnindex);
   }
 }
 
-static void macro_replacement (Ast * statement, Ast * initial, Stack * stack,
-			       bool nolineno, bool postmacros, bool expand_definitions,
-			       int * return_macro_index)
+void ast_macro_replacement (Ast * statement, Ast * initial, Stack * stack,
+			    bool nolineno, int postmacros, bool expand_definitions,
+			    int * return_macro_index)
 {
   Ast * identifier, * macro_statement = ast_schema (statement, sym_statement,
 						    0, sym_basilisk_statements,
@@ -551,14 +549,15 @@ static void macro_replacement (Ast * statement, Ast * initial, Stack * stack,
     str_append (ast_terminal (identifier)->start, "_inner");
 
   Ast * macro_definition = get_macro_definition (stack, identifier);  
-  if (!postmacros) {
+  if (postmacros >= 0) {
     Ast * macrodef = ast_find (ast_schema (macro_definition, sym_function_definition,
 					   0, sym_function_declaration),
 			       sym_declaration_specifiers,
 			       0, sym_storage_class_specifier,
 			       0, sym_MACRODEF);
     assert (macrodef);
-    if (!strcmp (ast_terminal (macrodef)->start, "postmacro"))
+    const char * suffix = ast_terminal (macrodef)->start + 5;
+    if (atoi (suffix) > postmacros)
       return;
   }
   

@@ -711,7 +711,7 @@ or for embedded boundaries. The distinction between the two cases is
 based on whether the `dirichlet` parameter is passed to the boundary
 function (using the `data` parameter). */
 
-postmacro
+macro2
 double dirichlet (double expr, Point point = point,
 		  scalar s = _s, bool * data = data)
 {
@@ -719,14 +719,14 @@ double dirichlet (double expr, Point point = point,
     *((bool *)data) = true, expr : 2.*expr - s[];
 }
 
-postmacro
+macro2
 double dirichlet_homogeneous (double expr, Point point = point,
 			      scalar s = _s, bool * data = data)
 {
   return data ? *((bool *)data) = true, 0 : - s[];
 }
 
-postmacro
+macro2
 double neumann (double expr, Point point = point,
 		scalar s = _s, bool * data = data)
 {
@@ -734,7 +734,7 @@ double neumann (double expr, Point point = point,
     *((bool *)data) = false, expr : Delta*expr + s[];
 }
 
-postmacro
+macro2
 double neumann_homogeneous (double expr, Point point = point,
 			    scalar s = _s, bool * data = data)
 {

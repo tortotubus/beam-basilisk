@@ -62,7 +62,7 @@ Array * linear_tree (size_t size, scalar newpid)
   return a;
 }
 
-postmacro foreach_tree (Array * t, size_t size, scalar * list, scalar newpid = newpid)
+macro2 foreach_tree (Array * t, size_t size, scalar * list, scalar newpid = newpid)
 {
   {
     const unsigned short _sent = 1 << user, _next = 1 << (user + 1);

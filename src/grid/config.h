@@ -18,7 +18,7 @@
 @define trash(x)  // data trashing is disabled by default. Turn it on with
                   // -DTRASH=1
 
-auto postmacro BEGIN_FOREACH() {{...}}
+auto macro2 BEGIN_FOREACH() {{...}}
 
 #if _OPENMP
 @ include <omp.h>
@@ -528,12 +528,12 @@ void mpi_init()
 
 #endif // not MPI, not OpenMP
 
-postmacro OMP_PARALLEL() {{...}}
+macro2 OMP_PARALLEL() {{...}}
 @define OMP_PARALLEL(...) OMP(omp parallel S__VA_ARGS__)
 
 @define NOT_UNUSED(x) (void)(x)
 
-postmacro VARIABLES() { _CATCH; }
+macro2 VARIABLES() { _CATCH; }
 @define _index(a,m)    (a.i)
 @define val(a,k,l,m)   data(k,l,m)[_index(a,m)]
 
@@ -647,11 +647,11 @@ These are placeholders for internally-defined macros. */
 
 typedef int Reduce;
 
-postmacro foreach_face (char flags = 0, Reduce reductions = None,
+macro2 foreach_face (char flags = 0, Reduce reductions = None,
 			const char * order = "xyz")
 {{...}}
-postmacro einstein_sum() {{...}}
-postmacro diagonalize (int a) {{...}}
+macro2 einstein_sum() {{...}}
+macro2 diagonalize (int a) {{...}}
 
 /**
 Macros overloaded by the interpreter. */

@@ -241,7 +241,7 @@ macro POINT_VARIABLES (Point point = point)
 #endif  
 #endif // !_MPI
 
-postmacro foreach_level (int l, char flags = 0, Reduce reductions = None) {
+macro2 foreach_level (int l, char flags = 0, Reduce reductions = None) {
   OMP_PARALLEL (reductions) {
     int ig = 0, jg = 0, kg = 0; NOT_UNUSED(ig); NOT_UNUSED(jg); NOT_UNUSED(kg);
     Point point = {0};
@@ -262,7 +262,7 @@ postmacro foreach_level (int l, char flags = 0, Reduce reductions = None) {
   }
 }
 
-postmacro foreach (char flags = 0, Reduce reductions = None) {
+macro2 foreach (char flags = 0, Reduce reductions = None) {
   OMP_PARALLEL (reductions) {
     int ig = 0, jg = 0, kg = 0; NOT_UNUSED(ig); NOT_UNUSED(jg); NOT_UNUSED(kg);
     Point point = {0};
@@ -295,7 +295,7 @@ postmacro foreach (char flags = 0, Reduce reductions = None) {
 @define tree multigrid
 #include "foreach_cell.h"
 
-postmacro foreach_face_generic (char flags = 0, Reduce reductions = None,
+macro2 foreach_face_generic (char flags = 0, Reduce reductions = None,
 				const char * order = "xyz")
 {
   OMP_PARALLEL (reductions) {
@@ -321,7 +321,7 @@ postmacro foreach_face_generic (char flags = 0, Reduce reductions = None,
 @define is_coarse() (point.level < depth())
 
 #if dimension == 1
-macro is_face_x() {
+macro1 is_face_x() {
   {
     int ig = -1; NOT_UNUSED(ig);
     {...}
@@ -330,7 +330,7 @@ macro is_face_x() {
 
 // foreach_edge?
 
-macro foreach_child (Point point = point, break = (_k = 2)) {
+macro1 foreach_child (Point point = point, break = (_k = 2)) {
   {
     int _i = 2*point.i - GHOSTS;
     point.level++;
@@ -349,21 +349,21 @@ macro foreach_child (Point point = point, break = (_k = 2)) {
 #elif dimension == 2
 #define foreach_edge() foreach_face(y,x)
 
-macro is_face_x (Point p = point) {
+macro1 is_face_x (Point p = point) {
   if (p.j < p.n.y + GHOSTS) {
     int ig = -1; NOT_UNUSED(ig);
     {...}
   }
 }
 
-macro is_face_y (Point p = point) {
+macro1 is_face_y (Point p = point) {
   if (p.i < p.n.x + GHOSTS) {
     int jg = -1; NOT_UNUSED(jg);
     {...}
   }
 }
 
-macro foreach_child (Point point = point, break = (_k = _l = 2))
+macro1 foreach_child (Point point = point, break = (_k = _l = 2))
 {
   {
     int _i = 2*point.i - GHOSTS, _j = 2*point.j - GHOSTS;
@@ -382,28 +382,28 @@ macro foreach_child (Point point = point, break = (_k = _l = 2))
 }
 
 #elif dimension == 3
-macro is_face_x (Point p = point) {
+macro1 is_face_x (Point p = point) {
   if (p.j < p.n.y + GHOSTS && p.k < p.n.z + GHOSTS) {
     int ig = -1; NOT_UNUSED(ig);
     {...}
   }
 }
 
-macro is_face_y (Point p = point) {
+macro1 is_face_y (Point p = point) {
   if (p.i < p.n.x + GHOSTS && p.k < p.n.z + GHOSTS) {
     int jg = -1; NOT_UNUSED(jg);
     {...}
   }
 }
 
-macro is_face_z (Point p = point) {
+macro1 is_face_z (Point p = point) {
   if (p.i < p.n.x + GHOSTS && p.j < p.n.y + GHOSTS) {
     int kg = -1; NOT_UNUSED(kg);
     {...}
   }
 }
 
-macro foreach_child (Point point = point, break = (_l = _m = _n = 2))
+macro1 foreach_child (Point point = point, break = (_l = _m = _n = 2))
 {
   {
     int _i = 2*point.i - GHOSTS;
@@ -450,7 +450,7 @@ void reset (void * alist, double val)
 // Boundaries
 
 #if dimension == 1
-postmacro foreach_boundary_dir (int l, int d, Reduce reductions = None)
+macro2 foreach_boundary_dir (int l, int d, Reduce reductions = None)
 {
   {
     int ig = 0, jg = 0, kg = 0; NOT_UNUSED(ig); NOT_UNUSED(jg); NOT_UNUSED(kg);
@@ -473,7 +473,7 @@ postmacro foreach_boundary_dir (int l, int d, Reduce reductions = None)
 @define is_boundary(point) (point.i < GHOSTS || point.i >= point.n.x + GHOSTS)
 
 #elif dimension == 2
-postmacro foreach_boundary_dir (int l, int d, Reduce reductions = None)
+macro2 foreach_boundary_dir (int l, int d, Reduce reductions = None)
 {
   OMP_PARALLEL (reductions) {
     int ig = 0, jg = 0, kg = 0; NOT_UNUSED(ig); NOT_UNUSED(jg); NOT_UNUSED(kg);
@@ -516,7 +516,7 @@ postmacro foreach_boundary_dir (int l, int d, Reduce reductions = None)
 @
 
 #elif dimension == 3
-postmacro foreach_boundary_dir (int l, int d, Reduce reductions = None) {
+macro2 foreach_boundary_dir (int l, int d, Reduce reductions = None) {
   OMP_PARALLEL (reductions) {
     int ig = 0, jg = 0, kg = 0; NOT_UNUSED(ig); NOT_UNUSED(jg); NOT_UNUSED(kg);
     Point point = {0};
@@ -579,7 +579,7 @@ postmacro foreach_boundary_dir (int l, int d, Reduce reductions = None) {
 extern double (* default_scalar_bc[]) (Point, Point, scalar, bool *);
 static double periodic_bc (Point point, Point neighbor, scalar s, bool * data);
 
-postmacro foreach_boundary (int b, Reduce reductions = None)
+macro2 foreach_boundary (int b, Reduce reductions = None)
 {
   if (default_scalar_bc[b] != periodic_bc)
     foreach_boundary_dir (depth(), b, reductions)
@@ -909,7 +909,7 @@ Point locate (double xp = 0, double yp = 0, double zp = 0)
 # include "multigrid-common.h"
 #endif
 
-postmacro foreach_vertex (char flags = 0, Reduce reductions = None) {
+macro2 foreach_vertex (char flags = 0, Reduce reductions = None) {
   foreach_face_generic (reductions) {
     int ig = -1; NOT_UNUSED(ig);
 #if dimension > 1
@@ -952,7 +952,7 @@ ivec dimensions (int nx = 0, int ny = 0, int nz = 0)
 #else // !_MPI
 
 #if dimension == 1
-postmacro foreach_cell_multigrid()
+macro2 foreach_cell_multigrid()
 {
   for (int ox = 0; ox < Dimensions.x; ox++)
     foreach_cell() {
@@ -962,7 +962,7 @@ postmacro foreach_cell_multigrid()
     }
 }
 #elif dimension == 2
-postmacro foreach_cell_multigrid()
+macro2 foreach_cell_multigrid()
 {
   for (int ox = 0; ox < Dimensions.x; ox++)
     for (int oy = 0; oy < Dimensions.y; oy++)
@@ -975,7 +975,7 @@ postmacro foreach_cell_multigrid()
       }
 }
 #elif dimension == 3
-postmacro foreach_cell_multigrid()
+macro2 foreach_cell_multigrid()
 {
   for (int ox = 0; ox < Dimensions.x; ox++)
     for (int oy = 0; oy < Dimensions.y; oy++)

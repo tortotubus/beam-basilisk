@@ -39,7 +39,7 @@ static Point last_point;
 
 macro POINT_VARIABLES (Point point = point) { VARIABLES(); }
 
-postmacro foreach (char flags = 0, Reduce reductions = None)
+macro2 foreach (char flags = 0, Reduce reductions = None)
 {
   OMP_PARALLEL (reductions) {
     int ig = 0, jg = 0; NOT_UNUSED(ig); NOT_UNUSED(jg);
@@ -55,7 +55,7 @@ postmacro foreach (char flags = 0, Reduce reductions = None)
   }
 }
 
-postmacro foreach_face_generic (char flags = 0, Reduce reductions = None,
+macro2 foreach_face_generic (char flags = 0, Reduce reductions = None,
 				const char * order = "xyz")
 {
   OMP_PARALLEL (reductions) {
@@ -74,14 +74,14 @@ postmacro foreach_face_generic (char flags = 0, Reduce reductions = None,
 
 #define foreach_edge() foreach_face(y,x)
 
-macro is_face_x (Point p = point) {
+macro1 is_face_x (Point p = point) {
   if (p.j <= p.n) {
     int ig = -1; NOT_UNUSED(ig);
     {...}
   }
 }
 
-macro is_face_y (Point p = point) {
+macro1 is_face_y (Point p = point) {
   if (p.i <= p.n) {
     int jg = -1; NOT_UNUSED(jg);
     {...}
@@ -107,7 +107,7 @@ void reset (void * alist, double val)
 
 // Boundaries
 
-postmacro foreach_boundary_dir (int l, int d)
+macro2 foreach_boundary_dir (int l, int d)
 {
   OMP_PARALLEL() {
     int ig = 0, jg = 0, kg = 0; NOT_UNUSED(ig); NOT_UNUSED(jg); NOT_UNUSED(kg);
@@ -203,7 +203,7 @@ static void box_boundary_level_tangent (const Boundary * b,
 extern double (* default_scalar_bc[]) (Point, Point, scalar, bool *);
 static double periodic_bc (Point point, Point neighbor, scalar s, bool * data);
 
-postmacro foreach_boundary (int b)
+macro2 foreach_boundary (int b)
 {
   if (default_scalar_bc[b] != periodic_bc)
     foreach_boundary_dir (depth(), b)
@@ -369,7 +369,7 @@ Point locate (double xp = 0, double yp = 0, double zp = 0)
 #include "cartesian-common.h"
 #endif
 
-postmacro foreach_vertex (char flags = 0, Reduce reductions = None)
+macro2 foreach_vertex (char flags = 0, Reduce reductions = None)
 {
   foreach_face_generic (flags, reductions) {
     int ig = -1, jg = -1; NOT_UNUSED(ig); NOT_UNUSED(jg);
