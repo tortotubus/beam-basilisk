@@ -72,7 +72,7 @@ int main() {
   Hysing et al. consider two cases (1 and 2), with the densities, dynamic
   viscosities and surface tension of fluid 1 and 2 given below. */
 
-  rho1 = 1000.[0], mu1 = 10.;  // works also with rho1 = [-3,0,1]
+  rho1 = 1000.[0], mu1 = 10.;  // works also with rho1 = 1000.[-3,0,1]
 #if CASE2
   rho2 = 1., mu2 = 0.1;
 #else
