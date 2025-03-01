@@ -56,7 +56,7 @@ postmacro foreach_face_generic (char flags = 0, Reduce reductions = None,
   }
 }
 
-macro is_face_x() {{ int ig = -1; NOT_UNUSED(ig); POINT_VARIABLES(); {...} }}
+macro is_face_x() {{ int ig = -1; NOT_UNUSED(ig); {...} }}
 
 // ghost cell coordinates for each direction
 static int _ig[] = {1,-1};

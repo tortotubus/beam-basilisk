@@ -74,16 +74,16 @@ postmacro foreach_face_generic (char flags = 0, Reduce reductions = None,
 
 #define foreach_edge() foreach_face(y,x)
 
-macro is_face_x (Point point = point) {
-  if (point.j <= point.n) {
-    int ig = -1; NOT_UNUSED(ig); POINT_VARIABLES();
+macro is_face_x (Point p = point) {
+  if (p.j <= p.n) {
+    int ig = -1; NOT_UNUSED(ig);
     {...}
   }
 }
 
-macro is_face_y (Point point = point) {
-  if (point.i <= point.n) {
-    int jg = -1; NOT_UNUSED(jg); POINT_VARIABLES();
+macro is_face_y (Point p = point) {
+  if (p.i <= p.n) {
+    int jg = -1; NOT_UNUSED(jg);
     {...}
   }
 }

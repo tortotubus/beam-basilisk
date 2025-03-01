@@ -695,25 +695,25 @@ postmacro foreach_face_generic (char flags = 0, Reduce reductions = None,
     {...}
 }
 
-macro is_face_x (unsigned short _f = _flags, Point point = point) {
+macro is_face_x (unsigned short _f = _flags) {
   if (_f & face_x) {
-    int ig = -1; NOT_UNUSED(ig); POINT_VARIABLES();
+    int ig = -1; NOT_UNUSED(ig);
     {...}
   }
 }
 
 #if dimension >= 2
-macro is_face_y (unsigned short _f = _flags, Point point = point) {
+macro is_face_y (unsigned short _f = _flags) {
   if (_f & face_y) {
-    int jg = -1; NOT_UNUSED(jg); POINT_VARIABLES();
+    int jg = -1; NOT_UNUSED(jg);
     {...}
   }
 }
 #endif
 #if dimension >= 3
-macro is_face_z (unsigned short _f = _flags, Point point = point) {
+macro is_face_z (unsigned short _f = _flags) {
   if (_f & face_z) {
-    int kg = -1; NOT_UNUSED(kg); POINT_VARIABLES();
+    int kg = -1; NOT_UNUSED(kg);
     {...}
   }
 }

@@ -2941,8 +2941,38 @@ static void translate (Ast * n, Stack * stack, void * data)
     }
     
     /**
-    ## Foreach statements
+    ## Foreach statements 
 
+    Add POINT_VARIABLES() before the statement. */
+
+    if (ast_is_foreach_statement (n) &&
+	!is_foreach_stencil_identifier (ast_schema (n, sym_macro_statement,
+						    0, sym_MACRO))) {
+      Ast * definition = ast_parent (n, sym_function_definition), * identifier;
+      if (!definition || !(identifier = ast_is_macro_declaration (definition->child[0])) ||
+	  !is_foreach_identifier (ast_terminal (identifier)->start)) {
+	if (!ast_find_identifier ("POINT_VARIABLES",
+				  get_macro_definition (stack, n->child[0]), sym_macro_statement,
+				  0, sym_MACRO)) {
+	  Ast * list = ast_block_list_get_item (ast_child (n, sym_statement))->parent;
+	  Ast * point_variables = NN(list, sym_statement,
+				     NN(list, sym_basilisk_statements,
+					NN(list, sym_macro_statement,
+					   NB(list, sym_MACRO, "POINT_VARIABLES"),
+					   NCB(list, "("),
+					   NCB(list, ")"),
+					   NN(list, sym_statement,
+					      NN(list, sym_expression_statement,
+						 NCB(list, ";"))))));
+	  ast_block_list_prepend (list, sym_block_item, point_variables);
+	  TranslateData * d = data;
+	  macro_replacement (point_variables, point_variables, stack, d->nolineno, false, false,
+			     &d->return_macro_index);
+	}
+      }
+    }
+      
+    /**
     ### foreach_face() statements */
 
     bool is_face_stencil = !strcmp (ast_terminal (identifier)->start,
@@ -3015,31 +3045,7 @@ static void translate (Ast * n, Stack * stack, void * data)
 
     if (ast_is_foreach_statement (n) &&
 	!is_foreach_stencil_identifier (ast_schema (n, sym_macro_statement,
-						    0, sym_MACRO))) {      
-      if (strcmp (ast_terminal (n->child[0])->start, "foreach_face_generic")) {
-	Ast * definition = ast_parent (n, sym_function_definition), * identifier;
-	if (!definition || !(identifier = ast_is_macro_declaration (definition->child[0])) ||
-	    !is_foreach_identifier (ast_terminal (identifier)->start)) {
-	  if (!ast_find_identifier ("POINT_VARIABLES",
-				    get_macro_definition (stack, n->child[0]), sym_macro_statement,
-				    0, sym_MACRO)) {
-	    Ast * list = ast_block_list_get_item (ast_child (n, sym_statement))->parent;
-	    Ast * point_variables = NN(list, sym_statement,
-				       NN(list, sym_basilisk_statements,
-					  NN(list, sym_macro_statement,
-					     NB(list, sym_MACRO, "POINT_VARIABLES"),
-					     NCB(list, "("),
-					     NCB(list, ")"),
-					     NN(list, sym_statement,
-						NN(list, sym_expression_statement,
-						   NCB(list, ";"))))));
-	    ast_block_list_prepend (list, sym_block_item, point_variables);
-	    TranslateData * d = data;
-	    macro_replacement (point_variables, point_variables, stack, d->nolineno, false, false, &d->return_macro_index);
-	  }
-	}
-      }
-      
+						    0, sym_MACRO))) {
       Ast ** consts = NULL;
       maybeconst (n, stack, append_const, &consts);
       if (consts) {
