@@ -1,8 +1,6 @@
 There is 1 unconstrained constant within the following 2
   /src/grid/variables.h:22: 'z = 0.'
   bubble.c:163: 'zb = 0.'
-[0]  ast/interpreter/overload.h: 'alphav.x[] = 0.'
-[0]  ast/interpreter/overload.h: 'alphav.y[] = 0.'
 [0]  ast/interpreter/overload.h: 'f[] = 0.'
 [0]  /src/grid/multigrid-common.h: 'sum = 0.'
 [0]  /src/grid/multigrid-common.h: 'size[] = 1'
@@ -244,8 +242,6 @@ There is 1 unconstrained constant within the following 2
 [4]  /src/fractions.h: '0.'
 [1,-1]  ast/interpreter/overload.h: 'u.x[] = 0.'
 [1,-1]  ast/interpreter/overload.h: 'u.y[] = 0.'
-[1,-1]  ast/interpreter/overload.h: 'uf.x[] = 0.'
-[1,-1]  ast/interpreter/overload.h: 'uf.y[] = 0.'
 [1,-1]  /src/grid/multigrid-common.h: 'sum = 0.'
 [1,-1]  /src/navier-stokes/centered.h: '0.'
 [1,-1]  /src/bcg.h: '0.'

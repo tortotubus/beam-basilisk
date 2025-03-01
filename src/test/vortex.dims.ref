@@ -55,8 +55,6 @@
 [0,-2]  /src/poisson.h: 'maxres = 0.'
 [1,-1]  ast/interpreter/overload.h: 'u.x[] = 0.'
 [1,-1]  ast/interpreter/overload.h: 'u.y[] = 0.'
-[1,-1]  ast/interpreter/overload.h: 'uf.x[] = 0.'
-[1,-1]  ast/interpreter/overload.h: 'uf.y[] = 0.'
 [1,-1]  /src/navier-stokes/centered.h: '0.'
 [1,-1]  /src/bcg.h: '0.'
 [1,-1]  /src/poisson.h: 'div[] = 0.'
