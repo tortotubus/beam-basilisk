@@ -182,6 +182,15 @@ event interface (t = 3.) {
   output_facets (f, stderr);
 }
 
+#if _GPU && SHOW
+event display (i++) {
+  output_ppm (f, fp = NULL, fps = 30, spread = -1, n = 1024);
+  scalar omega[];
+  vorticity (u, omega);
+  output_ppm (omega, fp = NULL, fps = 30, spread = 6, n = 1024);
+}
+#endif
+
 #if ADAPT
 event adapt (i++) {
   adapt_wavelet ({f,u}, (double[]){5e-4,1e-3,1e-3}, LEVEL);

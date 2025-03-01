@@ -582,11 +582,16 @@ dimensions-tests: bump2D.s capwave.s lid.s rising-axi.s		\
 # fixme: the dependencies *.gpu.s.d are not created automatically
 gpu-tests: gpu.gpu.tst gpu-cpu.gpu.tst gpu-reduce.gpu.tst layers.gpu.tst nonlinear.gpu.tst \
 	advection.gpu.tst bump2D-gpu.tst reversed.gpu.tst axi.gpu.tst lid.gpu.tst \
-	stommel-ml.gpu.tst bleck.gpu.tst
+	stommel-ml.gpu.tst bleck.gpu.tst rising-clsvof.gpu.tst
 gpu-tests: CFLAGS += -DPRINTNSHADERS
 
 gpu-cpu.c: gpu.c
 	ln -sf gpu.c gpu-cpu.c
 gpu-cpu.gpu.tst: CFLAGS += -cpu
+
+rising-clsvof.gpu.c: rising.c
+	ln -sf rising.c rising-clsvof.gpu.c
+rising-clsvof.gpu.s: CFLAGS += -DLEVELSET=1 -DCLSVOF=1
+rising-clsvof.gpu.tst: CFLAGS += -DLEVELSET=1 -DCLSVOF=1
 
 include ../Makefile.defs

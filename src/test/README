@@ -215,6 +215,7 @@ Tests for the multigrid solver on GPUs.
 
 * [Convergence of axisymmetric viscous terms](axi.c)
 * [Lid-driven cavity](lid.c)
+* [Rising bubble (CLSVOF version)](rising.c)
 
 See also the [GPU Benchmarks](/src/grid/gpu/Benchmarks.md).
 
