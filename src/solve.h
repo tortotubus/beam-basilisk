@@ -43,7 +43,7 @@ mgstats solve (scalar a, double func, double rhs,
 	       int nrelax = 4,
 	       int minlevel = 0,
 	       double tolerance = TOLERANCE)
-{
+{{
   mgstats _s = (mgstats){0};
   scalar _res[], _da[];
   scalar_clone (_da, a);
@@ -116,4 +116,4 @@ mgstats solve (scalar a, double func, double rhs,
 	     _s.i, _s.resa, _s.nrelax),
       fflush (ferr);
   return _s;
-}
+}}
