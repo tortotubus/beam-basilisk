@@ -1028,7 +1028,7 @@ static Ast * parent_is_foreach_definition (const Ast * n)
   return NULL;
 }
 
-Ast * ast_is_point_point (const Ast * n)
+static Ast * is_point_point (const Ast * n)
 {
   Ast * identifier = ast_schema (n, sym_IDENTIFIER);
   if (!identifier)
@@ -1040,6 +1040,8 @@ Ast * ast_is_point_point (const Ast * n)
     while (decl->sym != sym_declaration &&
 	   decl->sym != sym_parameter_declaration)
       decl = decl->parent;
+    if (decl->sym == sym_declaration)
+      return NULL;
     if (ast_schema (decl, sym_parameter_declaration,
 		    3, sym_initializer)) {
       Ast * fname = ast_function_identifier (ast_parent (decl, sym_function_definition));
@@ -3094,41 +3096,28 @@ static void translate (Ast * n, Stack * stack, void * data)
     /**
     ## Point point */
 
-    Ast * decl = ast_is_point_point (n);
+    Ast * decl = is_point_point (n);
     if (decl) {
-      if (decl->sym == sym_declaration) {
-	AstTerminal * t = ast_terminal (n);
-	if (ast_parent (n, sym_declaration) &&
-	    strncmp (t->file, BASILISK "/grid/", strlen (BASILISK "/grid/")) &&
-	    strncmp (t->file, "./grid/", strlen ("./grid/"))) {
-	  fprintf (stderr,
-		   "%s:%d: error: 'Point point = ...;' is obsolete, use 'foreach_point/region' instead\n",
-		   t->file, t->line);
-	  exit (1);
-	}
-      }
-      else { // decl->sym == sym_parameter_declaration
-	Ast * list = ast_schema (decl->parent, sym_compound_statement,
-				 1, sym_block_item_list);
-	if (list && !ast_find_identifier ("POINT_VARIABLES", list, sym_macro_statement,
-					  0, sym_MACRO)) {
-	  TranslateData * d = data;
-	  static const char * name[3] = {"ig", "jg", "kg"};
-	  char * src = strdup ("{");
-	  for (int i = 0; i < d->dimension; i++)
-	    str_append (src, "int ", name[i], "=0;NOT_UNUSED(", name[i], ");");
-	  str_append (src, "POINT_VARIABLES();}");
-	  Ast * point = ast_find (ast_parse_external_declaration (src, ast_get_root (decl)),
-				  sym_block_item_list);
-	  ast_set_line (point, ast_left_terminal (decl), true);
-	  free (src);
+      Ast * list = ast_schema (decl->parent, sym_compound_statement,
+			       1, sym_block_item_list);
+      if (list && !ast_find_identifier ("POINT_VARIABLES", list, sym_macro_statement,
+					0, sym_MACRO)) {
+	TranslateData * d = data;
+	static const char * name[3] = {"ig", "jg", "kg"};
+	char * src = strdup ("{");
+	for (int i = 0; i < d->dimension; i++)
+	  str_append (src, "int ", name[i], "=0;NOT_UNUSED(", name[i], ");");
+	str_append (src, "POINT_VARIABLES();}");
+	Ast * point = ast_find (ast_parse_external_declaration (src, ast_get_root (decl)),
+				sym_block_item_list);
+	ast_set_line (point, ast_left_terminal (decl), true);
+	free (src);
 	  
-	  Ast * point_variables = ast_parent (ast_find_identifier ("POINT_VARIABLES", point, sym_macro_statement,
-								   0, sym_MACRO), sym_statement);
-	  foreach_item (point, 1, item)
-	    ast_block_list_prepend (list, sym_block_item, item->child[0]);
-	  ast_macro_replacement (point_variables, point_variables, stack, d->nolineno, 0, false, &d->return_macro_index);
-	}
+	Ast * point_variables = ast_parent (ast_find_identifier ("POINT_VARIABLES", point, sym_macro_statement,
+								 0, sym_MACRO), sym_statement);
+	foreach_item (point, 1, item)
+	  ast_block_list_prepend (list, sym_block_item, item->child[0]);
+	ast_macro_replacement (point_variables, point_variables, stack, d->nolineno, 0, false, &d->return_macro_index);
       }
     }
     
