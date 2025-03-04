@@ -2942,9 +2942,6 @@ Value * ast_run_node (Ast * n, Stack * stack)
       Ast * identifier = ast_identifier_declaration (stack, ast_terminal (n->child[0]->child[0])->start);
       if (identifier && has_value (identifier))
 	value = (Value *) identifier;
-      if (ast_schema (ast_is_point_point (n->child[0]), sym_declaration) &&
-	  strcmp (ast_terminal (n->child[0]->child[0])->file, "ast/interpreter/overload.h"))
-	init_point_variables (stack);
     }
     else
       value = run (ast_child (n, sym_declarator), stack);

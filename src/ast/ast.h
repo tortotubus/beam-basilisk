@@ -277,7 +277,6 @@ bool  ast_is_foreach_stencil (const Ast * n);
 bool  ast_is_stencil_function (Ast * n);
 Ast * ast_is_point_function (const Ast * declarator);
 Ast * ast_stencil (Ast * n, bool parallel, bool overflow, bool nowarning);
-Ast * ast_is_point_point (const Ast * identifier);
 void  ast_stencil_access (Ast * n, Stack * stack, int dimension);
 const Ast * ast_attribute_access (const Ast * n, Stack * stack);
 Ast * ast_attribute_array_access (Ast * n);
