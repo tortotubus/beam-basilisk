@@ -34,7 +34,7 @@ static Point last_point;
 #define cartesian ((Cartesian *)grid)
 
 @undef val
-@define val(a,k,l,m) (((real *)cartesian->d)[(point.i + k + _index(a,m)*(point.n + 2))*(point.n + 2) + point.j + l])
+@define val(a,k,l,m) (((real *)cartesian->d)[(point.i + k + _index(a,m)*(size_t)(point.n + 2))*(point.n + 2) + point.j + l])
 @define allocated(...) true
 
 macro POINT_VARIABLES (Point point = point) { VARIABLES(); }
@@ -101,7 +101,7 @@ void reset (void * alist, double val)
   size_t len = sq(cartesian->n + 2);
   for (scalar s in list)
     if (!is_constant(s))
-      for (int i = 0; i < len; i++)
+      for (size_t i = 0; i < len; i++)
 	((real *)cartesian->d)[i + s.i*len] = val;
 }
 
@@ -324,7 +324,7 @@ void init_grid (int n)
     return;
   free_grid();
   Cartesian * p = qmalloc (1, Cartesian);
-  size_t len = (n + 2)*(n + 2)*datasize;
+  size_t len = sq((size_t)n + 2)*datasize;
   p->n = N = n;
   p->d = qmalloc (len, char);
   grid = (Grid *) p;
@@ -343,14 +343,14 @@ void init_grid (int n)
     add_boundary (b);
   }
   // mesh size
-  grid->n = grid->tn = sq(n);
+  grid->n = grid->tn = sq((size_t)n);
 }
 
 void realloc_scalar (int size)
 {
   Cartesian * p = cartesian;
   datasize += size;  
-  qrealloc (p->d, (p->n + 2)*(p->n + 2)*datasize, char);
+  qrealloc (p->d, sq((size_t)p->n + 2)*datasize, char);
 }
 
 Point locate (double xp = 0, double yp = 0, double zp = 0)

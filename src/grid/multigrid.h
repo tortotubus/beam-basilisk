@@ -17,9 +17,9 @@ typedef double real;
 #endif
 
 #if _MPI
-# define ND(i) (1 << point.level)
+# define ND(i) ((size_t)(1 << point.level))
 #else
-# define ND(i) ((1 << point.level)*((int *)&Dimensions)[i])
+# define ND(i) ((size_t)(1 << point.level)*((int *)&Dimensions)[i])
 #endif
 
 #define _I     (point.i - GHOSTS)
@@ -442,7 +442,7 @@ void reset (void * alist, double val)
       for (int b = 0; b < s.block; b++) {
 	real * data = (real *) multigrid->d;
 	data += (s.i + b)*multigrid->shift[depth() + 1];
-	for (int i = 0; i < multigrid->shift[depth() + 1]; i++, data++)
+	for (size_t i = 0; i < multigrid->shift[depth() + 1]; i++, data++)
 	  *data = val;
       }
 }
