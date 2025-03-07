@@ -13,20 +13,18 @@
 
 #define GPU_CODE()							\
   "#define valt(s,k,l,m)"						\
-  "  _data[_index(s,m)*field_size() + point.j + (l) + "			\
-  " (point.i + (k))*(point.n.y + 2*GHOSTS) + _shift[point.level]]\n"	\
-  "#define val_red_(s) _data[(s).i*field_size() + point.j - GHOSTS +"	\
-  "  (point.i - GHOSTS)*NY + _shift[point.level]]\n"			\
+  "  _data_val(_index(s,m), point.j + (l) + "				\
+  " (point.i + (k))*(point.n.y + 2*GHOSTS) + _shift[point.level])\n"	\
+  "#define val_red_(s) _data_val((s).i, point.j - GHOSTS +"		\
+  "  (point.i - GHOSTS)*NY + _shift[point.level])\n"			\
   "#define fine(a,k,l,m)"						\
-  "  _data[2*point.j - GHOSTS + (l) +"					\
+  "  _data_val(_index(a,m), 2*point.j - GHOSTS + (l) +"			\
   "        (2*point.i - GHOSTS + (k))*(point.n.y*2 + 2*GHOSTS) +"	\
-  "        _shift[point.level + 1] +"					\
-  "        _index(a,m)*field_size()]\n"					\
+  "        _shift[point.level + 1])\n"					\
   "#define coarse(a,k,l,m)"						\
-  "  _data[(point.j + GHOSTS)/2 + (l) +"				\
+  "  _data_val(_index(a,m), (point.j + GHOSTS)/2 + (l) +"		\
   "        ((point.i + GHOSTS)/2 + (k))*(point.n.y/2 + 2*GHOSTS) +"	\
-  "        _shift[point.level - 1] +"					\
-  "        _index(a,m)*field_size()]\n"
+  "        _shift[point.level - 1])\n"
 
 static bool _gpu_done_ = false;
 

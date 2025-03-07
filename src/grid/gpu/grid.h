@@ -238,9 +238,8 @@ priority" these are:
 
 * Only 2D Cartesian and Multigrid grids for now: 3D multigrid will
   follow easily, quadtrees and octrees are more difficult.
-* Access to video memories largers than 2^32^ bytes i.e. 4GB is
-  currently impossible. This will be lifted soon (once I have found a
-  solution...)
+* The maximum size of any scalar field is limited to what can be
+  indexed using a 32-bits unsigned integer i.e. 2^32^ floats or 16 GB.
 * Boundary conditions have only been implemented for 3x3 stencils.
 * At this stage only a few solvers [have been
   tested](/src/test/README#gpu-tests). Other solvers may or may not
@@ -287,6 +286,13 @@ To maximize performance, here are a few tips and observations:
   by GLSL, graphics cards and their drivers can have very poor support
   and the performances of standard "gamers" graphics cards [are usually
   terrible](https://www.reddit.com/r/CUDA/comments/lkhcbv/is_there_a_list_of_gpus_ranked_by_fp64/).
+
+## Bugs
+
+* Trying to use more than one shader storage buffer (SSBO) with Intel
+  drivers does not seem work. This limits the amount of available
+  video memory to a single SSBO with a maximum size which is usually
+  2GB (or less).
 
 ## See also
 
@@ -406,9 +412,9 @@ static char glsl_preproc[] =
   "#define nodata (1e30)\n"
   "#define fabs(x) abs(x)\n"
   "#define neighborp(_i,_j,_k) Point(point.i+_i,point.j+_j,point.level,point.n"
-  #if LAYERS
+#if LAYERS
   ",point.l"
-  #endif
+#endif
   ")\n"
   "const real z = 0.;\n"
   "const int ig = 0, jg = 0;\n"
@@ -645,10 +651,14 @@ uint32_t hash_shader (const External * externals,
   a32_hash_add (&hash, &nconst, sizeof (nconst));
   a32_hash_add (&hash, _constant, sizeof (*_constant)*nconst);
   static External ext[] = {
-    { .name = ".boundary_left",   .type = sym_function_declaration, .nd = attroffset (boundary_left) },
-    { .name = ".boundary_right",  .type = sym_function_declaration, .nd = attroffset (boundary_right) },
-    { .name = ".boundary_top",    .type = sym_function_declaration, .nd = attroffset (boundary_top) },
-    { .name = ".boundary_bottom", .type = sym_function_declaration, .nd = attroffset (boundary_bottom) },
+    { .name = ".boundary_left",   .type = sym_function_declaration,
+      .nd = attroffset (boundary_left) },
+    { .name = ".boundary_right",  .type = sym_function_declaration,
+      .nd = attroffset (boundary_right) },
+    { .name = ".boundary_top",    .type = sym_function_declaration,
+      .nd = attroffset (boundary_top) },
+    { .name = ".boundary_bottom", .type = sym_function_declaration,
+      .nd = attroffset (boundary_bottom) },
 #if LAYERS
     { .name = ".block", .type = sym_INT, .nd = attroffset (block) },
 #endif
@@ -657,11 +667,23 @@ uint32_t hash_shader (const External * externals,
   foreach_function (f, f->used = false);
   for (const External * g = loop->dirty ? ext : ext + 4; g->name; g++)
     hash_external (&hash, g, loop, 2);
+  int imax = 1;
+  if (GPUContext.nssbo > 1)
+    for (scalar s in baseblock)
+      if (s.gpu.index && s.i + s.block > imax)
+	imax = s.i + s.block;
   for (const External * g = externals; g && g->name; g++) {
-    if (g->reduct)
+    if (g->reduct) {
       a32_hash_add (&hash, &g->s, sizeof (scalar));
+      if (GPUContext.nssbo > 1) {
+	scalar s = g->s;
+	if (s.i + s.block > imax)
+	  imax = s.i + s.block;
+      }
+    }
     hash_external (&hash, g, loop, 2);
   }
+  a32_hash_add (&hash, &imax, sizeof (imax));
   return a32_hash (&hash);
 }
 
@@ -704,7 +726,7 @@ char * build_shader (External * externals, const ForeachData * loop,
 		     const RegionParameters * region, const GLuint nwg[2])
 {
   int Nl = region->level > 0 ? 1 << (region->level - 1) : N/Dimensions.x;
-  char s[20];
+  char s[30];
   snprintf (s, 19, "%d", nconst > 0 ? nconst : 1);
   char a[20];
   snprintf (a, 19, "%g", nconst > 0 ? _constant[0] : 0);
@@ -715,10 +737,20 @@ char * build_shader (External * externals, const ForeachData * loop,
     snprintf (a, 19, "%g", _constant[i]);
     fs = str_append (fs, ",", a);
   }
-  fs = str_append (fs, "};\n");
-  fs = str_append (fs, "layout(std430, binding = 0)"
-		   " restrict buffer _data_layout { real _data[]; };\n");
-
+  fs = str_append (fs, "};\n"
+		   "layout(std430, binding = 0)"
+		   " restrict buffer _data_layout { real f[]; } _data");
+  if (GPUContext.nssbo > 1) {
+    snprintf (a, 19, "%d", GPUContext.nssbo);
+    snprintf (s, 29, "%ld", GPUContext.max_ssbo_size/sizeof(real));
+    fs = str_append (fs, "[", a, "];\n"
+		     "#define _data_val(field,index) _data[_offset[(field)].i+(_offset[(field)].j+(index))/", s,
+		     "].f[(_offset[(field)].j+(index))%", s, "]\n");
+  }
+  else
+    fs = str_append (fs, ";\n"
+		     "#define _data_val(field,index) _data.f[(field)*field_size() + (index)]\n");
+  
   /**
   Scalar field attributes */
       
@@ -795,6 +827,38 @@ char * build_shader (External * externals, const ForeachData * loop,
       }
     fs = str_append (fs, "};\n");
   }
+
+  /**
+  Field offsets when using multiple SSBOs */
+
+  if (GPUContext.nssbo > 1) {
+    int imax = 1;
+    for (scalar s in baseblock)
+      if (s.gpu.index && s.i + s.block > imax)
+	imax = s.i + s.block;
+    for (External * g = externals; g; g = g->next)
+      if (g->reduct) {
+	scalar s = g->s;
+	if (s.i + s.block > imax)
+	  imax = s.i + s.block;
+      }
+    char string[100]; snprintf (string, 19, "%d", imax);
+    fs = str_append (fs, "const struct { uint i, j; } _offset[", string, "]={");
+    for (int s = 0; s < imax; s++) {
+      fs = str_append (fs, s ? ",{" : "{");
+      size_t offset = s*field_size(), size = GPUContext.max_ssbo_size/sizeof(real);
+      size_t i = offset/size, j = offset%size;
+      snprintf (string, 99, "%ld,%ld", i, j);
+      fs = str_append (fs, string, "}");
+
+      if (j + field_size() > 1L << 32) {
+	fprintf (stderr, "%s:%d: error: resolution is too high for 32-bits indexing\n",
+		 __FILE__, LINENO);
+	exit (1);
+      }
+    }
+    fs = str_append (fs, "};\n");
+  }
   
   /**
   Non-local variables */
@@ -853,13 +917,18 @@ char * build_shader (External * externals, const ForeachData * loop,
 	     g->type != sym_TENSOR) {
       if (g->type == sym_INT && !strcmp (g->name, "N")) {
 	int level = region->level > 0 ? region->level - 1 : depth();
-	char s[20], d[20], l[20], size[30];
+	char s[20], d[20], l[20];
 	snprintf (s, 19, "%d", Nl);
 	snprintf (d, 19, "%d", depth());
 	snprintf (l, 19, "%d", level);
-	snprintf (size, 19, "%ld", (size_t) field_size());
 	fs = str_append (fs,
-			 "const uint N = ", s, ", _depth = ", d, ", _field_size = ", size, ";\n");
+			 "const uint N = ", s, ", _depth = ", d, ";\n");
+	if (GPUContext.nssbo == 1) {
+	  char size[30];
+	  snprintf (size, 19, "%ld", (size_t) field_size());	  
+	  fs = str_append (fs,
+			   "const uint _field_size = ", size, ";\n");
+	}
 #ifdef shift_level // multigrid
 	fs = str_append (fs,
 			 "const uint _shift[_depth + 1] = {");
@@ -1058,7 +1127,14 @@ void gpu_free()
     GL_C (glDeleteBuffers (2, gpu_grid->reduct));
     for (int i = 0; i < 2; i++)
       gpu_grid->reduct[i] = 0;
-  }    
+  }
+  if (GPUContext.nssbo) {
+    GL_C (glDeleteBuffers (GPUContext.nssbo, GPUContext.ssbo));
+    free (GPUContext.ssbo);
+    GPUContext.ssbo = NULL;
+    GPUContext.nssbo = 0;
+  }
+  GPUContext.current_size = 0;
 }
 
 void gpu_init()
@@ -1102,8 +1178,6 @@ void gpu_init()
       GL_C (glDebugMessageControl (GL_DONT_CARE, GL_DONT_CARE, GL_DONT_CARE, 0, NULL, GL_TRUE));
     }
 #endif // DEBUG_OPENGL
-    
-    GL_C (glGenBuffers (1, &GPUContext.ssbo));
 
     free_solver_func_add (gpu_free);
     free_solver_func_add (gpu_free_solver);
@@ -1151,19 +1225,28 @@ static void gpu_cpu_sync_scalar (scalar s, char * sep, GLenum mode)
 	  (mode == GL_MAP_WRITE_BIT && s.gpu.stored > 0));
   if (s.gpu.stored > 0 && s.dirty)
     boundary ({s});
-  GL_C (glBindBuffer (GL_SHADER_STORAGE_BUFFER, GPUContext.ssbo));
   GL_C (glMemoryBarrier (GL_BUFFER_UPDATE_BARRIER_BIT));
-  size_t size = field_size()*sizeof(real);
-  char * gd = glMapBufferRange (GL_SHADER_STORAGE_BUFFER, s.i*size, s.block*size, mode);
-  assert (gd);
-  char * cd = grid_data() + s.i*size;
-  if (mode == GL_MAP_READ_BIT)
-    memcpy (cd, gd, s.block*size);
-  else if (mode == GL_MAP_WRITE_BIT)
-    memcpy (gd, cd, s.block*size);
-  else
-    assert (false);
-  assert (glUnmapBuffer (GL_SHADER_STORAGE_BUFFER));
+  size_t size = (size_t)field_size()*sizeof(real), offset = s.i*size, totalsize = s.block*size;
+  char * cd = grid_data() + offset;
+  int index = offset/GPUContext.max_ssbo_size;
+  offset -= index*GPUContext.max_ssbo_size;
+  while (totalsize) {
+    GL_C (glBindBuffer (GL_SHADER_STORAGE_BUFFER, GPUContext.ssbo[index]));
+    size_t size = min (totalsize, GPUContext.max_ssbo_size - offset);
+
+    //    fprintf (stderr, "map %d %ld %ld\n", index, offset, size);
+    
+    char * gd = glMapBufferRange (GL_SHADER_STORAGE_BUFFER, offset, size, mode);
+    assert (gd);
+    if (mode == GL_MAP_READ_BIT)
+      memcpy (cd, gd, size);
+    else if (mode == GL_MAP_WRITE_BIT)
+      memcpy (gd, cd, size);
+    else
+      assert (false);
+    assert (glUnmapBuffer (GL_SHADER_STORAGE_BUFFER));
+    cd += size, totalsize -= size, offset = 0, index++;
+  }
   GL_C (glBindBuffer (GL_SHADER_STORAGE_BUFFER, 0));
   if (sep)
     fprintf (stderr, "%s%s", sep, s.name);
@@ -1200,21 +1283,28 @@ static void gpu_cpu_sync (scalar * list, GLenum mode, const char * fname, int li
 trace
 void reset_gpu (void * alist, double val)
 {
-  size_t size = field_size()*sizeof(real);
-  GL_C (glBindBuffer (GL_SHADER_STORAGE_BUFFER, GPUContext.ssbo));
+  size_t size = (size_t)field_size()*sizeof(real);
   scalar * list = alist;
   for (scalar s in list)
     if (!is_constant(s)) {
+      size_t offset = s.i*size, totalsize = s.block*size;
+      int index = offset/GPUContext.max_ssbo_size;
+      offset -= index*GPUContext.max_ssbo_size;
+      while (totalsize) {
+	GL_C (glBindBuffer (GL_SHADER_STORAGE_BUFFER, GPUContext.ssbo[index]));
+	size_t size = min (totalsize, GPUContext.max_ssbo_size - offset);
 #if SINGLE_PRECISION
-      float fval = val;
-      GL_C (glClearBufferSubData (GL_SHADER_STORAGE_BUFFER, GL_R32F,
-				  s.i*size, s.block*size,
-				  GL_RED, GL_FLOAT, &fval));
+	float fval = val;
+	GL_C (glClearBufferSubData (GL_SHADER_STORAGE_BUFFER, GL_R32F,
+				    offset, size,
+				    GL_RED, GL_FLOAT, &fval));
 #else
-      GL_C (glClearBufferSubData (GL_SHADER_STORAGE_BUFFER, GL_RG32UI,
-				  s.i*size, s.block*size,
-				  GL_RG_INTEGER, GL_UNSIGNED_INT, &val));      
+	GL_C (glClearBufferSubData (GL_SHADER_STORAGE_BUFFER, GL_RG32UI,
+				    offset, size,
+				    GL_RG_INTEGER, GL_UNSIGNED_INT, &val));      
 #endif
+	totalsize -= size, offset = 0, index++;
+      }
       s.gpu.stored = -1;
     }
   GL_C (glBindBuffer (GL_SHADER_STORAGE_BUFFER, 0));
@@ -1678,7 +1768,8 @@ static Shader * setup_shader (ForeachData * loop, const RegionParameters * regio
   if (shader->id != GPUContext.current_shader) {
     GL_C (glBindBufferBase (GL_SHADER_STORAGE_BUFFER, 0, 0));
     GL_C (glUseProgram (shader->id));
-    GL_C (glBindBufferBase (GL_SHADER_STORAGE_BUFFER, 0, GPUContext.ssbo));
+    for (int i = 0; i < GPUContext.nssbo; i++)
+      GL_C (glBindBufferBase (GL_SHADER_STORAGE_BUFFER, i, GPUContext.ssbo[i]));
     GPUContext.current_shader = shader->id;
   }
     

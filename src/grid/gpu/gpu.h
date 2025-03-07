@@ -9,13 +9,15 @@
 static struct {
   ///// GPU /////
   GLFWwindow * window;
-  GLuint ssbo;
+  GLuint * ssbo;
   bool fragment_shader;
-  int current_shader;
-} GPUContext = { .current_shader = -1 };
+  int current_shader, nssbo;
+  size_t max_ssbo_size, current_size;
+} GPUContext = {
+  .current_shader = -1,
+};
 
-static void gpu_check_error (const char * stmt,
-			     const char * fname, int line)
+static void gpu_check_error (const char * stmt, const char * fname, int line)
 {
   GLenum err = glGetError();
   if (err != GL_NO_ERROR) {
@@ -40,7 +42,8 @@ void gpu_free_solver (void)
 {
   GL_C (glFinish());
   GL_C (glBindFramebuffer (GL_FRAMEBUFFER, 0));
-  glDeleteBuffers (1, &GPUContext.ssbo);
+  glDeleteBuffers (GPUContext.nssbo, GPUContext.ssbo);
+  free (GPUContext.ssbo);
   glfwTerminate();
   GPUContext.window = NULL;
 }
@@ -174,6 +177,9 @@ GLString gpu_limits_list[] = {
   {"GL_MAX_COMPUTE_UNIFORM_COMPONENTS", GL_MAX_COMPUTE_UNIFORM_COMPONENTS},
   {"GL_MAX_COMPUTE_UNIFORM_BLOCKS", GL_MAX_COMPUTE_UNIFORM_BLOCKS},
   {"GL_MAX_COMPUTE_TEXTURE_IMAGE_UNITS", GL_MAX_COMPUTE_TEXTURE_IMAGE_UNITS},
+  {"GL_MAX_SHADER_STORAGE_BLOCK_SIZE", GL_MAX_SHADER_STORAGE_BLOCK_SIZE},
+  {"GL_MAX_COMPUTE_SHADER_STORAGE_BLOCKS", GL_MAX_COMPUTE_SHADER_STORAGE_BLOCKS},
+  {"GL_MAX_TEXTURE_BUFFER_SIZE", GL_MAX_TEXTURE_BUFFER_SIZE},
 #endif
   {"GL_MAX_GEOMETRY_UNIFORM_COMPONENTS", GL_MAX_GEOMETRY_UNIFORM_COMPONENTS},
   {"GL_MAX_GEOMETRY_UNIFORM_BLOCKS", GL_MAX_GEOMETRY_UNIFORM_BLOCKS},
@@ -359,10 +365,91 @@ macro2 foreach_level_or_leaf_stencil (int _level, char flags, Reduce reductions,
 
 void realloc_ssbo()
 {
-  GL_C (glBindBuffer (GL_SHADER_STORAGE_BUFFER, GPUContext.ssbo));
-  GL_C (glBufferData (GL_SHADER_STORAGE_BUFFER,
-		      field_size()*datasize, grid_data(), GL_DYNAMIC_READ));
+  if (!datasize)
+    return;
+  
+  GLint max_ssbo_size;
+  GL_C (glGetIntegerv (GL_MAX_SHADER_STORAGE_BLOCK_SIZE, &max_ssbo_size));
+#if 1
+  GPUContext.max_ssbo_size = 128*(max_ssbo_size/128);
+#else // for testing multi SSBOs
+  GPUContext.max_ssbo_size = 128*(5*field_size()/2*sizeof(float)/128);
+#endif
+  
+  size_t totalsize = field_size()*datasize;
+  int nssbo = totalsize/GPUContext.max_ssbo_size;
+  if (nssbo*GPUContext.max_ssbo_size < totalsize)
+    nssbo++;
+
+  GLint max_ssbo_blocks;
+  GL_C (glGetIntegerv (GL_MAX_COMPUTE_SHADER_STORAGE_BLOCKS, &max_ssbo_blocks));
+  if (nssbo > max_ssbo_blocks) {
+    fprintf (stderr,
+	     "%s:%d: error: cannot allocate %ld bytes\n"
+	     "%s:%d: error: maximum allowed is %d x %ld bytes\n",
+	     __FILE__, LINENO, totalsize, __FILE__, LINENO,
+	     max_ssbo_blocks, GPUContext.max_ssbo_size);
+    exit (1);
+  }
+
+#if DEBUGALLOC
+  fprintf (stderr, "resizing from %ld to %ld nssbo %d pnssbo %d max_ssbo %ld\n", 
+	   GPUContext.current_size, totalsize, nssbo, GPUContext.nssbo, GPUContext.max_ssbo_size);
+#endif
+  assert (totalsize > GPUContext.current_size);
+  size_t size = max(GPUContext.nssbo - 1, 0)*GPUContext.max_ssbo_size;
+  size_t current_size = GPUContext.current_size - size;
+  assert (current_size >= 0 && current_size <= GPUContext.max_ssbo_size);
+  GPUContext.current_size = totalsize;
+  totalsize -= size;
+  assert (totalsize >= 0);
+
+  if (current_size > 0) {
+    size_t size = min (totalsize, GPUContext.max_ssbo_size);
+    totalsize -= size;
+    if (current_size < GPUContext.max_ssbo_size) {
+      GLuint ssbo;
+      GL_C (glGenBuffers (1, &ssbo));
+      GL_C (glBindBuffer (GL_SHADER_STORAGE_BUFFER, ssbo));
+      GL_C (glBufferData (GL_SHADER_STORAGE_BUFFER, size, NULL, GL_DYNAMIC_READ));
+      GL_C (glBindBuffer (GL_COPY_READ_BUFFER, GPUContext.ssbo[GPUContext.nssbo - 1]));
+      GL_C (glBindBuffer (GL_COPY_WRITE_BUFFER, ssbo));
+      GL_C (glCopyBufferSubData (GL_COPY_READ_BUFFER, GL_COPY_WRITE_BUFFER, 0, 0, current_size));
+      GL_C (glDeleteBuffers (1, &GPUContext.ssbo[GPUContext.nssbo - 1]));
+      GPUContext.ssbo[GPUContext.nssbo - 1] = ssbo;
+    }
+#if DEBUGALLOC    
+    else
+      fprintf (stderr, "  skipping fully allocated %ld\n", current_size);
+#endif
+  }
+
+#if DEBUGALLOC
+  fprintf (stderr, "  need to allocate %ld\n", totalsize);
+#endif
+  if (nssbo > GPUContext.nssbo) {
+    assert (totalsize > 0);
+    GPUContext.ssbo = realloc (GPUContext.ssbo, nssbo*sizeof(GLuint));
+#if DEBUGALLOC
+    fprintf (stderr, "  allocating %d buffers\n", nssbo - GPUContext.nssbo);
+#endif
+    GL_C (glGenBuffers (nssbo - GPUContext.nssbo, GPUContext.ssbo + GPUContext.nssbo));
+    while (GPUContext.nssbo < nssbo) {
+      GL_C (glBindBuffer (GL_SHADER_STORAGE_BUFFER, GPUContext.ssbo[GPUContext.nssbo]));
+      size_t size = min (totalsize, GPUContext.max_ssbo_size);
+#if DEBUGALLOC
+      fprintf (stderr, "  allocating buffer %d size %ld\n", GPUContext.nssbo, size);
+#endif
+      GL_C (glBufferData (GL_SHADER_STORAGE_BUFFER, size, NULL, GL_DYNAMIC_READ));
+      totalsize -= size;
+      GPUContext.nssbo++;
+    }
+  }
   GL_C (glBindBuffer (GL_SHADER_STORAGE_BUFFER, 0));
+#if DEBUGALLOC
+  fprintf (stderr, "done resizing %d %ld %ld\n", GPUContext.nssbo, GPUContext.current_size, totalsize);
+#endif  
+  assert (totalsize == 0);
 }
 
 static void gpu_cpu_sync_scalar (scalar s, char * sep, GLenum mode);
@@ -370,27 +457,6 @@ static void gpu_cpu_sync_scalar (scalar s, char * sep, GLenum mode);
 void realloc_scalar_gpu (int size)
 {
   realloc_scalar (size);
-#if PRINTCOPYGPU
-  bool copy = false;
-#endif
-  for (scalar s in baseblock)
-    if (s.gpu.stored < 0) {
-#if PRINTCOPYGPU
-      if (!copy) {
-	fprintf (stderr, "%s:%d: importing ", __FILE__, LINENO);
-	copy = true;
-	gpu_cpu_sync_scalar (s, "{", GL_MAP_READ_BIT);
-      }
-      else
-	gpu_cpu_sync_scalar (s, ",", GL_MAP_READ_BIT);
-#else
-      gpu_cpu_sync_scalar (s, NULL, GL_MAP_READ_BIT);
-#endif
-    }
-#if PRINTCOPYGPU
-  if (copy)
-    fprintf (stderr, "} from GPU\n");
-#endif
   realloc_ssbo();
 }
 
