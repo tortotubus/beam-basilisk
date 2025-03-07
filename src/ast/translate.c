@@ -2190,7 +2190,7 @@ static void user_macros (Ast * n, Stack * stack, void * data)
 
   case sym_statement: case sym_function_call: {
     TranslateData * d = data;
-    ast_macro_replacement (n, n, stack, d->nolineno, 0, false, &d->return_macro_index);
+    ast_macro_replacement (n, n, stack, d->nolineno, 0, false, &d->return_macro_index, NULL);
     break;
   }
 
@@ -2290,7 +2290,7 @@ static void postmacros (Ast * n, Stack * stack, void * data)
   }
   else if (n->sym == sym_statement || n->sym == sym_function_call) {
     TranslateData * d = data;
-    ast_macro_replacement (n, n, stack, d->nolineno, 2, false, &d->return_macro_index);
+    ast_macro_replacement (n, n, stack, d->nolineno, 2, false, &d->return_macro_index, NULL);
   }
 }
 
@@ -2954,7 +2954,7 @@ static void translate (Ast * n, Stack * stack, void * data)
       if (!definition || !(identifier = ast_is_macro_declaration (definition->child[0])) ||
 	  !is_foreach_identifier (ast_terminal (identifier)->start)) {
 	if (!ast_find_identifier ("POINT_VARIABLES",
-				  get_macro_definition (stack, n->child[0]), sym_macro_statement,
+				  get_macro_definition (stack, n->child[0], NULL), sym_macro_statement,
 				  0, sym_MACRO)) {
 	  Ast * list = ast_block_list_get_item (ast_child (n, sym_statement))->parent;
 	  Ast * point_variables = NN(list, sym_statement,
@@ -2969,7 +2969,7 @@ static void translate (Ast * n, Stack * stack, void * data)
 	  ast_block_list_prepend (list, sym_block_item, point_variables);
 	  TranslateData * d = data;
 	  ast_macro_replacement (point_variables, point_variables, stack, d->nolineno, 0, false,
-			     &d->return_macro_index);
+				 &d->return_macro_index, NULL);
 	}
       }
     }
@@ -3112,12 +3112,13 @@ static void translate (Ast * n, Stack * stack, void * data)
 				sym_block_item_list);
 	ast_set_line (point, ast_left_terminal (decl), true);
 	free (src);
-	  
+
 	Ast * point_variables = ast_parent (ast_find_identifier ("POINT_VARIABLES", point, sym_macro_statement,
 								 0, sym_MACRO), sym_statement);
 	foreach_item (point, 1, item)
 	  ast_block_list_prepend (list, sym_block_item, item->child[0]);
-	ast_macro_replacement (point_variables, point_variables, stack, d->nolineno, 0, false, &d->return_macro_index);
+	ast_macro_replacement (point_variables, point_variables, stack, d->nolineno, 0, false,
+			       &d->return_macro_index, NULL);
       }
     }
     
@@ -3739,7 +3740,7 @@ static void stencils (Ast * n, Stack * stack, void * data)
 	str_prepend (params, "call(", par, ",(External[]){");
 	str_append (params, "{0}},");
 	if (gpu)
-	  params = ast_kernel (foreach, params, d->nolineno);
+	  params = ast_kernel (foreach, params, d->nolineno, NULL);
 	else
 	  str_append (params, "NULL");
 	str_append (params, ");");
@@ -3846,7 +3847,7 @@ static void stencils (Ast * n, Stack * stack, void * data)
 
   case sym_function_call: case sym_statement: {
     TranslateData * d = data;
-    ast_macro_replacement (n, n, stack, d->nolineno, 0, false, &d->return_macro_index);
+    ast_macro_replacement (n, n, stack, d->nolineno, 0, false, &d->return_macro_index, NULL);
     break;
   }        
     
@@ -4953,6 +4954,17 @@ static void checks (AstRoot * root, AstRoot * d, TranslateData * data)
   CHECK (data->init_solver, true);
 }
 
+static void push_global_declarations (Ast * n, Stack * stack)
+{
+  if (n->sym != sym_compound_statement) {
+    Ast * scope = ast_push_declarations (n, stack);
+    if (n->child)
+      for (Ast ** c = n->child; *c; c++)
+	push_global_declarations (*c, stack);
+    ast_pop_scope (stack, scope);
+  }
+}
+
 static void macros_to_functions (Ast * n)
 {
   Ast * macro = ast_schema (n, sym_function_call,
@@ -5079,12 +5091,14 @@ AstRoot * endfor (FILE * fin, FILE * fout,
   compound_prepend (data.last_events, m);
 
   if (data.gpu) {
+    stack_push (root->stack, &root);
+    push_global_declarations ((Ast *) root, root->stack);
     Ast ** name;
     for (int i = 0; (name = stack_indexi (data.functions, i)); i++) {
       Ast * func = ast_parent (*name, sym_function_definition);
       ast_after (m, "register_function ((void (*)(void))", ast_terminal (*name)->start,
 		 ",\"", ast_terminal (*name)->start, "\",");
-      char * kernel = ast_kernel (func, NULL, nolineno);
+      char * kernel = ast_kernel (func, NULL, nolineno, *name);
       char * references = ast_external_references (func, NULL, data.functions);
       ast_after (m, "$(", kernel, "),");
       free (kernel);
@@ -5095,6 +5109,7 @@ AstRoot * endfor (FILE * fin, FILE * fout,
       else
 	ast_after (m, "NULL);\n");
     }
+    ast_pop_scope (root->stack, (Ast *) root);
   }
   stack_destroy (data.functions);
     

@@ -908,8 +908,10 @@ Ast * ast_identifier_declaration_from_to (Stack * stack, const char * identifier
       assert (*d == start);
       i++;
     }
-    else
+    else {
+      assert (false); // start not found!!
       return NULL;
+    }
   }
   for (; (d = stack_index (stack, i)); i++)
     if (end && *d == end)

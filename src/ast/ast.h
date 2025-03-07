@@ -303,7 +303,7 @@ Ast * ast_get_array_dimensions (Ast * direct_declarator, int symbol, AstDimensio
 
 void ast_diagonalize (Ast * n, Stack * stack, void * field);
 char * ast_external_references (Ast * n, char * references, Stack * functions);
-char * ast_kernel              (Ast * n, char * argument, bool nolineno);
+char * ast_kernel              (Ast * n, char * argument, bool nolineno, Ast * macroscope);
 
 /**
 ## Macros */
@@ -311,7 +311,7 @@ char * ast_kernel              (Ast * n, char * argument, bool nolineno);
 Ast * ast_is_macro_declaration (const Ast * function_declaration);
 void ast_macro_replacement (Ast * statement, Ast * initial, Stack * stack,
 			    bool nolineno, int postmacros, bool expand_definitions,
-			    int * return_macro_index);
+			    int * return_macro_index, Ast * scope);
 
 /**
 ## Interface for the generic C interpreter */
