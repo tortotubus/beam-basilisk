@@ -200,7 +200,7 @@ macros.*
 # Implementation */
 
 typedef struct {
-  Ast * statement, * arguments, * parameters, * call, * label, * initial;
+  Ast * statement, * arguments, * parameters, * call, * label, * initial, * scope;
   Stack * sparameters;
   int * returnindex;  
   bool nolineno, complex_call;
@@ -471,9 +471,12 @@ static void replace_return (Ast * n, Stack * stack, void * data)
   }
 }
 
-Ast * get_macro_definition (Stack * stack, const Ast * identifier)
+static
+Ast * get_macro_definition (Stack * stack, const Ast * identifier, Ast * scope)
 {
-  Ast * decl = ast_identifier_declaration (stack, ast_terminal (identifier)->start);
+  Ast * decl = scope ?
+    ast_identifier_declaration_from_to (stack, ast_terminal (identifier)->start, scope, NULL) :
+    ast_identifier_declaration (stack, ast_terminal (identifier)->start);
   Ast * macro_definition = ast_schema (ast_ancestor (decl, 6), sym_function_definition);
 
   if (!macro_definition) {
@@ -514,13 +517,13 @@ static void replace_macros (Ast * n, Stack * stack, void * data)
 {
   if (n->sym == sym_statement || n->sym == sym_function_call) {
     MacroReplacement * r = data;
-    ast_macro_replacement (n, r->initial, stack, r->nolineno, r->postmacros, true, r->returnindex);
+    ast_macro_replacement (n, r->initial, stack, r->nolineno, r->postmacros, true, r->returnindex, r->scope);
   }
 }
 
 void ast_macro_replacement (Ast * statement, Ast * initial, Stack * stack,
 			    bool nolineno, int postmacros, bool expand_definitions,
-			    int * return_macro_index)
+			    int * return_macro_index, Ast * scope)
 {
   Ast * identifier, * macro_statement = ast_schema (statement, sym_statement,
 						    0, sym_basilisk_statements,
@@ -548,7 +551,7 @@ void ast_macro_replacement (Ast * statement, Ast * initial, Stack * stack,
       (inforeach (statement) || point_declaration (stack)))
     str_append (ast_terminal (identifier)->start, "_inner");
 
-  Ast * macro_definition = get_macro_definition (stack, identifier);  
+  Ast * macro_definition = get_macro_definition (stack, identifier, scope);
   if (postmacros >= 0) {
     Ast * macrodef = ast_find (ast_schema (macro_definition, sym_function_definition,
 					   0, sym_function_declaration),
@@ -581,7 +584,8 @@ void ast_macro_replacement (Ast * statement, Ast * initial, Stack * stack,
 				 0, sym_jump_statement,
 				 0, sym_RETURN),
     .returnindex = return_macro_index,
-    .postmacros = postmacros
+    .postmacros = postmacros,
+    .scope = scope
   };
 
   if (r.parameters) {
