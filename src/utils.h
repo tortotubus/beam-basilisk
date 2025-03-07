@@ -15,10 +15,12 @@ struct {
   long nc;
   // total number of (leaf) cells advanced for all processes
   long tnc;
-  // real time elapsed since the start
-  double t;
+  // real time elapsed since the start, time of the previous step
+  double t, tp;
   // average computational speed (leaves/sec)
   double speed;
+  // instantaneous computational speed (leaves/sec)
+  double ispeed;
   // global timer
   timer gt;
 } perf = {0};
@@ -32,6 +34,8 @@ void update_perf() {
   perf.tnc += grid->tn;
   perf.t = timer_elapsed (perf.gt);
   perf.speed = perf.tnc/perf.t;
+  perf.ispeed = grid->tn/(perf.t - perf.tp);
+  perf.tp = perf.t;
 }
 
 /**
