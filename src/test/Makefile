@@ -17,6 +17,8 @@ check: halo.vtst interpolate.vtst events.vtst faces.vtst coarsen.vtst \
 basilisk.tst: basilisk.gnu
 basilisk.tst: CFLAGS += -DDEBUG=1
 
+bleck.tst: bleck.ctst
+
 boundaries3.tst: boundaries3.ctst
 
 boundary_face.tst: boundary_face.ctst boundary_face_cartesian.tst
