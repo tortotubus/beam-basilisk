@@ -1704,8 +1704,7 @@ bool draw_string (char * str,
 # *labels()*: displays label fields */
 
 trace
-bool labels (char * f,
-	     float lc[3] = {0}, float lw = 1)
+bool labels (char * f, float lc[3] = {0}, float lw = 1, int level = -1)
 {
 #if dimension == 2
   bool expr = false;
@@ -1717,6 +1716,8 @@ bool labels (char * f,
   float res = view->res;
   if (view->res < 150*view->samples)
     view->res = 150*view->samples;
+  int maxlevel = view->maxlevel;
+  view->maxlevel = level;
   draw_lines (view, lc, lw) {
     glMatrixMode (GL_MODELVIEW);
     foreach_visible (view)
@@ -1732,6 +1733,7 @@ bool labels (char * f,
       }
   }
   view->res = res;
+  view->maxlevel = maxlevel;
   if (expr) delete ({ff});
   return true;
 #else // dimension == 3
