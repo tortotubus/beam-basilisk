@@ -84,7 +84,7 @@ function(add_basilisk_source_executable target_name source)
 
   # default GRID to "none" if the caller didn’t specify it
   if(NOT BE_GRID)
-    set(qcc_grid_flag)
+    set(qcc_grid_flag "")
   else()
     if (BE_GRID STREQUAL "")
       set(qcc_grid_flag "")
