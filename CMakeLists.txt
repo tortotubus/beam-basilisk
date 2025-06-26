@@ -8,9 +8,11 @@ project(basilisk
 set(CMAKE_C_STANDARD 99)
 set(CMAKE_C_STANDARD_REQUIRED ON)
 
+set(BASILISK_ROOT ${CMAKE_CURRENT_SOURCE_DIR})
+
 # --- basilisk c target helper  -----
 
-include(${CMAKE_SOURCE_DIR}/cmake/BasiliskCTargets.cmake)
+include(${BASILISK_ROOT}/cmake/BasiliskCTargets.cmake)
 
 
 # --- 
@@ -20,7 +22,7 @@ include(GNUInstallDirs)
 
 # --- config ---------------------------------------------------------
 
-include(${CMAKE_SOURCE_DIR}/cmake/detect_compiler.cmake)
+include(${BASILISK_ROOT}/cmake/detect_compiler.cmake)
 detect_c_compiler(COMP)
 
 message(STATUS " → C compiler ID:      ${COMP_ID}")
