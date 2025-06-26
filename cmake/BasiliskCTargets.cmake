@@ -53,7 +53,7 @@ function(add_basilisk_executable target_name source)
     OUTPUT "${target_name}.c"
     COMMAND ${CMAKE_COMMAND} -E copy_if_different "${absolute_source}" "${input_copy}"
     WORKING_DIRECTORY "${build_source_directory}"
-    COMMAND $<TARGET_FILE:qcc-source> "${filename}.c" -o "_${filename}.c" -source ${qcc_grid_flag} ${qcc_include_flags}
+    COMMAND $<TARGET_FILE:qcc-source> "${filename}.c" -o "_${filename}.c" -source ${qcc_include_flags}
     COMMAND ${CMAKE_COMMAND} -E rename "_${filename}.c" "${target_name}.c"
     COMMAND ${CMAKE_COMMAND} -E remove "${input_copy}"
     DEPENDS
