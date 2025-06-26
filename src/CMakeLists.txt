@@ -74,8 +74,8 @@ add_subdirectory(wsServer)
 
 # --- bview2d ------------------------------------------------
 
-#add_basilisk_executable(bview2d bview.c gl ${CMAKE_CURRENT_SOURCE_DIR})
-add_basilisk_executable(bview2D bview.c)
+#add_basilisk_source_executable(bview2d bview.c gl ${CMAKE_CURRENT_SOURCE_DIR})
+add_basilisk_source_executable(bview2D bview.c)
 
 target_link_libraries(bview2D PRIVATE 
   $<TARGET_OBJECTS:fb_tiny> 
@@ -94,8 +94,8 @@ target_compile_definitions(qcc-source PRIVATE LIBDIR=\"${LIBDIR_SOURCE}\")
 
 # --- bview3d 
 
-#add_basilisk_executable(bview2d bview.c gl ${CMAKE_CURRENT_SOURCE_DIR})
-add_basilisk_executable(bview3D bview.c GRID octree)
+#add_basilisk_source_executable(bview2d bview.c gl ${CMAKE_CURRENT_SOURCE_DIR})
+add_basilisk_source_executable(bview3D bview.c GRID octree)
 
 target_link_libraries(bview3D PRIVATE 
   $<TARGET_OBJECTS:fb_tiny> 
@@ -112,8 +112,8 @@ set_target_properties(bview3D PROPERTIES
 # --- bview2Dm
 
 
-#add_basilisk_executable(bview2d bview.c gl ${CMAKE_CURRENT_SOURCE_DIR})
-add_basilisk_executable(bview2Dm bview.c GRID multigrid)
+#add_basilisk_source_executable(bview2d bview.c gl ${CMAKE_CURRENT_SOURCE_DIR})
+add_basilisk_source_executable(bview2Dm bview.c GRID multigrid)
 
 target_link_libraries(bview2Dm PRIVATE 
   $<TARGET_OBJECTS:fb_tiny> 
