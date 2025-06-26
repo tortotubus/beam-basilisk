@@ -57,11 +57,16 @@ set(AST_OBJ_SOURCES
   # ${SYMBOLS_H}
 )
 
+#
+#
+#
+
 add_library(ast_obj OBJECT ${AST_OBJ_SOURCES})
 
 target_compile_definitions(ast_obj PRIVATE BASILISK=\"${BASILISK}\" )
 target_include_directories(ast_obj PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/..")
 target_include_directories(ast_obj PRIVATE "${CMAKE_CURRENT_BINARY_DIR}")
+
 
 add_library(ast STATIC 
   $<TARGET_OBJECTS:ast_obj> 
@@ -69,3 +74,21 @@ add_library(ast STATIC
 )
 
 set_target_properties(ast PROPERTIES OUTPUT_NAME "ast")
+
+#
+#
+#
+
+add_library(ast_obj-source OBJECT ${AST_OBJ_SOURCES})
+
+target_compile_definitions(ast_obj-source PRIVATE BASILISK=\"${BASILISK_SOURCE}\" )
+target_include_directories(ast_obj-source PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/..")
+target_include_directories(ast_obj-source PRIVATE "${CMAKE_CURRENT_BINARY_DIR}")
+
+
+add_library(ast-source STATIC 
+  $<TARGET_OBJECTS:ast_obj-source> 
+  $<TARGET_OBJECTS:interpreter_obj-source>
+)
+
+set_target_properties(ast-source PROPERTIES OUTPUT_NAME "ast-source")
