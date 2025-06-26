@@ -5,6 +5,8 @@
 
 function(add_basilisk_executable target_name source)
 
+  set(CMAKE_VERBOSE_MAKEFILE ON)
+
   # 1) parse named args: GRID (single) and INCLUDE_DIRS (multiple)
   set(options)
   set(oneValueArgs GRID)
@@ -15,7 +17,11 @@ function(add_basilisk_executable target_name source)
   if(NOT BE_GRID)
     set(qcc_grid_flag)
   else()
+    if (BE_GRID STREQUAL "")
+      set(qcc_grid_flag "")
+    else()
     set(qcc_grid_flag "-grid=${BE_GRID}")
+      endif()
   endif()
 
   # 2) turn INCLUDE_DIRS into both -I flags for the qcc invocation
@@ -80,8 +86,13 @@ function(add_basilisk_source_executable target_name source)
   if(NOT BE_GRID)
     set(qcc_grid_flag)
   else()
+    if (BE_GRID STREQUAL "")
+      set(qcc_grid_flag "")
+    else()
     set(qcc_grid_flag "-grid=${BE_GRID}")
+      endif()
   endif()
+
 
   # 2) turn INCLUDE_DIRS into both -I flags for the qcc invocation
   #    and into a list we’ll give to the real CMake target
