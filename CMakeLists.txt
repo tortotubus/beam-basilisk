@@ -88,11 +88,14 @@ endif()
 
 # --- hardlinks for qcc
 
+
 set(BASILISK "${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_INCLUDEDIR}/basilisk/")
 set(LIBDIR "${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_INCLUDEDIR}/basilisk/")
+message("Target qcc using ${BASILISK}")
 
-set(BASILISK_SOURCE "${CMAKE_SOURCE_DIR}/src/")
-set(LIBDIR_SOURCE "${CMAKE_SOURCE_DIR}/src/")
+set(BASILISK_SOURCE "${CMAKE_CURRENT_SOURCE_DIR}/src/")
+set(LIBDIR_SOURCE "${CMAKE_CURRENT_SOURCE_DIR}/src/")
+message("Target qcc-source using ${BASILISK_SOURCE}")
 
 # --- subdir
 
