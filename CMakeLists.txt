@@ -120,35 +120,70 @@ write_basic_package_version_file(
   COMPATIBILITY  AnyNewerVersion
 )
 
-
-# 5) install & export those targets
+# 5a) qcc executable in QCC
 install(TARGETS qcc
-  EXPORT BasiliskTargets
-  RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
-  COMPONENT QCC
-)
-install(TARGETS bview2D bview3D bview2Dm
-  EXPORT BasiliskTargets
-  RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
-  COMPONENT Tools
+  EXPORT      BasiliskTargets
+  RUNTIME     DESTINATION ${CMAKE_INSTALL_BINDIR}
+  COMPONENT   QCC
 )
 
-# 6) install the export file itself
+# 5b) viewer executables in Tools
+install(TARGETS bview2D bview3D bview2Dm
+  EXPORT      BasiliskTargets
+  RUNTIME     DESTINATION ${CMAKE_INSTALL_BINDIR}
+  COMPONENT   Tools
+)
+
+# 6) export file only in QCC (so `find_package(basilisk)` works when you ask for QCC)
 install(EXPORT BasiliskTargets
   FILE        BasiliskTargets.cmake
   NAMESPACE   Basilisk::
-  DESTINATION "lib/cmake/basilisk"
+  DESTINATION lib/cmake/basilisk
+  COMPONENT   QCC
 )
 
 # 7) install all headers under include/basilisk
 install(DIRECTORY "${CMAKE_SOURCE_DIR}/src/"
-  DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/basilisk
-  FILES_MATCHING PATTERN "*.h"
+  DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}/basilisk"
+  COMPONENT QCC
 )
 
-# 8) install the generated Config files
+# 8) CMake config + version only in QCC
 install(FILES
   "${CMAKE_CURRENT_BINARY_DIR}/BasiliskConfig.cmake"
   "${CMAKE_CURRENT_BINARY_DIR}/BasiliskConfigVersion.cmake"
-  DESTINATION "lib/cmake/basilisk"
+  DESTINATION lib/cmake/basilisk
+  COMPONENT   QCC
 )
+
+# # 5) install & export those targets
+# install(TARGETS qcc
+#   EXPORT BasiliskTargets
+#   RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
+#   COMPONENT QCC
+# )
+# install(TARGETS bview2D bview3D bview2Dm
+#   EXPORT BasiliskTargets
+#   RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
+#   COMPONENT Tools
+# )
+
+# # 6) install the export file itself
+# install(EXPORT BasiliskTargets
+#   FILE        BasiliskTargets.cmake
+#   NAMESPACE   Basilisk::
+#   DESTINATION "lib/cmake/basilisk"
+# )
+
+# # 7) install all headers under include/basilisk
+# install(DIRECTORY "${CMAKE_SOURCE_DIR}/src/"
+#   DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/basilisk
+#   FILES_MATCHING PATTERN "*.h"
+# )
+
+# # 8) install the generated Config files
+# install(FILES
+#   "${CMAKE_CURRENT_BINARY_DIR}/BasiliskConfig.cmake"
+#   "${CMAKE_CURRENT_BINARY_DIR}/BasiliskConfigVersion.cmake"
+#   DESTINATION "lib/cmake/basilisk"
+# )
