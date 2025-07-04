@@ -120,18 +120,17 @@ write_basic_package_version_file(
   COMPATIBILITY  AnyNewerVersion
 )
 
-# 4) collect the executables you want to export
-set(BASILISK_EXECUTABLES
-  qcc
-  bview2D
-  bview3D
-  bview2Dm
-)
 
 # 5) install & export those targets
-install(TARGETS ${BASILISK_EXECUTABLES}
-  EXPORT      BasiliskTargets
-  RUNTIME     DESTINATION ${CMAKE_INSTALL_BINDIR}
+install(TARGETS qcc
+  EXPORT BasiliskTargets
+  RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
+  COMPONENT QCC
+)
+install(TARGETS bview2D bview3D bview2Dm
+  EXPORT BasiliskTargets
+  RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
+  COMPONENT Tools
 )
 
 # 6) install the export file itself
