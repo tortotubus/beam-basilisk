@@ -73,7 +73,7 @@ plot [1e-6:]'log' u (t0 - $1):3 ps 0.5 t '', a*x**(-1./3.) t 'x^{-1/3}'
 ~~~
 
 For a more detailed description see [Popinet, 2009](/sandbox/popinet/README#popinet2009) and
-[Popinet, 2011](/sandbox/popinet/README#popinet2011b).
+[Popinet & Antkowiak, 2011](/sandbox/popinet/README#popinet2011d).
 
 ## Setup
 
