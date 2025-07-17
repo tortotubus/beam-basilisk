@@ -37,7 +37,7 @@ plot 'prof-0.2' u 1:($2 - y0) w l lc -1, '' u 1:(-$2-y0) w l lc -1, \
 ~~~
 
 The animation below shows how adaptivity is used to track the high
-curvatures and short timescales close to pinchoff. Up to 14 levels of
+curvatures and short timescales close to pinchoff. Up to 18 levels of
 refinement are used to capture roughly four orders of magnitude in
 characteristic spatial scales.
 
@@ -45,31 +45,31 @@ characteristic spatial scales.
 
 The scalings for the minimum radius and maximum velocity are given
 in the figures below, together with the
-theoretical fits. The fit is excellent for at least three orders of
+theoretical fits. The fit is excellent for at least four orders of
 magnitude in timescale. The departures from the power laws close to
 pinchoff are due to saturation of the spatial resolution (the
-minimum value on the y-axis of Figure \ref{radius} is the grid size
-$1/2^{14}$).
+minimum value on the y-axis of the first figure is the grid size
+$1/2^{18}$).
 
 ~~~gnuplot Evolution of the minimum radius
 reset
 # We define the breakup time as the time when the axial velocity is maximum
-t0="`awk '{ if ($3 > max) { max = $3; t0 = $1; } } END{ print t0 }' < log`"
+t0="`awk '{ if (NF == 3 && $3 > max) { max = $3; t0 = $1; } } END{ print t0 }' < log`"
 set key spacing 1.5
 set grid
 set xlabel 't_0 - t'
 set ylabel 'r_{min}'
 set logscale
-set format x "10^{%L}"
-set format y "10^{%L}"
-fit [1e-6:1e-3] a*x**(2./3.) 'log' u (t0 - $1):2 via a
-plot [1e-6:][1./2**14:]'log' u (t0 - $1):2 ps 0.5 t '', a*x**(2./3.) t 'x^{2/3}'
+set format x '10^{%L}'
+set format y '10^{%L}'
+fit [1e-7:1e-3] a*x**(2./3.) 'log' u (t0 - $1):2 via a
+plot [1e-8:][1./2**18:]'log' u (t0 - $1):2 ps 0.5 t '', a*x**(2./3.) t 'x^{2/3}'
 ~~~
 
 ~~~gnuplot Evolution of the maximum axial velocity
 set ylabel 'u_{max}'
-fit [1e-6:1e-3] a*x**(-1./3.) 'log' u (t0 - $1):3 via a
-plot [1e-6:]'log' u (t0 - $1):3 ps 0.5 t '', a*x**(-1./3.) t 'x^{-1/3}'
+fit [1e-7:1e-3] a*x**(-1./3.) 'log' u (t0 - $1):3 via a
+plot [1e-8:]'log' u (t0 - $1):3 ps 0.5 t '', a*x**(-1./3.) t 'x^{-1/3}'
 ~~~
 
 For a more detailed description see [Popinet, 2009](/sandbox/popinet/README#popinet2009) and
@@ -84,6 +84,8 @@ Navier--Stokes equations with two phases and surface tension. */
 #include "navier-stokes/centered.h"
 #include "two-phase.h"
 #include "tension.h"
+
+const int maxlevel = 18;
 
 int main()
 {
@@ -129,7 +131,7 @@ event logfile (i += 5)
 /**
 We generate interface profiles and an animation. */
 
-const double tpinch = 0.75585;
+const double tpinch = 0.75626;
 
 event profiles (t = {0.2, 0.6, tpinch, 0.8})
 {
@@ -147,10 +149,10 @@ event movie (t = 0.6; i += 5; t <= tpinch)
   view (fov = 30, near = 0.01, far = 1000,
 	tx = -0.111, tz = -0.4,
 	width = 1024, height = 680);
-  squares (color = "level", min = 6, max = 14, spread = -1);
+  squares (color = "level", min = 6, max = maxlevel, spread = -1);
   draw_vof (c = "f");
   mirror ({0,-1}) {
-    squares (color = "level", min = 6, max = 14, spread = -1);
+    squares (color = "level", min = 6, max = maxlevel, spread = -1);
     draw_vof (c = "f");
   }
   save ("movie.mp4");
@@ -159,7 +161,7 @@ event movie (t = 0.6; i += 5; t <= tpinch)
 /**
 The mesh is adapted "manually" so that the axisymmetric radius of
 deformation of the interface is alway described by at least 5 grid
-points, down to a maximum level of refinement of 14. */
+points, down to a maximum level of refinement of maxlevel. */
 
 event adapt (i++)
 {
@@ -170,18 +172,22 @@ event adapt (i++)
   position (f, Y, {0,1});
   static bool broken = false;
   if (!broken)
-    broken = statsf(Y).min < 1./(1 << 14);
+    broken = statsf(Y).min < 1./(1 << maxlevel);
 
   /**
-  The refinement uses 14 levels before breakup and 10 after. */
-  
-  refine (level < (broken ? 10 : 14) && interfacial (point, f) && Delta > Y[]/5.);
+  The refinement uses maxlevel levels before breakup and 10 after. */
+
+  const double eps = 1e-6;
+  refine (level < (broken ? 10 : maxlevel) &&
+	  f[] > eps && f[] < 1. - eps &&
+	  Delta > Y[]/5.);
 
   /**
   Cells which do not contain the interface (or which are at a level
   larger than 10 after breakup) are "unrefined". */
   
-  unrefine (!interfacial (point, f) || (broken && level > 10));
+  unrefine (f[] <= eps || f[] >= 1. - eps ||
+	    (broken && level > 10));
 }
 
 /**
