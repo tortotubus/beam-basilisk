@@ -22,18 +22,10 @@ unset key
 unset xtics
 unset ytics
 unset border
-y0 = 0
-y1 = 0.6
-y2 = 1.4
-y3 = 2.3
-plot 'prof-0.2' u 1:($2 - y0) w l lc -1, '' u 1:(-$2-y0) w l lc -1, \
-     '' u (1-$1):($2 - y0) w l lc -1, '' u (1-$1):(-$2-y0) w l lc -1, \
-     'prof-0.6' u 1:($2 - y1) w l lc -1, '' u 1:(-$2-y1) w l lc -1, \
-     '' u (1-$1):($2 - y1) w l lc -1, '' u (1-$1):(-$2-y1) w l lc -1, \
-     'prof-0.75585' u 1:($2 - y2) w l lc -1, '' u 1:(-$2-y2) w l lc -1, \
-     '' u (1-$1):($2 - y2) w l lc -1, '' u (1-$1):(-$2-y2) w l lc -1, \
-     'prof-0.8' u 1:($2 - y3) w l lc -1, '' u 1:(-$2-y3) w l lc -1, \
-     '' u (1-$1):($2 - y3) w l lc -1, '' u (1-$1):(-$2-y3) w l lc -1 
+array s[4] = [0, 0.6, 1.4, 2.3]
+array q[4] = ["0.2","0.6","0.75585","0.8"]
+plot for [j=1:4] for [x0=0:2:2] for [i=-1:1:2] 'prof-'.q[j] u (x0+$1):(i*$2 - s[j]) w l lc -1, \
+     for [j=1:4] for [x0=0:2:2] for [i=-1:1:2] 'prof-'.q[j] u (x0+1-$1):(i*$2 - s[j]) w l lc -1
 ~~~
 
 The animation below shows how adaptivity is used to track the high
