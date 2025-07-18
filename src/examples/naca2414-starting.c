@@ -10,7 +10,7 @@ flow. This phenomenon does not depend for its existence on the
 viscosity of the air, or the third dimension. However, it does depend
 on the trailing edge being sharp, as it is for most aerofoils.
 
-![Animation of the vorticity field. The corresponds to
+![Animation of the vorticity field. The colorscale corresponds to
 $\pm$ 20 U/L.](naca2414-starting/vorticity.mp4)(autoplay width="100%")
 
 We solve the Navier-Stokes equations and add the NACA2414 airfoil using
