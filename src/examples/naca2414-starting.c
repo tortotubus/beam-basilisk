@@ -104,7 +104,7 @@ int main()
   /**
   The domain is $16\times 16$, centered on the origin. */
 
-  size (16);
+  size (16 [1]);
   origin (-L0/2., -L0/2.);
 
   mu = muv;
