@@ -1256,10 +1256,12 @@ bool squares (char * color,
     foreach()
       foreach_dimension()
         fn.x[] = (Z[1] - Z[-1])/(2.*Delta_x);
+    boundary ({fn}); // fixme: necessary because foreach_leaf() below doesn't do automatic BCs
   }
 #endif
   colorize_args();
   scalar f = col;
+  boundary ({f}); // fixme: necessary because foreach_leaf() below doesn't do automatic BCs
   bview * view = draw();
   glShadeModel (GL_SMOOTH);
   if (linear) {
