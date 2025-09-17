@@ -228,6 +228,7 @@ See also the [GPU Benchmarks](/src/grid/gpu/Benchmarks.md).
 
 ## Basic operations
 
+* [Periodic boundary conditions on face fields](boundary_face.c)
 * [Automatic stencils / boundary conditions](stencils.c)
 * [Interpolation on halos](interp.c)
 * [Tangential interpolation on face vector fields](interpu.c)

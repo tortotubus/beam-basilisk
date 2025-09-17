@@ -296,7 +296,7 @@ macro2 foreach (char flags = 0, Reduce reductions = None) {
 #include "foreach_cell.h"
 
 macro2 foreach_face_generic (char flags = 0, Reduce reductions = None,
-				const char * order = "xyz")
+			     const char * order = "xyz")
 {
   OMP_PARALLEL (reductions) {
     int ig = 0, jg = 0, kg = 0; NOT_UNUSED(ig); NOT_UNUSED(jg); NOT_UNUSED(kg);
@@ -618,7 +618,7 @@ static void box_boundary_level (const Boundary * b, scalar * scalars, int l)
 	    sb = (&s.v.x)[(j - d/2 + dimension) % dimension];
 	  }
 #endif
-	  if (sb.boundary[d] && sb.boundary[d] != periodic_bc) {
+	  if (sb.i >= 0 && sb.boundary[d] && sb.boundary[d] != periodic_bc) {
 	    list = list_append (list, s);
 	    listb = list_append (listb, sb);
 	  }
@@ -711,7 +711,7 @@ static void periodic_boundary_level_x (const Boundary * b, scalar * list, int l)
     if (!is_constant(s) && s.block > 0) {
       if (s.face) {
 	scalar vt = VT;
-	if (vt.boundary[right] == periodic_bc)
+	if (vt.i >= 0 && vt.boundary[right] == periodic_bc)
 	  list1 = list_add (list1, s);
       }
       else if (s.boundary[right] == periodic_bc)
