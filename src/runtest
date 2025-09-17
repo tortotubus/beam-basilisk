@@ -56,7 +56,7 @@ script()
     test -s warn || rm -f warn
 
     pass=true
-    rm -f log-* stencil stencil-* fine fine-* coarse coarse-*
+    rm -f $log log-* stencil stencil-* fine fine-* coarse coarse-*
     tail -f --pid=$$ --retry display.html 2> /dev/null | grep -o 'http://.*:[0-9]*' &
     tail -f --pid=$$ --retry $log 2> /dev/null | grep -E '.*:[0-9]*:.*(warning|error).*:' &
     retail=$!
