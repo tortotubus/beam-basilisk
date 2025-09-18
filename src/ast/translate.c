@@ -3991,7 +3991,7 @@ static Ast * mpi_reductions (const Ast * foreach, Stack * stack)
 	str_append (sreductions, "mpi_all_reduce_array((double *)", t->start, ",MPI_DOUBLE,");
 	sreductions = mpi_operator (sreductions, reduction->child[2]);
 	char s[100];
-	snprintf (s, 99, "sizeof(%s)/sizeof(double)", t->start);
+	snprintf (s, 99, "sizeof(%s)/(sizeof(double))", t->start);
 	str_append (sreductions, s, ");");
       }
     }
@@ -4002,7 +4002,7 @@ static Ast * mpi_reductions (const Ast * foreach, Stack * stack)
       else {
 	// cast the adress of the first member into a double for coord and mat3
 	str_append (sreductions, "mpi_all_reduce_array((double *)&", t->start,",MPI_DOUBLE");
-	snprintf (s, 99, "sizeof(%s)/sizeof(double)", t->start);
+	snprintf (s, 99, "sizeof(%s)/(sizeof(double))", t->start);
       }
       str_append (sreductions, ",");
       sreductions = mpi_operator (sreductions, reduction->child[2]);
