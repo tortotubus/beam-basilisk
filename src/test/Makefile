@@ -22,7 +22,7 @@ boundaries3.tst: boundaries3.ctst
 boundary_face.tst: boundary_face.ctst boundary_face_cartesian.tst
 
 boundary_face_cartesian.c: boundary_face.c boundary_face_cartesian.ref
-	ln -sf boundary_face.c boundary_face_cartesian.c
+	cp boundary_face.c boundary_face_cartesian.c
 boundary_face_cartesian.ref: boundary_face.ref
 	cp boundary_face.ref boundary_face_cartesian.ref
 boundary_face_cartesian.s: CFLAGS += -grid=cartesian
