@@ -11,7 +11,7 @@ export LANG=en_US.UTF-8
 CHECKSUM="md5sum -c --status"
 GENSUM="md5sum"
 
-PANDOC="pandoc -f markdown --smart --katex --preserve-tabs"
+PANDOC="pandoc -f markdown+smart --katex --preserve-tabs"
 
 COOKIE_OPTS="path=/; HttpOnly; SameSite=Lax"
 MAX_LOGIN_AGE=43200
@@ -38,12 +38,12 @@ EOF
 
 encode()
 {
-    openssl enc -aes-256-cbc -a -A -e -in - -out - -kfile $(passfile)
+    openssl enc -aes-256-cbc -pbkdf2 -a -A -e -in - -out - -kfile $(passfile)
 }
 
 decode()
 {
-    openssl enc -aes-256-cbc -a -A -d -in - -out - -kfile $(passfile)
+    openssl enc -aes-256-cbc -pbkdf2 -a -A -d -in - -out - -kfile $(passfile)
 }
 
 sanitize()
@@ -154,6 +154,7 @@ if [[ "$REQUEST_URI" == "/_user" ]]; then
     no_cache
     echo -e "Content-type: text/plain\n"
     echo -n "$username"
+    echo "/_user/$username" >&2
     exit 0
 fi
 
@@ -164,6 +165,7 @@ if [[ "$REQUEST_URI" == "/_logout" ]]; then
     echo "Set-Cookie: darcsit_ssid=bar; max-age=0; $COOKIE_OPTS"
     echo "Status: 302 Found"
     echo -e "Location: $HTTP_REFERER\n"
+    echo "/_logout/$username/$HTTP_REFERER" >&2
     exit 0
 fi
 
@@ -181,7 +183,7 @@ function is_not_bot()
 {
     # echo "checking for bot: $HTTP_USER_AGENT" >&2
     # try to guess whether the client is an indexing robot
-    if [[ "$HTTP_USER_AGENT" =~ [Bb]ot[s]* ]]; then
+    if [[ "$HTTP_USER_AGENT" =~ [Bb]ot[s]* ]] || [[ "$HTTP_USER_AGENT" =~ [Ss]crapy* ]]; then
 	echo "Access denied for bot: $HTTP_USER_AGENT" >&2
 	cat <<EOF
 Content-Type: text/html; charset=utf-8
@@ -1057,7 +1059,7 @@ if [[ "$REQUEST_URI" == /_run/* ]] && runnable "$REQUEST_URI"; then
 		    filename="~$filename"
 		    basename="~$basename"
 		    rm -f "$basename.log"
-		    if ( make -f "$makefile" "$basename.s" ) > "$basename.log" 2>&1; then
+		    if (CFLAGS+=-Wdimensions make -f "$makefile" "$basename.s" ) > "$basename.log" 2>&1; then
 			if rm -f "$basename/fail.tst" && \
 				SANDBOX="$HTTP_SANDBOX" CFLAGS="-O2 -DMTRACE=3" \
 				       make -f "$makefile" "$basename.tst" > "$basename.log" 2> "$basename.make.log"; then
@@ -1330,6 +1332,71 @@ if [[ -d $file ]] && is_not_bot; then
     tabs="$tabs<li><a href=\"${REQUEST_URI}?history\">history</a></li>"
     $PREPROC | $PANDOCT -s -V wikititle="$WIKI_TITLE"		    \
 		       -V pagetitle="$REQUEST_URI"		    \
+		       -V notitle=true                              \
+		       -V sitenav=true				    \
+		       -V tabs="$tabs"                              \
+		       -V users="$USERS"                            \
+	| sed 's/__ESCAPEDDOLLAR__/$/g'
+    exit 0
+fi
+
+################### _failed ################################
+
+difftime()
+{
+    expr $(date -r "$1" "+%s") - $(date -r "$2" "+%s")
+}
+
+failedpreproc()
+{
+    echo "<h2>Recently failed runs in $1 (inverse chronological order)</h2>"
+    cat <<EOF
+<style>
+#failed {
+  th, td {
+    padding-bottom: 0px;
+  }
+}
+</style>
+<div id="failed">
+<table>
+<tr>
+<th>File</th>
+<th>Failed on</th>
+<th>Last passed on</th>
+</tr>
+EOF
+    for dir in $(darcs show files --no-pending --no-directories $1 | grep '.*\.c$' | sed 's/\.c$//g'); do
+	if test -f $dir/fail -a -f $dir-pass/pass; then
+	    echo -e $(difftime $dir/fail $dir-pass/pass)'\t'$dir'\t'$(date -r $dir/fail)'\t'$(date -r $dir-pass/pass)
+	fi
+    done | sort -n -k1,2 | sed "s|$1||g" | awk 'BEGIN{FS="\t"}{
+    	 if (1) {
+    	 print "<tr>"
+    	 print "<td><a href=\"" $2 ".c\">" $2 ".c</a></td>"
+	 print "<td>" $3 "</td>"
+	 print "<td>" $4 "</td>"
+	 print "</tr>"
+         }
+	 #         print $0 "<br>"
+    }'
+    echo "</table></div>"
+}
+
+if [[ "$REQUEST_URI" == *\?failed ]] && is_not_bot; then
+    basename=.${REQUEST_URI%%\?*}
+
+    cd $DOCUMENT_ROOT
+    login_timeout
+    no_cache
+    echo "X-Robots-Tag: noindex"
+    echo -e "Content-type: text/html; charset=utf-8\n"
+    
+    tabs="<li class=selected><a href=\"${REQUEST_URI}\">view</a></li>"
+    tabs="$tabs<li><a href=\"${REQUEST_URI}?history\">history</a></li>"
+    
+    failedpreproc $basename | $PANDOCT -s -V wikititle="$WIKI_TITLE"	    \
+		       -V pagetitle="Recently failed in $basename"  \
 		       -V notitle=true                              \
 		       -V sitenav=true				    \
 		       -V tabs="$tabs"                              \
