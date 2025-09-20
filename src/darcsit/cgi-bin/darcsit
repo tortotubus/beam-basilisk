@@ -64,6 +64,9 @@ echo "${REQUEST_URI}" >&2
 
 ################## End of configuration ##################
 
+# remove trailing ?_=* added to bypass cache
+REQUEST_URI=${REQUEST_URI%%[?&]_=*}
+
 file="$DOCUMENT_ROOT$REQUEST_URI"
 export BASILISK="$HTTP_BASILISK"
 export BASILISK_INCLUDE_PATH="$HTTP_BASILISK_INCLUDE_PATH"
@@ -136,7 +139,19 @@ echo "</pre>"
 
 ################### _user ################################
 
+function no_cache()
+{
+    # from https://www.willmaster.com/library/web-content-prep/preventing-browser-cache.php
+    cat <<EOF
+Cache-Control: no-store, no-cache, max-age=0, must-revalidate, proxy-revalidate, private
+Pragma: no-cache
+Expires: Thu, 01 Jan 1970 00:00:00 GMT
+Expires: 0
+EOF
+}
+
 if [[ "$REQUEST_URI" == "/_user" ]]; then
+    no_cache
     echo -e "Content-type: text/plain\n"
     echo -n "$username"
     exit 0
@@ -145,6 +160,7 @@ fi
 ################### _logout ##############################
 
 if [[ "$REQUEST_URI" == "/_logout" ]]; then
+    no_cache
     echo "Set-Cookie: darcsit_ssid=bar; max-age=0; $COOKIE_OPTS"
     echo "Status: 302 Found"
     echo -e "Location: $HTTP_REFERER\n"
@@ -190,6 +206,7 @@ if [[ "$REQUEST_URI" == *\?changes=* ]] && is_not_bot; then
     shortname=$(echo "$basename" | sed -e 's|^./||' -e 's/%20/ /g')
     hash=${REQUEST_URI##*\?changes=}
     login_timeout
+    no_cache
     echo "X-Robots-Tag: noindex"
     echo -e "Content-type: text/html; charset=utf-8\n"
     # replace --match "date $hash with --hash=$hash for darcs version 2.12
@@ -300,6 +317,7 @@ if [[ "$REQUEST_URI" == *\?history ]] && is_not_bot; then
     basename=.${REQUEST_URI%%\?*}
     shortname=$(echo $basename | sed -e 's|^./||' -e 's/%20/ /g')
     login_timeout
+    no_cache
     echo "X-Robots-Tag: noindex"
     echo -e "Content-type: text/html; charset=utf-8\n"
     tabs="<li><a href=\"${REQUEST_URI%%\?*}\">view</a></li>"
@@ -324,6 +342,7 @@ fi
 
 if [[ "$basename" == _activity* ]] && is_not_bot; then
     login_timeout
+    no_cache
     echo "X-Robots-Tag: noindex"
     echo -e "Content-type: text/html; charset=utf-8\n"
     ( user=${basename##_activity?forUser=}
@@ -416,18 +435,6 @@ EOF
     fi
 }
 
-function no_cache()
-{
-    # from https://www.willmaster.com/library/web-content-prep/preventing-browser-cache.php
-    cat <<EOF
-Cache-Control: max-age=0
-Cache-Control: no-cache
-Expires: -1
-Expires: Thu, 01 Jan 1970 00:00:00 GMT
-Pragma: no-cache
-EOF
-}
-
 function runnable()
 {
     if [[ -r "$USERS" && -r "$HTTP_RUNNERS" && -n "$HTTP_SANDBOX" && "$1" == *.[cm] ]]; then
@@ -473,6 +480,7 @@ searchpreproc()
 
 if [[ "$REQUEST_URI" == "/_search?"* ]] && is_not_bot; then
     patterns=${REQUEST_URI##/_search\?patterns=}
+    no_cache
     echo "X-Robots-Tag: noindex"
     echo -e "Content-type: text/html\n"
     searchpreproc "$patterns" | iconv -f utf-8 -t utf-8 -c |  \
@@ -724,6 +732,7 @@ function status()
 }
 
 if [[ "$REQUEST_URI" == *.[cm]\?status ]]; then
+    no_cache
     echo -e "Content-type: text/plain; charset=utf-8\n"
     status "${REQUEST_URI%%\?status}"
     exit 0
@@ -856,6 +865,7 @@ While retrieving URL $REQUEST_URI on $SERVER_NAME.
 EOF
 		exit 0
     fi
+    no_cache
     if [[ "$username" ]]; then
 	basename=.${REQUEST_URI##/_edit}
 	shortname=$(echo $basename | sed -e 's|^./||' -e 's/%20/ /g')
@@ -905,7 +915,6 @@ EOF
 		checkboxes=$(check_path "$basename")
 	    fi
 	fi
-	no_cache
 	echo "X-Robots-Tag: noindex"
 	echo -e "Content-type: text/html; charset=utf-8\n"
 	tabs="<li><a href=\"${REQUEST_URI##/_edit}\">view</a></li>"
@@ -952,6 +961,7 @@ function get_edited_text()
 }
     
 if [[ -n "$USERS" && "$REQUEST_URI" == /_save/* ]]; then
+    no_cache
     if [[ "$username" ]]; then
 	basename=.${REQUEST_URI##/_save}
 	shortname=$(echo $basename | sed -e 's|^./||' -e 's/%20/ /g')
@@ -1013,6 +1023,7 @@ fi
 ######################## _run ############################
 
 if [[ "$REQUEST_URI" == /_run/* ]] && runnable "$REQUEST_URI"; then
+    no_cache
     if [[ "$username" ]]; then
 	basename=.${REQUEST_URI##/_run}
 	dirname="${basename%/*}"
@@ -1163,6 +1174,7 @@ function setproc()
 }
 
 if [[ -n "$USERS" && "$REQUEST_URI" == /_preview/* ]]; then
+    no_cache
     if [[ "$username" ]]; then
 	if [[ -r $DOCUMENT_ROOT/${REQUEST_URI##/_preview/} ]]; then
 	    basename=${file//$dirname\//}
@@ -1250,6 +1262,7 @@ running_preproc()
 }
 
 if [[ "$REQUEST_URI" == *\?running ]]; then
+    no_cache
     echo -e "Content-type: text/html; charset=utf-8\n"
     running_preproc ${REQUEST_URI%%\?running} | $PANDOCT -s -V wikititle="$WIKI_TITLE"	    \
 		       -V pagetitle="Codes currently running in ${REQUEST_URI%%\?running}"	    \
@@ -1308,6 +1321,7 @@ if [[ -d $file ]] && is_not_bot; then
 
     if test -n "$REQUEST_URI"; then
 	login_timeout
+	no_cache
 	echo "X-Robots-Tag: noindex"
 	echo -e "Content-type: text/html; charset=utf-8\n"
     fi
@@ -1422,11 +1436,9 @@ if [[ "$REQUEST_URI" == "/_register"* && -n "$USERS" ]] && is_not_bot; then
 	    exit 0	    
 	fi
     fi
+    no_cache
     cat <<EOF
 Content-type: text/html; charset=utf-8
-Expires: Thu, 01 Jan 1970 00:00:00 GMT
-Pragma: no-cache
-Cache-Control: no-cache
 
 EOF
     echo |                         \
@@ -1456,6 +1468,7 @@ EOF
 }
 
 if [[ "$REQUEST_URI" == *\?delete ]] && is_not_bot; then
+    no_cache
     if [[ "$username" ]]; then
 	basename=".${REQUEST_URI%%\?*}"
 	shortname=$(echo "$basename" | sed -e 's|^./||' -e 's/%20/ /g')
