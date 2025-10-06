@@ -1037,10 +1037,11 @@ static Ast * is_point_point (const Ast * n)
   if (identifier && identifier->parent->parent->sym == sym_direct_declarator &&
       !strcmp (ast_terminal (identifier)->start, "point")) {    
     const Ast * decl = n;
-    while (decl->sym != sym_declaration &&
+    while (decl &&
+	   decl->sym != sym_declaration &&
 	   decl->sym != sym_parameter_declaration)
       decl = decl->parent;
-    if (decl->sym == sym_declaration)
+    if (!decl || decl->sym == sym_declaration)
       return NULL;
     if (ast_schema (decl, sym_parameter_declaration,
 		    3, sym_initializer)) {
