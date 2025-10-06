@@ -1,13 +1,12 @@
 # column indices in perfs.h
 t = 1
 dt = 2
-mgpi = 3
-nrelax = 4
-tn = 5
-wt = 6
-speed = 7
-npe = 8
-ispeed = 9
+tn = 3
+wt = 4
+speed = 5
+npe = 6
+ispeed = 7
+mem = 8
 
 # "infinite" loop
 do for [i=0:1000000] {
@@ -54,7 +53,7 @@ EVERY = ceil(STATS_records/200.)
 unset key
 set style fill solid
 
-#-----------------------------------------------
+#------------------ dt -----------------------------
 # subplot  1-4
 #  set horizontal margins for first column
 set lmargin at screen left(1)
@@ -68,7 +67,7 @@ set logscale y
 plot 'perfs' u t:dt every EVERY w boxes lc 0
 unset logscale y
 
-#-----------------------------------------------
+#-------------------- #cells ---------------------------
 # subplot  2-4
 #  set horizontal margins for second column
 set lmargin at screen left(2)
@@ -87,7 +86,7 @@ set y2label '# cells'
 plot 'perfs' u t:tn every EVERY w boxes lc 0
 set yrange [*:*]
 
-#-----------------------------------------------
+#------------------- Wall-clock time ----------------------------
 # subplot  1-3
 #  set horizontal margins for first column
 set lmargin at screen left(1)
@@ -100,11 +99,10 @@ unset ylabel
 unset y2label
 set ytics auto
 unset y2tics
-colori(i) = (i < 10 ? 65280 : i > 20 ? 16711680 : 16753920)
-set ylabel 'mgp.i'
-plot [][0:]'perfs' u t:mgpi:(colori(column(mgpi))) every EVERY w boxes lc rgbcolor variable
+set ylabel 'Wall-clock time'
+plot 'perfs' u t:wt every EVERY w boxes lc 0
 
-#-----------------------------------------------
+#---------------------- points.step/sec/core -------------------------
 # subplot  2-3
 #  set horizontal margins for second column
 set lmargin at screen left(2)
@@ -113,14 +111,15 @@ set rmargin at screen right(2)
 set tmargin at screen top(2)
 set bmargin at screen bot(2)
 
-stats "perfs" u t:nrelax nooutput
+stats "perfs" u t:(column(ispeed)/column(npe)) nooutput
 if (STATS_min_y == STATS_max_y) { set y2range [STATS_max_y-1:STATS_max_y+1]; } \
 else { set y2range [STATS_min_y:STATS_max_y]; }
 unset ytics
 set y2tics auto
 unset ylabel
-set y2label 'mgp.nrelax'
-plot [][0:]'perfs' u t:nrelax:(colori(column(nrelax))) every EVERY w boxes lc rgbcolor variable
+set y2label 'points.step/sec/core'
+set format y '%e'
+plot 'perfs' u t:(column(ispeed)/column(npe)) every EVERY w boxes lc 0
 
 #-----------------------------------------------
 # subplot  1-2
@@ -133,31 +132,13 @@ set bmargin at screen bot(1)
 
 set xlabel "time"
 unset y2label
-set ylabel "Wall-clock time"
+set ylabel "Resident memory (kB)"
 set xtics auto
 set format x '% g'
+set format y '% g'
 unset y2tics
 set ytics auto
-plot 'perfs' u t:wt every EVERY w boxes lc 0
-
-#-----------------------------------------------
-# subplot  2-2
-#  set horizontal margins for second column
-set lmargin at screen left(2)
-set rmargin at screen right(2)
-#  set horizontal margins for second row (middle)
-set tmargin at screen top(1)
-set bmargin at screen bot(1)
-
-stats "perfs" u t:(column(ispeed)/column(npe)) nooutput
-if (STATS_min_y == STATS_max_y) { set y2range [STATS_max_y-1:STATS_max_y+1]; } \
-else { set y2range [STATS_min_y:STATS_max_y]; }
-unset ytics
-set y2tics auto
-unset ylabel
-set y2label 'points.step/sec/core'
-set format y '%e'
-plot 'perfs' u t:(column(ispeed)/column(npe)) every EVERY w boxes lc 0
+plot 'perfs' u t:mem every EVERY w boxes lc 0
 
 unset multiplot
 
