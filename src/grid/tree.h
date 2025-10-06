@@ -23,7 +23,8 @@ struct _Point {
 #endif
 };
 
-#include "memindex/range.h"
+//#include "memindex/range.h"
+#include "memindex/virtual.h"
 
 #if LAYERS
 # include "grid/layers.h"
