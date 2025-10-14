@@ -951,47 +951,6 @@ ivec dimensions (int nx = 0, int ny = 0, int nz = 0)
 # include "multigrid-mpi.h"
 #else // !_MPI
 
-#if dimension == 1
-macro2 foreach_cell_multigrid()
-{
-  for (int ox = 0; ox < Dimensions.x; ox++)
-    foreach_cell() {
-      point.i += ox*(1 << point.level);
-      {...}
-      point.i -= ox*(1 << point.level);
-    }
-}
-#elif dimension == 2
-macro2 foreach_cell_multigrid()
-{
-  for (int ox = 0; ox < Dimensions.x; ox++)
-    for (int oy = 0; oy < Dimensions.y; oy++)
-      foreach_cell() {
-	point.i += ox*(1 << point.level);
-	point.j += oy*(1 << point.level);
-	{...}
-  	point.i -= ox*(1 << point.level);
-	point.j -= oy*(1 << point.level);
-      }
-}
-#elif dimension == 3
-macro2 foreach_cell_multigrid()
-{
-  for (int ox = 0; ox < Dimensions.x; ox++)
-    for (int oy = 0; oy < Dimensions.y; oy++)
-      for (int oz = 0; oz < Dimensions.z; oz++)
-	foreach_cell() {
-	  point.i += ox*(1 << point.level);
-	  point.j += oy*(1 << point.level);
-	  point.k += oz*(1 << point.level);
-	  {...}
-	  point.i -= ox*(1 << point.level);
-	  point.j -= oy*(1 << point.level);
-	  point.k -= oz*(1 << point.level);
-	}
-}
-#endif // dimension == 3
-
-#define foreach_cell() foreach_cell_multigrid()
+#define foreach_cell() foreach_cell_restore()
 
 #endif // !_MPI
