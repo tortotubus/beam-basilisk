@@ -377,6 +377,8 @@ nonlinear-ml.c: nonlinear.c
 nonlinear-ml.s: CFLAGS += -DML=1
 nonlinear-ml.tst: CFLAGS += -DML=1
 
+reductions.tst: CC=mpicc -D_MPI=4
+
 shockwave.tst: CFLAGS += -grid=bitree
 shockwave.ctst: CFLAGS += -grid=multigrid1D
 shockwave.tst: shockwave.ctst
