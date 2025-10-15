@@ -123,10 +123,10 @@ static void optional_arguments (Ast * call, Stack * stack)
   AstTerminal * t = ast_terminal (call->sym == sym_function_call ? ast_function_call_identifier (call) :
 				  ast_schema (call, sym_macro_statement, 0, sym_MACRO));
   Ast * type = ast_identifier_declaration (stack, t->start);
-  if (type) {
+  if (type && !ast_schema (ast_ancestor (type, 3), sym_declarator,
+			   0, sym_pointer)) {
     AstTerminal * tname = t;
-    while (type->sym != sym_declarator)
-      type = type->parent;
+    type = ast_parent (type, sym_declarator);
     while (type->sym != sym_declaration &&
 	   type->sym != sym_function_definition)
       type = type->parent;
