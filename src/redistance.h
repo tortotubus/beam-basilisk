@@ -142,21 +142,21 @@ void dphidt (scalar phi, scalar dphi, scalar phi0, double cfl)
 	  if (phi0[]*phi0[j] < 0.) {
 
 	    /**
-	    We compute the subcell fix near the interface.
+	    We compute the subcell fix near the interface (see section 2.2 in [Min, 2010](#min2010)).
 
 	    $$
 	    \Delta x^+ = \left\{ \begin{array}{ll}
-	    \Delta x \cdot \left( \dfrac{\phi^0_{i,j}-\phi^0_{i+1,j} -
+	    \Delta x \cdot \left( \frac{1}{2} + \dfrac{\phi^0_{i,j}-\phi^0_{i+1,j} -
 	    \text{sgn}(\phi^0_{i,j}-\phi^0_{i+1,j})\sqrt{D}}{}\right) 
-	    \text{ if } \left| \phi^0_{xx}\right| >\epsilon \		\
-	    \Delta x \cdot \dfrac{\phi^0_{ij}}{\phi^0_{i,j}-\phi^0_{i+1,j}} \text{ else.}\ \
+	    \text{ if } \left| \phi^0_{xx}\right| >\epsilon \\
+	    \Delta x \cdot \dfrac{\phi^0_{ij}}{\phi^0_{i,j}-\phi^0_{i+1,j}} \text{ else.} \\
 	    \end{array}
 	    \right.
 	    $$
 	    with
 	    $$
 	    \phi_{xx}^0 = \text{minmod}(\phi^0_{i-1,j}-2\phi^0_{ij}+\phi^0_{i+1,j}, 
-	    \phi^0_{i,j}-2\phi^0_{i+1j}+\phi^0_{i+2,j}) \		\
+	    \phi^0_{i,j}-2\phi^0_{i+1j}+\phi^0_{i+2,j}) \\
 	    D = \left( \phi^0_{xx}/2  - \phi_{ij}^0 - \phi_{i+1,j} \right)^2 
                 - 4\phi_{ij}^0\phi_{i+1,j}^0
 	    $$
@@ -166,7 +166,7 @@ void dphidt (scalar phi, scalar dphi, scalar phi0, double cfl)
 	    double dx = Delta;
 	    double phixx = minmod3 (phi0[2*j] + phi0[] - 2.*phi0[j],
 				    phi0[1] + phi0[-1] - 2.*phi0[]);
-	    if (fabs(phixx) > 1e-6*dx) {
+	    if (fabs(phixx) > 1e-7) {
 	      double D = sq(phixx/2. - phi0[] - phi0[j]) - 4.*phi0[]*phi0[j];
 	      dx *= 1/2. + (phi0[] - phi0[j] - sign2(phi0[] - phi0[j])*sqrt(D))/phixx;
 	    }
