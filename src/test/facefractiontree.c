@@ -5,7 +5,6 @@ This test verifies that the face fraction calculation works well also on tree
 grids. */
 
 #include "fractions.h"
-#include "fracface.h"
 
 int main (void) {
   origin (-0.5, -0.5);

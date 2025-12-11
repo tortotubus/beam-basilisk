@@ -5,7 +5,6 @@ We wish to assess the convergence of the face fraction calculation by comparing 
 */
 
 #include "fractions.h"
-#include "fracface.h"
 #include "utils.h"
 
 scalar c[], f[];
