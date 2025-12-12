@@ -1,16 +1,21 @@
-enable_language(CXX)
+cmake_minimum_required (VERSION 3.12...3.26)
+project(tinyrenderer)
 
-#set(CMAKE_C_FLAGS   "${CMAKE_C_FLAGS}   -std=c11 -Wall")
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++17 -Wall")
+set(CMAKE_CXX_STANDARD 20)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-add_library(tinyrenderer OBJECT
-  tiny.c
-  model.cpp
-  tgaimage.cpp
-  #main.cpp
-)
+find_package(OpenMP)
+if(OPENMP_FOUND)
+  set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} ${OpenMP_C_FLAGS}")
+  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${OpenMP_CXX_FLAGS}")
+  set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} ${OpenMP_EXE_LINKER_FLAGS}")
+endif()
 
-target_include_directories(tinyrenderer PRIVATE
-  ${CMAKE_CURRENT_SOURCE_DIR}     
-  ${CMAKE_CURRENT_SOURCE_DIR}/.. 
-)
+if(NOT CMAKE_BUILD_TYPE)
+  set(CMAKE_BUILD_TYPE Release)
+endif()
+
+set(SOURCES main.cpp model.cpp tgaimage.cpp tiny.c)
+
+add_executable(${PROJECT_NAME} ${SOURCES}) 
+

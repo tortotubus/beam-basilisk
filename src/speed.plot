@@ -18,6 +18,13 @@ set clip one
 unset clip two
 set bar 1.000000 front
 set border 31 front linetype -1 linewidth 1.000
+<<<<<<<< HEAD:src/test/bump1.plot
+set xdata
+set ydata
+set zdata
+set x2data
+set y2data
+========
 set timefmt z "%d/%m/%Y-%H:%M:%S"
 set zdata 
 set timefmt y "%d/%m/%Y-%H:%M:%S"
@@ -29,6 +36,7 @@ set timefmt y2 "%d/%m/%Y-%H:%M:%S"
 set y2data 
 set timefmt x2 "%d/%m/%Y-%H:%M:%S"
 set x2data 
+>>>>>>>> 83ae166056f3c3c2be5d1307ac5dc52d85feaafd:src/speed.plot
 set boxwidth
 set style fill  empty border
 set style rectangle back fc lt -3 fillstyle   solid 1.00 border lt -1
@@ -140,7 +148,6 @@ set lmargin  -1
 set bmargin  -1
 set rmargin  -1
 set tmargin  -1
-set locale "en_NZ.utf8"
 set pm3d explicit at s
 set pm3d scansautomatic
 set pm3d interpolate 1,1 flush begin noftriangles nohidden3d corners2color mean
