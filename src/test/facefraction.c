@@ -1,8 +1,9 @@
 /**
-# Convergence of the face fraction
+# Convergence of the face fraction field
 
-We wish to assess the convergence of the face fraction calculation by comparing the face fraction field, reconstructed from the volume fraction, with the benchmark value obtained from the intialization.
-*/
+We wish to assess the convergence of the face fraction calculation by
+comparing the face fraction field, reconstructed from the volume
+fraction, with the benchmark value obtained from the intialization. */
 
 #include "fractions.h"
 #include "utils.h"

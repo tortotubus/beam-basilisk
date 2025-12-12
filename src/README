@@ -309,7 +309,6 @@ Several metric spaces/coordinate systems are predefined:
 * [Tagging connected neighborhoods](tag.h)
 * [Counting droplets](examples/atomisation.c#counting-droplets)
 * [Harmonic decomposition](harmonic.h)
-* [Calculation of the face fraction from a PLIC interface](fractions.h#face-fraction)
 
 # Output functions
 
