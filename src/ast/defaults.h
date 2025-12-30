@@ -56,27 +56,27 @@ typedef double time_t;
  * From <signal.h>
  */
 
-// Signal and pthread stubs (used in <signal.h>, <pthread.h>)
-typedef int                 sig_atomic_t;
-typedef int                 pid_t;
-typedef unsigned long       sigset_t;
-typedef void (*__sighandler_t)(int);
+// // Signal and pthread stubs (used in <signal.h>, <pthread.h>)
+// typedef int                 sig_atomic_t;
+// typedef int                 pid_t;
+// typedef unsigned long       sigset_t;
+// typedef void (*__sighandler_t)(int);
 
-// Structures referenced in <signal.h>/<ucontext.h>
-typedef struct sigaction      { int _dummy; } sigaction;
-typedef struct siginfo        { int _dummy; } siginfo_t;
-typedef struct timespec       { long tv_sec; long tv_nsec; } timespec;
-typedef struct stack_t        { void *ss_sp; int ss_flags; size_t ss_size; } stack_t;
-typedef struct mcontext_t     { long gregs[23]; } mcontext_t;
-typedef struct ucontext_t     { int _dummy; } ucontext_t;
-typedef struct _libc_fpstate  { double _dummy; } _libc_fpstate;
+// // Structures referenced in <signal.h>/<ucontext.h>
+// typedef struct sigaction      { int _dummy; } sigaction;
+// typedef struct siginfo        { int _dummy; } siginfo_t;
+// typedef struct timespec       { long tv_sec; long tv_nsec; } timespec;
+// typedef struct stack_t        { void *ss_sp; int ss_flags; size_t ss_size; } stack_t;
+// typedef struct mcontext_t     { long gregs[23]; } mcontext_t;
+// typedef struct ucontext_t     { int _dummy; } ucontext_t;
+// typedef struct _libc_fpstate  { double _dummy; } _libc_fpstate;
 
-// Pthread stubs (avoids __atomic_wide_counter, etc.)
-typedef struct __pthread_cond_s { int _dummy; } __pthread_cond_s;
-typedef struct __pthread_mutex_s { int _dummy; } __pthread_mutex_s;
-typedef struct pthread_mutex_t { int _dummy; } pthread_mutex_t;
-typedef struct pthread_cond_t  { int _dummy; } pthread_cond_t;
-typedef struct pthread_t       { int _dummy; } pthread_t;
+// // Pthread stubs (avoids __atomic_wide_counter, etc.)
+// typedef struct __pthread_cond_s { int _dummy; } __pthread_cond_s;
+// typedef struct __pthread_mutex_s { int _dummy; } __pthread_mutex_s;
+// typedef struct pthread_mutex_t { int _dummy; } pthread_mutex_t;
+// typedef struct pthread_cond_t  { int _dummy; } pthread_cond_t;
+// typedef struct pthread_t       { int _dummy; } pthread_t;
 
 /**
 ## Tricks for AST
