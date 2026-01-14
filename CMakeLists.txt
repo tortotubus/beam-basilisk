@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.10)
+cmake_minimum_required(VERSION 3.5...4.1)
 project(basilisk 
   VERSION 1.0.0
   LANGUAGES C CXX
@@ -87,15 +87,15 @@ elseif(COMP_ID STREQUAL "Intel")
 endif()
 
 # --- hardlinks for qcc
+set(BASILISK "${CMAKE_INSTALL_FULL_INCLUDEDIR}/basilisk/"
+    CACHE PATH "Root for Basilisk includes used by qcc")
+set(LIBDIR "${CMAKE_INSTALL_FULL_INCLUDEDIR}/basilisk/"
+    CACHE PATH "Root for Basilisk libraries used by qcc")
 
-
-set(BASILISK "${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_INCLUDEDIR}/basilisk/")
-set(LIBDIR "${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_INCLUDEDIR}/basilisk/")
-message("Target qcc using ${BASILISK}")
-
-set(BASILISK_SOURCE "${CMAKE_CURRENT_SOURCE_DIR}/src/")
-set(LIBDIR_SOURCE "${CMAKE_CURRENT_SOURCE_DIR}/src/")
-message("Target qcc-source using ${BASILISK_SOURCE}")
+set(BASILISK_SOURCE "${CMAKE_INSTALL_FULL_INCLUDEDIR}/basilisk/"
+    CACHE PATH "Root for Basilisk includes used by qcc-source")
+set(LIBDIR_SOURCE "${CMAKE_INSTALL_FULL_INCLUDEDIR}/basilisk/"
+    CACHE PATH "Root for Basilisk libraries used by qcc-source")
 
 # --- subdir
 
@@ -128,11 +128,11 @@ install(TARGETS qcc
 )
 
 # 5b) viewer executables in Tools
-install(TARGETS bview2D bview3D bview2Dm
-  EXPORT      BasiliskTargets
-  RUNTIME     DESTINATION ${CMAKE_INSTALL_BINDIR}
-  COMPONENT   Tools
-)
+# install(TARGETS bview2D bview3D bview2Dm
+#   EXPORT      BasiliskTargets
+#   RUNTIME     DESTINATION ${CMAKE_INSTALL_BINDIR}
+#   COMPONENT   Tools
+# )
 
 # 6) export file only in QCC (so `find_package(basilisk)` works when you ask for QCC)
 install(EXPORT BasiliskTargets
