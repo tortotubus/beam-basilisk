@@ -98,9 +98,9 @@ set(BASILISK "${CMAKE_INSTALL_FULL_INCLUDEDIR}/basilisk/"
 set(LIBDIR "${CMAKE_INSTALL_FULL_INCLUDEDIR}/basilisk/"
     CACHE PATH "Root for Basilisk libraries used by qcc-install")
 
-set(BASILISK_SOURCE "${CMAKE_SOURCE_DIR}/src/"
+set(BASILISK_SOURCE "${PROJECT_SOURCE_DIR}/src/"
     CACHE PATH "Root for Basilisk includes used by qcc-toolchain")
-set(LIBDIR_SOURCE "${CMAKE_SOURCE_DIR}/src/"
+set(LIBDIR_SOURCE "${PROJECT_SOURCE_DIR}/src/"
     CACHE PATH "Root for Basilisk libraries used by qcc-toolchain")
 
 #
