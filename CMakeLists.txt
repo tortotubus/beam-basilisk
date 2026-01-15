@@ -126,7 +126,7 @@ install(
 
 # Copy the entire src/ directory into include/basilisk
 install(
-  DIRECTORY "${CMAKE_SOURCE_DIR}/src/"
+  DIRECTORY "${PROJECT_SOURCE_DIR}/src/"
   DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}/basilisk"
   FILES_MATCHING
   PATTERN "*"
