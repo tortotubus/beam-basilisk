@@ -9,15 +9,6 @@ set(CMAKE_C_STANDARD 99)
 set(CMAKE_C_STANDARD_REQUIRED ON)
 
 set(BASILISK_ROOT ${CMAKE_CURRENT_SOURCE_DIR})
-
-# --- basilisk c target helper  -----
-
-include(${BASILISK_ROOT}/cmake/BasiliskCTargets.cmake)
-
-
-# --- 
-
-# Install settings
 include(GNUInstallDirs)
 
 # --- config ---------------------------------------------------------
@@ -30,6 +21,13 @@ message(STATUS " → C compiler version: ${COMP_VERSION}")
 message(STATUS " → C compiler path:    ${COMP_PATH}")
 
 # ——— C99 flags ———
+
+#
+# These are used when qcc is not given the -source flag and pipes the 
+# transpiled code to another compiler. These definitions are taken 
+# directly from src/config.* where * denotes various compilers. Most
+# users will use GCC.
+#
 
 if(COMP_ID STREQUAL GNU)
 
@@ -86,104 +84,50 @@ elseif(COMP_ID STREQUAL "Intel")
 
 endif()
 
-# --- hardlinks for qcc
+# When qcc is built, it needs a compile-time macro definiing the home
+# of the basilisk source code: The consequence is that we cannot relocate
+# our library without also recompiling qcc to point to this new location.
+#
+# Therefore, we create two qcc binaries: One points to the source tree, which 
+# should be used for "internal" toolchain build steps when included in other 
+# projects. The other is an "install" executable which will expect the source 
+# to live at the desired include path
+
 set(BASILISK "${CMAKE_INSTALL_FULL_INCLUDEDIR}/basilisk/"
-    CACHE PATH "Root for Basilisk includes used by qcc")
+    CACHE PATH "Root for Basilisk includes used by qcc-install")
 set(LIBDIR "${CMAKE_INSTALL_FULL_INCLUDEDIR}/basilisk/"
-    CACHE PATH "Root for Basilisk libraries used by qcc")
+    CACHE PATH "Root for Basilisk libraries used by qcc-install")
 
-set(BASILISK_SOURCE "${CMAKE_INSTALL_FULL_INCLUDEDIR}/basilisk/"
-    CACHE PATH "Root for Basilisk includes used by qcc-source")
-set(LIBDIR_SOURCE "${CMAKE_INSTALL_FULL_INCLUDEDIR}/basilisk/"
-    CACHE PATH "Root for Basilisk libraries used by qcc-source")
+set(BASILISK_SOURCE "${CMAKE_SOURCE_DIR}/src/"
+    CACHE PATH "Root for Basilisk includes used by qcc-toolchain")
+set(LIBDIR_SOURCE "${CMAKE_SOURCE_DIR}/src/"
+    CACHE PATH "Root for Basilisk libraries used by qcc-toolchain")
 
-# --- subdir
+#
+# Now, we recurse into the source directory
+#
 
-# Recurse targets
 add_subdirectory(src)
 
-# --- export
 
-include(CMakePackageConfigHelpers)
+#
+# 
+#  Installation
+#
+#
+ 
 
-# 2) configure the <build>/BasiliskConfig.cmake that find_package() will use
-configure_package_config_file(
-  "${CMAKE_CURRENT_SOURCE_DIR}/cmake/BasiliskConfig.cmake.in"
-  "${CMAKE_CURRENT_BINARY_DIR}/BasiliskConfig.cmake"
-  INSTALL_DESTINATION "lib/cmake/basilisk"
+# Create an alias so qcc-install is installed under the name "qcc"
+install(
+  PROGRAMS $<TARGET_FILE:qcc-install>
+  DESTINATION "${CMAKE_INSTALL_BINDIR}"
+  RENAME qcc
 )
 
-# 3) write the version file
-write_basic_package_version_file(
-  "${CMAKE_CURRENT_BINARY_DIR}/BasiliskConfigVersion.cmake"
-  VERSION        ${PROJECT_VERSION}
-  COMPATIBILITY  AnyNewerVersion
-)
-
-# 5a) qcc executable in QCC
-install(TARGETS qcc
-  EXPORT      BasiliskTargets
-  RUNTIME     DESTINATION ${CMAKE_INSTALL_BINDIR}
-  COMPONENT   QCC
-)
-
-# 5b) viewer executables in Tools
-# install(TARGETS bview2D bview3D bview2Dm
-#   EXPORT      BasiliskTargets
-#   RUNTIME     DESTINATION ${CMAKE_INSTALL_BINDIR}
-#   COMPONENT   Tools
-# )
-
-# 6) export file only in QCC (so `find_package(basilisk)` works when you ask for QCC)
-install(EXPORT BasiliskTargets
-  FILE        BasiliskTargets.cmake
-  NAMESPACE   Basilisk::
-  DESTINATION lib/cmake/basilisk
-  COMPONENT   QCC
-)
-
-# 7) install all headers under include/basilisk
-install(DIRECTORY "${CMAKE_SOURCE_DIR}/src/"
+# Copy the entire src/ directory into include/basilisk
+install(
+  DIRECTORY "${CMAKE_SOURCE_DIR}/src/"
   DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}/basilisk"
-  COMPONENT QCC
-)
-
-# 8) CMake config + version only in QCC
-install(FILES
-  "${CMAKE_CURRENT_BINARY_DIR}/BasiliskConfig.cmake"
-  "${CMAKE_CURRENT_BINARY_DIR}/BasiliskConfigVersion.cmake"
-  DESTINATION lib/cmake/basilisk
-  COMPONENT   QCC
-)
-
-# # 5) install & export those targets
-# install(TARGETS qcc
-#   EXPORT BasiliskTargets
-#   RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
-#   COMPONENT QCC
-# )
-# install(TARGETS bview2D bview3D bview2Dm
-#   EXPORT BasiliskTargets
-#   RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
-#   COMPONENT Tools
-# )
-
-# # 6) install the export file itself
-# install(EXPORT BasiliskTargets
-#   FILE        BasiliskTargets.cmake
-#   NAMESPACE   Basilisk::
-#   DESTINATION "lib/cmake/basilisk"
-# )
-
-# # 7) install all headers under include/basilisk
-# install(DIRECTORY "${CMAKE_SOURCE_DIR}/src/"
-#   DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/basilisk
-#   FILES_MATCHING PATTERN "*.h"
-# )
-
-# # 8) install the generated Config files
-# install(FILES
-#   "${CMAKE_CURRENT_BINARY_DIR}/BasiliskConfig.cmake"
-#   "${CMAKE_CURRENT_BINARY_DIR}/BasiliskConfigVersion.cmake"
-#   DESTINATION "lib/cmake/basilisk"
-# )
+  FILES_MATCHING
+  PATTERN "*"
+) 

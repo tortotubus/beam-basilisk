@@ -1,24 +1,3 @@
-#
-# symbols.h
-#
-
-set(SYMBOLS_H "${CMAKE_CURRENT_BINARY_DIR}/symbols.h")
-
-add_custom_command(
-  OUTPUT ${SYMBOLS_H}
-  COMMAND ${CMAKE_COMMAND}
-    -DBASILISK_C=${CMAKE_CURRENT_SOURCE_DIR}/basilisk.c
-    -DOUT=${SYMBOLS_H}
-    -P ${CMAKE_SOURCE_DIR}/cmake/generate_symbols_h.cmake
-  DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/basilisk.c
-  WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
-  COMMENT "Generating symbols.h from basilisk.c"
-)
-
-#
-# interpreter_obj
-#
-
 add_subdirectory(interpreter)
 
 #
@@ -54,41 +33,40 @@ set(AST_OBJ_SOURCES
   kernels.c
   check.c
   ${YACC_OUT}
-  # ${SYMBOLS_H}
 )
 
 #
+# ast-obj-install
 #
-#
 
-add_library(ast_obj OBJECT ${AST_OBJ_SOURCES})
+add_library(ast-obj-install OBJECT ${AST_OBJ_SOURCES})
 
-target_compile_definitions(ast_obj PRIVATE BASILISK=\"${BASILISK}\" )
-target_include_directories(ast_obj PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/..")
-target_include_directories(ast_obj PRIVATE "${CMAKE_CURRENT_BINARY_DIR}")
+target_compile_definitions(ast-obj-install PRIVATE BASILISK=\"${BASILISK}\" )
+target_include_directories(ast-obj-install PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/..")
+target_include_directories(ast-obj-install PRIVATE "${CMAKE_CURRENT_BINARY_DIR}")
 
 
-add_library(ast STATIC 
-  $<TARGET_OBJECTS:ast_obj> 
-  $<TARGET_OBJECTS:interpreter_obj>
+add_library(ast-install STATIC 
+  $<TARGET_OBJECTS:ast-obj-install> 
+  $<TARGET_OBJECTS:interpreter-obj-install>
 )
 
-set_target_properties(ast PROPERTIES OUTPUT_NAME "ast")
+set_target_properties(ast-install PROPERTIES OUTPUT_NAME "ast-install")
 
 #
+# ast-obj-toolchain
 #
-#
 
-add_library(ast_obj-source OBJECT ${AST_OBJ_SOURCES})
+add_library(ast-obj-toolchain OBJECT ${AST_OBJ_SOURCES})
 
-target_compile_definitions(ast_obj-source PRIVATE BASILISK=\"${BASILISK_SOURCE}\" )
-target_include_directories(ast_obj-source PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/..")
-target_include_directories(ast_obj-source PRIVATE "${CMAKE_CURRENT_BINARY_DIR}")
+target_compile_definitions(ast-obj-toolchain PRIVATE BASILISK=\"${BASILISK_SOURCE}\" )
+target_include_directories(ast-obj-toolchain PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/..")
+target_include_directories(ast-obj-toolchain PRIVATE "${CMAKE_CURRENT_BINARY_DIR}")
 
 
-add_library(ast-source STATIC 
-  $<TARGET_OBJECTS:ast_obj-source> 
-  $<TARGET_OBJECTS:interpreter_obj-source>
+add_library(ast-toolchain STATIC 
+  $<TARGET_OBJECTS:ast-obj-toolchain> 
+  $<TARGET_OBJECTS:interpreter-obj-toolchain>
 )
 
-set_target_properties(ast-source PROPERTIES OUTPUT_NAME "ast-source")
+set_target_properties(ast-toolchain PROPERTIES OUTPUT_NAME "ast-toolchain")
