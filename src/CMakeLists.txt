@@ -26,7 +26,7 @@ add_custom_command(
   # Run the *built* grammar tool (not whatever is on PATH)
   COMMAND $<TARGET_FILE:qcc-grammar> < "${YACC_IN}" > "${YACC_OUT}"
   DEPENDS qcc-grammar "${YACC_IN}"
-  BYPRODUCTS "${YACC_OUT}"
+  # BYPRODUCTS "${YACC_OUT}"
   COMMENT "Generating grammar.h from basilisk.yacc"
   VERBATIM
 )
